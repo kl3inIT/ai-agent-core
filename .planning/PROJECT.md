@@ -21,7 +21,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 <!-- All Active requirements are hypotheses until shipped and validated. -->
 
 **Add-on packaging & integration**
-- [ ] Ship as standard Jmix add-on with three modules: `ai-agent` (functional), `ai-agent-starter`, `ai-agent-flowui` + `ai-agent-flowui-starter`
+- [ ] Ship as standard Jmix add-on with modules: `ai-agent` (functional) + `ai-agent-starter` today; `ai-agent-flowui` + `ai-agent-flowui-starter` split **deferred** per [D-01](phases/01-walking-skeleton/01-CONTEXT.md) until a named REST-only consumer use case surfaces
 - [ ] Works plug-and-play: host adds starter dep → chat view, KB admin, audit log appear in menu with sensible defaults
 - [ ] Spring Boot auto-configuration wires Spring AI 1.0.2 primitives (ChatClient, advisors, VectorStore, ChatMemory)
 - [ ] Demo host app (`jmix-app/` with Customer/Order) doubles as integration-test harness
@@ -120,7 +120,6 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Keep existing two-sided repo: `ai-agent/` add-on + `jmix-app/` host | Repo already formalizes the add-on / consumer split; demo host doubles as integration-test harness | — Pending |
-| Add `ai-agent-flowui` + `ai-agent-flowui-starter` modules | Plug-and-play UI requirement; separates Flow UI from headless functional core so non-UI hosts (pure REST) can consume the agent | — Pending |
 | Spring AI 1.0.2 with official primitives only | Product spec mandate; avoid custom abstractions so Spring AI upgrades stay cheap | — Pending |
 | OpenAI-compatible provider (via OpenRouter) as MVP default | Matches reference projects; one starter covers many models; per-request model switching via `ChatOptions` | — Pending |
 | pgvector as default vector store | Reuses Postgres familiar to Jmix enterprise; Spring AI first-class support; matches reference | — Pending |
@@ -129,6 +128,10 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 | MVP UI: Chat + Conversations + Parameters + KB + Audit | Full admin suite modeled on `jmix-ai-backend` reference; "plug and play" requires no external tools | — Pending |
 | Any authenticated user gets Chat; admin role gates settings | Low friction for end-users; safe defaults for governance | — Pending |
 | File upload only for KB ingestion in v1 | Covers enterprise doc flows; URL crawling/entity auto-ingest deferred | — Pending |
+
+### Deferred Decisions
+
+- **Split add-on into 4 modules** (`ai-agent-flowui` + `ai-agent-flowui-starter` alongside existing `ai-agent` + `ai-agent-starter`) — was Key Decision #2. **Deferred** per [D-01 in Phase 1 CONTEXT](phases/01-walking-skeleton/01-CONTEXT.md). Trigger: a named REST-only consumer use case that cannot accept Vaadin deps. Until then, `ai-agent-starter` ships with UI and PKG-04 (zero-Vaadin functional module posture) remains open.
 
 ## Evolution
 

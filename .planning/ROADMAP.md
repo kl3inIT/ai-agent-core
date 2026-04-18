@@ -31,18 +31,18 @@
 **Requirements:** PKG-01, PKG-02, PKG-03, PKG-04, PKG-05, TEST-01 (scaffold only)
 
 **Deliverables:**
-- `ai-agent-flowui` + `ai-agent-flowui-starter` modules added alongside existing `ai-agent` + `ai-agent-starter`
+- Keep existing 2-module shape (`ai-agent` + `ai-agent-starter`) per [D-01 in 01-CONTEXT.md](phases/01-walking-skeleton/01-CONTEXT.md). The `ai-agent-flowui` / `ai-agent-flowui-starter` split is **deferred** until a named REST-only consumer use case justifies it; `ai-agent-starter` continues to ship UI deps (PKG-04 deferred accordingly).
 - `spring-ai-bom:1.0.2` imported; `https://repo.spring.io/milestone` added to repositories
-- Both starters register via `AutoConfiguration.imports`
+- The `ai-agent-starter` registers via `AutoConfiguration.imports`
 - `@JmixModule(dependsOn = …)` on each configuration class
 - Smoke test: `ChatClient.prompt().call().content()` end-to-end through OpenRouter (as a `@Tag("live")` test) + mock `ChatModel` variant for CI
 - Three-tier JUnit layout scaffolded (`src/test`, `src/integrationTest`, `@Tag("live")` excluded by default)
 - Verify Jmix 2.8 → Spring Boot baseline ≥ 3.4; document version matrix
 
 **Success criteria:**
-1. `./gradlew :ai-agent-flowui-starter:bootRun` (via `jmix-app`) boots with all four add-on modules loaded and no bean-wiring errors
+1. `./gradlew :jmix-app:bootRun` boots the host app with the 2-module add-on (`ai-agent` + `ai-agent-starter`) loaded and no bean-wiring errors
 2. `ChatService` bean (stub impl) is injectable in `jmix-app` with default config
-3. `publishToMavenLocal` + a fresh minimal Jmix consumer project boots with `ai-agent-flowui-starter` on the classpath
+3. `publishToMavenLocal` + `jmix-app` in Maven-coord mode (composite `includeBuild 'ai-agent'` toggled off) boots with `ai-agent-starter` resolved from `~/.m2/repository`, per [docs/consumer-smoke.md](../docs/consumer-smoke.md) (D-02)
 4. `@Tag("live")` smoke test calls OpenRouter successfully with `spring-ai-starter-model-openai` and pinned `base-url`
 
 **Needs research phase:** YES — verify M4 starter IDs + BOM availability + Boot baseline via Context7.
@@ -50,9 +50,9 @@
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Gradle/BOM wiring + excludeTags + jmix-app application.yaml
-- [ ] 01-02-PLAN.md — ChatService API + DefaultChatServiceImpl + AIAutoConfiguration ChatClient bean
-- [ ] 01-03-PLAN.md — ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"))
+- [x] 01-01-PLAN.md — Gradle/BOM wiring + excludeTags + jmix-app application.yaml
+- [x] 01-02-PLAN.md — ChatService API + DefaultChatServiceImpl + AIAutoConfiguration ChatClient bean
+- [x] 01-03-PLAN.md — ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"))
 - [ ] 01-04-PLAN.md — Version matrix + consumer-smoke doc + jmix-app CommandLineRunner injection proof + ROADMAP/PROJECT updates
 
 ---
