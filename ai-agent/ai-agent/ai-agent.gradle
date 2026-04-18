@@ -6,6 +6,8 @@ dependencies {
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
+    implementation 'org.springframework.ai:spring-ai-client-chat'
+
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
@@ -21,6 +23,19 @@ configurations.implementation {
     exclude group: 'com.vaadin', module: 'copilot'
 }
 
-test {
-    useJUnitPlatform()
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'live'
+    }
+}
+
+tasks.register('liveTest', Test) {
+    description = 'Run @Tag("live") integration tests (require OPENROUTER_API_KEY).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'live'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
 }
