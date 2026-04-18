@@ -13,4 +13,10 @@ dependencies {
     implementation 'io.jmix.data:jmix-data'
 
     implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+
+    testImplementation 'org.springframework.ai:spring-ai-test'
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
 }

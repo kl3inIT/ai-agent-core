@@ -59,7 +59,7 @@ subprojects {
     }
 
     ext {
-        set('springAiVersion', "2.0.0-M4")
+        set('springAiVersion', "1.0.2")
     }
 
     dependencyManagement {
@@ -353,7 +353,7 @@ spring:
           model: ${OPENROUTER_MODEL:openai/gpt-4o-mini}
 ```
 
-**Note on `base-url` path (RESEARCH Assumption A2):** `traffic-law-chatbot` uses `https://openrouter.ai/api` (no `/v1`); OpenRouter docs show `/api/v1`. Planner MUST verify via live smoke which combo works with Spring AI 2.0.0-M4 `completions-path` default, then pin the correct one in the version matrix doc.
+**Note on `base-url` path (RESEARCH Assumption A2):** `traffic-law-chatbot` uses `https://openrouter.ai/api` (no `/v1`); OpenRouter docs show `/api/v1`. Planner MUST verify via live smoke which combo works with Spring AI 1.0.2 `completions-path` default, then pin the correct one in the version matrix doc.
 
 **Do NOT lift** the full `app.ai.models[]` catalog, vector-store config, chat-memory config, embedding config — those are Phases 4/5/6.
 
@@ -370,8 +370,8 @@ spring:
 | Java toolchain | 17 | repo root `build.gradle` |
 | Jmix | 2.8.0 | `ai-agent/build.gradle` `bomVersion` |
 | Spring Boot | 3.5.11 | transitive via `jmix-bom:2.8.0` |
-| Spring AI BOM | 2.0.0-M4 | `ai-agent/build.gradle` `springAiVersion` |
-| `spring-ai-starter-model-openai` | via BOM (2.0.0-M4) | Maven Central |
+| Spring AI BOM | 1.0.2 | `ai-agent/build.gradle` `springAiVersion` |
+| `spring-ai-starter-model-openai` | via BOM (1.0.2) | Maven Central |
 | OpenRouter base-url | `https://openrouter.ai/api/v1` (TBD after smoke) | verified at smoke time |
 | Gradle wrapper | 8.14.4 | `gradle-wrapper.properties` |
 
@@ -447,7 +447,7 @@ public class AITestConfiguration {
 
 ### Pattern S5: BOM Repositories Ordering
 **Source:** `ai-agent/build.gradle` lines 18-23 (existing subprojects repos).
-**Rule (RESEARCH Pitfall 1):** `mavenCentral()` MUST precede `maven { url = '…repo.spring.io/milestone' }`. Gradle resolves first-hit; `spring-ai-bom:2.0.0-M4` lives on Central, not on the milestone repo.
+**Rule (RESEARCH Pitfall 1):** `mavenCentral()` MUST precede `maven { url = '…repo.spring.io/milestone' }`. Gradle resolves first-hit; `spring-ai-bom:1.0.2` lives on Central, not on the milestone repo.
 
 ### Pattern S6: Env-var Skip for Live Tests (RESEARCH Pitfall 3)
 **Belt + suspenders:**

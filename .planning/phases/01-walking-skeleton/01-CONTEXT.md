@@ -6,10 +6,10 @@
 <domain>
 ## Phase Boundary
 
-Prove the Jmix add-on skeleton works end-to-end with Spring AI 2.0.0-M4 pinned via BOM before any feature code lands. Specifically:
+Prove the Jmix add-on skeleton works end-to-end with Spring AI 1.0.2 pinned via BOM before any feature code lands. Specifically:
 
 - Keep the existing 2-module shape (`ai-agent` functional + `ai-agent-starter`) — no new modules in Phase 1.
-- Pin `spring-ai-bom:2.0.0-M4`, add `https://repo.spring.io/milestone` repo, surface OpenAI-compatible starter.
+- Pin `spring-ai-bom:1.0.2`, add `https://repo.spring.io/milestone` repo, surface OpenAI-compatible starter.
 - A stub `ChatService` bean is injectable in `jmix-app` and reaches `ChatClient.prompt().call().content()` end-to-end through OpenRouter (under `@Tag("live")`) and through a mocked `ChatModel` in CI.
 - `publishToMavenLocal` produces artifacts `jmix-app` can consume (verified by toggling `jmix-app` from `includeBuild` to a Maven-Local dependency).
 - Three-tier JUnit layout scaffolded (`src/test` default + `@Tag("live")` excluded from CI). `integrationTest` source set is Claude's Discretion — only add it if research shows a concrete need beyond plain `src/test`.
@@ -87,7 +87,7 @@ Prove the Jmix add-on skeleton works end-to-end with Spring AI 2.0.0-M4 pinned v
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java` — existing `@Configuration` to receive `@JmixModule(dependsOn = …)`.
 
 ### External reference implementations (pattern source, NOT a dependency)
-- `D:/ai/traffic-law-chatbot/build.gradle` — **authoritative pattern for Spring AI 2.0.0-M4 wiring**: `ext { set('springAiVersion', "2.0.0-M4") }`, `dependencyManagement.imports.mavenBom("org.springframework.ai:spring-ai-bom:${springAiVersion}")`, `maven { url = 'https://repo.spring.io/milestone' }`, `maven { url = 'https://repo.spring.io/snapshot' }`, `testImplementation 'org.springframework.ai:spring-ai-test'` (version via BOM), `test { useJUnitPlatform { excludeTags 'live' } }`. Follow this layout where it makes sense in `ai-agent/build.gradle`.
+- `D:/ai/traffic-law-chatbot/build.gradle` — **authoritative pattern for Spring AI 1.0.2 wiring**: `ext { set('springAiVersion', "1.0.2") }`, `dependencyManagement.imports.mavenBom("org.springframework.ai:spring-ai-bom:${springAiVersion}")`, `maven { url = 'https://repo.spring.io/milestone' }`, `maven { url = 'https://repo.spring.io/snapshot' }`, `testImplementation 'org.springframework.ai:spring-ai-test'` (version via BOM), `test { useJUnitPlatform { excludeTags 'live' } }`. Follow this layout where it makes sense in `ai-agent/build.gradle`.
 - `D:/ai/traffic-law-chatbot/src/main/resources/application.yaml` — OpenRouter wiring template: `spring.ai.openai.api-key: ${OPENROUTER_API_KEY:none}` + `base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}` + `options.model` override. Phase 1 lifts only enough for the live smoke test; full profile wiring is Phase 3.
 - `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/src/test/java/io/jmix/ai/backend/retrieval/RerankerTest.java` — canonical `Mockito.mock(ChatModel.class)` pattern for unit tests.
 - `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/build.gradle` — uses `jmix-flowui-test-assist` as the Jmix-side test harness; adopt if view-level tests land (not required in Phase 1).
