@@ -26,13 +26,13 @@
 
 ### Phase 1 — Walking Skeleton & Packaging De-risk
 
-**Goal:** Prove the add-on skeleton (4 modules, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 2.0.0-M4 pinned via BOM, and de-risk milestone-release API drift before committing to architecture.
+**Goal:** Prove the add-on skeleton (4 modules, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 1.0.2 pinned via BOM, and de-risk milestone-release API drift before committing to architecture.
 
 **Requirements:** PKG-01, PKG-02, PKG-03, PKG-04, PKG-05, TEST-01 (scaffold only)
 
 **Deliverables:**
 - `ai-agent-flowui` + `ai-agent-flowui-starter` modules added alongside existing `ai-agent` + `ai-agent-starter`
-- `spring-ai-bom:2.0.0-M4` imported; `https://repo.spring.io/milestone` added to repositories
+- `spring-ai-bom:1.0.2` imported; `https://repo.spring.io/milestone` added to repositories
 - Both starters register via `AutoConfiguration.imports`
 - `@JmixModule(dependsOn = …)` on each configuration class
 - Smoke test: `ChatClient.prompt().call().content()` end-to-end through OpenRouter (as a `@Tag("live")` test) + mock `ChatModel` variant for CI

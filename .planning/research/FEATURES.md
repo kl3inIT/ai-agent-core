@@ -112,7 +112,7 @@ The reference project `jmix-ai-backend` already ships a credible admin UI shape 
 | YAML-based Parameters configuration (like reference project) | Version-controllable; copy-paste between envs; admins can import/export | M | Reference has this exact pattern; adopt it wholesale |
 | Prompt/instruction contributors SPI (host augments system prompt with tenant/user context) | Per-PROJECT.md SPI list; lets host inject "current user is a sales manager at Tenant X" | M | Called during ChatClient build; composes additively |
 | Context-contributor SPI (inject current user, locale, timezone) | Removes a whole class of "the AI doesn't know who I am" complaints | S | PROJECT.md SPI; low-cost high-value |
-| Guardrails / forbidden-topic config | "Never answer questions about employee salaries" | M | Input advisor that short-circuits on keyword/classifier hit; avoid rolling our own — use Spring AI `SafeGuardAdvisor` if present in 2.0.0-M4 |
+| Guardrails / forbidden-topic config | "Never answer questions about employee salaries" | M | Input advisor that short-circuits on keyword/classifier hit; avoid rolling our own — use Spring AI `SafeGuardAdvisor` if present in 1.0.2 |
 
 #### Anti-Features
 
@@ -342,7 +342,7 @@ Mutation-tool scaffolding (disabled)
 
 - **Schema generation is the critical path.** Tools, exposure policy, and audit entity fields all depend on a stable internal schema representation. Land this in the first phase or everything downstream rebases.
 - **Audit must be wired at the advisor layer, not per tool.** If each tool calls `auditService.log(...)` itself, custom host tools can forget to — violates the "cannot be silently disabled" MVP requirement.
-- **Citations depend on metadata propagation through the full RAG advisor chain.** Spring AI 2.0.0-M4 advisor ordering must be verified via Context7 before locking in the design — retrieval-metadata survival through subsequent advisors has bitten teams on earlier Spring AI versions.
+- **Citations depend on metadata propagation through the full RAG advisor chain.** Spring AI 1.0.2 advisor ordering must be verified via Context7 before locking in the design — retrieval-metadata survival through subsequent advisors has bitten teams on earlier Spring AI versions.
 - **"Test prompt" differentiator requires the full advisor chain in place**, so it's naturally a later-phase feature after Chat + Parameters + KB exist.
 - **Exposure admin view (differentiator) requires the exposure policy SPI to be introspectable** — design the SPI with "list current effective allow/deny set" in mind from day one.
 
@@ -474,13 +474,13 @@ Key takeaway: our **unique positioning** is the intersection of *metadata-first 
 - `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/README.md` — reference feature surface (Chat, Parameters, VectorStore, Answer checks, Ingesters, Reranker, Post-retrieval filtering)
 - `D:/DTH/ai-agent-core/CLAUDE.md` — Jmix conventions, forbidden patterns (EntityManager, Lombok on entities, hardcoded UI text)
 - Cross-product pattern synthesis: Glean, ChatGPT Enterprise, Microsoft 365 Copilot, Perplexity Enterprise, Danswer/Onyx, OpenWebUI, LibreChat, Dify (training-data + ecosystem-level confidence; no version-specific API claims made from these)
-- Spring AI 2.0.0-M4 primitives referenced by name (`ChatClient`, `MessageChatMemoryAdvisor`, `ToolCallAdvisor`, `VectorStore`, `@Tool`); **actual API shapes for roadmap must be verified via Context7** (`jmix-framework/jmix-context7` and `spring-projects/spring-ai`) before implementation — milestone release, known API drift
+- Spring AI 1.0.2 primitives referenced by name (`ChatClient`, `MessageChatMemoryAdvisor`, `ToolCallAdvisor`, `VectorStore`, `@Tool`); **actual API shapes for roadmap must be verified via Context7** (`jmix-framework/jmix-context7` and `spring-projects/spring-ai`) before implementation — milestone release, known API drift
 
 ### Confidence Notes
 
 - **HIGH confidence** on table-stakes vs differentiator vs anti-feature classification — these patterns are stable across the enterprise AI copilot category and directly reinforced by PROJECT.md's explicit scope decisions.
 - **HIGH confidence** on Jmix-specific table stakes (DataManager security, `messages*.properties`, menu.xml, role gating) — backed by CLAUDE.md and Jmix convention.
-- **MEDIUM confidence** on Spring AI 2.0.0-M4 specific wiring details (advisor ordering, streaming tool-call transparency) — Context7 verification required at implementation time per PROJECT.md's own "milestone release" warning.
+- **MEDIUM confidence** on Spring AI 1.0.2 specific wiring details (advisor ordering, streaming tool-call transparency) — Context7 verification required at implementation time per PROJECT.md's own "milestone release" warning.
 - **MEDIUM confidence** on complexity estimates — based on reference project's scope and general Jmix/Spring AI effort patterns; should be re-estimated during phase planning.
 
 ---

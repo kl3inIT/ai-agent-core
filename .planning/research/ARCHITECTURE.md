@@ -2,7 +2,7 @@
 
 **Domain:** Metadata-first enterprise AI copilot add-on for Jmix 2.8 (Spring Boot 3 + Vaadin Flow)
 **Researched:** 2026-04-18
-**Confidence:** HIGH for Spring AI primitives (verified via Context7 against `/spring-projects/spring-ai`) and Jmix module patterns (verified against codebase + CLAUDE.md). MEDIUM on exact observability surface of Spring AI 2.0.0-M4 (milestone-moving target; final APIs may rename).
+**Confidence:** HIGH for Spring AI primitives (verified via Context7 against `/spring-projects/spring-ai`) and Jmix module patterns (verified against codebase + CLAUDE.md). MEDIUM on exact observability surface of Spring AI 1.0.2 (milestone-moving target; final APIs may rename).
 
 ---
 
@@ -518,11 +518,11 @@ LLM provider rate limits, not Jmix/DataManager. A metadata-first read tool is ch
 
 ### Gaps / Open Questions (flag for later phases)
 
-- **Streaming responses in Vaadin Flow + advisor chain with tools:** `ChatClient.stream()` behavior during tool calls needs verification against 2.0.0-M4 release notes; may force non-streaming for turns containing tool calls in v1.
+- **Streaming responses in Vaadin Flow + advisor chain with tools:** `ChatClient.stream()` behavior during tool calls needs verification against 1.0.2 release notes; may force non-streaming for turns containing tool calls in v1.
 - **`ToolCallingManager` observability hook:** Spring AI 2.x has a listener/metrics surface; exact interface name is still moving between M-releases. AuditAdvisor as an around-advisor is the safe default; refine once the observability contract stabilizes.
 - **pgvector index strategy at 10M+ chunks:** HNSW vs IVFFlat choice — out of scope for v1 but worth revisiting before multi-tenant rollout.
 - **Per-tenant `VectorStore` isolation:** Metadata filter `tenant == 'X'` via `SearchRequest.filterExpression` is the lean path; dedicated stores-per-tenant is a v2 discussion.
 
 ---
-*Architecture research for: Jmix AI Copilot (metadata-first, Spring AI 2.0.0-M4)*
+*Architecture research for: Jmix AI Copilot (metadata-first, Spring AI 1.0.2)*
 *Researched: 2026-04-18*

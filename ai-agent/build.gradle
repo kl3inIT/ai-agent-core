@@ -32,7 +32,7 @@ subprojects {
     }
 
     ext {
-        set('springAiVersion', "2.0.0-M4")
+        set('springAiVersion', "1.0.2")
     }
 
     dependencyManagement {

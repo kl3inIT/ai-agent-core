@@ -23,7 +23,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 **Add-on packaging & integration**
 - [ ] Ship as standard Jmix add-on with three modules: `ai-agent` (functional), `ai-agent-starter`, `ai-agent-flowui` + `ai-agent-flowui-starter`
 - [ ] Works plug-and-play: host adds starter dep → chat view, KB admin, audit log appear in menu with sensible defaults
-- [ ] Spring Boot auto-configuration wires Spring AI 2.0.0-M4 primitives (ChatClient, advisors, VectorStore, ChatMemory)
+- [ ] Spring Boot auto-configuration wires Spring AI 1.0.2 primitives (ChatClient, advisors, VectorStore, ChatMemory)
 - [ ] Demo host app (`jmix-app/` with Customer/Order) doubles as integration-test harness
 
 **Metadata-first runtime**
@@ -32,7 +32,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 - [ ] All structured-data access flows through `DataManager` (inherits Jmix entity, attribute, row-level security)
 - [ ] Additional AI exposure layer (allowlist/denylist) on top of Jmix security controls what the model can see in planning
 
-**Spring AI 2.0.0-M4 integration**
+**Spring AI 1.0.2 integration**
 - [ ] Use official primitives only: `ChatClient.builder(...).defaultAdvisors(...)`, `MessageChatMemoryAdvisor`, RAG advisors, `ToolCallAdvisor`, `.entity(...)` structured output, `StructuredOutputValidationAdvisor` where applicable
 - [ ] Default provider: OpenAI-compatible via OpenRouter (reuse pattern from `D:/ai/traffic-law-chatbot`); provider layer extensible for other vendors
 - [ ] Do not assume every model supports native structured output — degrade gracefully
@@ -96,7 +96,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 - `D:/ai/traffic-law-chatbot` — Spring AI + OpenRouter wiring pattern (OpenAI starter with custom `base-url`, per-request model selection via `ChatOptions`).
 
 **Ecosystem realities:**
-- Spring AI 2.0.0-M4 is a milestone release — APIs and starter coordinates are still shifting; research must verify current syntax via Context7/official docs, not training data.
+- Spring AI 1.0.2 is a milestone release — APIs and starter coordinates are still shifting; research must verify current syntax via Context7/official docs, not training data.
 - Jmix 2.8 uses Spring Boot 3, Java 17, Vaadin Flow — matches Spring AI's Boot 3 requirement.
 - `DataManager` fluent API is the only supported entry point for secured data access; `EntityManager` bypasses Jmix security and is explicitly forbidden in this codebase (see `CLAUDE.md`).
 
@@ -105,7 +105,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 ## Constraints
 
 - **Tech stack**: Jmix 2.8 + Spring Boot 3 + Vaadin Flow + Java 17 — fixed by host ecosystem
-- **Spring AI version**: 2.0.0-M4 — required per product spec; milestone release means extra docs verification
+- **Spring AI version**: 1.0.2 — required per product spec; milestone release means extra docs verification
 - **Vector store default**: pgvector — reuses Postgres infra familiar to Jmix enterprise deployments
 - **Data access**: `DataManager` only — `EntityManager` forbidden by project conventions and breaks Jmix security model
 - **Entities**: No Lombok on entities; UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`; instantiate via `Metadata.create()` / `DataManager.create()`
@@ -121,7 +121,7 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 |----------|-----------|---------|
 | Keep existing two-sided repo: `ai-agent/` add-on + `jmix-app/` host | Repo already formalizes the add-on / consumer split; demo host doubles as integration-test harness | — Pending |
 | Add `ai-agent-flowui` + `ai-agent-flowui-starter` modules | Plug-and-play UI requirement; separates Flow UI from headless functional core so non-UI hosts (pure REST) can consume the agent | — Pending |
-| Spring AI 2.0.0-M4 with official primitives only | Product spec mandate; avoid custom abstractions so Spring AI upgrades stay cheap | — Pending |
+| Spring AI 1.0.2 with official primitives only | Product spec mandate; avoid custom abstractions so Spring AI upgrades stay cheap | — Pending |
 | OpenAI-compatible provider (via OpenRouter) as MVP default | Matches reference projects; one starter covers many models; per-request model switching via `ChatOptions` | — Pending |
 | pgvector as default vector store | Reuses Postgres familiar to Jmix enterprise; Spring AI first-class support; matches reference | — Pending |
 | Audit records as Jmix JPA entity in host DB | Queryable via DataManager, visible in Jmix admin UI, inherits Jmix security; exposable via SPI listener for side-channels | — Pending |

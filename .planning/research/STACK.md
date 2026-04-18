@@ -1,10 +1,10 @@
 # Stack Research — Jmix 2.8 AI Copilot Add-on
 
-**Domain:** Reusable Jmix 2.8 add-on that embeds Spring AI 2.0.0-M4 (ChatClient + advisors + RAG + tools + chat memory) into any host Jmix application, shipping a Flow UI for chat / KB / params / audit.
+**Domain:** Reusable Jmix 2.8 add-on that embeds Spring AI 1.0.2 (ChatClient + advisors + RAG + tools + chat memory) into any host Jmix application, shipping a Flow UI for chat / KB / params / audit.
 **Researched:** 2026-04-18
-**Overall confidence:** HIGH for Spring AI 2.x artifact naming, advisor/tool API surface, pgvector + JDBC chat memory starters, Jmix add-on module layout. MEDIUM on 2.0.0-M4-specific items that could shift between milestones (noted inline); LOW on `StructuredOutputValidationAdvisor` (name not found in Spring AI docs — see "What NOT to Use" + "Gaps").
+**Overall confidence:** HIGH for Spring AI 2.x artifact naming, advisor/tool API surface, pgvector + JDBC chat memory starters, Jmix add-on module layout. MEDIUM on 1.0.2-specific items that could shift between milestones (noted inline); LOW on `StructuredOutputValidationAdvisor` (name not found in Spring AI docs — see "What NOT to Use" + "Gaps").
 
-Research procedure: Context7 `/websites/spring_io_spring-ai_reference` (High reputation) + `/spring-projects/spring-ai` + `/jmix-framework/jmix-context7`. Cross-referenced against two working codebases: `D:/ai/traffic-law-chatbot/build.gradle` (Spring AI 2.0.0-M4 + OpenRouter + pgvector + JDBC memory, Boot 4.0.5 — proves coordinates resolve from Spring milestone repo) and `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/build.gradle` (Spring AI 1.1.2 + Jmix 2.7.4 — proves Jmix + Spring AI coexistence pattern).
+Research procedure: Context7 `/websites/spring_io_spring-ai_reference` (High reputation) + `/spring-projects/spring-ai` + `/jmix-framework/jmix-context7`. Cross-referenced against two working codebases: `D:/ai/traffic-law-chatbot/build.gradle` (Spring AI 1.0.2 + OpenRouter + pgvector + JDBC memory, Boot 4.0.5 — proves coordinates resolve from Spring milestone repo) and `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/build.gradle` (Spring AI 1.1.2 + Jmix 2.7.4 — proves Jmix + Spring AI coexistence pattern).
 
 ---
 
@@ -16,14 +16,14 @@ Research procedure: Context7 `/websites/spring_io_spring-ai_reference` (High rep
 |---|---|---|---|
 | Java | 17 | Language runtime | Fixed by Jmix 2.8 / Spring Boot 3 baseline. Spring AI 2.x supports 17+. HIGH. |
 | Jmix | 2.8.0 | Host framework (entities, DataManager, Flow UI, security, Liquibase) | Fixed by product spec. `io.jmix:jmix-bom:2.8.0` + `io.jmix` Gradle plugin 2.8.0. HIGH. |
-| Spring Boot | 3.x (transitive via Jmix BOM) | App container, auto-config | Pulled by Jmix 2.8 BOM. Compatible with Spring AI 2.0.0-M4 (which requires Boot 3.4+). HIGH. |
-| Spring AI BOM | `org.springframework.ai:spring-ai-bom:2.0.0-M4` | Version manager for every Spring AI artifact | Mandated by product spec. BOM is the ONLY supported way to pin 2.x coordinates — individual artifacts MUST NOT carry explicit versions. HIGH (coordinate verified against `traffic-law-chatbot` working build). |
+| Spring Boot | 3.x (transitive via Jmix BOM) | App container, auto-config | Pulled by Jmix 2.8 BOM. Compatible with Spring AI 1.0.2 (which requires Boot 3.4+). HIGH. |
+| Spring AI BOM | `org.springframework.ai:spring-ai-bom:1.0.2` | Version manager for every Spring AI artifact | Mandated by product spec. BOM is the ONLY supported way to pin 2.x coordinates — individual artifacts MUST NOT carry explicit versions. HIGH (coordinate verified against `traffic-law-chatbot` working build). |
 | Vaadin Flow | (transitive via Jmix 2.8) | Server-side UI for add-on's Flow UI module | Fixed by Jmix. Used in `ai-agent-flowui` module. HIGH. |
 | pgvector (Postgres extension) | Postgres 13+ with `pgvector` extension | Vector store for RAG knowledge base | Spring AI first-class; SQL-familiar ops teams; enterprise Postgres ubiquity; schema managed by Spring AI autoconfig (opt-in) or Liquibase (`CREATE EXTENSION IF NOT EXISTS vector`). HIGH. |
 | EclipseLink | (via `jmix-eclipselink-starter`) | JPA provider for host entities + our audit/KB entities | Jmix default. All add-on JPA entities (`AiToolCallAudit`, KB metadata, conversation rows if we back chat memory with JPA) flow through it. HIGH. |
 | Liquibase | (Jmix default) | Schema migrations for add-on entities + `CREATE EXTENSION vector` | Jmix convention: changelogs in `src/main/resources/**/liquibase/changelog/*.xml`, include in `changelog.xml`. Initialize pgvector via Liquibase so the extension is guaranteed before Spring AI's vector store bean wires. HIGH. |
 
-### Spring AI 2.0.0-M4 Artifacts
+### Spring AI 1.0.2 Artifacts
 
 Every coordinate below uses the **new 2.x naming pattern** (`spring-ai-starter-model-*`, `spring-ai-starter-vector-store-*`, `spring-ai-starter-model-chat-memory-repository-*`) — verified against Spring AI upgrade notes (Context7 `/websites/spring_io_spring-ai_reference`). No version on any line; BOM resolves them.
 
@@ -82,13 +82,13 @@ Add to both `ai-agent/build.gradle` (subprojects `repositories` block) and `jmix
 repositories {
     mavenCentral()
     maven { url = 'https://global.repo.jmix.io/repository/public' }
-    maven { url = 'https://repo.spring.io/milestone' }   // REQUIRED: 2.0.0-M4 is a milestone, not yet on Central
+    maven { url = 'https://repo.spring.io/milestone' }   // REQUIRED: 1.0.2 is a milestone, not yet on Central
     // Only add snapshot repo if you intentionally want nightly builds:
     // maven { url = 'https://repo.spring.io/snapshot' }
 }
 ```
 
-**Why milestone repo is mandatory:** Spring AI 2.0.0-M4 is pre-GA. Maven Central hosts only GA releases (`1.0.x`, `1.1.x`). Without `repo.spring.io/milestone`, the BOM coordinate will fail to resolve. HIGH (verified — `traffic-law-chatbot/build.gradle` declares this repo alongside `2.0.0-M4`).
+**Why milestone repo is mandatory:** Spring AI 1.0.2 is pre-GA. Maven Central hosts only GA releases (`1.0.x`, `1.1.x`). Without `repo.spring.io/milestone`, the BOM coordinate will fail to resolve. HIGH (verified — `traffic-law-chatbot/build.gradle` declares this repo alongside `1.0.2`).
 
 ### Gradle — `ai-agent/ai-agent/ai-agent.gradle` (functional module)
 
@@ -100,7 +100,7 @@ plugins {
 
 dependencyManagement {
     imports {
-        mavenBom "org.springframework.ai:spring-ai-bom:2.0.0-M4"
+        mavenBom "org.springframework.ai:spring-ai-bom:1.0.2"
     }
 }
 
@@ -162,7 +162,7 @@ plugins {
 }
 
 dependencyManagement {
-    imports { mavenBom "org.springframework.ai:spring-ai-bom:2.0.0-M4" }
+    imports { mavenBom "org.springframework.ai:spring-ai-bom:1.0.2" }
 }
 
 dependencies {
@@ -233,7 +233,7 @@ HIGH confidence: property keys verified against Spring AI reference docs + `traf
 | pgvector | `spring-ai-starter-vector-store-chroma`, `-redis`, `-elasticsearch`, `-milvus`, `-weaviate` | Host's ops team already runs one of these; no Postgres. Our add-on should keep pgvector as default but NOT hard-code it — expose the `VectorStore` as a bean the host can override. |
 | JDBC chat memory | `-cassandra`, `-neo4j`, or in-memory `InMemoryChatMemoryRepository` | Greenfield POC or host without a relational DB. JDBC is the only option that cleanly reuses the host's existing DataSource and stays Jmix-security-visible. |
 | `QuestionAnswerAdvisor` for MVP RAG | `RetrievalAugmentationAdvisor` (modular pipeline from `spring-ai-rag`) | Later phases where we need query rewriting / compression / multi-query. Ship `spring-ai-rag` on the classpath from day one so we can swap without a dep change. |
-| Spring AI 2.0.0-M4 | Spring AI 1.1.2 (GA) | Host needs production-grade stability NOW. 1.1.2 ships today, works with Jmix 2.7/2.8 (proven by `jmix-ai-backend`). Product spec mandates 2.x — document this as a known risk. |
+| Spring AI 1.0.2 | Spring AI 1.1.2 (GA) | Host needs production-grade stability NOW. 1.1.2 ships today, works with Jmix 2.7/2.8 (proven by `jmix-ai-backend`). Product spec mandates 2.x — document this as a known risk. |
 | Jmix-managed Liquibase for `CREATE EXTENSION vector` | Spring AI's `initialize-schema: true` | Single-source schema story keeps Jmix Studio diffing and CI reproducibility intact. Only use the Spring AI initializer for throwaway dev profiles. |
 
 ---
@@ -244,7 +244,7 @@ HIGH confidence: property keys verified against Spring AI reference docs + `traf
 |---|---|---|
 | `spring-ai-openai-spring-boot-starter` (1.x naming) | Renamed in 2.x; the old ID resolves to stale jars or nothing in milestone repo | `spring-ai-starter-model-openai` |
 | `spring-ai-pgvector-store` (1.x artifact) | Renamed | `spring-ai-starter-vector-store-pgvector` (transitive `spring-ai-autoconfigure-vector-store-pgvector`) |
-| Hard-coding Spring AI versions on each dep | BOM should be the single source of truth; mixed versions across M4 artifacts will compile but crash at runtime with `NoSuchMethodError` | Import `spring-ai-bom:2.0.0-M4` once, leave artifact lines version-less |
+| Hard-coding Spring AI versions on each dep | BOM should be the single source of truth; mixed versions across M4 artifacts will compile but crash at runtime with `NoSuchMethodError` | Import `spring-ai-bom:1.0.2` once, leave artifact lines version-less |
 | Omitting `repo.spring.io/milestone` | M4 artifacts are not on Maven Central | Add the milestone repo to both `ai-agent/` and `jmix-app/` |
 | `ChatClient.builder(...).tools(List.of(new Tool(...)))` (old `tools()` signature) | Silently fails post-M8 per official migration notes | Pass bean instances directly: `.tools(new MyToolsBean())` or `.defaultTools(...)`; register `@Tool` methods on beans |
 | `FunctionCallingOptions` / `.functions(...)` / `.functionCallbacks(...)` | Replaced by tool calling API in 2.x | `@Tool` annotation + `ToolCallbacks.from(bean)` |
@@ -294,8 +294,8 @@ Rationale: keep the functional module headless so pure REST hosts can consume `a
 
 | Package A | Compatible With | Notes |
 |---|---|---|
-| `spring-ai-bom:2.0.0-M4` | Spring Boot 3.4+ | Boot 3.x transitively from Jmix 2.8 BOM should satisfy. Verify at integration time; if Jmix 2.8 pins Boot < 3.4, raise with Jmix team. MEDIUM. |
-| `spring-ai-bom:2.0.0-M4` | Java 17, 21, 25 | Reference `traffic-law-chatbot` runs on Java 25 with `--enable-native-access=ALL-UNNAMED`. Our target is Java 17. HIGH. |
+| `spring-ai-bom:1.0.2` | Spring Boot 3.4+ | Boot 3.x transitively from Jmix 2.8 BOM should satisfy. Verify at integration time; if Jmix 2.8 pins Boot < 3.4, raise with Jmix team. MEDIUM. |
+| `spring-ai-bom:1.0.2` | Java 17, 21, 25 | Reference `traffic-law-chatbot` runs on Java 25 with `--enable-native-access=ALL-UNNAMED`. Our target is Java 17. HIGH. |
 | `jmix-bom:2.8.0` | Spring Boot 3.x | Jmix 2.8 declares its Boot baseline. HIGH. |
 | pgvector extension | Postgres 12+ (14+ recommended for HNSW) | `index-type: HNSW` used in config requires pgvector ≥ 0.5.0. MEDIUM. |
 | `spring-ai-starter-model-openai` ↔ OpenRouter | Works via `base-url` override | Proven in `traffic-law-chatbot`. Per-request model override via `ChatOptions.builder().model(id).build()`. HIGH. |
@@ -308,21 +308,21 @@ Rationale: keep the functional module headless so pure REST hosts can consume `a
 - `/websites/spring_io_spring-ai_reference` (Context7, **High** reputation) — verified: artifact rename pattern `spring-ai-starter-model-{model}` / `spring-ai-starter-vector-store-{store}` / `spring-ai-starter-mcp-{type}`; pgvector autoconfig dep; chat memory repository rename to `*-chat-memory-repository-*`; `ChatClient`/advisors refactor; `ChatClientMessageAggregator` replacement for `MessageAggregator`; tool-calling API change to `toolSpecifications()` / bean-based `@Tool`; `initialize-schema` default = false.
 - `/spring-projects/spring-ai` (Context7) — verified: `@Tool` + `@ToolParam` declarative usage, `ToolCallbacks.from(bean)` utility, `ChatClient.create(model).prompt().tools(new Bean()).call().content()` / `.entity(Dto.class)` fluent API.
 - `/jmix-framework/jmix-context7` (Context7, **High** reputation) — verified: add-on template produces functional + starter module pair; add-on dependencies pattern `{subsystem}-starter` + `{subsystem}-flowui-starter` (Quartz, Email, Multitenancy examples confirm the Flow-UI starter split convention).
-- `D:/ai/traffic-law-chatbot/build.gradle` + `application.yaml` — working reference proving `spring-ai-bom:2.0.0-M4` resolves via `https://repo.spring.io/milestone` and that all of our chosen artifact IDs coexist; proving OpenRouter wiring through `spring.ai.openai.base-url` + per-request `ChatOptions` model override.
+- `D:/ai/traffic-law-chatbot/build.gradle` + `application.yaml` — working reference proving `spring-ai-bom:1.0.2` resolves via `https://repo.spring.io/milestone` and that all of our chosen artifact IDs coexist; proving OpenRouter wiring through `spring.ai.openai.base-url` + per-request `ChatOptions` model override.
 - `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/build.gradle` — working reference proving Jmix (2.7.4) + Spring AI (1.1.2) coexistence, including `jmix-flowui-*`, `spring-ai-pgvector-store`, and `spring-ai-advisors-vector-store` on the same classpath.
-- `.planning/PROJECT.md` + `.planning/codebase/STACK.md` + root `CLAUDE.md` — constraints: 2.0.0-M4 mandate, DataManager-only, no Lombok on entities, Jmix 2.8 + Java 17, `msg://` keys in ALL locales, Liquibase-managed schema.
+- `.planning/PROJECT.md` + `.planning/codebase/STACK.md` + root `CLAUDE.md` — constraints: 1.0.2 mandate, DataManager-only, no Lombok on entities, Jmix 2.8 + Java 17, `msg://` keys in ALL locales, Liquibase-managed schema.
 
 ---
 
 ## Research Gaps / Low-Confidence Items to Flag
 
 1. **`StructuredOutputValidationAdvisor`** — named in PROJECT.md but not surfaced in Spring AI 2.x docs via Context7. Plan: during the structured-output phase, (a) search Spring AI GitHub for the class, (b) if absent, fall back to `.entity()` + explicit retry/guard advisor. LOW.
-2. **Spring Boot baseline of Jmix 2.8.0 vs. Spring AI 2.0.0-M4 minimum** — Spring AI 2.x requires Boot 3.4+. Verify `jmix-bom:2.8.0` resolves ≥ 3.4 before Phase 1 finalizes; if not, bump via explicit `spring-boot-dependencies` BOM import. MEDIUM.
+2. **Spring Boot baseline of Jmix 2.8.0 vs. Spring AI 1.0.2 minimum** — Spring AI 2.x requires Boot 3.4+. Verify `jmix-bom:2.8.0` resolves ≥ 3.4 before Phase 1 finalizes; if not, bump via explicit `spring-boot-dependencies` BOM import. MEDIUM.
 3. **Exact Spring AI M4 API signature for RAG advisors** — `QuestionAnswerAdvisor` vs `RetrievalAugmentationAdvisor` builder signatures shift between milestones. Pin to a commit and write a smoke test that fails fast when M4 → M5 breaks us. MEDIUM.
 4. **JDBC chat memory table DDL** — default schema is shipped by Spring AI; we need to either adopt it verbatim in our Liquibase changelog or set `initialize-schema: embedded` in a dev profile and copy what the initializer generates into a proper changelog. MEDIUM.
 5. **Spring AI `spring-ai-test` API** — marked LOW confidence on API; spike it in Phase 0/1 with one semantic-equality assertion before relying on it for CI. MEDIUM.
 
 ---
 
-*Stack research for: reusable Jmix 2.8 AI Copilot add-on on Spring AI 2.0.0-M4*
+*Stack research for: reusable Jmix 2.8 AI Copilot add-on on Spring AI 1.0.2*
 *Researched: 2026-04-18*

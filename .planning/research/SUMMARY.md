@@ -1,7 +1,7 @@
 # Project Research Summary
 
 **Project:** Jmix AI Copilot (ai-agent-core)
-**Domain:** Reusable Jmix 2.8 add-on embedding Spring AI 2.0.0-M4 (ChatClient + advisors + RAG + tools + chat memory) with a Flow UI for chat / KB / parameters / audit
+**Domain:** Reusable Jmix 2.8 add-on embedding Spring AI 1.0.2 (ChatClient + advisors + RAG + tools + chat memory) with a Flow UI for chat / KB / parameters / audit
 **Researched:** 2026-04-18
 **Confidence:** MEDIUM-HIGH
 
@@ -11,16 +11,16 @@ This add-on is a **governed, metadata-first Q&A layer** over a Jmix app's live e
 
 The recommended approach is to **use Spring AI 2.x primitives as-is** (ChatClient, advisors, VectorStore, ChatMemory, `@Tool` beans) and only add Jmix-owned wiring: six generic parametric read-tools generated from `Metadata`, a stacked 5-layer security chain (Jmix auth → entity/attr/row policies → EntityExposurePolicy → ToolGuard → AuditAdvisor), a dual-layer chat persistence where a `ChatMemoryRepository` decorator projects Spring AI's memory rows into Jmix `AiConversation`/`AiMessage` entities, and a strict module split (`ai-agent` functional / `ai-agent-starter` / `ai-agent-flowui` / `ai-agent-flowui-starter`) so headless hosts can consume the copilot without Vaadin.
 
-Dominant risks: (1) Spring AI 2.0.0-M4 milestone drift — verify every call via Context7, isolate behind thin factories; (2) security bypass via cached per-app tool schemas — build schema per-user, not per-app; (3) prompt injection through user-editable record fields returned by tools; (4) RAG that ignores user authorization — needs per-request `FILTER_EXPRESSION` derived from caller's roles; (5) add-on packaging mistakes (missing `@JmixModule`, missing `AutoConfiguration.imports`, menu/message-key collisions). A walking-skeleton phase must land before feature work to defuse these.
+Dominant risks: (1) Spring AI 1.0.2 milestone drift — verify every call via Context7, isolate behind thin factories; (2) security bypass via cached per-app tool schemas — build schema per-user, not per-app; (3) prompt injection through user-editable record fields returned by tools; (4) RAG that ignores user authorization — needs per-request `FILTER_EXPRESSION` derived from caller's roles; (5) add-on packaging mistakes (missing `@JmixModule`, missing `AutoConfiguration.imports`, menu/message-key collisions). A walking-skeleton phase must land before feature work to defuse these.
 
 ## Key Findings
 
 ### Recommended Stack (headline)
 
-Spring AI 2.0.0-M4 via `spring-ai-bom` (never per-artifact versions), 2.x starter naming. Milestone repo `https://repo.spring.io/milestone` mandatory. OpenRouter via OpenAI-compatible starter with `base-url` override. pgvector default, swappable `VectorStore` bean.
+Spring AI 1.0.2 via `spring-ai-bom` (never per-artifact versions), 2.x starter naming. Milestone repo `https://repo.spring.io/milestone` mandatory. OpenRouter via OpenAI-compatible starter with `base-url` override. pgvector default, swappable `VectorStore` bean.
 
 - Java 17 + Jmix 2.8.0 + Spring Boot 3.x (HIGH)
-- `org.springframework.ai:spring-ai-bom:2.0.0-M4` (HIGH)
+- `org.springframework.ai:spring-ai-bom:1.0.2` (HIGH)
 - `spring-ai-starter-model-openai` (HIGH)
 - `spring-ai-starter-vector-store-pgvector` + Liquibase-owned `CREATE EXTENSION vector` (HIGH)
 - `spring-ai-starter-model-chat-memory-repository-jdbc` (HIGH)
@@ -75,7 +75,7 @@ Honourable mentions: M4 API drift (P0 adapter + canary); EntityManager/native-SQ
 Researchers suggested 5, 7, and 8 phases independently. Synthesized into **8 coarse-grain phases** aligned with PROJECT.md Active groupings and ARCHITECTURE dependency graph.
 
 ### Phase 0 — Walking Skeleton & Packaging De-risk
-Pin `spring-ai-bom:2.0.0-M4` + milestone repo; `AutoConfiguration.imports` in both starters; `@JmixModule(dependsOn=…)`; end-to-end `ChatClient.prompt().call()` smoke via OpenRouter; mock `ChatModel` scaffold; three-tier JUnit layout; `publishToMavenLocal` fresh-consumer smoke.
+Pin `spring-ai-bom:1.0.2` + milestone repo; `AutoConfiguration.imports` in both starters; `@JmixModule(dependsOn=…)`; end-to-end `ChatClient.prompt().call()` smoke via OpenRouter; mock `ChatModel` scaffold; three-tier JUnit layout; `publishToMavenLocal` fresh-consumer smoke.
 *Defuses:* #5 packaging, #12 collisions, #14 live-LLM-in-CI. **Research flag: YES** (M4 surface, Boot baseline).
 
 ### Phase 1 — Foundations (entities, security, SPI contracts)
@@ -144,7 +144,7 @@ E2E integration tests in `jmix-app` with Jmix-security negative cases (restricte
 
 ### Secondary (MEDIUM)
 - Cross-product feature synthesis (Glean, M365 Copilot, Perplexity, Danswer, OpenWebUI, LibreChat, Dify)
-- Spring AI 2.0.0-M4 milestone surface — expect drift
+- Spring AI 1.0.2 milestone surface — expect drift
 - Jmix 2.8 Boot baseline — numeric pin unverified
 
 ### Tertiary (LOW)

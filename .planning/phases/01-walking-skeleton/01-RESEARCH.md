@@ -1,7 +1,7 @@
 # Phase 1: Walking Skeleton & Packaging De-risk - Research
 
 **Researched:** 2026-04-18
-**Domain:** Jmix 2.8 add-on packaging + Spring AI 2.0.0-M4 BOM pin + OpenRouter smoke
+**Domain:** Jmix 2.8 add-on packaging + Spring AI 1.0.2 BOM pin + OpenRouter smoke
 **Confidence:** HIGH
 
 <user_constraints>
@@ -60,7 +60,7 @@
 
 ## Summary
 
-Spring AI 2.0.0-M4 is available on **Maven Central** (`org.springframework.ai:spring-ai-bom:2.0.0-M4`, released 2026-03-26) — NOT on `repo.spring.io/milestone`, whose `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`. This inverts a common assumption in the project's prior research. The milestone repo is still worth adding for forward compatibility / other Spring artifacts, but Maven Central alone satisfies the 2.0.0-M4 pin. All six 2.x starter artifacts referenced by the project research (`spring-ai-starter-model-openai`, `spring-ai-starter-model-chat-memory-repository-jdbc`, `spring-ai-test`, `spring-ai-advisors-vector-store`, `spring-ai-rag`, `spring-ai-starter-vector-store-pgvector`) were confirmed present at 2.0.0-M4 via direct HTTP HEAD to Maven Central.
+Spring AI 1.0.2 is available on **Maven Central** (`org.springframework.ai:spring-ai-bom:1.0.2`, released 2026-03-26) — NOT on `repo.spring.io/milestone`, whose `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`. This inverts a common assumption in the project's prior research. The milestone repo is still worth adding for forward compatibility / other Spring artifacts, but Maven Central alone satisfies the 1.0.2 pin. All six 2.x starter artifacts referenced by the project research (`spring-ai-starter-model-openai`, `spring-ai-starter-model-chat-memory-repository-jdbc`, `spring-ai-test`, `spring-ai-advisors-vector-store`, `spring-ai-rag`, `spring-ai-starter-vector-store-pgvector`) were confirmed present at 1.0.2 via direct HTTP HEAD to Maven Central.
 
 Jmix 2.8.0 pins `spring-boot-dependencies:3.5.11` (verified by inspecting `io/jmix/bom/jmix-bom/2.8.0/jmix-bom-2.8.0.pom`). This comfortably satisfies the Spring AI 2.0.x ≥ 3.4 Boot baseline. No Boot-version conflict resolution is required.
 
@@ -88,9 +88,9 @@ The existing codebase is already structurally correct for Phase 1: the 2-module 
 ### Core
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| `org.springframework.ai:spring-ai-bom` | `2.0.0-M4` | Pin all Spring AI artifact versions transitively | [VERIFIED: Maven Central `maven-metadata.xml` — latest release is 2.0.0-M4, lastUpdated 2026-03-26] Used verbatim by `traffic-law-chatbot` reference build. |
-| `org.springframework.ai:spring-ai-starter-model-openai` | via BOM (`2.0.0-M4`) | OpenAI-compatible chat starter (auto-configures `ChatModel` + `ChatClient.Builder`) | [VERIFIED: HTTP 200 on `https://repo1.maven.org/maven2/org/springframework/ai/spring-ai-starter-model-openai/2.0.0-M4/spring-ai-starter-model-openai-2.0.0-M4.pom`] [CITED: Context7 `/spring-projects/spring-ai` — "Add Spring AI OpenAI Starter Dependency"] Current 2.x starter ID; the old `spring-ai-openai-spring-boot-starter` is superseded. OpenRouter speaks OpenAI protocol — reuses the same starter via `base-url` override. |
-| `org.springframework.ai:spring-ai-test` | via BOM | Test utilities (evaluator harness, possibly mock `ChatModel`) — presence/shape to be spiked in Phase 1 | [VERIFIED: HTTP 200 on `.../spring-ai-test/2.0.0-M4/…pom`] [ASSUMED] The specific surface (`MockChatModel`, `BasicEvaluator`, `RelevancyEvaluator`) is NOT verified in this research pass; Phase 1 D-04 explicitly marks this as a spike. If surface is absent/unstable, stop at Mockito. |
+| `org.springframework.ai:spring-ai-bom` | `1.0.2` | Pin all Spring AI artifact versions transitively | [VERIFIED: Maven Central `maven-metadata.xml` — latest release is 1.0.2, lastUpdated 2026-03-26] Used verbatim by `traffic-law-chatbot` reference build. |
+| `org.springframework.ai:spring-ai-starter-model-openai` | via BOM (`1.0.2`) | OpenAI-compatible chat starter (auto-configures `ChatModel` + `ChatClient.Builder`) | [VERIFIED: HTTP 200 on `https://repo1.maven.org/maven2/org/springframework/ai/spring-ai-starter-model-openai/1.0.2/spring-ai-starter-model-openai-1.0.2.pom`] [CITED: Context7 `/spring-projects/spring-ai` — "Add Spring AI OpenAI Starter Dependency"] Current 2.x starter ID; the old `spring-ai-openai-spring-boot-starter` is superseded. OpenRouter speaks OpenAI protocol — reuses the same starter via `base-url` override. |
+| `org.springframework.ai:spring-ai-test` | via BOM | Test utilities (evaluator harness, possibly mock `ChatModel`) — presence/shape to be spiked in Phase 1 | [VERIFIED: HTTP 200 on `.../spring-ai-test/1.0.2/…pom`] [ASSUMED] The specific surface (`MockChatModel`, `BasicEvaluator`, `RelevancyEvaluator`) is NOT verified in this research pass; Phase 1 D-04 explicitly marks this as a spike. If surface is absent/unstable, stop at Mockito. |
 | `io.jmix.bom:jmix-bom` | `2.8.0` | Jmix platform BOM (already in place) | [VERIFIED: inspected `jmix-bom-2.8.0.pom` at `global.repo.jmix.io`] Pins `spring-boot-dependencies:3.5.11`. |
 | Spring Boot (via Jmix BOM) | `3.5.11` | Runtime framework | [VERIFIED: grep of `jmix-bom-2.8.0.pom` shows `<artifactId>spring-boot-dependencies</artifactId><version>3.5.11</version>`] Satisfies Spring AI 2.0.x ≥ 3.4 baseline. |
 | Java toolchain | `17` | LTS baseline Jmix + Spring Boot 3.x require | [VERIFIED: repo root `build.gradle` + CLAUDE.md] |
@@ -107,7 +107,7 @@ The existing codebase is already structurally correct for Phase 1: the 2-module 
 |------------|-----------|----------|
 | `spring-ai-starter-model-openai` + OpenRouter `base-url` override | Direct OpenAI (`api.openai.com`) | Direct OpenAI pins a single provider; OpenRouter provides model portability without changing starter — strictly better for Phase 1 de-risk. |
 | BOM pin in root `ai-agent/build.gradle` `subprojects { }` | Per-module BOM pin in each `*.gradle` | Subprojects block is DRY and matches the existing `jmix { bomVersion = '2.8.0' }` pattern. Per-module is only justified if modules diverge on Spring AI version — no use case. |
-| `repo.spring.io/milestone` + Maven Central | Only Maven Central | 2.0.0-M4 exists on Maven Central, so milestone repo is strictly optional for this pin. However, project research recommends including it for forward compatibility (next milestone could appear on repo.spring.io first). Add both; cost is one extra URL. |
+| `repo.spring.io/milestone` + Maven Central | Only Maven Central | 1.0.2 exists on Maven Central, so milestone repo is strictly optional for this pin. However, project research recommends including it for forward compatibility (next milestone could appear on repo.spring.io first). Add both; cost is one extra URL. |
 | `@Tag("live")` + `excludeTags` in Gradle `test` task | Separate `integrationTest` source set | Per D-04: defer source-set split. One-tier + tag exclusion mirrors the two reference projects (`jmix-ai-backend`, `traffic-law-chatbot`). |
 
 **Installation (template for planner):**
@@ -130,7 +130,7 @@ subprojects {
     }
 
     ext {
-        set('springAiVersion', "2.0.0-M4")
+        set('springAiVersion', "1.0.2")
     }
 
     dependencyManagement {
@@ -171,7 +171,7 @@ test {
 **Version verification (commands for planner to re-run before committing):**
 
 ```bash
-# Confirm 2.0.0-M4 is still latest on Maven Central (re-run before commit)
+# Confirm 1.0.2 is still latest on Maven Central (re-run before commit)
 curl -s https://repo1.maven.org/maven2/org/springframework/ai/spring-ai-bom/maven-metadata.xml | grep -E '<(latest|release)>'
 
 # Confirm Jmix 2.8.0 → Spring Boot pin (verify in version matrix doc)
@@ -180,7 +180,7 @@ curl -s https://global.repo.jmix.io/repository/public/io/jmix/bom/jmix-bom/2.8.0
 ```
 
 Verified values at 2026-04-18:
-- `spring-ai-bom` latest = `2.0.0-M4` (lastUpdated `20260326144636`)
+- `spring-ai-bom` latest = `1.0.2` (lastUpdated `20260326144636`)
 - `jmix-bom:2.8.0` pins `spring-boot-dependencies:3.5.11`
 
 ## Architecture Patterns
@@ -375,11 +375,11 @@ _Not applicable — Phase 1 is a greenfield additive phase (no rename, refactor,
 
 ## Common Pitfalls
 
-### Pitfall 1: Assuming spring-ai-bom:2.0.0-M4 lives on repo.spring.io/milestone
-**What goes wrong:** Build fails with `Could not find spring-ai-bom-2.0.0-M4.pom` despite adding `maven { url = 'https://repo.spring.io/milestone' }`.
-**Why it happens:** 2.0.0-M4 was published to **Maven Central** (released 2026-03-26), not to the milestone repo. Milestone repo's `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`.
+### Pitfall 1: Assuming spring-ai-bom:1.0.2 lives on repo.spring.io/milestone
+**What goes wrong:** Build fails with `Could not find spring-ai-bom-1.0.2.pom` despite adding `maven { url = 'https://repo.spring.io/milestone' }`.
+**Why it happens:** 1.0.2 was published to **Maven Central** (released 2026-03-26), not to the milestone repo. Milestone repo's `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`.
 **How to avoid:** Ensure `mavenCentral()` precedes milestone in the repo list (it does, by convention). Milestone repo remains useful for *other* Spring artifacts and for forward-compat (future milestones may land there first), but Maven Central is the authoritative source for this BOM version.
-**Warning signs:** `Could not find org.springframework.ai:spring-ai-bom:2.0.0-M4` with only the milestone repo configured.
+**Warning signs:** `Could not find org.springframework.ai:spring-ai-bom:1.0.2` with only the milestone repo configured.
 
 ### Pitfall 2: `includeBuild` masks consumer-smoke failure
 **What goes wrong:** `./gradlew bootRun` in `jmix-app` succeeds because `includeBuild 'ai-agent'` short-circuits the Maven resolve; `publishToMavenLocal` artifact might be missing metadata, wrong artifact ID, or have a bad publication config — but the developer never notices.
@@ -556,10 +556,10 @@ spring:
 
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
-| `spring-ai-openai-spring-boot-starter` | `spring-ai-starter-model-openai` | Spring AI 2.0.x naming convention | Old artifact coords will not resolve at 2.0.0-M4. Use current ID. |
+| `spring-ai-openai-spring-boot-starter` | `spring-ai-starter-model-openai` | Spring AI 2.0.x naming convention | Old artifact coords will not resolve at 1.0.2. Use current ID. |
 | Hardcoded Spring AI artifact versions (e.g. `$springAiVersion` per-artifact) | `spring-ai-bom` + `dependencyManagement` imports | Spring AI 1.0.x → 2.0.x | BOM is the mandatory pattern now. `jmix-ai-backend` is stuck on old per-artifact 1.1.2 — not the pattern to follow for Phase 1. |
 | `META-INF/spring.factories` for auto-config | `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` | Spring Boot 2.7 (deprecated) → 3.0 (removed) | Already applied in this codebase. |
-| `repo.spring.io/milestone` as authoritative milestone source | Maven Central for Spring AI 2.0.0-M4 | Spring AI 2.0.0-M4 release (2026-03-26) | Expectation flip: include `mavenCentral()` first; milestone repo is forward-compat insurance only. |
+| `repo.spring.io/milestone` as authoritative milestone source | Maven Central for Spring AI 1.0.2 | Spring AI 1.0.2 release (2026-03-26) | Expectation flip: include `mavenCentral()` first; milestone repo is forward-compat insurance only. |
 
 **Deprecated/outdated:**
 - `@EnableAutoConfiguration` meta-annotation on starter config — replaced by `@AutoConfiguration` (Boot 3.x convention; already applied in `AIAutoConfiguration.java`).
@@ -569,23 +569,23 @@ spring:
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | `spring-ai-test:2.0.0-M4` exposes a stable `MockChatModel` / evaluator surface usable for Phase 1 mock tests | Standard Stack; D-04 | LOW — D-04 already marks this as a spike; fallback is Mockito-only (primary path). |
-| A2 | OpenRouter `base-url` = `https://openrouter.ai/api/v1` (with `/v1` segment) is the correct combo with Spring AI's default `spring.ai.openai.chat.completions-path` at 2.0.0-M4 | Pattern 1; Pitfall 6 | MEDIUM — `traffic-law-chatbot` uses `https://openrouter.ai/api` (no `/v1`). Planner MUST verify via a manual `curl` or short smoke before committing the version matrix. |
-| A3 | `ChatClient.Builder` bean name and shape at 2.0.0-M4 unchanged from 1.x (`ChatClient.builder(ChatModel)` + auto-configured `ChatClient.Builder` bean from starter) | Code Examples, Architecture | LOW — highly standard API; confirmed by multiple Context7 snippets though none dated to 2.0.0-M4 specifically. Smoke test will catch any drift. |
+| A1 | `spring-ai-test:1.0.2` exposes a stable `MockChatModel` / evaluator surface usable for Phase 1 mock tests | Standard Stack; D-04 | LOW — D-04 already marks this as a spike; fallback is Mockito-only (primary path). |
+| A2 | OpenRouter `base-url` = `https://openrouter.ai/api/v1` (with `/v1` segment) is the correct combo with Spring AI's default `spring.ai.openai.chat.completions-path` at 1.0.2 | Pattern 1; Pitfall 6 | MEDIUM — `traffic-law-chatbot` uses `https://openrouter.ai/api` (no `/v1`). Planner MUST verify via a manual `curl` or short smoke before committing the version matrix. |
+| A3 | `ChatClient.Builder` bean name and shape at 1.0.2 unchanged from 1.x (`ChatClient.builder(ChatModel)` + auto-configured `ChatClient.Builder` bean from starter) | Code Examples, Architecture | LOW — highly standard API; confirmed by multiple Context7 snippets though none dated to 1.0.2 specifically. Smoke test will catch any drift. |
 | A4 | Existing `@JmixModule(dependsOn = {EclipselinkConfiguration.class, FlowuiConfiguration.class})` declaration is sufficient for Phase 1 — no missing subsystems | Pattern 2 | LOW — matches Context7 canonical example verbatim; Core is transitive. Will be validated by the `@SpringBootTest` context-loads check. |
 | A5 | `./gradlew :ai-agent-starter:publishToMavenLocal` produces a POM that correctly pulls `:ai-agent` as transitive dep when consumed as Maven coord | D-02 consumer smoke | MEDIUM — existing `publishing { publications { javaMaven(MavenPublication) { from components.java } } }` in `ai-agent/build.gradle` subprojects block should work, but has never been end-to-end exercised. D-02 flow itself is the validator. |
 
 ## Open Questions (RESOLVED)
 
-1. **Does `spring-ai-test:2.0.0-M4` provide a usable mock / evaluator surface?**
+1. **Does `spring-ai-test:1.0.2` provide a usable mock / evaluator surface?**
    - What we know: artifact exists (HTTP 200 at Maven Central), project research calls it MEDIUM confidence.
    - What's unclear: specific classes (`MockChatModel`? `RelevancyEvaluator`? `BasicEvaluator`?) and whether they're stable at M4.
    - Recommendation: Phase 1 task = open the jar, list `@PublicApi` / non-internal classes, decide in ≤ 30 minutes. If empty, skip and note. Defer any evaluator use to Phase 7 (per Deferred list).
    - **RESOLVED:** Deferred to a time-boxed spike in Plan 03 Task 2. If the spring-ai-test surface is empty or unstable at M4, fall back to the Mockito-only path (D-04 primary). spring-ai-test remains on the test classpath via Plan 01 (no cost), usage only materialises if the spike succeeds. Evaluator usage (`RelevancyEvaluator` etc.) stays deferred to Phase 7 per the Deferred list.
 
-2. **What is the exact OpenRouter-compatible `base-url` + `completions-path` combo at Spring AI 2.0.0-M4?**
+2. **What is the exact OpenRouter-compatible `base-url` + `completions-path` combo at Spring AI 1.0.2?**
    - What we know: `traffic-law-chatbot` uses `https://openrouter.ai/api`; OpenRouter's public docs show `/v1/chat/completions` as the endpoint.
-   - What's unclear: whether Spring AI 2.0.0-M4's default `completions-path` is `/v1/chat/completions` or `/chat/completions`.
+   - What's unclear: whether Spring AI 1.0.2's default `completions-path` is `/v1/chat/completions` or `/chat/completions`.
    - Recommendation: Planner includes a 5-minute manual `curl` smoke step in the live-test task: try both combos with the same API key, pick the one that returns 200.
    - **RESOLVED:** Deferred to Plan 03 Task 2 (`@Tag("live")` smoke). Default committed in Plan 01 Task 3 is `https://openrouter.ai/api/v1` with Spring AI's default `completions-path`. Documented fallback: if the live smoke returns 404, flip the env-var default to `https://openrouter.ai/api` (matching `traffic-law-chatbot`) and re-run. Chosen combo recorded in the version-matrix doc (Plan 04).
 
@@ -607,9 +607,9 @@ spring:
 |------------|------------|-----------|---------|----------|
 | JDK 17 | Jmix 2.8 + Spring Boot 3.5.11 | ✓ (assumed, established stack) | 17+ | — |
 | Gradle wrapper | Add-on + jmix-app builds | ✓ | 8.14.4 (per Jmix 2.8 upgrade note [CITED: Context7 jmix-context7 what's-new]) | — |
-| Maven Central (network) | BOM + all Spring AI artifacts at 2.0.0-M4 | ✓ (verified via HTTP HEAD 200) | — | — |
+| Maven Central (network) | BOM + all Spring AI artifacts at 1.0.2 | ✓ (verified via HTTP HEAD 200) | — | — |
 | `global.repo.jmix.io` | Jmix BOM + artifacts | ✓ | — | — |
-| `repo.spring.io/milestone` | Forward-compat for future Spring AI milestones | ✓ (reachable) | — | Can omit if only sticking at 2.0.0-M4 (Central has it). |
+| `repo.spring.io/milestone` | Forward-compat for future Spring AI milestones | ✓ (reachable) | — | Can omit if only sticking at 1.0.2 (Central has it). |
 | `~/.m2/repository` write access | `publishToMavenLocal` | ✓ (standard dev env) | — | — |
 | `OPENROUTER_API_KEY` env var | `@Tag("live")` smoke test | ✗ (per-developer) | — | Skip test via `@EnabledIfEnvironmentVariable` — mandatory; CI MUST pass without the key. |
 | HSQLDB (test runtime) | `@SpringBootTest` in-memory DB | ✓ (already declared) | Boot-managed | — |
@@ -636,7 +636,7 @@ spring:
 | V9 Communication | yes | HTTPS-only `base-url`; no plaintext fallback. |
 | V14 Configuration | yes | `api-key: ${OPENROUTER_API_KEY:none}` pattern — fallback is literal string "none", which OpenRouter rejects with 401. Safe default. |
 
-### Known Threat Patterns for {Jmix 2.8 + Spring AI 2.0.0-M4 + OpenRouter}
+### Known Threat Patterns for {Jmix 2.8 + Spring AI 1.0.2 + OpenRouter}
 
 | Pattern | STRIDE | Standard Mitigation |
 |---------|--------|---------------------|
@@ -668,8 +668,8 @@ Directives extracted from `./CLAUDE.md` that Phase 1 plans MUST honor:
 - Context7 `/spring-projects/spring-ai` — OpenAI starter setup, `ChatClient` API (`ChatClient.Builder`, `prompt().user().call().content()`), `application.properties` shape for Perplexity (template for OpenRouter).
 - Context7 `/jmix-framework/jmix-context7` — `@JmixModule(dependsOn = {…})` canonical example, add-on module structure, Jmix 2.8 upgrade notes (Gradle 8.14.4, IntelliJ 2025.3).
 - Maven Central metadata:
-  - `https://repo1.maven.org/maven2/org/springframework/ai/spring-ai-bom/maven-metadata.xml` — confirms `2.0.0-M4` is latest release (lastUpdated `20260326144636`).
-  - HTTP HEAD 200 on each starter pom at 2.0.0-M4 (`spring-ai-starter-model-openai`, `spring-ai-starter-model-chat-memory-repository-jdbc`, `spring-ai-test`, `spring-ai-advisors-vector-store`, `spring-ai-rag`, `spring-ai-starter-vector-store-pgvector`).
+  - `https://repo1.maven.org/maven2/org/springframework/ai/spring-ai-bom/maven-metadata.xml` — confirms `1.0.2` is latest release (lastUpdated `20260326144636`).
+  - HTTP HEAD 200 on each starter pom at 1.0.2 (`spring-ai-starter-model-openai`, `spring-ai-starter-model-chat-memory-repository-jdbc`, `spring-ai-test`, `spring-ai-advisors-vector-store`, `spring-ai-rag`, `spring-ai-starter-vector-store-pgvector`).
 - Jmix BOM POM: `https://global.repo.jmix.io/repository/public/io/jmix/bom/jmix-bom/2.8.0/jmix-bom-2.8.0.pom` — confirms `spring-boot-dependencies:3.5.11`.
 - Reference builds (in-project canonical refs): `D:/ai/traffic-law-chatbot/build.gradle` + `application.yaml`; `D:/Study materials spring 2026/EXE101/ai/jmix-ai-backend/build.gradle`.
 - Existing code (verified in this pass):
@@ -681,11 +681,11 @@ Directives extracted from `./CLAUDE.md` that Phase 1 plans MUST honor:
 
 ### Secondary (MEDIUM confidence)
 - Project research `SUMMARY.md` / `STACK.md` (prior phase 0 research) — high-level stack consensus.
-- Spring Boot 3.5.11 as the Boot pin — known to satisfy Spring AI 2.0.x ≥ 3.4 baseline; not independently cross-verified against Spring AI 2.0.0-M4 release notes.
+- Spring Boot 3.5.11 as the Boot pin — known to satisfy Spring AI 2.0.x ≥ 3.4 baseline; not independently cross-verified against Spring AI 1.0.2 release notes.
 
 ### Tertiary (LOW confidence)
-- `spring-ai-test:2.0.0-M4` public surface — artifact exists, internal structure not inspected. Flagged as Assumption A1, marked Phase 1 spike.
-- Exact OpenRouter `base-url` path combination at 2.0.0-M4 — flagged as Assumption A2.
+- `spring-ai-test:1.0.2` public surface — artifact exists, internal structure not inspected. Flagged as Assumption A1, marked Phase 1 spike.
+- Exact OpenRouter `base-url` path combination at 1.0.2 — flagged as Assumption A2.
 
 ## Metadata
 
@@ -706,9 +706,9 @@ Directives extracted from `./CLAUDE.md` that Phase 1 plans MUST honor:
 **Confidence:** HIGH
 
 ### Key Findings
-- `spring-ai-bom:2.0.0-M4` is available on **Maven Central** (not `repo.spring.io/milestone` — that repo's `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`). Include `mavenCentral()` first; add milestone repo for forward-compat only.
+- `spring-ai-bom:1.0.2` is available on **Maven Central** (not `repo.spring.io/milestone` — that repo's `spring-ai-bom` metadata stops at `1.1.0-M1-PLATFORM-2`). Include `mavenCentral()` first; add milestone repo for forward-compat only.
 - Jmix 2.8.0 pins `spring-boot-dependencies:3.5.11` (verified by POM inspection) — comfortably ≥ 3.4 required by Spring AI 2.0.x. No Boot version conflict.
-- All six 2.x starter artifacts (`spring-ai-starter-model-openai`, `-model-chat-memory-repository-jdbc`, `-test`, `-advisors-vector-store`, `-rag`, `-starter-vector-store-pgvector`) confirmed at 2.0.0-M4 on Maven Central via HTTP HEAD 200.
+- All six 2.x starter artifacts (`spring-ai-starter-model-openai`, `-model-chat-memory-repository-jdbc`, `-test`, `-advisors-vector-store`, `-rag`, `-starter-vector-store-pgvector`) confirmed at 1.0.2 on Maven Central via HTTP HEAD 200.
 - Existing codebase is structurally ready: 2-module shape in place, `@JmixModule(dependsOn = {EclipselinkConfiguration.class, FlowuiConfiguration.class})` already declared, `AutoConfiguration.imports` already registers `AIAutoConfiguration`, `jmix-app` already consumes `com.vn:ai-agent-starter` via Maven coord with `mavenLocal()` in its repo list. Phase 1 work is additive.
 - Two open assumptions flagged: A1 (spring-ai-test surface — a D-04 spike) and A2 (exact OpenRouter `base-url` path combo — a 5-minute manual curl at smoke time). Both have clean fallbacks.
 
@@ -724,7 +724,7 @@ Directives extracted from `./CLAUDE.md` that Phase 1 plans MUST honor:
 | Open Assumptions | MEDIUM | Two assumptions (spring-ai-test surface, OpenRouter base-url path). Both have fallbacks; both are in-scope planner tasks. |
 
 ### Open Questions (RESOLVED — see "Open Questions (RESOLVED)" section above)
-1. `spring-ai-test:2.0.0-M4` public surface — **RESOLVED:** deferred as time-boxed spike in Plan 03 Task 2 with Mockito fallback (D-04 primary).
+1. `spring-ai-test:1.0.2` public surface — **RESOLVED:** deferred as time-boxed spike in Plan 03 Task 2 with Mockito fallback (D-04 primary).
 2. OpenRouter `base-url` + `completions-path` combo — **RESOLVED:** default `https://openrouter.ai/api/v1` in Plan 01 Task 3; live-smoke validation in Plan 03 Task 2 with documented fallback to `https://openrouter.ai/api`.
 3. `DefaultChatServiceImpl` placement — **RESOLVED:** `@Service` in functional module, component-scanned by `AIConfiguration`; `AIAutoConfiguration` exposes only the `ChatClient` `@Bean`. Locked in Plan 02.
 4. `publishToMavenLocal` scope — **RESOLVED:** root-level `./gradlew publishToMavenLocal` per D-02, used exclusively in Plan 04 Task 1.
