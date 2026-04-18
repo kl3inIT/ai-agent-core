@@ -80,6 +80,21 @@ Plans:
 
 **Needs research phase:** No — standard Jmix entity/security patterns.
 
+**Plans:** 11 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Entity enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + enum i18n
+- [ ] 02-02-PLAN.md — Six SPI interfaces + ToolVetoedException in com.vn.agent.spi
+- [ ] 02-03-PLAN.md — Five JPA entities (Conversation, Message, ToolCallAudit, Parameters, KnowledgeDocument) + entity/attribute i18n
+- [ ] 02-04-PLAN.md — Add-on master changelog + step changelogs 010-050 + host <include> edit
+- [ ] 02-05-PLAN.md — SPRING_AI_CHAT_MEMORY changeset (Postgres + HSQLDB) + application.properties initialize-schema:never
+- [ ] 02-06-PLAN.md — pgvector extension + AI_AGENT_KB_VECTOR_STORE + HNSW index (Postgres-only with preCondition gating)
+- [ ] 02-07-PLAN.md — SpiDefaultsAutoConfiguration with six @ConditionalOnMissingBean no-op beans
+- [ ] 02-08-PLAN.md — AiAgentUserRole, AiAgentAdminRole, AiAgentUserRowLevelRole + role i18n
+- [ ] 02-09-PLAN.md — AIConfiguration @JmixModule dependsOn widened (Data + Security + Eclipselink + Flowui)
+- [ ] 02-10-PLAN.md — FoundationsBootSmokeTest (5 @Test methods: Liquibase, entities, row-level, SPI defaults, roles)
+- [ ] 02-11-PLAN.md — D-10 doc updates (REQUIREMENTS, ROADMAP, PROJECT, STACK) + D-02 Liquibase-include correction
+
 ---
 
 ### Phase 3 — Metadata-First Runtime & Six Tools
