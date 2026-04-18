@@ -93,6 +93,22 @@ Land the durable persistence + security + SPI-contract layer that phases 3–8 d
     - Phase 3 `TOOL-08` (read-only tool bodies) reframed: enforced via test-level assertion on tool-exposure registry, not ArchUnit.
     - No `archunit` dependency added to any module.
 
+### SPI Surface Philosophy
+
+- **D-11: SPIs are for truly app-specific behavior only; baseline runtime context is built-in.** The add-on itself populates standard Jmix runtime data (current user identity, roles, locale, conversation id) before contributors run — hosts do NOT re-derive these via `ContextContributor`. Contributors are needed only for:
+  - Domain-specific instructions / house prompts (`PromptContextContributor`)
+  - Context from external systems the add-on cannot know (`ContextContributor`)
+  - Business rules / veto logic the add-on cannot infer (`ToolGuard`)
+  - Tool packs that add functionality (`ToolContributor`)
+  - Custom KB sources (`CustomIngester`)
+  - Side-channel observability (`AuditListener`)
+
+  **Consequences for Phase 2 planner:**
+  - `ContextContributor` Javadoc must clarify: the bag already contains reserved `agent.*` keys (`agent.userId`, `agent.username`, `agent.roles`, `agent.locale`, `agent.conversationId`) populated by the add-on. Hosts add their own keys under a host-owned namespace — they do NOT set `agent.*` keys.
+  - `PromptContextContributor` Javadoc must clarify: the base system prompt already includes user/role/locale context; host fragments are for domain instructions (vocabulary, constraints, house rules), not identity plumbing.
+  - Phase 2 ships **interface + Javadoc only** — the actual wiring that populates baseline `agent.*` keys is Phase 4 `ChatService` work. Phase 2 simply documents the contract so Phase 4 knows what to populate.
+  - No-op defaults are correct precisely because baseline is handled elsewhere.
+
 ### Documentation Updates Required in Phase 2
 
 - **D-10: Update `REQUIREMENTS.md`, `ROADMAP.md`, and `PROJECT.md` as part of Phase 2 execution.** These are planning-authoritative docs; they must reflect the scope reductions locked by D-05 and D-09 before Phase 2 is called complete. Specifically:
