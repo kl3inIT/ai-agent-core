@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 01 complete
-last_updated: "2026-04-18T14:55:30.000Z"
+last_updated: "2026-04-18T15:45:57.134Z"
 progress:
-  total_phases: 8
+  total_phases: 2
   completed_phases: 1
   total_plans: 4
   completed_plans: 4
-  percent: 12.5
+  percent: 100
 ---
 
 # Project State
@@ -44,6 +44,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 ## Phase 01 Outcome
 
 All 4 plans completed and merged into master:
+
 - 01-01: Spring AI BOM pinned at **1.0.2** (downgrade from 2.0.0-M4 due to Spring 7 / Jmix 2.8 incompatibility), OpenRouter wired, liveTest task split
 - 01-02: ChatService SPI + DefaultChatServiceImpl + AIAutoConfiguration ChatClient @Bean
 - 01-03: ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"), opt-in)
