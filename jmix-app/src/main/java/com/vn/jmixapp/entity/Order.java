@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 @JmixEntity
-@Entity
+@Entity(name = "jmixapp_Order")
 @Table(name = "CUSTOMER_ORDER", indexes = {
         @Index(name = "IDX_CUSTOMER_ORDER__ON_NUMBER", columnList = "NUMBER_", unique = true),
         @Index(name = "IDX_CUSTOMER_ORDER__ON_CUSTOMER", columnList = "CUSTOMER_ID")

@@ -8,7 +8,7 @@
                 <property name="customer" fetchPlan="_base"/>
             </fetchPlan>
             <loader id="ordersDl" readOnly="true">
-                <query><![CDATA[select e from Order e order by e.orderDate desc]]></query>
+                <query><![CDATA[select e from jmixapp_Order e order by e.orderDate desc]]></query>
             </loader>
         </collection>
     </data>
