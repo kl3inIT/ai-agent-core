@@ -4,6 +4,7 @@ buildscript {
     }
     dependencies {
         classpath "io.jmix.gradle:jmix-gradle-plugin:2.8.0"
+        classpath "io.spring.gradle:dependency-management-plugin:1.1.6"
     }
 }
 
@@ -14,17 +15,30 @@ subprojects {
     apply plugin: 'java-library'
     apply plugin: 'maven-publish'
     apply plugin: 'io.jmix'
+    apply plugin: 'io.spring.dependency-management'
 
     repositories {
         mavenCentral()
         maven {
             url = 'https://global.repo.jmix.io/repository/public'
         }
+        maven { url = 'https://repo.spring.io/milestone' }
+        maven { url = 'https://repo.spring.io/snapshot' }
     }
 
     jmix {
         bomVersion = '2.8.0'
         projectId = 'AI'
+    }
+
+    ext {
+        set('springAiVersion', "2.0.0-M4")
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+        }
     }
 
     group = this.group
