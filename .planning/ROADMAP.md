@@ -47,6 +47,14 @@
 
 **Needs research phase:** YES — verify M4 starter IDs + BOM availability + Boot baseline via Context7.
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Gradle/BOM wiring + excludeTags + jmix-app application.yaml
+- [ ] 01-02-PLAN.md — ChatService API + DefaultChatServiceImpl + AIAutoConfiguration ChatClient bean
+- [ ] 01-03-PLAN.md — ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"))
+- [ ] 01-04-PLAN.md — Version matrix + consumer-smoke doc + jmix-app CommandLineRunner injection proof + ROADMAP/PROJECT updates
+
 ---
 
 ### Phase 2 — Foundations
