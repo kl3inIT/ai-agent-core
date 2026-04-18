@@ -575,27 +575,31 @@ spring:
 | A4 | Existing `@JmixModule(dependsOn = {EclipselinkConfiguration.class, FlowuiConfiguration.class})` declaration is sufficient for Phase 1 — no missing subsystems | Pattern 2 | LOW — matches Context7 canonical example verbatim; Core is transitive. Will be validated by the `@SpringBootTest` context-loads check. |
 | A5 | `./gradlew :ai-agent-starter:publishToMavenLocal` produces a POM that correctly pulls `:ai-agent` as transitive dep when consumed as Maven coord | D-02 consumer smoke | MEDIUM — existing `publishing { publications { javaMaven(MavenPublication) { from components.java } } }` in `ai-agent/build.gradle` subprojects block should work, but has never been end-to-end exercised. D-02 flow itself is the validator. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `spring-ai-test:2.0.0-M4` provide a usable mock / evaluator surface?**
    - What we know: artifact exists (HTTP 200 at Maven Central), project research calls it MEDIUM confidence.
    - What's unclear: specific classes (`MockChatModel`? `RelevancyEvaluator`? `BasicEvaluator`?) and whether they're stable at M4.
    - Recommendation: Phase 1 task = open the jar, list `@PublicApi` / non-internal classes, decide in ≤ 30 minutes. If empty, skip and note. Defer any evaluator use to Phase 7 (per Deferred list).
+   - **RESOLVED:** Deferred to a time-boxed spike in Plan 03 Task 2. If the spring-ai-test surface is empty or unstable at M4, fall back to the Mockito-only path (D-04 primary). spring-ai-test remains on the test classpath via Plan 01 (no cost), usage only materialises if the spike succeeds. Evaluator usage (`RelevancyEvaluator` etc.) stays deferred to Phase 7 per the Deferred list.
 
 2. **What is the exact OpenRouter-compatible `base-url` + `completions-path` combo at Spring AI 2.0.0-M4?**
    - What we know: `traffic-law-chatbot` uses `https://openrouter.ai/api`; OpenRouter's public docs show `/v1/chat/completions` as the endpoint.
    - What's unclear: whether Spring AI 2.0.0-M4's default `completions-path` is `/v1/chat/completions` or `/chat/completions`.
    - Recommendation: Planner includes a 5-minute manual `curl` smoke step in the live-test task: try both combos with the same API key, pick the one that returns 200.
+   - **RESOLVED:** Deferred to Plan 03 Task 2 (`@Tag("live")` smoke). Default committed in Plan 01 Task 3 is `https://openrouter.ai/api/v1` with Spring AI's default `completions-path`. Documented fallback: if the live smoke returns 404, flip the env-var default to `https://openrouter.ai/api` (matching `traffic-law-chatbot`) and re-run. Chosen combo recorded in the version-matrix doc (Plan 04).
 
 3. **Should `DefaultChatServiceImpl` live in `ai-agent` (functional) or `ai-agent-starter` (auto-config)?**
    - What we know: interface MUST be in functional (D-03). Impl location is flexible.
    - Tradeoff: impl-in-functional = component-scanned automatically, simpler; impl-in-starter auto-config = cleaner `@ConditionalOnMissingBean` swap point.
    - Recommendation: Start with impl as `@Service` in functional (com.vn.agent package, same as interface); upgrade to auto-config `@Bean` with `@ConditionalOnMissingBean` only when a second impl is introduced (Phase 3+).
+   - **RESOLVED:** `@Service` in the functional module (`com.vn.agent.DefaultChatServiceImpl`), component-scanned by existing `AIConfiguration`'s `@ComponentScan`. `AIAutoConfiguration` only exposes the `ChatClient` `@Bean` (with `@ConditionalOnMissingBean`); it does NOT register a `ChatService` `@Bean` (would collide with the component-scanned `@Service`). Promotion to auto-config `@Bean` + `@ConditionalOnMissingBean` is deferred to Phase 3+ when a second impl arrives. Locked in Plan 02 Task 2 + Task 3.
 
 4. **Does `publishToMavenLocal` publish both `ai-agent` AND `ai-agent-starter`, or only `ai-agent-starter`?**
    - What we know: `subprojects { apply plugin: 'maven-publish' }` applies to both; both should publish.
    - What's unclear: whether `./gradlew :ai-agent-starter:publishToMavenLocal` transitively triggers the `:ai-agent` publication, or whether we need `./gradlew publishToMavenLocal` (root task).
    - Recommendation: Use the root `./gradlew publishToMavenLocal` (publishes all) in the documented task to be safe.
+   - **RESOLVED:** Root-level `./gradlew publishToMavenLocal` task per D-02 (publishes ALL subprojects in one invocation). Plan 04 Task 1 uses the root task exclusively; the per-module form `:ai-agent-starter:publishToMavenLocal` is explicitly NOT the documented path. This guarantees both `com.vn:ai-agent:0.0.1-SNAPSHOT` and `com.vn:ai-agent-starter:0.0.1-SNAPSHOT` land in `~/.m2/repository/` before the consumer smoke toggle.
 
 ## Environment Availability
 
@@ -719,11 +723,11 @@ Directives extracted from `./CLAUDE.md` that Phase 1 plans MUST honor:
 | Pitfalls | HIGH | Project-specific pitfalls (`includeBuild` masking D-02 toggle, Maven-Central-vs-milestone expectation flip) concretely documented. |
 | Open Assumptions | MEDIUM | Two assumptions (spring-ai-test surface, OpenRouter base-url path). Both have fallbacks; both are in-scope planner tasks. |
 
-### Open Questions
-1. `spring-ai-test:2.0.0-M4` public surface — planner opens jar, 30-min spike.
-2. OpenRouter `base-url` + `completions-path` combo — planner runs manual `curl` at smoke time.
-3. `DefaultChatServiceImpl` placement — functional vs. starter auto-config — start in functional, escalate later.
-4. Whether `./gradlew :ai-agent-starter:publishToMavenLocal` triggers `:ai-agent` transitively — use root `publishToMavenLocal` to be safe.
+### Open Questions (RESOLVED — see "Open Questions (RESOLVED)" section above)
+1. `spring-ai-test:2.0.0-M4` public surface — **RESOLVED:** deferred as time-boxed spike in Plan 03 Task 2 with Mockito fallback (D-04 primary).
+2. OpenRouter `base-url` + `completions-path` combo — **RESOLVED:** default `https://openrouter.ai/api/v1` in Plan 01 Task 3; live-smoke validation in Plan 03 Task 2 with documented fallback to `https://openrouter.ai/api`.
+3. `DefaultChatServiceImpl` placement — **RESOLVED:** `@Service` in functional module, component-scanned by `AIConfiguration`; `AIAutoConfiguration` exposes only the `ChatClient` `@Bean`. Locked in Plan 02.
+4. `publishToMavenLocal` scope — **RESOLVED:** root-level `./gradlew publishToMavenLocal` per D-02, used exclusively in Plan 04 Task 1.
 
 ### Ready for Planning
 Research complete. Planner can now create the Phase 1 PLAN with confidence in BOM coords, Boot baseline, module shape, and known pitfalls.
