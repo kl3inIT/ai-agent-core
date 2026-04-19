@@ -2,10 +2,12 @@ package com.vn.agent;
 
 import io.jmix.core.annotation.JmixModule;
 import io.jmix.core.impl.scanning.AnnotationScanMetadataReaderFactory;
+import io.jmix.data.DataConfiguration;
 import io.jmix.eclipselink.EclipselinkConfiguration;
 import io.jmix.flowui.FlowuiConfiguration;
 import io.jmix.flowui.sys.ActionsConfiguration;
 import io.jmix.flowui.sys.ViewControllersConfiguration;
+import io.jmix.security.SecurityConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +20,12 @@ import java.util.Collections;
 @Configuration
 @ComponentScan
 @ConfigurationPropertiesScan
-@JmixModule(dependsOn = {EclipselinkConfiguration.class, FlowuiConfiguration.class})
+@JmixModule(dependsOn = {
+        DataConfiguration.class,
+        SecurityConfiguration.class,
+        EclipselinkConfiguration.class,
+        FlowuiConfiguration.class
+})
 @PropertySource(name = "com.vn.agent", value = "classpath:/com/vn/agent/module.properties")
 public class AIConfiguration {
 
