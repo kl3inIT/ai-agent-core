@@ -7,7 +7,16 @@
 
     <!-- Master changelog for the ai-agent add-on. Hosts MUST include this from their master
          changelog: <include file="/com/vn/agent/liquibase/changelog.xml"/>. Add-on changelogs
-         are NOT auto-discovered by Jmix (verified per Phase 2 research). -->
-    <includeAll path="/com/vn/agent/liquibase/changelog"/>
+         are NOT auto-discovered by Jmix (verified per Phase 2 research).
+
+         Explicit <include> rather than <includeAll> because Liquibase classpath directory
+         scanning fails when the add-on is packaged as a JAR (Maven Local resolution). -->
+    <include file="/com/vn/agent/liquibase/changelog/010-ai-conversation.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/020-ai-message.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/030-ai-tool-call-audit.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/040-ai-parameters.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/050-ai-knowledge-document.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/060-ai-chat-memory.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml"/>
 
 </databaseChangeLog>
