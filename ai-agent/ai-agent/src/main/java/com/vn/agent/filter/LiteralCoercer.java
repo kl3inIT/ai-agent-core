@@ -6,11 +6,7 @@ import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -29,9 +25,9 @@ import java.util.UUID;
  *       {@link UUID#fromString}.</li>
  *   <li>Enum attribute ({@link Range#isEnum()}): value must be a String matching an enum
  *       constant by name; valid names included in {@code expected}.</li>
- *   <li>Datatype attribute ({@link Range#isDatatype()}): dispatch on
- *       {@code datatype.getJavaClass()} — String, UUID, Boolean, Integer, Long, Short,
- *       BigDecimal, Double, Float, LocalDate, LocalDateTime, OffsetDateTime, Instant.</li>
+ *   <li>Datatype attribute ({@link Range#isDatatype()}): delegate to
+ *       {@link Datatype#parse(String)} — Jmix's canonical parser covering every registered
+ *       datatype, including user-defined ones. {@link ParseException} → {@link ToolUserError}.</li>
  *   <li>Anything else → {@code unsupported_type}.</li>
  * </ul>
  *
@@ -149,25 +145,33 @@ public class LiteralCoercer {
     }
 
     private List<String> enumConstantNames(MetaProperty mp) {
-        Object[] constants = mp.getRange().asEnumeration().getJavaClass().getEnumConstants();
-        if (constants == null) {
-            return List.of();
-        }
-        List<String> names = new ArrayList<>(constants.length);
-        for (Object c : constants) {
+        List<?> values = mp.getRange().asEnumeration().getValues();
+        List<String> names = new ArrayList<>(values.size());
+        for (Object c : values) {
             names.add(((Enum<?>) c).name());
         }
         return names;
     }
 
+    /**
+     * Delegate scalar datatype coercion to Jmix's {@link Datatype#parse(String)}. Keeps
+     * three narrow special cases:
+     * <ul>
+     *   <li>UUID — accept only String input (JSON numbers are never UUIDs).</li>
+     *   <li>Boolean — richer acceptance than {@link Datatype} (true/false strings,
+     *       raw JSON boolean), needed for {@code IS_SET}.</li>
+     *   <li>Numeric datatypes — pass JSON {@link Number} through without re-parsing,
+     *       preserving integer/long semantics when the LLM sends a bare number.</li>
+     * </ul>
+     */
     private Object coerceDatatype(Object raw, MetaProperty mp) {
         Datatype<?> dt = mp.getRange().asDatatype();
         Class<?> jc = dt.getJavaClass();
         String propName = mp.getName();
-        String asString = raw.toString();
 
         if (jc == String.class) {
-            return asString;
+            // Avoid an unnecessary Datatype.parse round-trip for String-typed attributes.
+            return raw.toString();
         }
         if (jc == UUID.class) {
             return coerceUuidString(raw, propName, "expected UUID for " + propName);
@@ -175,106 +179,47 @@ public class LiteralCoercer {
         if (jc == Boolean.class) {
             return coerceBoolean(raw, propName);
         }
-        if (jc == Integer.class) {
-            if (raw instanceof Number n) {
-                return n.intValue();
-            }
-            try {
-                return Integer.parseInt(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "Integer");
-            }
+        if (raw instanceof Number n && Number.class.isAssignableFrom(box(jc))) {
+            return narrowNumber(n, jc, propName);
         }
-        if (jc == Long.class) {
-            if (raw instanceof Number n) {
-                return n.longValue();
-            }
-            try {
-                return Long.parseLong(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "Long");
-            }
-        }
-        if (jc == Short.class) {
-            if (raw instanceof Number n) {
-                return n.shortValue();
-            }
-            try {
-                return Short.parseShort(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "Short");
-            }
-        }
-        if (jc == BigDecimal.class) {
-            try {
-                return new BigDecimal(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "BigDecimal");
-            }
-        }
-        if (jc == Double.class) {
-            if (raw instanceof Number n) {
-                return n.doubleValue();
-            }
-            try {
-                return Double.parseDouble(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "Double");
-            }
-        }
-        if (jc == Float.class) {
-            if (raw instanceof Number n) {
-                return n.floatValue();
-            }
-            try {
-                return Float.parseFloat(asString);
-            } catch (NumberFormatException ex) {
-                throw invalidLiteral(propName, "Float");
-            }
-        }
-        if (jc == LocalDate.class) {
-            try {
-                return LocalDate.parse(asString);
-            } catch (RuntimeException ex) {
+
+        String asString = raw.toString();
+        try {
+            Object parsed = dt.parse(asString);
+            if (parsed == null) {
                 throw new ToolUserError("invalid_literal",
-                        "expected ISO-8601 date YYYY-MM-DD for " + propName,
-                        List.of("YYYY-MM-DD"));
+                        "expected " + jc.getSimpleName() + " for " + propName,
+                        List.of(jc.getSimpleName()));
             }
+            return parsed;
+        } catch (ParseException ex) {
+            throw new ToolUserError("invalid_literal",
+                    "expected " + jc.getSimpleName() + " for " + propName,
+                    List.of(jc.getSimpleName()));
         }
-        if (jc == LocalDateTime.class) {
-            try {
-                return LocalDateTime.parse(asString);
-            } catch (RuntimeException ex) {
-                throw new ToolUserError("invalid_literal",
-                        "expected ISO-8601 date-time YYYY-MM-DDTHH:MM:SS for " + propName,
-                        List.of("YYYY-MM-DDTHH:MM:SS"));
-            }
-        }
-        if (jc == OffsetDateTime.class) {
-            try {
-                return OffsetDateTime.parse(asString);
-            } catch (RuntimeException ex) {
-                throw new ToolUserError("invalid_literal",
-                        "expected ISO-8601 offset date-time for " + propName,
-                        List.of("YYYY-MM-DDTHH:MM:SS+HH:MM"));
-            }
-        }
-        if (jc == Instant.class) {
-            try {
-                return Instant.parse(asString);
-            } catch (RuntimeException ex) {
-                throw new ToolUserError("invalid_literal",
-                        "expected ISO-8601 instant for " + propName,
-                        List.of("YYYY-MM-DDTHH:MM:SSZ"));
-            }
-        }
-        throw new ToolUserError("unsupported_type",
-                "no literal coercion for type " + jc.getName());
     }
 
-    private ToolUserError invalidLiteral(String propName, String typeName) {
-        return new ToolUserError("invalid_literal",
-                "expected " + typeName + " for " + propName,
-                List.of(typeName));
+    private static Class<?> box(Class<?> c) {
+        if (c == int.class) return Integer.class;
+        if (c == long.class) return Long.class;
+        if (c == short.class) return Short.class;
+        if (c == double.class) return Double.class;
+        if (c == float.class) return Float.class;
+        if (c == byte.class) return Byte.class;
+        return c;
+    }
+
+    private Object narrowNumber(Number n, Class<?> jc, String propName) {
+        if (jc == Integer.class) return n.intValue();
+        if (jc == Long.class) return n.longValue();
+        if (jc == Short.class) return n.shortValue();
+        if (jc == Double.class) return n.doubleValue();
+        if (jc == Float.class) return n.floatValue();
+        if (jc == java.math.BigDecimal.class) {
+            return new java.math.BigDecimal(n.toString());
+        }
+        throw new ToolUserError("invalid_literal",
+                "expected " + jc.getSimpleName() + " for " + propName,
+                List.of(jc.getSimpleName()));
     }
 }

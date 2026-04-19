@@ -80,6 +80,20 @@ class FilterDslMapperTest {
         @SuppressWarnings({"unchecked", "rawtypes"})
         Class raw = javaClass;
         lenient().when(dt.getJavaClass()).thenReturn(raw);
+        // LiteralCoercer (after finding #1) delegates scalar datatype parsing to Datatype.parse.
+        // For test fixtures using BigDecimal amount with string values like "10", stub parse
+        // to echo back a BigDecimal. String and Boolean short-circuit inside the coercer.
+        try {
+            lenient().when(dt.parse(anyString())).thenAnswer(inv -> {
+                String s = inv.getArgument(0);
+                if (javaClass == java.math.BigDecimal.class) return new java.math.BigDecimal(s);
+                if (javaClass == Long.class) return Long.valueOf(s);
+                if (javaClass == Integer.class) return Integer.valueOf(s);
+                return s;
+            });
+        } catch (java.text.ParseException e) {
+            throw new AssertionError(e);
+        }
         return mp;
     }
 
