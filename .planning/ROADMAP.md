@@ -123,6 +123,15 @@ Plans:
 
 **Needs research phase:** Partial — verify M4 `MethodToolCallback.Builder` signature.
 
+**Plans:** 5 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — MetamodelScanner + EffectiveSchemaComputer + schema DTOs (TOOL-01, TOOL-02)
+- [ ] 03-02-PLAN.md — FilterNode DSL + LiteralCoercer + FilterDslMapper with DeMorgan NOT + depth cap (TOOL-05, TOOL-06)
+- [ ] 03-03-PLAN.md — ToolResultFormatter (<data> wrapping) + BuiltInDataTools (six @Tool methods) + AgentToolCallbacks + AiToolsAutoConfiguration (TOOL-03, TOOL-04, TOOL-06, TOOL-07)
+- [ ] 03-04-PLAN.md — Unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest (TOOL-08, TEST-02)
+- [ ] 03-05-PLAN.md — OrderSummaryToolContributor host SPI impl + ChatServiceToolIntegrationTest (SPI-01)
+
 ---
 
 ### Phase 4 — Orchestration Core
