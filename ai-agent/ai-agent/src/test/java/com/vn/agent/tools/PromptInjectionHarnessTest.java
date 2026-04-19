@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Phase 3 success criterion #5 + Pitfall 4 (delimiter-escape bypass) prompt-injection
- * harness. Seeds a Phase 2 {@link AiMessage} with a hostile value in the user-editable
+ * harness. Seeds a Phase 2 {@link AiMessage} with a hostile value in the untrusted-text
  * String attribute {@code content} and asserts {@link ToolResultFormatter#record} wraps
  * it in {@code <data>...</data>} and HTML-escapes literal delimiters inside the value.
  *
@@ -38,7 +38,7 @@ class PromptInjectionHarnessTest {
     SystemAuthenticator systemAuthenticator;
 
     @Test
-    void userEditableStringIsWrappedInDataDelimiters() {
+    void untrustedTextValueIsWrappedInDataDelimiters() {
         systemAuthenticator.runWithSystem(() -> {
             AiMessage entity = metadata.create(AiMessage.class);
             entity.setContent(ATTACK);

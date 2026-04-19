@@ -41,27 +41,17 @@ public class EffectiveSchemaComputer {
      * {@code @SystemLevel} entities (same policy as the scanner).
      */
     public Map<MetaClass, Set<String>> forCurrentUser() {
-        Map<MetaClass, Set<String>> out = new LinkedHashMap<>();
-        for (MetaClass mc : metadata.getSession().getClasses()) {
-            if (mc.getJavaClass().isAnnotationPresent(SystemLevel.class)) {
+        Map<MetaClass, Set<String>> readableAttributeNamesByEntity = new LinkedHashMap<>();
+        for (MetaClass metaClass : metadata.getSession().getClasses()) {
+            if (isSystemLevelEntity(metaClass)) {
                 continue;
             }
-            CrudEntityContext ec = new CrudEntityContext(mc);
-            accessManager.applyRegisteredConstraints(ec);
-            if (!ec.isReadPermitted()) {
+            if (!canReadEntity(metaClass)) {
                 continue;
             }
-            Set<String> visible = new LinkedHashSet<>();
-            for (MetaProperty mp : mc.getProperties()) {
-                EntityAttributeContext ac = new EntityAttributeContext(mc, mp.getName());
-                accessManager.applyRegisteredConstraints(ac);
-                if (ac.canView()) {
-                    visible.add(mp.getName());
-                }
-            }
-            out.put(mc, visible);
+            readableAttributeNamesByEntity.put(metaClass, collectReadableAttributeNames(metaClass));
         }
-        return out;
+        return readableAttributeNamesByEntity;
     }
 
     /**
@@ -69,19 +59,34 @@ public class EffectiveSchemaComputer {
      * during depth-cap path validation (D-08). {@code attrPath} may be a dotted path (e.g.
      * {@code "customer.region.code"}) — {@code EntityAttributeContext} accepts property paths.
      */
-    public boolean canReadAttribute(MetaClass mc, String attrPath) {
-        EntityAttributeContext ac = new EntityAttributeContext(mc, attrPath);
-        accessManager.applyRegisteredConstraints(ac);
-        return ac.canView();
+    public boolean canReadAttribute(MetaClass metaClass, String attributePath) {
+        EntityAttributeContext attributeAccessContext =
+                new EntityAttributeContext(metaClass, attributePath);
+        accessManager.applyRegisteredConstraints(attributeAccessContext);
+        return attributeAccessContext.canView();
     }
-
+    
     /**
      * Per-request entity read-access check. Used by the filter mapper when walking relationship
      * hops and by {@code BuiltInDataTools.resolveOrError(...)}.
      */
-    public boolean canReadEntity(MetaClass mc) {
-        CrudEntityContext ec = new CrudEntityContext(mc);
-        accessManager.applyRegisteredConstraints(ec);
-        return ec.isReadPermitted();
+    public boolean canReadEntity(MetaClass metaClass) {
+        CrudEntityContext entityAccessContext = new CrudEntityContext(metaClass);
+        accessManager.applyRegisteredConstraints(entityAccessContext);
+        return entityAccessContext.isReadPermitted();
+    }
+
+    private boolean isSystemLevelEntity(MetaClass metaClass) {
+        return metaClass.getJavaClass().isAnnotationPresent(SystemLevel.class);
+    }
+
+    private Set<String> collectReadableAttributeNames(MetaClass metaClass) {
+        Set<String> readableAttributeNames = new LinkedHashSet<>();
+        for (MetaProperty metaProperty : metaClass.getProperties()) {
+            if (canReadAttribute(metaClass, metaProperty.getName())) {
+                readableAttributeNames.add(metaProperty.getName());
+            }
+        }
+        return readableAttributeNames;
     }
 }
