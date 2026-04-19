@@ -6,6 +6,7 @@ import com.vn.agent.metadata.AiAttributeInfo;
 import com.vn.agent.metadata.AiEntityInfo;
 import com.vn.agent.metadata.MetamodelScanner;
 import io.jmix.core.EntityStates;
+import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
@@ -34,13 +35,16 @@ public class ToolResultFormatter {
     private final ObjectMapper objectMapper;
     private final MetamodelScanner scanner;
     private final EntityStates entityStates;
+    private final MetadataTools metadataTools;
 
     public ToolResultFormatter(ObjectMapper objectMapper,
                                MetamodelScanner scanner,
-                               EntityStates entityStates) {
+                               EntityStates entityStates,
+                               MetadataTools metadataTools) {
         this.objectMapper = objectMapper;
         this.scanner = scanner;
         this.entityStates = entityStates;
+        this.metadataTools = metadataTools;
     }
 
     // ---- public API ----
@@ -155,16 +159,21 @@ public class ToolResultFormatter {
             Object v = EntityValues.getValue(entity, mp.getName());
             if (v instanceof String s && userEditable.contains(mp.getName())) {
                 row.put(mp.getName(), "<data>" + escapeDataDelimiters(s) + "</data>");
-            } else if (v instanceof Collection<?>) {
-                // Collections of related entities: leave to downstream tools; render as null
-                // to avoid accidentally serializing a lazy-loaded graph. get_related_records
-                // is the supported path.
-                row.put(mp.getName(), null);
+            } else if (v instanceof Collection<?> col) {
+                // Collection-valued attribute. When loaded, emit {_collectionSize: n} so the LLM
+                // can distinguish "empty" from "not fetched" (null). get_related_records is the
+                // supported path to drill into the actual rows (D-12).
+                Map<String, Object> sizeOnly = new LinkedHashMap<>();
+                sizeOnly.put("_collectionSize", col.size());
+                row.put(mp.getName(), sizeOnly);
             } else if (v != null && mp.getRange().isClass()) {
-                // Reference attribute: serialize the target's instance-name fragment by name only,
-                // to avoid recursing and to avoid double-wrapping. Callers use get_record /
-                // get_related_records to drill further (D-12).
-                row.put(mp.getName(), String.valueOf(v));
+                // Reference attribute: render via MetadataTools.getInstanceName (canonical Jmix
+                // instance-name) wrapped in <data>...</data>. Instance names are derived from
+                // user-editable fields, so the <data> wrap + delimiter escape closes the gap
+                // where a malicious @InstanceName field would otherwise bypass TOOL-07/D-13.
+                String instanceName = metadataTools.getInstanceName(v);
+                row.put(mp.getName(),
+                        "<data>" + escapeDataDelimiters(instanceName) + "</data>");
             } else {
                 row.put(mp.getName(), v);
             }
