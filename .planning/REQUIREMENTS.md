@@ -1,17 +1,17 @@
 # Requirements — Jmix AI Copilot (ai-agent-core)
 
 **Version:** v1 (MVP)
-**Last updated:** 2026-04-18 (D-10 applied)
+**Last updated:** 2026-04-19 (post-forensics sync)
 
 ## v1 Requirements
 
 ### Packaging & Distribution
 
-- [ ] **PKG-01**: Add-on ships as four Gradle modules under `ai-agent/`: `ai-agent` (functional), `ai-agent-starter`, `ai-agent-flowui`, `ai-agent-flowui-starter`
-- [ ] **PKG-02**: Each starter registers auto-configuration via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
-- [ ] **PKG-03**: Add-on declares `@JmixModule(dependsOn = {CoreConfiguration.class, DataConfiguration.class, SecurityConfiguration.class, FlowuiConfiguration.class})` where appropriate
-- [ ] **PKG-04**: Functional module (`ai-agent`) contains zero Vaadin/Flow UI dependencies — consumable by REST-only hosts
-- [ ] **PKG-05**: Clean-consumer smoke test: `publishToMavenLocal` + fresh Jmix project consumes `ai-agent-flowui-starter` and boots with default config
+- [ ] **PKG-01**: Add-on ships today as two Gradle modules under `ai-agent/`: `ai-agent` (functional) + `ai-agent-starter`. The `ai-agent-flowui` / `ai-agent-flowui-starter` split is deferred until a named REST-only consumer use case justifies it.
+- [ ] **PKG-02**: Active starter modules register auto-configuration via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+- [ ] **PKG-03**: Add-on declares `@JmixModule(dependsOn = {CoreConfiguration.class, DataConfiguration.class, SecurityConfiguration.class, FlowuiConfiguration.class})` where appropriate for the current packaging shape
+- [ ] **PKG-04**: Zero-Vaadin functional-module posture is deferred with the 4-module split; current 2-module packaging keeps UI dependencies in `ai-agent-starter`
+- [ ] **PKG-05**: Clean-consumer smoke test: `publishToMavenLocal` + fresh Jmix project consumes `ai-agent-starter` and boots with default config
 
 ### Entities, Data & Security
 
@@ -114,7 +114,7 @@
 - [ ] **TEST-04**: Security negative-case suite: user without read access to an entity receives filtered schema AND execution is denied; RAG retrieval filters out forbidden roles; cross-user conversation access denied
 - [ ] **TEST-05**: `@Tag("live")` opt-in tier uses semantic-similarity assertions (`spring-ai-test`) — no brittle exact-text asserts
 - [ ] **TEST-06**: (removed per D-10 — ArchUnit rules deferred per MEMORY note "Avoid ArchUnit until drift"). Code review + the existing forbidden-import convention in CLAUDE.md remain authoritative until rule drift justifies ArchUnit.
-- [ ] **TEST-07**: Clean-consumer smoke: `publishToMavenLocal` → fresh minimal Jmix app consumes `ai-agent-flowui-starter` → boots + menu registers (runs in CI on release)
+- [ ] **TEST-07**: Clean-consumer smoke: `publishToMavenLocal` → fresh minimal Jmix app consumes `ai-agent-starter` → boots + menu registers (runs in CI on release)
 
 ## v2 Requirements (deferred)
 

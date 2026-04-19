@@ -3,7 +3,7 @@
 **Version:** v1 (MVP)
 **Granularity:** Coarse
 **Phases:** 8
-**Last updated:** 2026-04-18 (D-10 applied)
+**Last updated:** 2026-04-19 (post-forensics sync)
 
 ## Phase Summary
 
@@ -26,7 +26,7 @@
 
 ### Phase 1 — Walking Skeleton & Packaging De-risk
 
-**Goal:** Prove the add-on skeleton (4 modules, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 1.1.4 pinned via BOM (upgraded from 1.0.2 between Phase 1 wave start and Phase 2 start, per D-10), and de-risk milestone-release API drift before committing to architecture.
+**Goal:** Prove the add-on skeleton (current 2-module shape, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 1.1.4 pinned via BOM (upgraded from 1.0.2 between Phase 1 wave start and Phase 2 start, per D-10), and de-risk milestone-release API drift before committing to architecture.
 
 **Requirements:** PKG-01, PKG-02, PKG-03, PKG-04, PKG-05, TEST-01 (scaffold only)
 
@@ -53,7 +53,7 @@ Plans:
 - [x] 01-01-PLAN.md — Gradle/BOM wiring + excludeTags + jmix-app application.yaml
 - [x] 01-02-PLAN.md — ChatService API + DefaultChatServiceImpl + AIAutoConfiguration ChatClient bean
 - [x] 01-03-PLAN.md — ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"))
-- [ ] 01-04-PLAN.md — Version matrix + consumer-smoke doc + jmix-app CommandLineRunner injection proof + ROADMAP/PROJECT updates
+- [x] 01-04-PLAN.md — Version matrix + consumer-smoke doc + jmix-app CommandLineRunner injection proof + ROADMAP/PROJECT updates
 
 ---
 
@@ -85,16 +85,16 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Entity enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + enum i18n
-- [ ] 02-02-PLAN.md — Six SPI interfaces + ToolVetoedException in com.vn.agent.spi
-- [ ] 02-03-PLAN.md — Five JPA entities (AiConversation, AiMessage, AiToolCallAudit, AiParameters, AiKnowledgeDocument) + entity/attribute i18n
-- [ ] 02-04-PLAN.md — Add-on master changelog + five step changelogs (010-050) + host <include> edit (D-02 correction)
-- [ ] 02-05-PLAN.md — SPRING_AI_CHAT_MEMORY changeset (Postgres + HSQLDB variants) + application.properties initialize-schema:never
-- [ ] 02-06-PLAN.md — pgvector extension + AI_AGENT_KB_VECTOR_STORE table + HNSW index (Postgres-only with preCondition gating)
-- [ ] 02-07-PLAN.md — SpiDefaultsAutoConfiguration with six @ConditionalOnMissingBean no-op beans
-- [ ] 02-08-PLAN.md — AiAgentUserRole, AiAgentAdminRole, AiAgentUserRowLevelRole + role i18n
-- [ ] 02-09-PLAN.md — AIConfiguration @JmixModule dependsOn widened to include DataConfiguration + SecurityConfiguration
-- [ ] 02-10-PLAN.md — FoundationsBootSmokeTest (5 @Test methods: Liquibase, entities, row-level, SPI defaults, roles)
-- [ ] 02-11-PLAN.md — D-10 doc updates (REQUIREMENTS, ROADMAP, PROJECT, STACK) + D-02 Liquibase-include correction
+- [x] 02-02-PLAN.md — Six SPI interfaces + ToolVetoedException in com.vn.agent.spi
+- [x] 02-03-PLAN.md — Five JPA entities (AiConversation, AiMessage, AiToolCallAudit, AiParameters, AiKnowledgeDocument) + entity/attribute i18n
+- [x] 02-04-PLAN.md — Add-on master changelog + five step changelogs (010-050) + host <include> edit (D-02 correction)
+- [x] 02-05-PLAN.md — SPRING_AI_CHAT_MEMORY changeset (Postgres + HSQLDB variants) + application.properties initialize-schema:never
+- [x] 02-06-PLAN.md — pgvector extension + AI_AGENT_KB_VECTOR_STORE table + HNSW index (Postgres-only with preCondition gating)
+- [x] 02-07-PLAN.md — SpiDefaultsAutoConfiguration with six @ConditionalOnMissingBean no-op beans
+- [x] 02-08-PLAN.md — AiAgentUserRole, AiAgentAdminRole, AiAgentUserRowLevelRole + role i18n
+- [x] 02-09-PLAN.md — AIConfiguration @JmixModule dependsOn widened to include DataConfiguration + SecurityConfiguration
+- [x] 02-10-PLAN.md — FoundationsBootSmokeTest (5 @Test methods: Liquibase, entities, row-level, SPI defaults, roles)
+- [x] 02-11-PLAN.md — D-10 doc updates (REQUIREMENTS, ROADMAP, PROJECT, STACK) + D-02 Liquibase-include correction
 
 ---
 

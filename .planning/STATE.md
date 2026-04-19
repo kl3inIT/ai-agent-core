@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-last_updated: "2026-04-19T05:46:47.232Z"
+last_updated: "2026-04-19T06:32:23Z"
 progress:
-  total_phases: 3
+  total_phases: 8
   completed_phases: 2
   total_plans: 15
   completed_plans: 15
-  percent: 100
+  percent: 25
 ---
 
 # Project State
@@ -22,7 +22,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 02 — Foundations (all 11 plans complete; static verification PASS; human-verify Gradle test + boot pending merge)
+**Current focus:** Phase 03 — Metadata-First Runtime & Six Tools (context captured; documentation consistency repaired; planning next). Phase 02 human verification and branch merge remain pending.
 
 ## Phase Status
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 |---|-------|--------|
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
 | 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
-| 3 | Metadata-First Runtime & Six Tools | Not started |
+| 3 | Metadata-First Runtime & Six Tools | Context captured; planning pending |
 | 4 | Orchestration Core | Not started |
 | 5 | RAG Layer | Not started |
 | 6 | Parameters, Structured Output & Guardrails | Not started |
@@ -39,13 +39,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 ## Active Milestone
 
-**MVP v1** — 8 phases, 73 requirements. 1/8 phases complete.
+**MVP v1** — 8 phases, 69 requirements. 2/8 phases complete.
 
 ## Phase 01 Outcome
 
 All 4 plans completed and merged into master:
 
-- 01-01: Spring AI BOM pinned at **1.0.2** (downgrade from 2.0.0-M4 due to Spring 7 / Jmix 2.8 incompatibility), OpenRouter wired, liveTest task split
+- 01-01: Spring AI BOM pinned at **1.1.4** (landed on 1.0.2 initially; upgraded before Phase 2 completion per D-10), OpenRouter wired, liveTest task split
 - 01-02: ChatService SPI + DefaultChatServiceImpl + AIAutoConfiguration ChatClient @Bean
 - 01-03: ChatServiceMockTest + ChatServiceLiveTest (@Tag("live"), opt-in)
 - 01-04: docs/versions.md, docs/consumer-smoke.md, ChatServiceSmokeRunner injection proof, ROADMAP/PROJECT D-01
@@ -91,3 +91,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | Phase 1 plans/summaries | `.planning/phases/01-walking-skeleton/` |
 | Codebase map | `.planning/codebase/` |
 | Config | `.planning/config.json` |
+
+## Session Tracking
+
+- 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
