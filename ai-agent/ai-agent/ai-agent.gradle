@@ -27,6 +27,9 @@ dependencies {
 
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'org.hsqldb:hsqldb'
+
+    // Phase 3 Plan 04 (D-16): bytecode scan of BuiltInDataTools for read-only enforcement.
+    testImplementation 'org.ow2.asm:asm:9.7'
 }
 
 configurations.implementation {
