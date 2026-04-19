@@ -1,5 +1,7 @@
 package com.vn.agent.spi;
 
+import java.util.List;
+
 /**
  * Host extension point for contributing additional {@code @Tool}-annotated beans to the agent.
  * <p>Spring AI 2.x tool-callback resolution consumes every ToolContributor bean in the
@@ -19,5 +21,5 @@ package com.vn.agent.spi;
  */
 public interface ToolContributor {
     /** @return beans whose {@code @Tool} methods should be exposed; empty list = no contribution. */
-    java.util.List<Object> contribute();
+    List<Object> contribute();
 }

@@ -11,6 +11,17 @@
 
          Explicit <include> rather than <includeAll> because Liquibase classpath directory
          scanning fails when the add-on is packaged as a JAR (Maven Local resolution). -->
+
+    <!-- Liquibase type properties. Declared here so the add-on's integration tests
+         (which load only this changelog) can resolve ${uuid.type}. Hosts that also
+         declare these properties will get a harmless override. -->
+    <property name="uuid.type" value="uuid" dbms="postgresql"/>
+    <property name="uuid.type" value="varchar(36)" dbms="hsqldb"/>
+    <property name="uuid.type" value="uniqueidentifier" dbms="mssql"/>
+    <property name="offsetDateTime.type" value="timestamp with time zone" dbms="postgresql"/>
+    <property name="offsetDateTime.type" value="timestamp" dbms="hsqldb"/>
+    <property name="offsetDateTime.type" value="datetimeoffset" dbms="mssql"/>
+
     <include file="/com/vn/agent/liquibase/changelog/010-ai-conversation.xml"/>
     <include file="/com/vn/agent/liquibase/changelog/020-ai-message.xml"/>
     <include file="/com/vn/agent/liquibase/changelog/030-ai-tool-call-audit.xml"/>

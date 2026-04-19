@@ -1,5 +1,7 @@
 package com.vn.agent.spi;
 
+import java.util.Map;
+
 /**
  * Host extension point that can veto a tool invocation before it runs.
  * <p>Multiple guards compose by short-circuit AND: any guard throwing {@link ToolVetoedException}
@@ -25,5 +27,5 @@ public interface ToolGuard {
      * @param arguments the resolved tool arguments as a map
      * @throws ToolVetoedException when the invocation must be blocked
      */
-    void check(String toolName, java.util.Map<String, Object> arguments) throws ToolVetoedException;
+    void check(String toolName, Map<String, Object> arguments) throws ToolVetoedException;
 }

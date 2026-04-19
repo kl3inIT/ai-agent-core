@@ -1,5 +1,6 @@
 package com.vn.agent.spi;
 
+import java.util.Map;
 /**
  * Host extension point for injecting <b>app-specific</b> per-request context into the
  * tool-execution ToolContext. Fires once per {@code ChatService.ask}/{@code stream} call,
@@ -30,5 +31,5 @@ public interface ContextContributor {
      *            reserved {@code agent.*} baseline keys. Add app-specific entries under
      *            a host-owned namespace; do not touch {@code agent.*}.
      */
-    void contribute(java.util.Map<String, Object> bag);
+    void contribute(Map<String, Object> bag);
 }

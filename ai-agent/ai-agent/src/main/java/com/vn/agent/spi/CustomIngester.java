@@ -1,5 +1,9 @@
 package com.vn.agent.spi;
 
+import org.springframework.ai.document.Document;
+
+import java.util.List;
+
 /**
  * Host extension point to plug in custom knowledge-base ingestion sources
  * (S3, Confluence, SharePoint, classpath markdown, etc.).
@@ -18,5 +22,5 @@ public interface CustomIngester {
     String getDisplayName();
 
     /** Pull documents from the source; Phase 5 splits + embeds + writes to the vector store. */
-    java.util.List<org.springframework.ai.document.Document> read();
+    List<Document> read();
 }

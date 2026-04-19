@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "postgres-mcp-pro": {
+      "command": "C:\\Users\\admin\\.local\\bin\\uvx.exe",
+      "args": ["postgres-mcp", "--access-mode=unrestricted"],
+      "env": {
+        "DATABASE_URI": "postgresql://postgres:admin123@10.123.123.174:5555/ai-agent"
+      }
+    }
+  }
+}
