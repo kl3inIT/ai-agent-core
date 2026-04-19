@@ -1,7 +1,29 @@
 # Phase 3 — Jmix-Reuse Review (v2, from scratch)
 
 Reviewed: 2026-04-19
+Fixed: 2026-04-19
 Lens: six justified concerns only; everything else is duplication suspect.
+
+## Fix status (2026-04-19)
+
+| # | Severity | Finding | Status | Commit |
+|---|---|---|---|---|
+| 1 | HIGH | LiteralCoercer → `Datatype.parse` | **FIXED** | `aa912be` |
+| 2 | MEDIUM | MetamodelScanner trim (enum via `asEnumeration`, drop `collectValidationConstraints`, `maxLength` from `getColumn`) | **FIXED** (folded into #3) | `7a4a17c` |
+| 3 | MEDIUM | Delete `AiSchema`/`AiEntityInfo`/`AiAttributeInfo`; compose describe live | **FIXED** | `7a4a17c` |
+| 4 | MEDIUM | `countRecords` JPQL concat | **PARTIAL** — factored behind `buildCountContext` helper (Jmix 2.8 fluent `getCount()` not available) | `1a4ed2e` |
+| 5 | LOW | Collection-valued attributes emit `{_collectionSize}` when loaded | **FIXED** | `81274d7` |
+| 6 | LOW | Reference serialization via `MetadataTools.getInstanceName` wrapped in `<data>` | **FIXED** | `81274d7` |
+| 7 | LOW | `FilterDslMapper` NOT via `LogicalCondition.NOT` | **SKIPPED** — verified Jmix 2.8 `LogicalCondition.Type` only exposes `AND`/`OR`; DeMorgan expansion stays | — |
+| 8 | LOW | `SpiDefaultsAutoConfiguration` no-op defaults | **DEFERRED** to Phase 6 (per original review recommendation) | — |
+
+**Verification:** `./gradlew :ai-agent:ai-agent:test` — BUILD SUCCESSFUL after all fixes.
+
+**Net impact of #3/#7:** `EffectiveSchemaComputer` now returns `Map<MetaClass, Set<String>>`; `MetamodelScanner` owns only `UserEditableStringIndex`; `ToolResultFormatter.describe(mc, allowedAttrs)` computes typeLabel / caption / enum values / maxLength live from `MetaClass` + `MessageTools` + `@Column`. Locale-sensitive by construction, never cached.
+
+---
+
+## Original review (preserved below)
 
 ## Verdict
 
