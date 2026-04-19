@@ -2,6 +2,7 @@ package com.vn.agent.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.metadata.MetamodelScanner;
+import io.jmix.core.EntityStates;
 import io.jmix.core.metamodel.model.MetaClass;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ class ToolResultFormatterTest {
 
     @Test
     void errorDtoSerializesErrorAndReason() {
-        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class));
+        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class), mock(EntityStates.class));
         String json = f.error("bad_filter", "depth exceeded");
         assertThat(json)
                 .contains("\"error\":\"bad_filter\"")
@@ -51,7 +52,7 @@ class ToolResultFormatterTest {
 
     @Test
     void errorFromToolUserErrorSerializesExpectedList() {
-        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class));
+        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class), mock(EntityStates.class));
         ToolUserError e = new ToolUserError("unknown_operation", "bad",
                 java.util.List.of("EQUAL", "NOT_EQUAL"));
         String json = f.error(e);
@@ -63,7 +64,7 @@ class ToolResultFormatterTest {
 
     @Test
     void countSerializesEntityNameAndCount() {
-        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class));
+        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class), mock(EntityStates.class));
         MetaClass mc = mock(MetaClass.class);
         when(mc.getName()).thenReturn("jmixapp_Order");
 
@@ -75,7 +76,7 @@ class ToolResultFormatterTest {
 
     @Test
     void toJsonWrapsArbitraryValue() {
-        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class));
+        ToolResultFormatter f = new ToolResultFormatter(new ObjectMapper(), mock(MetamodelScanner.class), mock(EntityStates.class));
         String json = f.toJson(java.util.List.of(java.util.Map.of("name", "foo")));
         assertThat(json).isEqualTo("[{\"name\":\"foo\"}]");
     }
