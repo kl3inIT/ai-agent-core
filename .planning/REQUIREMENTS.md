@@ -33,7 +33,7 @@
 - [x] **TOOL-05**: `find_records` accepts a structured filter DSL (attribute + operator + literal) mapped to `Condition.createAnd(...)` — not free-text JPQL
 - [ ] **TOOL-06**: Hard row-count cap (default 20, max 100) on every collection-returning tool; LLM cannot override
 - [ ] **TOOL-07**: Tool result formatter wraps user-editable string fields in `<data>…</data>` delimiters with escaping to defuse prompt injection
-- [ ] **TOOL-08**: Read-only posture enforced by code review + unit tests asserting each tool class's public methods call only `DataManager` read-path operations (`DataManager.load` / `DataManager.getCount` / `DataManager.loadValues`). (ArchUnit deferred per D-10 and MEMORY note "Avoid ArchUnit until drift".)
+- [x] **TOOL-08**: Read-only posture enforced by code review + unit tests asserting each tool class's public methods call only `DataManager` read-path operations (`DataManager.load` / `DataManager.getCount` / `DataManager.loadValues`). (ArchUnit deferred per D-10 and MEMORY note "Avoid ArchUnit until drift".) [Plan 03-04 `BuiltInDataToolsReadOnlyTest` — ASM bytecode scan; sabotage-and-revert validated.]
 
 ### Orchestration (ChatClient + Advisors + Memory)
 
