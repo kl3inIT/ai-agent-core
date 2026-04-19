@@ -486,9 +486,9 @@ Use `public record X(...)` — no Lombok, no builders.
 ```
 
 ### Thin Adapter over Jmix Built-ins (added 2026-04-20, post-execute)
-**Source:** Refactor of Plan 03-01's six metadata classes (`AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex`, `MetamodelScanner`, `EffectiveSchemaComputer`) into a single adapter `com.vn.agent.metadata.CurrentUserSchemaAccess`.
+**Source:** post-execute refactor of Plan 03-01's six metadata classes (`AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex`, `MetamodelScanner`, `EffectiveSchemaComputer` — all collapsed) into a single adapter `com.vn.agent.metadata.CurrentUserSchemaAccess`.
 **User feedback:** `memory/feedback_reuse_jmix_builtins.md` — "Reuse Jmix built-ins over parallel layers." Audit against `Metadata` / `AccessManager` / `DataManager` / `FetchPlan` / `MetadataTools` first; own only the thin LLM adapter (schema shape, literal coercion, path depth, result limits, injection-safe formatting).
-**Apply to:** Any future metadata-to-LLM surface. Do NOT build parallel DTO trees (`AiSchema` etc.) that mirror Jmix's `MetaClass` / `MetaProperty`. Instead expose a 3-method adapter (`getReadableSchema`, `canReadAttribute`, `canReadEntity`) that delegates to `Metadata` + `AccessManager` per-call and returns Jmix types directly where possible.
+**Apply to:** Any future metadata-to-LLM surface. Do NOT build parallel DTO trees (`AiSchema` etc. — previously; collapsed post-execute) that mirror Jmix's `MetaClass` / `MetaProperty`. Instead expose a 3-method adapter (`getReadableSchema`, `canReadAttribute`, `canReadEntity`) that delegates to `Metadata` + `AccessManager` per-call and returns Jmix types directly where possible.
 **Lesson learned:** Front-loading six DTO records + two service beans added surface area without paying for itself — every call site already had `Metadata` and `AccessManager` available.
 
 ### Authenticated Code Section in Test
