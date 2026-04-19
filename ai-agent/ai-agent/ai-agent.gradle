@@ -13,6 +13,14 @@ dependencies {
     }
     testImplementation 'org.springframework.boot:spring-boot-starter-web'
 
+    // FoundationsBootSmokeTest (plan 02-10) references the add-on's
+    // auto-configuration classes (AIAutoConfiguration, SpiDefaultsAutoConfiguration)
+    // directly via @ImportAutoConfiguration. Those classes live in the sibling
+    // ai-agent-starter module, so pull it onto the TEST classpath only. This is
+    // test-scoped and does NOT create a production-cycle: ai-agent-starter's
+    // `api project(':ai-agent')` continues to be the single compile-time direction.
+    testImplementation project(':ai-agent-starter')
+
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'org.hsqldb:hsqldb'
 }
