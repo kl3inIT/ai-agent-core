@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@bytebase/dbhub",
+        "--dsn",
+        "postgresql://postgres:admin123@10.123.123.174:5555/traffic_law"
+      ]
+    }
+  }
+}
