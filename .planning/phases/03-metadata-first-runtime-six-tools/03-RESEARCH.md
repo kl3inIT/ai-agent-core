@@ -723,34 +723,34 @@ class ChatServiceToolIntegrationTest {
 | A6 | Scanner running on `ApplicationReadyEvent` is early enough for the first request | Scanner code example | LOW — Jmix `Metadata` is fully initialized by then. Phase 1/2 patterns confirm. |
 | A7 | The `ToolContributor` no-op default from Phase 2 returns `List.of()` and will not interfere with assembly | AgentToolCallbacks code | VERIFIED — read `SpiDefaultsAutoConfiguration.java`: `return Collections::emptyList;`. Not assumed. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **NOT-operator mapping strategy** (D-06 specifies `{not: {...}}` but `LogicalCondition` has no `.not()`).
    - What we know: `PropertyCondition` has negative counterparts (`NOT_EQUAL`, `DOES_NOT_CONTAIN`, `NOT_IN_LIST`, `IS_SET(false)`); Jmix 2.5 API docs don't show a `LogicalCondition.not()`.
    - What's unclear: whether Jmix 2.8 added it; whether `JpqlCondition("not (" + …)` is an acceptable escape hatch.
-   - **Recommendation:** Implement DeMorgan expansion in `FilterDslMapper` recursively. Verify `LogicalCondition.not()` absence on Jmix 2.8 before committing. If found, prefer it.
+   - **RESOLVED:** Implement DeMorgan expansion in `FilterDslMapper` recursively. Verify `LogicalCondition.not()` absence on Jmix 2.8 before committing. If found, prefer it.
 
 2. **ASM vs JDK reflection for D-16 test.**
    - What we know: ASM is already in the Gradle transitive graph via Spring Boot; requires only adding a test-scope dep. JDK reflection can walk bytecode via `ClassLoader.getResourceAsStream(ClassName.replace('.', '/') + ".class")` and a simple constant-pool scan.
    - What's unclear: which is more maintainable. ASM is ~30 LOC; JDK-only is ~80 LOC.
-   - **Recommendation:** ASM. Add `testImplementation 'org.ow2.asm:asm:9.7'` to `ai-agent/ai-agent.gradle`. Trivial, reliable, stable API.
+   - **RESOLVED:** ASM. Add `testImplementation 'org.ow2.asm:asm:9.7'` to `ai-agent/ai-agent.gradle`. Trivial, reliable, stable API.
 
 3. **Entity-name prefix handling (`jmixapp_Order` vs `Order`).**
    - What we know: `@Entity(name = "jmixapp_Order")` in `jmix-app`; Jmix expects this form in `metadata.getClass(name)`.
    - What's unclear: whether collisions across add-ons matter for an LLM user (LLMs handle longer names fine).
-   - **Recommendation:** Expose the verbatim Jmix name to the LLM. Pair with localized display label so the LLM can render the user-friendly name while referencing the stable id.
+   - **RESOLVED:** Expose the verbatim Jmix name to the LLM. Pair with localized display label so the LLM can render the user-friendly name while referencing the stable id.
 
 4. **D-15 sample tool selection.**
    - What we know: `jmix-app` has `Customer`, `Order`, `OrderLine`, `Product`, `User`. `Order` has a `totalAmount` computed from lines and a relation to `Customer`.
-   - Recommendation: an `OrderSummaryToolContributor` that takes `customerId` and returns recent-order summaries with totals. Joins two entities, exercises per-request assembly, illustrates the real host extension pattern.
+   - **RESOLVED:** an `OrderSummaryToolContributor` that takes `customerId` and returns recent-order summaries with totals. Joins two entities, exercises per-request assembly, illustrates the real host extension pattern.
 
 5. **`DataManager.getCount` with `Condition`.**
    - What we know: `DataManager` has a `getCount(LoadContext)` overload.
    - What's unclear: cleanest Jmix 2.8 idiom for count-with-condition.
-   - **Recommendation:** planner verifies during implementation via Jmix skill (`jmix-services`). Likely: `LoadContext.createQuery(jpql).setCondition(c)` then `dataManager.getCount(loadContext)`.
+   - **RESOLVED:** planner verifies during implementation via Jmix skill (`jmix-services`). Likely: `LoadContext.createQuery(jpql).setCondition(c)` then `dataManager.getCount(loadContext)`.
 
 6. **`@Scope("request")` vs stateless `@Component` for `EffectiveSchemaComputer`.**
-   - **Recommendation:** stateless. `AccessManager` and `CurrentAuthentication` already resolve per-call; stateless is simpler and thread-safe.
+   - **RESOLVED:** stateless. `AccessManager` and `CurrentAuthentication` already resolve per-call; stateless is simpler and thread-safe.
 
 ## Environment Availability
 

@@ -186,6 +186,8 @@ Deliverables:
 - **Mutation tools (create/update/delete)** — v2. `MutationTool` SPI scaffolding deferred until after v1 ships.
 - **Auto-ingesting host entity records into the vector store** — out of scope per PROJECT.md; `DataManager` is the source of truth for structured data.
 - **ArchUnit rules** — dropped per D-09; revisit only if the rule set grows or drift appears.
+- **ChatService-routed variant of success criterion #3 (find_records through ChatService)** — Phase 3 covers the `find_records` round-trip by invoking `BuiltInDataTools.findRecords(...)` directly against seeded rows (the DataManager path — what Phase 3 actually owns). Routing the same scenario through `ChatService.ask(...)` with a mocked `ChatModel` scripting a tool-call response requires the advisor chain + `ChatClientFactory` wiring that Phase 4 delivers (`CHAT-02`/`CHAT-03`). The ChatService-routed integration variant is therefore deferred to Phase 4, where a mock-`ChatModel` end-to-end test will cover the full request path. Phase 3's acceptance of success criterion #3 is the direct DataManager path.
+- **Integration-level assertion of denied-attribute absence for a restricted user** — Phase 3 covers denied-attribute behaviour at unit level in Plan 04's `EffectiveSchemaComputerTest` (asserts a restricted user's `AiSchema` omits attributes denied by `AccessManager`). Plan 05's `@SpringBootTest` exercises the admin path end-to-end but does NOT add a second restricted-user integration class — the unit-level assertion is authoritative for Phase 3's slice of success criterion #3. A full restricted-user `@SpringBootTest` variant is deferred until Phase 4's advisor wiring or Phase 6's `ToolGuard` work provides a natural home for multi-role integration harnesses.
 
 </deferred>
 
