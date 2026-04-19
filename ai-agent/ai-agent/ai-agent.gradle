@@ -6,7 +6,7 @@ dependencies {
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
-    implementation 'org.springframework.ai:spring-ai-client-chat'
+    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
