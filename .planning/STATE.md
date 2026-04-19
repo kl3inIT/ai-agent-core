@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 03
-last_updated: "2026-04-19T09:17:58.839Z"
+last_updated: "2026-04-19T09:24:30.000Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 20
-  completed_plans: 15
-  percent: 75
+  completed_plans: 16
+  percent: 80
 ---
 
 # Project State
@@ -92,6 +92,11 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | Codebase map | `.planning/codebase/` |
 | Config | `.planning/config.json` |
 
+## Phase 03 Progress
+
+- 03-01: ✅ Metadata core — 6 files under `com.vn.agent.metadata`: `AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex` (DTOs); `MetamodelScanner` (TOOL-01, `ApplicationReadyEvent`, MetadataTools.isJpa-backed D-13 index); `EffectiveSchemaComputer` (TOOL-02, stateless AccessManager filter + per-request MessageTools labels). Commits `fec54d5`, `0856763`, `00960b7`. Deviation: plan said `io.jmix.core.security.AccessManager`; Jmix 2.8 ships it at `io.jmix.core.AccessManager` (Rule 1 bug-fix applied at Task 3 write time).
+
 ## Session Tracking
 
 - 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
+- 2026-04-19 16:24 +07:00 — Plan 03-01 complete (metadata core). Next: 03-02 (FilterNode DSL / LiteralCoercer / FilterDslMapper).
