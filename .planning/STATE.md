@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-04-18T16:47:09.865Z"
+status: In progress
+last_updated: "2026-04-19T03:31:00.000Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 15
-  completed_plans: 4
-  percent: 27
+  completed_plans: 5
+  percent: 33
 ---
 
 # Project State
 
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-19
 
 ## Project Reference
 
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 02 — Foundations (next)
+**Current focus:** Phase 02 — Foundations (in progress — plan 02-01 complete)
 
 ## Phase Status
 
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
-| 2 | Foundations | Not started |
+| 2 | Foundations | In progress (1/11 plans) |
 | 3 | Metadata-First Runtime & Six Tools | Not started |
 | 4 | Orchestration Core | Not started |
 | 5 | RAG Layer | Not started |
@@ -56,9 +56,13 @@ All 4 plans completed and merged into master:
 
 - HSQLDB file-lock flakiness on Windows during aborted boots. Pre-boot hygiene documented; consider Postgres migration for `jmix-app` if it recurs.
 
+## Phase 02 Progress
+
+- 02-01: ✅ Three EnumClass<String> enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + EN/VI i18n. Decision: enum ids frozen to upper-case to match Spring AI 1.1.4 chat-memory CHECK constraint.
+
 ## Next Steps
 
-1. Run `/gsd-discuss-phase 2` or `/gsd-plan-phase 2` to begin Foundations.
+1. Continue Phase 2 — next plan 02-02 (SPI interfaces + ToolVetoedException).
 2. Phase 2 depends on Phase 1's `ChatService` SPI and the 1.0.2 BOM pin.
 
 ## Key Artifacts

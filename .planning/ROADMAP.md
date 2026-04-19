@@ -83,7 +83,7 @@ Plans:
 **Plans:** 11 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Entity enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + enum i18n
+- [x] 02-01-PLAN.md — Entity enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + enum i18n
 - [ ] 02-02-PLAN.md — Six SPI interfaces + ToolVetoedException in com.vn.agent.spi
 - [ ] 02-03-PLAN.md — Five JPA entities (Conversation, Message, ToolCallAudit, Parameters, KnowledgeDocument) + entity/attribute i18n
 - [ ] 02-04-PLAN.md — Add-on master changelog + step changelogs 010-050 + host <include> edit
