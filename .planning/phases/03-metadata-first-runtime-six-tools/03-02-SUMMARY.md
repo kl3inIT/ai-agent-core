@@ -12,20 +12,20 @@ dependency_graph:
     - io.jmix.core.metamodel.model.MetaProperty
     - io.jmix.core.metamodel.datatype.Datatype
     - com.fasterxml.jackson.annotation.JsonTypeInfo
-    - com.vn.agent.metadata.EffectiveSchemaComputer
+    - com.vn.agent.metadata.CurrentUserSchemaAccess  # post-execute: renamed/collapsed from EffectiveSchemaComputer
   provides:
     - com.vn.agent.filter.FilterNode (sealed)
     - com.vn.agent.filter.AndNode
     - com.vn.agent.filter.OrNode
     - com.vn.agent.filter.NotNode
     - com.vn.agent.filter.LeafNode
-    - com.vn.agent.filter.LiteralCoercer
-    - com.vn.agent.filter.FilterDslMapper
+    - com.vn.agent.filter.FilterLiteralValueConverter
+    - com.vn.agent.filter.StructuredFilterConditionMapper
     - com.vn.agent.tools.ToolLimits
     - com.vn.agent.tools.ToolErrorDto
     - com.vn.agent.tools.ToolUserError
   affects:
-    - Plan 03-03 BuiltInDataTools (consumes FilterDslMapper.map, ToolLimits.clampLimit, ToolUserError)
+    - Plan 03-03 BuiltInDataTools (consumes StructuredFilterConditionMapper.map, ToolLimits.clampLimit, ToolUserError)
     - Plan 03-04 ToolResultFormatter (serializes ToolErrorDto)
     - Plan 03-05 BuiltInDataToolsTest (pins ToolLimits constants; exercises every operator branch)
 tech_stack:
@@ -43,8 +43,8 @@ key_files:
     - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/OrNode.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/NotNode.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/LeafNode.java
-    - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/LiteralCoercer.java
-    - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/FilterDslMapper.java
+    - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/FilterLiteralValueConverter.java
+    - ai-agent/ai-agent/src/main/java/com/vn/agent/filter/StructuredFilterConditionMapper.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolLimits.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolErrorDto.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolUserError.java
@@ -70,8 +70,8 @@ metrics:
 **Filter DSL core** (`com.vn.agent.filter`, 7 files):
 - `FilterNode` sealed interface permitting exactly `AndNode`, `OrNode`, `NotNode`, `LeafNode`; Jackson `JsonTypeInfo.Id.DEDUCTION` polymorphism selects subtype by distinguishing property (`and`/`or`/`not`/`property`).
 - `AndNode` / `OrNode` / `NotNode` / `LeafNode` records — immutable, defensive `List.copyOf`.
-- `LiteralCoercer` @Component — per-`MetaProperty` strict coercion: `UUID.fromString`, `Enum.valueOf`, `BigDecimal`, `Integer`/`Long`/`Short`/`Double`/`Float`, `LocalDate.parse`/`LocalDateTime.parse`/`OffsetDateTime.parse`/`Instant.parse` (ISO-8601). Every failure → `ToolUserError` with structured `{error, reason, expected}`; no stack traces leak.
-- `FilterDslMapper` @Component — exhaustive switch over sealed hierarchy; DeMorgan NOT; 13-operator mapping; `validatePath` with depth cap + per-hop `EffectiveSchemaComputer.canReadAttribute`/`canReadEntity` (D-08 fail-closed).
+- `FilterLiteralValueConverter` @Component — per-`MetaProperty` strict coercion: `UUID.fromString`, `Enum.valueOf`, `BigDecimal`, `Integer`/`Long`/`Short`/`Double`/`Float`, `LocalDate.parse`/`LocalDateTime.parse`/`OffsetDateTime.parse`/`Instant.parse` (ISO-8601). Every failure → `ToolUserError` with structured `{error, reason, expected}`; no stack traces leak.
+- `StructuredFilterConditionMapper` @Component — exhaustive switch over sealed hierarchy; DeMorgan NOT; 13-operator mapping; `validatePath` with depth cap + per-hop `CurrentUserSchemaAccess.canReadAttribute`/`canReadEntity` (D-08 fail-closed). (Adapter was previously named `EffectiveSchemaComputer`; collapsed post-execute.)
 
 **Tool primitives** (`com.vn.agent.tools`, 3 files):
 - `ToolLimits` — `DEFAULT_LIMIT=20`, `MAX_LIMIT=100`, `DEFAULT_MAX_FILTER_DEPTH=3`; `clampLimit` helper.
@@ -82,11 +82,11 @@ metrics:
 
 ## Entry Points for Plan 03
 
-- `FilterDslMapper.map(FilterNode root, MetaClass mc) → Condition`
+- `StructuredFilterConditionMapper.map(FilterNode root, MetaClass mc) → Condition`
 - `ToolLimits.clampLimit(Integer requested) → int`
 - `ToolLimits.DEFAULT_LIMIT`, `ToolLimits.MAX_LIMIT`, `ToolLimits.DEFAULT_MAX_FILTER_DEPTH`
 - `ToolErrorDto`, `ToolUserError` (+ `toDto()`)
-- `LiteralCoercer.coerce / coerceList / coerceBoolean`
+- `FilterLiteralValueConverter.coerce / coerceList / coerceBoolean`
 
 ## Deviations from Plan
 
@@ -95,14 +95,14 @@ metrics:
 **1. [Rule 1 - Bug] Jmix 2.8 op constant is `NOT_CONTAINS`, not `DOES_NOT_CONTAIN`**
 - **Found during:** Task 3 (first `./gradlew compileJava` attempt failed with `cannot find symbol DOES_NOT_CONTAIN`).
 - **Root cause:** The plan's `<interfaces>` block listed the constant as `DOES_NOT_CONTAIN` (likely based on older Jmix docs). `javap` against `jmix-core-2.8.0.jar` shows the actual constants: `CONTAINS`, `NOT_CONTAINS` (plus `IN_INTERVAL`, `DATE_EQUALS`, `IS_COLLECTION_EMPTY`, `MEMBER_OF_COLLECTION`, `NOT_MEMBER_OF_COLLECTION` — not in D-05's 13 but present in the enum).
-- **Fix:** `FilterDslMapper.resolveOperation` accepts both DSL spellings (`"DOES_NOT_CONTAIN"` and `"NOT_CONTAINS"`) for LLM convenience and maps both to `PropertyCondition.Operation.NOT_CONTAINS`. LLM-facing surface preserved; emitted Jmix op is correct for 2.8.
-- **Files modified:** `FilterDslMapper.java`
+- **Fix:** `StructuredFilterConditionMapper.resolveOperation` accepts both DSL spellings (`"DOES_NOT_CONTAIN"` and `"NOT_CONTAINS"`) for LLM convenience and maps both to `PropertyCondition.Operation.NOT_CONTAINS`. LLM-facing surface preserved; emitted Jmix op is correct for 2.8.
+- **Files modified:** `StructuredFilterConditionMapper.java`
 - **Commit:** `542891b`
 
 **2. [Rule 3 - Blocking] Removed `JpqlCondition` token from Javadoc to satisfy acceptance grep**
 - **Issue:** Acceptance criterion required `grep -rn "JpqlCondition"` to return zero matches across the `filter/` tree (structural proof there is no JPQL in source). Initial Javadoc text said `"no JpqlCondition escape hatch"` — tripped the grep.
-- **Fix:** Renamed the Javadoc mention to `"raw-JPQL escape hatch"` in both `FilterDslMapper` class javadoc and `NotNode` javadoc. Intent unchanged.
-- **Files modified:** `FilterDslMapper.java`, `NotNode.java`
+- **Fix:** Renamed the Javadoc mention to `"raw-JPQL escape hatch"` in both `StructuredFilterConditionMapper` class javadoc and `NotNode` javadoc. Intent unchanged.
+- **Files modified:** `StructuredFilterConditionMapper.java`, `NotNode.java`
 - **Commit:** `542891b`
 
 ### Authentication Gates
@@ -112,7 +112,7 @@ None — no external-service interaction.
 ## Verification
 
 - `./gradlew :ai-agent:ai-agent:compileJava` → BUILD SUCCESSFUL.
-- All 13 D-05 operators referenced in `FilterDslMapper.java` (grep count 26 — each op referenced both positive and negated branches).
+- All 13 D-05 operators referenced in `StructuredFilterConditionMapper.java` (grep count 26 — each op referenced both positive and negated branches).
 - `grep -rn "JpqlCondition|createQuery|createNativeQuery" ai-agent/ai-agent/src/main/java/com/vn/agent/filter/` → 0 matches.
 - `grep -rn "@Autowired|@Inject" ai-agent/ai-agent/src/main/java/com/vn/agent/filter/ ai-agent/ai-agent/src/main/java/com/vn/agent/tools/` → 0 matches (constructor injection only).
 - `ToolLimits.DEFAULT_LIMIT = 20`, `ToolLimits.MAX_LIMIT = 100`, `ToolLimits.DEFAULT_MAX_FILTER_DEPTH = 3` — all literal matches.
@@ -127,8 +127,8 @@ None — all surface in this plan is internal mapping logic; no new network endp
 | Task | Commit    | Summary                                                          |
 |------|-----------|------------------------------------------------------------------|
 | 1    | `998c500` | Sealed FilterNode hierarchy + ToolLimits + ToolErrorDto + ToolUserError |
-| 2    | `c08d8d3` | LiteralCoercer strict fail-closed coercion                       |
-| 3    | `542891b` | FilterDslMapper DeMorgan NOT + D-08 path validation + module.properties |
+| 2    | `c08d8d3` | FilterLiteralValueConverter strict fail-closed coercion                       |
+| 3    | `542891b` | StructuredFilterConditionMapper DeMorgan NOT + D-08 path validation + module.properties |
 
 ## Self-Check: PASSED
 

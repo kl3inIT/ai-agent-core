@@ -6,12 +6,10 @@ tags: [spring-ai, tools, data-manager, formatter, auto-configuration, prompt-inj
 requirements: [TOOL-03, TOOL-04, TOOL-06, TOOL-07]
 dependency_graph:
   requires:
-    - com.vn.agent.metadata.EffectiveSchemaComputer
-    - com.vn.agent.metadata.MetamodelScanner
-    - com.vn.agent.metadata.UserEditableStringIndex
-    - com.vn.agent.filter.FilterDslMapper
+    - com.vn.agent.metadata.CurrentUserSchemaAccess  # post-execute: collapsed from EffectiveSchemaComputer + MetamodelScanner + UserEditableStringIndex
+    - com.vn.agent.filter.StructuredFilterConditionMapper
     - com.vn.agent.filter.FilterNode
-    - com.vn.agent.filter.LiteralCoercer
+    - com.vn.agent.filter.FilterLiteralValueConverter
     - com.vn.agent.tools.ToolLimits
     - com.vn.agent.tools.ToolErrorDto
     - com.vn.agent.tools.ToolUserError
@@ -53,6 +51,7 @@ key_files:
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolResultFormatter.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java
     - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/AgentToolCallbacks.java
+    - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolResultPayloads.java  # post-execute addition: package-private record DTOs (ReadableEntitySummary, DescribeEntityResult, AttributeDescription, RecordsResult, RelatedRecordsResult, CountResult) used by the @Tool result serialization
     - ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AiToolsAutoConfiguration.java
   modified:
     - ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
@@ -60,12 +59,12 @@ key_files:
 decisions:
   - "Spring AI 1.1.4 lacks ToolCallbacks.from(Object) — replaced with MethodToolCallbackProvider.builder().toolObjects(bean).build().getToolCallbacks() which is the documented equivalent. Same reflection pass over @Tool methods; same contract (fresh array per call, no caching)."
   - "ToolResultFormatter renders reference attributes (non-null, Range.isClass, non-Collection) as String.valueOf(v) (the Jmix instance-name) rather than recursing. Collections of related entities render as null; callers drill via get_related_records (D-12)."
-  - "parseId delegates to LiteralCoercer.coerce(id, pkProperty) rather than branching on UUID vs. long explicitly — reuses the Plan 02 fail-closed coercion machinery for idempotent error shape."
+  - "parseId delegates to FilterLiteralValueConverter.coerce(id, pkProperty) rather than branching on UUID vs. long explicitly — reuses the Plan 02 fail-closed coercion machinery for idempotent error shape."
 metrics:
   duration_seconds: 600
   duration_human: "~10 minutes"
   tasks_completed: 3
-  files_created: 4
+  files_created: 5  # post-execute: +1 for ToolResultPayloads.java
   files_modified: 2
   completed: "2026-04-19"
 ---
@@ -78,15 +77,17 @@ metrics:
 
 ### Task 1 — `ToolResultFormatter` (commit `d4f3e98`)
 
-Public API: `toJson`, `error(code, reason)` / `error(dto)` / `error(ToolUserError)`, `describe(AiEntityInfo)`, `record(Object, MetaClass)`, `records(List, MetaClass, int, boolean)`, `related(Object, MetaProperty, List)`, `count(MetaClass, long)`.
+Public API: `toJson`, `error(code, reason)` / `error(dto)` / `error(ToolUserError)`, `describe(AiEntityInfo)` (previously — the `AiEntityInfo` DTO was collapsed post-execute; the `describe` shape is now built inline against `MetaClass`), `record(Object, MetaClass)`, `records(List, MetaClass, int, boolean)`, `related(Object, MetaProperty, List)`, `count(MetaClass, long)`.
 
-- Constructor-injects `ObjectMapper` (Spring Boot auto-registered) + `MetamodelScanner` (for the `UserEditableStringIndex`).
+- Constructor-injects `ObjectMapper` (Spring Boot auto-registered) + `CurrentUserSchemaAccess` (for user-editable string bookkeeping; previously `MetamodelScanner` + a standalone `UserEditableStringIndex` DTO, both collapsed post-execute).
 - `buildEntityMap` iterates `mc.getProperties()`; for each `MetaProperty` reads via `EntityValues.getValue(entity, attrName)` and:
   - If value is `String` AND attribute name is in `userEditable` → wraps `"<data>" + escapeDataDelimiters(s) + "</data>"`.
   - If value is `Collection` (non-null) → renders `null` to avoid lazy graph serialization; callers use `get_related_records`.
   - If value is non-null and `MetaProperty.getRange().isClass()` (reference) → `String.valueOf(v)` (Jmix instance-name fragment).
   - Otherwise → raw value (serialized by Jackson).
 - `escapeDataDelimiters` replaces literal `<data>` → `&lt;data&gt;` and `</data>` → `&lt;/data&gt;` (Pitfall 4: delimiter-bypass defense). Single-pass `String.replace` is commutative-safe for these two disjoint tokens.
+
+Post-execute addition: the package-private file `ToolResultPayloads.java` declares the record DTOs used for `@Tool` serialization (`ReadableEntitySummary`, `DescribeEntityResult`, `AttributeDescription`, `RecordsResult`, `RelatedRecordsResult`, `CountResult`). This replaces the previous inline `Map`-assembly in `ToolResultFormatter`/`BuiltInDataTools` with strongly-typed shapes while preserving the on-wire JSON.
 
 ### Task 2 — `BuiltInDataTools` (commit `bfd76c9`)
 
@@ -103,13 +104,13 @@ One `@Component` with exactly six `@Tool` methods:
 
 All descriptions fit the ~200-char budget from Pitfall 2 (longest: `find_records` at 198 chars).
 
-- Constructor injection: `DataManager`, `Metadata`, `MetadataTools`, `FetchPlans`, `EffectiveSchemaComputer`, `FilterDslMapper`, `LiteralCoercer`, `ToolResultFormatter`.
+- Constructor injection: `DataManager`, `Metadata`, `MetadataTools`, `FetchPlans`, `CurrentUserSchemaAccess` (previously `EffectiveSchemaComputer`; collapsed post-execute), `StructuredFilterConditionMapper`, `FilterLiteralValueConverter`, `ToolResultFormatter`.
 - Every body catches `ToolUserError` and converts to `formatter.error(e)`; other exceptions propagate (Phase 4 advisor handles).
 - `find_records` uses `.maxResults(clampedLimit + 1)` then `subList(0, clampedLimit)` — the `+1` row is the truncation sentinel (`truncated = rows.size() > clampedLimit`).
 - `count_records` builds a `LoadContext<>(mc)` with a `LoadContext.Query("select e from " + mc.getName() + " e")` where `mc.getName()` comes from the whitelist via `resolveOrError → Metadata.getClass(entityName)`. Condition attached via `q.setCondition(cond)` (parameterized). Zero LLM input enters the query string (T-03-13).
 - `get_record` / `get_related_records` use `fetchPlan(FetchPlan.INSTANCE_NAME)` (D-12); the latter builds a per-call fetch plan `fetchPlans.builder(rootCls).addFetchPlan(INSTANCE_NAME).add(rel, fpb -> fpb.addFetchPlan(INSTANCE_NAME)).build()`.
 - `resolveOrError(entityName)` fails closed on blank/unknown/denied (T-03-14).
-- `parseId` delegates to `LiteralCoercer.coerce(id, metadataTools.getPrimaryKeyProperty(mc))` — UUID, long, or String ids all handled with Plan 02's fail-closed shape.
+- `parseId` delegates to `FilterLiteralValueConverter.coerce(id, metadataTools.getPrimaryKeyProperty(mc))` — UUID, long, or String ids all handled with Plan 02's fail-closed shape.
 
 ### Task 3 — `AgentToolCallbacks` + `AiToolsAutoConfiguration` + imports + gradle (commit `ece124c`)
 

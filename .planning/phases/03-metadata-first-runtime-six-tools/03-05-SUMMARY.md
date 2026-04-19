@@ -83,7 +83,7 @@ Delivered SPI-01 (the host-side `ToolContributor` sample) and closed Phase 3's s
   1. **`perRequestAssemblyIncludesBuiltInsAndHostContributor`** — `AgentToolCallbacks.forCurrentUser()` returns a callback array of length ≥ 7; the callback names contain all six built-in tool names **and** `summarize_customer_orders`. Per-request assembly (built-ins + host contributor) verified end-to-end.
   2. **`findRecordsOrderRoundTrip`** — seeds one `Customer` + one `Order` under `SystemAuthenticator.runWithSystem(Runnable)` with a time-stamped order number (T-03-26 mitigation against cross-run collisions), then calls `BuiltInDataTools.findRecords("jmixapp_Order", null, null)` directly and asserts the returned JSON contains the seeded order's number plus `"truncated":false`. **Phase 3 success criterion #3 DataManager-path coverage.**
   3. **`describeEntityAdminPathSurfacesStructuredJson`** — under `AuthenticatedAsAdmin`, calls `BuiltInDataTools.describeEntity("jmixapp_Order")` and asserts the returned JSON contains `jmixapp_Order` plus at least one expected attribute (`number`, `orderDate`, `customer`, `status`). Smoke assertion that `describe_entity` plumbing works end-to-end in `@SpringBootTest`.
-- Restricted-user integration variant **NOT** added — covered authoritatively at unit level by Plan 04's `EffectiveSchemaComputerTest` (per 03-CONTEXT.md `## Deferred Ideas`).
+- Restricted-user integration variant **NOT** added — covered authoritatively at unit level by Plan 04's `CurrentUserSchemaAccessTest` (previously `EffectiveSchemaComputerTest`; collapsed post-execute) per 03-CONTEXT.md `## Deferred Ideas`.
 - ChatService-routed mock-`ChatModel` variant **NOT** added — deferred to Phase 4 alongside `ChatClientFactory` + advisor chain (CHAT-02/CHAT-03). The DataManager-path assertion is the authoritative Phase 3 coverage.
 
 ## Deviations from Plan
@@ -116,9 +116,9 @@ Delivered SPI-01 (the host-side `ToolContributor` sample) and closed Phase 3's s
 
 ## Restricted-User Coverage Choice
 
-Chose **deferral to Plan 04 `EffectiveSchemaComputerTest`** (the option explicitly recommended by 03-CONTEXT.md `## Deferred Ideas`). Rationale:
+Chose **deferral to Plan 04 `CurrentUserSchemaAccessTest`** (previously `EffectiveSchemaComputerTest`; collapsed post-execute — the option explicitly recommended by 03-CONTEXT.md `## Deferred Ideas`). Rationale:
 
-- Plan 04's unit-level `EffectiveSchemaComputerTest` asserts a restricted user's `AiSchema` omits `AccessManager`-denied attributes — the authoritative Phase 3 coverage.
+- Plan 04's unit-level `CurrentUserSchemaAccessTest` (previously `EffectiveSchemaComputerTest`) asserts a restricted user's readable schema (previously the `AiSchema` DTO; collapsed post-execute) omits `AccessManager`-denied attributes — the authoritative Phase 3 coverage.
 - A `@SpringBootTest` duplicate would triple the CI runtime of this test class with no additional correctness signal (both paths go through the same `AccessManager` contract).
 - `03-05-PLAN.md` explicitly instructs: *"Plan 05 does NOT add a second restricted-user integration class."* We followed that.
 

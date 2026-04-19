@@ -4,20 +4,22 @@
 **Files analyzed:** 14 new + 2 modified
 **Analogs found:** 14 / 16 (2 files have no close analog in this codebase — see "No Analog Found")
 
+> **Post-execute refactor note (2026-04-20):** Class-name references in this document reflect the original pre-refactor design intent. Per user feedback "Reuse Jmix built-ins over parallel layers" (`memory/feedback_reuse_jmix_builtins.md`), the six metadata classes (`AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */`, `AiEntityInfo /* collapsed post-execute into CurrentUserSchemaAccess */`, `AiAttributeInfo /* collapsed post-execute into CurrentUserSchemaAccess */`, `UserEditableStringIndex /* collapsed post-execute into CurrentUserSchemaAccess */`, `CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */`, `CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */`) were collapsed post-execute into a single adapter `com.vn.agent.metadata.CurrentUserSchemaAccess`, and the filter classes were renamed (`FilterLiteralValueConverter /* previously LiteralCoercer - renamed post-execute */` → `FilterLiteralValueConverter`, `StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */` → `StructuredFilterConditionMapper`). The patterns below are preserved as-executed for pattern-map traceability. A new pattern entry "Thin adapter over Jmix built-ins" (see §Shared Patterns) captures the lesson learned from that refactor.
+
 ---
 
 ## File Classification
 
 | New/Modified File | Role | Data Flow | Closest Analog | Match Quality |
 |-------------------|------|-----------|----------------|---------------|
-| `com.vn.agent.metadata.MetamodelScanner` | service (startup singleton) | event-driven (ApplicationReadyEvent → cache) | `ai-agent/.../spi/ToolContributor.java` + `DefaultChatServiceImpl.java` (constructor-injection pattern) | role-match (no existing startup-event scanner in repo) |
-| `com.vn.agent.metadata.EffectiveSchemaComputer` | service (stateless, request-scoped behavior) | request-response (transform) | `DefaultChatServiceImpl.java` | role-match |
-| `com.vn.agent.metadata.AiSchema` / `AiEntityInfo` / `AiAttributeInfo` / `UserEditableStringIndex` | DTO (record) | transform | `ChatResponse.java` (record DTO) | exact |
+| `com.vn.agent.metadata.CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */` | service (startup singleton) | event-driven (ApplicationReadyEvent → cache) | `ai-agent/.../spi/ToolContributor.java` + `DefaultChatServiceImpl.java` (constructor-injection pattern) | role-match (no existing startup-event scanner in repo) |
+| `com.vn.agent.metadata.CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */` | service (stateless, request-scoped behavior) | request-response (transform) | `DefaultChatServiceImpl.java` | role-match |
+| `com.vn.agent.metadata.AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */` / `AiEntityInfo /* collapsed post-execute into CurrentUserSchemaAccess */` / `AiAttributeInfo /* collapsed post-execute into CurrentUserSchemaAccess */` / `UserEditableStringIndex /* collapsed post-execute into CurrentUserSchemaAccess */` | DTO (record) | transform | `ChatResponse.java` (record DTO) | exact |
 | `com.vn.agent.tools.BuiltInDataTools` (6 × `@Tool`) | controller (LLM-facing) | request-response + CRUD (read-only) | `DefaultChatServiceImpl.java` (constructor DI + @Service on single bean); `OrderService.java` (DataManager + fetch plans) | role-match |
 | `com.vn.agent.tools.DataManagerToolExecutor` | service | CRUD (read-only) | `jmix-app/.../service/OrderService.java` | exact |
 | `com.vn.agent.filter.FilterNode` (sealed) + `FilterDsl` records | DTO | transform | `ChatResponse.java` (record) | role-match (no sealed hierarchy exists yet) |
-| `com.vn.agent.filter.FilterDslMapper` | service (pure transform) | transform | `DefaultChatServiceImpl.java` (stateless service) | role-match |
-| `com.vn.agent.filter.LiteralCoercer` | utility | transform | — (none) | no analog |
+| `com.vn.agent.filter.StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */` | service (pure transform) | transform | `DefaultChatServiceImpl.java` (stateless service) | role-match |
+| `com.vn.agent.filter.FilterLiteralValueConverter /* previously LiteralCoercer - renamed post-execute */` | utility | transform | — (none) | no analog |
 | `com.vn.agent.tools.ToolResultFormatter` | utility (formatter) | transform | — (none — new cross-cutting concern) | no analog |
 | `com.vn.agent.tools.ToolLimits` | config (constants) | — | `AiAgentUserRowLevelRole.CODE` constant style | partial |
 | `com.vn.agent.tools.ToolErrorDto` | DTO (record) | transform | `ChatResponse.java` | exact |
@@ -42,9 +44,9 @@
 ```java
 package com.vn.agent.tools;
 
-import com.vn.agent.filter.FilterDslMapper;
+import com.vn.agent.filter.StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */;
 import com.vn.agent.filter.FilterNode;
-import com.vn.agent.metadata.EffectiveSchemaComputer;
+import com.vn.agent.metadata.CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
@@ -69,9 +71,9 @@ public class BuiltInDataTools {
     private final Metadata metadata;
     private final AccessManager accessManager;
     private final MessageTools messageTools;
-    private final EffectiveSchemaComputer schemaComputer;
+    private final CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */ schemaComputer;
     private final FetchPlans fetchPlans;
-    private final FilterDslMapper filterMapper;
+    private final StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */ filterMapper;
     private final ToolResultFormatter formatter;
 
     // CLAUDE.md: constructor injection only.
@@ -100,24 +102,24 @@ Adapt: use `FetchPlan.INSTANCE_NAME` instead of `"_base"` per D-12; use `mc.getJ
 
 ---
 
-### `com.vn.agent.metadata.MetamodelScanner` (service, event-driven)
+### `com.vn.agent.metadata.CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */` (service, event-driven)
 
 **Analog:** None exact. Structural shape mirrors `DefaultChatServiceImpl.java` (single `@Component`, constructor DI, `final` fields).
 
 **Pattern to use** (synthesized from RESEARCH.md §Code Examples + `DefaultChatServiceImpl` shape):
 ```java
 @Component
-public class MetamodelScanner {
+public class CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */ {
     private final Metadata metadata;
-    private volatile AiSchema rawSchema;
+    private volatile AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */ rawSchema;
 
-    public MetamodelScanner(Metadata metadata) {
+    public CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */(Metadata metadata) {
         this.metadata = metadata;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void scan() {
-        // iterate metadata.getSession().getClasses(), build immutable AiSchema
+        // iterate metadata.getSession().getClasses(), build immutable AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */
     }
 }
 ```
@@ -126,29 +128,29 @@ Do NOT use `@PostConstruct` (Pitfall 1 — `AccessManager` not valid at that pha
 
 ---
 
-### `com.vn.agent.metadata.EffectiveSchemaComputer` (service, request-response)
+### `com.vn.agent.metadata.CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */` (service, request-response)
 
 **Analog:** `DefaultChatServiceImpl.java` for shape; `AccessManager` usage is novel for this repo (no existing caller).
 
 **Pattern** (per D-04, D-05, RESEARCH.md §Code Examples):
 ```java
 @Component
-public class EffectiveSchemaComputer {
+public class CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */ {
 
     private final AccessManager accessManager;
-    private final MetamodelScanner scanner;
+    private final CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */ scanner;
     private final MessageTools messageTools;
 
-    public EffectiveSchemaComputer(AccessManager accessManager,
-                                   MetamodelScanner scanner,
+    public CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */(AccessManager accessManager,
+                                   CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */ scanner,
                                    MessageTools messageTools) {
         this.accessManager = accessManager;
         this.scanner = scanner;
         this.messageTools = messageTools;
     }
 
-    public AiSchema forCurrentUser() {
-        AiSchema raw = scanner.getRawSchema();
+    public AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */ forCurrentUser() {
+        AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */ raw = scanner.getRawSchema();
         // for each entity:
         //   CrudEntityContext ec = new CrudEntityContext(metaClass);
         //   accessManager.applyRegisteredConstraints(ec);
@@ -165,7 +167,7 @@ Keep stateless (Open Question #6 answer). Do NOT cache across requests (TOOL-02)
 
 ---
 
-### `com.vn.agent.filter.FilterDslMapper` (service, transform)
+### `com.vn.agent.filter.StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */` (service, transform)
 
 **Analog:** Shape follows `DefaultChatServiceImpl.java` (`@Component`, constructor DI, pure Java). Jmix `PropertyCondition`/`LogicalCondition` usage is novel in this repo.
 
@@ -178,7 +180,7 @@ public record NotNode(FilterNode child)          implements FilterNode {}
 public record LeafNode(String property, String operation, Object value) implements FilterNode {}
 ```
 
-**Mapper core pattern:** see RESEARCH.md §"Filter DSL → Condition" code example (lines 449-499 of 03-RESEARCH.md) — switch on the sealed type, map operation string to `PropertyCondition.Operation.*` constant, call `LiteralCoercer.coerce(...)` before `PropertyCondition.createWithValue(...)`. Implement DeMorgan expansion for `NotNode` (Pitfall 6 recommendation).
+**Mapper core pattern:** see RESEARCH.md §"Filter DSL → Condition" code example (lines 449-499 of 03-RESEARCH.md) — switch on the sealed type, map operation string to `PropertyCondition.Operation.*` constant, call `FilterLiteralValueConverter /* previously LiteralCoercer - renamed post-execute */.coerce(...)` before `PropertyCondition.createWithValue(...)`. Implement DeMorgan expansion for `NotNode` (Pitfall 6 recommendation).
 
 **Validation pattern (D-08 path + depth cap):** At each hop, call `AccessManager.applyRegisteredConstraints(new EntityAttributeContext(mc, prop))` and reject if `!ac.canView()`. Fail-closed: throw `ToolUserError` → caught at tool boundary → returned as structured error DTO.
 
@@ -251,7 +253,7 @@ public class AiToolsAutoConfiguration {
 }
 ```
 
-Key decision: the six Phase 3 beans (`MetamodelScanner`, `EffectiveSchemaComputer`, `BuiltInDataTools`, `DataManagerToolExecutor`, `FilterDslMapper`, `AgentToolCallbacks`) are discovered via the existing `@ComponentScan` on `AIConfiguration` (see `AIConfiguration.java` line 21). They live under `com.vn.agent.*` so no base-package widening is needed.
+Key decision: the six Phase 3 beans (`CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */`, `CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */`, `BuiltInDataTools`, `DataManagerToolExecutor`, `StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */`, `AgentToolCallbacks`) are discovered via the existing `@ComponentScan` on `AIConfiguration` (see `AIConfiguration.java` line 21). They live under `com.vn.agent.*` so no base-package widening is needed.
 
 ---
 
@@ -411,11 +413,11 @@ class PromptInjectionHarnessTest {
 
 ---
 
-### Other unit tests (`MetamodelScannerTest`, `EffectiveSchemaComputerTest`, `FilterDslMapperTest`, `ToolLimitsTest`, `ToolResultFormatterTest`)
+### Other unit tests (`CurrentUserSchemaAccessTest /* previously CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */Test - collapsed post-execute */`, `CurrentUserSchemaAccessTest /* previously CurrentUserSchemaAccess /* previously EffectiveSchemaComputer - collapsed post-execute */Test - collapsed post-execute */`, `StructuredFilterConditionMapperTest /* previously StructuredFilterConditionMapper /* previously FilterDslMapper - renamed post-execute */Test - renamed post-execute */`, `ToolLimitsTest`, `ToolResultFormatterTest`)
 
 **Analog for pure unit tests (no Spring):** `ChatServiceMockTest.java` — JUnit 5 + AssertJ, no `@SpringBootTest`.
 
-**Analog for Spring-backed unit tests (`MetamodelScannerTest` needs `Metadata`):** `FoundationsBootSmokeTest.java` header pattern (lines 79-84). Also `DefaultChatServiceImplTest.java` for lighter-weight Mockito-only variant.
+**Analog for Spring-backed unit tests (`CurrentUserSchemaAccessTest /* previously CurrentUserSchemaAccess /* previously MetamodelScanner - collapsed post-execute */Test - collapsed post-execute */` needs `Metadata`):** `FoundationsBootSmokeTest.java` header pattern (lines 79-84). Also `DefaultChatServiceImplTest.java` for lighter-weight Mockito-only variant.
 
 ---
 
@@ -462,7 +464,7 @@ Not required for Phase 3 core beans unless explicitly desired.
 
 ### Record DTO Pattern
 **Source:** `ai-agent/ai-agent/src/main/java/com/vn/agent/ChatResponse.java` (record `ChatResponse(String content, Map<String,String> metadata)`).
-**Apply to:** `AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `FilterNode` and implementers, `ToolErrorDto`.
+**Apply to:** `AiSchema /* collapsed post-execute into CurrentUserSchemaAccess */`, `AiEntityInfo /* collapsed post-execute into CurrentUserSchemaAccess */`, `AiAttributeInfo /* collapsed post-execute into CurrentUserSchemaAccess */`, `FilterNode` and implementers, `ToolErrorDto`.
 Use `public record X(...)` — no Lombok, no builders.
 
 ### Host-side Integration Test Harness
@@ -483,6 +485,12 @@ Use `public record X(...)` — no Lombok, no builders.
                            AiToolsAutoConfiguration.class })
 ```
 
+### Thin Adapter over Jmix Built-ins (added 2026-04-20, post-execute)
+**Source:** Refactor of Plan 03-01's six metadata classes (`AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex`, `MetamodelScanner`, `EffectiveSchemaComputer`) into a single adapter `com.vn.agent.metadata.CurrentUserSchemaAccess`.
+**User feedback:** `memory/feedback_reuse_jmix_builtins.md` — "Reuse Jmix built-ins over parallel layers." Audit against `Metadata` / `AccessManager` / `DataManager` / `FetchPlan` / `MetadataTools` first; own only the thin LLM adapter (schema shape, literal coercion, path depth, result limits, injection-safe formatting).
+**Apply to:** Any future metadata-to-LLM surface. Do NOT build parallel DTO trees (`AiSchema` etc.) that mirror Jmix's `MetaClass` / `MetaProperty`. Instead expose a 3-method adapter (`getReadableSchema`, `canReadAttribute`, `canReadEntity`) that delegates to `Metadata` + `AccessManager` per-call and returns Jmix types directly where possible.
+**Lesson learned:** Front-loading six DTO records + two service beans added surface area without paying for itself — every call site already had `Metadata` and `AccessManager` available.
+
 ### Authenticated Code Section in Test
 **Source:** `FoundationsBootSmokeTest.java` lines 122-123
 ```java
@@ -498,8 +506,8 @@ Apply to any test that needs to seed `jmixapp_Order` / `jmixapp_Customer` rows b
 
 | File | Role | Data Flow | Reason / Fallback |
 |------|------|-----------|-------------------|
-| `com.vn.agent.tools.ToolResultFormatter` | utility (JSON + `<data>` wrapper) | transform | No formatter in repo. Fallback: Jackson `ObjectMapper` (transitively on classpath) + custom `<data>` wrapping logic per RESEARCH.md §Pattern 4 and D-13. Use `ObjectMapper` as `@Bean` or singleton; walk attribute set provided by `UserEditableStringIndex`. |
-| `com.vn.agent.filter.LiteralCoercer` | utility | transform | No type-coercion utility in repo. Direct implementation per D-07: `UUID.fromString`, `Enum.valueOf`, `BigDecimal`/`Long`/`Integer` parse, ISO-8601 `LocalDate.parse` / `OffsetDateTime.parse`. Dispatch on `MetaProperty.getRange()`. |
+| `com.vn.agent.tools.ToolResultFormatter` | utility (JSON + `<data>` wrapper) | transform | No formatter in repo. Fallback: Jackson `ObjectMapper` (transitively on classpath) + custom `<data>` wrapping logic per RESEARCH.md §Pattern 4 and D-13. Use `ObjectMapper` as `@Bean` or singleton; walk attribute set provided by `UserEditableStringIndex /* collapsed post-execute into CurrentUserSchemaAccess */`. |
+| `com.vn.agent.filter.FilterLiteralValueConverter /* previously LiteralCoercer - renamed post-execute */` | utility | transform | No type-coercion utility in repo. Direct implementation per D-07: `UUID.fromString`, `Enum.valueOf`, `BigDecimal`/`Long`/`Integer` parse, ISO-8601 `LocalDate.parse` / `OffsetDateTime.parse`. Dispatch on `MetaProperty.getRange()`. |
 
 ---
 
