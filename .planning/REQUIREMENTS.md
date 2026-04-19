@@ -30,7 +30,7 @@
 - [ ] **TOOL-02**: Effective per-user schema computed per request via `AccessManager` directly — never cached per-app. (`EntityExposurePolicy` chain dropped per D-10; Jmix native security is authoritative.)
 - [ ] **TOOL-03**: Six generic read-only tools auto-generated: `list_entities`, `describe_entity`, `find_records`, `get_record`, `count_records`, `get_related_records`
 - [ ] **TOOL-04**: All tool bodies call `DataManager` (inheriting Jmix entity/attribute/row security); no native SQL, no JPQL authored by the LLM
-- [ ] **TOOL-05**: `find_records` accepts a structured filter DSL (attribute + operator + literal) mapped to `Condition.createAnd(...)` — not free-text JPQL
+- [x] **TOOL-05**: `find_records` accepts a structured filter DSL (attribute + operator + literal) mapped to `Condition.createAnd(...)` — not free-text JPQL
 - [ ] **TOOL-06**: Hard row-count cap (default 20, max 100) on every collection-returning tool; LLM cannot override
 - [ ] **TOOL-07**: Tool result formatter wraps user-editable string fields in `<data>…</data>` delimiters with escaping to defuse prompt injection
 - [ ] **TOOL-08**: Read-only posture enforced by code review + unit tests asserting each tool class's public methods call only `DataManager` read-path operations (`DataManager.load` / `DataManager.getCount` / `DataManager.loadValues`). (ArchUnit deferred per D-10 and MEMORY note "Avoid ArchUnit until drift".)

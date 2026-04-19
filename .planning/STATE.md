@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 03
-last_updated: "2026-04-19T09:24:30.000Z"
+last_updated: "2026-04-19T10:35:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # Project State
@@ -95,8 +95,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 ## Phase 03 Progress
 
 - 03-01: ✅ Metadata core — 6 files under `com.vn.agent.metadata`: `AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex` (DTOs); `MetamodelScanner` (TOOL-01, `ApplicationReadyEvent`, MetadataTools.isJpa-backed D-13 index); `EffectiveSchemaComputer` (TOOL-02, stateless AccessManager filter + per-request MessageTools labels). Commits `fec54d5`, `0856763`, `00960b7`. Deviation: plan said `io.jmix.core.security.AccessManager`; Jmix 2.8 ships it at `io.jmix.core.AccessManager` (Rule 1 bug-fix applied at Task 3 write time).
+- 03-02: ✅ Filter DSL + tool primitives — 10 files under `com.vn.agent.filter` and `com.vn.agent.tools`: sealed `FilterNode` (+ `AndNode`/`OrNode`/`NotNode`/`LeafNode`); `LiteralCoercer` (strict fail-closed D-07); `FilterDslMapper` (TOOL-05, DeMorgan NOT, 13 D-05 operators, depth cap + per-hop AccessManager from D-08); `ToolLimits` (TOOL-06 DEFAULT_LIMIT=20/MAX_LIMIT=100/DEFAULT_MAX_FILTER_DEPTH=3); `ToolErrorDto` + `ToolUserError`. `module.properties` gains `jmix.ai-agent.tools.max-filter-depth = 3`. Commits `998c500`, `c08d8d3`, `542891b`. Deviations: (1) Jmix 2.8 op constant is `NOT_CONTAINS`, not `DOES_NOT_CONTAIN` — mapper accepts both DSL spellings, emits real Jmix constant (Rule 1 bug); (2) renamed a Javadoc mention of `JpqlCondition` to `raw-JPQL` to satisfy acceptance grep (Rule 3).
 
 ## Session Tracking
 
 - 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
 - 2026-04-19 16:24 +07:00 — Plan 03-01 complete (metadata core). Next: 03-02 (FilterNode DSL / LiteralCoercer / FilterDslMapper).
+- 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
