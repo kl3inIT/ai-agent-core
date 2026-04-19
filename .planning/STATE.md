@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 03
-last_updated: "2026-04-19T10:35:00.000Z"
+last_updated: "2026-04-19T18:30:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 20
-  completed_plans: 17
-  percent: 85
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -96,9 +96,11 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 - 03-01: ✅ Metadata core — 6 files under `com.vn.agent.metadata`: `AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex` (DTOs); `MetamodelScanner` (TOOL-01, `ApplicationReadyEvent`, MetadataTools.isJpa-backed D-13 index); `EffectiveSchemaComputer` (TOOL-02, stateless AccessManager filter + per-request MessageTools labels). Commits `fec54d5`, `0856763`, `00960b7`. Deviation: plan said `io.jmix.core.security.AccessManager`; Jmix 2.8 ships it at `io.jmix.core.AccessManager` (Rule 1 bug-fix applied at Task 3 write time).
 - 03-02: ✅ Filter DSL + tool primitives — 10 files under `com.vn.agent.filter` and `com.vn.agent.tools`: sealed `FilterNode` (+ `AndNode`/`OrNode`/`NotNode`/`LeafNode`); `LiteralCoercer` (strict fail-closed D-07); `FilterDslMapper` (TOOL-05, DeMorgan NOT, 13 D-05 operators, depth cap + per-hop AccessManager from D-08); `ToolLimits` (TOOL-06 DEFAULT_LIMIT=20/MAX_LIMIT=100/DEFAULT_MAX_FILTER_DEPTH=3); `ToolErrorDto` + `ToolUserError`. `module.properties` gains `jmix.ai-agent.tools.max-filter-depth = 3`. Commits `998c500`, `c08d8d3`, `542891b`. Deviations: (1) Jmix 2.8 op constant is `NOT_CONTAINS`, not `DOES_NOT_CONTAIN` — mapper accepts both DSL spellings, emits real Jmix constant (Rule 1 bug); (2) renamed a Javadoc mention of `JpqlCondition` to `raw-JPQL` to satisfy acceptance grep (Rule 3).
+- 03-03: ✅ LLM-facing tool surface — 4 files added / 2 modified: `ToolResultFormatter` (`<data>` wrap + literal-delimiter HTML escape, D-13/Pitfall 4), `BuiltInDataTools` (single @Component, six @Tool methods — `list_entities`/`describe_entity`/`find_records`/`count_records`/`get_record`/`get_related_records` — all read-only via `DataManager.load`/`.getCount`, `FetchPlan.INSTANCE_NAME`, `ToolLimits.clampLimit`), `AgentToolCallbacks` (per-request `ToolCallback[]` via `MethodToolCallbackProvider` — Phase 4 entry point), `AiToolsAutoConfiguration` (`@AutoConfigureAfter` AI + SPI defaults). `AutoConfiguration.imports` now 3 lines. `ai-agent.gradle` adds `org.ow2.asm:asm:9.7` testImplementation for Plan 04 D-16. Commits `d4f3e98`, `bfd76c9`, `ece124c`. Deviations: (1) Spring AI 1.1.4 has no `ToolCallbacks.from(bean)` — replaced with `MethodToolCallbackProvider.builder().toolObjects(bean).build().getToolCallbacks()` (Rule 1 bug in plan interfaces); (2) `LoadContext.createQuery(...)` is not a static factory — used `new LoadContext.Query(...)` (Rule 1 bug in plan interfaces).
 
 ## Session Tracking
 
 - 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
 - 2026-04-19 16:24 +07:00 — Plan 03-01 complete (metadata core). Next: 03-02 (FilterNode DSL / LiteralCoercer / FilterDslMapper).
 - 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
+- 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
