@@ -1,1 +1,2 @@
 com.vn.autoconfigure.agent.AIAutoConfiguration
+com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration
