@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        pgvector extension + AI_AGENT_KB_VECTOR_STORE table.
+        Gated to PostgreSQL via dbms attribute AND preConditions onFail="MARK_RAN"
+        (belt-and-suspenders per Pitfall #3). HSQLDB boot skips the entire changeset.
+
+        Table shape matches the Spring AI PgVectorStore reference schema exactly
+        (id uuid DEFAULT uuid_generate_v4, content text, metadata json, embedding vector(1536)).
+        Phase 5 wires PgVectorStore.builder().vectorTableName("ai_agent_kb_vector_store")
+        .initializeSchema(false); Liquibase owns the DDL.
+    -->
+
+    <changeSet id="1" author="ai-agent" dbms="postgresql">
+        <preConditions onFail="MARK_RAN" onFailMessage="Not PostgreSQL — skipping pgvector extension install">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sql>CREATE EXTENSION IF NOT EXISTS vector;</sql>
+        <sql>CREATE EXTENSION IF NOT EXISTS hstore;</sql>
+        <sql>CREATE EXTENSION IF NOT EXISTS "uuid-ossp";</sql>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent" dbms="postgresql">
+        <preConditions onFail="MARK_RAN" onFailMessage="Not PostgreSQL — skipping AI_AGENT_KB_VECTOR_STORE DDL">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <sql>
+            CREATE TABLE IF NOT EXISTS AI_AGENT_KB_VECTOR_STORE (
+                id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+                content text,
+                metadata json,
+                embedding vector(1536)
+            );
+        </sql>
+        <sql>
+            CREATE INDEX IF NOT EXISTS IDX_AI_AGENT_KB_VECTOR_STORE__EMBEDDING
+            ON AI_AGENT_KB_VECTOR_STORE USING HNSW (embedding vector_cosine_ops);
+        </sql>
+    </changeSet>
+</databaseChangeLog>
