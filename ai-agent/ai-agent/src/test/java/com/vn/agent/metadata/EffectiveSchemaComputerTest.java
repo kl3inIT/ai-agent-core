@@ -1,16 +1,19 @@
 package com.vn.agent.metadata;
 
 import io.jmix.core.AccessManager;
-import io.jmix.core.MessageTools;
+import io.jmix.core.Metadata;
 import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.accesscontext.EntityAttributeContext;
 import io.jmix.core.metamodel.model.MetaClass;
+import io.jmix.core.metamodel.model.MetaProperty;
+import io.jmix.core.metamodel.model.Session;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -26,99 +29,74 @@ import static org.mockito.Mockito.when;
  */
 class EffectiveSchemaComputerTest {
 
-    private static MetaClass entityMock(String name) {
+    private static MetaClass entityMock(String name, String... attrNames) {
         MetaClass mc = mock(MetaClass.class);
         lenient().when(mc.getName()).thenReturn(name);
-        // forCurrentUser() calls mc.findProperty(attr.name()) for locale-label lookup.
-        // Returning null is a valid result (property absent in metamodel) — the computer
-        // guards with `if (mp != null)` before calling MessageTools. Keeps this unit test
-        // free of the nested-stubbing Mockito pitfall (UnfinishedStubbingException).
-        lenient().when(mc.findProperty(Mockito.anyString())).thenReturn(null);
+        lenient().when(mc.getJavaClass()).thenReturn((Class) Object.class);
+        List<MetaProperty> props = new java.util.ArrayList<>();
+        for (String n : attrNames) {
+            MetaProperty mp = mock(MetaProperty.class);
+            lenient().when(mp.getName()).thenReturn(n);
+            props.add(mp);
+        }
+        lenient().when(mc.getProperties()).thenReturn(props);
         return mc;
     }
 
-    private static AiEntityInfo entity(MetaClass mc, String name) {
-        AiAttributeInfo attr = new AiAttributeInfo("name", "String", true, null, null, List.of(), null);
-        return new AiEntityInfo(mc, name, null, List.of(attr));
+    private static Metadata metadataWith(MetaClass... classes) {
+        Metadata metadata = mock(Metadata.class);
+        Session session = mock(Session.class);
+        when(metadata.getSession()).thenReturn(session);
+        lenient().when(session.getClasses()).thenReturn(List.of(classes));
+        return metadata;
     }
 
     @Test
     void deniedEntityIsAbsent() {
         AccessManager accessManager = mock(AccessManager.class);
-        MessageTools messageTools = mock(MessageTools.class);
-        MetamodelScanner scanner = mock(MetamodelScanner.class);
-
-        MetaClass mcA = entityMock("entityA");
-        MetaClass mcB = entityMock("entityB");
-        when(scanner.getRawSchema()).thenReturn(new AiSchema(Map.of(
-                "entityA", entity(mcA, "entityA"),
-                "entityB", entity(mcB, "entityB"))));
-
-        lenient().when(messageTools.getEntityCaption(Mockito.any())).thenReturn("label");
-        lenient().when(messageTools.getPropertyCaption(Mockito.any())).thenReturn("attr-label");
+        MetaClass mcA = entityMock("entityA", "name");
+        MetaClass mcB = entityMock("entityB", "name");
+        Metadata metadata = metadataWith(mcA, mcB);
 
         try (MockedConstruction<CrudEntityContext> crud = Mockito.mockConstruction(
                 CrudEntityContext.class,
                 (mockCtx, ctx) -> {
-                    // Evaluate name BEFORE the when() call — calling a mocked method
-                    // inside an ongoing stubbing trips Mockito's UnfinishedStubbingException.
                     MetaClass arg = (MetaClass) ctx.arguments().get(0);
                     String argName = arg.getName();
-                    boolean permitted = !"entityA".equals(argName);
-                    when(mockCtx.isReadPermitted()).thenReturn(permitted);
+                    when(mockCtx.isReadPermitted()).thenReturn(!"entityA".equals(argName));
                 });
              MockedConstruction<EntityAttributeContext> attr = Mockito.mockConstruction(
                      EntityAttributeContext.class,
                      (mockCtx, ctx) -> when(mockCtx.canView()).thenReturn(true))) {
 
-            EffectiveSchemaComputer computer =
-                    new EffectiveSchemaComputer(accessManager, scanner, messageTools);
-            AiSchema effective = computer.forCurrentUser();
+            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
+            Map<MetaClass, Set<String>> out = computer.forCurrentUser();
 
-            assertThat(effective.entities()).containsOnlyKeys("entityB");
-            assertThat(effective.entities()).doesNotContainKey("entityA");
+            assertThat(out.keySet()).extracting(MetaClass::getName)
+                    .containsExactly("entityB")
+                    .doesNotContain("entityA");
         }
     }
 
     @Test
     void restrictedUserWithAllEntitiesDeniedReturnsEmpty() {
         AccessManager accessManager = mock(AccessManager.class);
-        MessageTools messageTools = mock(MessageTools.class);
-        MetamodelScanner scanner = mock(MetamodelScanner.class);
-
-        MetaClass mcA = entityMock("entityA");
-        MetaClass mcB = entityMock("entityB");
-        when(scanner.getRawSchema()).thenReturn(new AiSchema(Map.of(
-                "entityA", entity(mcA, "entityA"),
-                "entityB", entity(mcB, "entityB"))));
+        Metadata metadata = metadataWith(entityMock("entityA", "name"), entityMock("entityB", "name"));
 
         try (MockedConstruction<CrudEntityContext> crud = Mockito.mockConstruction(
                 CrudEntityContext.class,
                 (mockCtx, ctx) -> when(mockCtx.isReadPermitted()).thenReturn(false))) {
 
-            EffectiveSchemaComputer computer =
-                    new EffectiveSchemaComputer(accessManager, scanner, messageTools);
-            AiSchema effective = computer.forCurrentUser();
-
-            // Success criterion #2: a user with read policy missing returns zero entries.
-            assertThat(effective.entities()).isEmpty();
+            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
+            assertThat(computer.forCurrentUser()).isEmpty();
         }
     }
 
     @Test
     void deniedAttributeIsFilteredButEntityKept() {
         AccessManager accessManager = mock(AccessManager.class);
-        MessageTools messageTools = mock(MessageTools.class);
-        MetamodelScanner scanner = mock(MetamodelScanner.class);
-
-        MetaClass mc = entityMock("entityA");
-        AiAttributeInfo a1 = new AiAttributeInfo("visible", "String", true, null, null, List.of(), null);
-        AiAttributeInfo a2 = new AiAttributeInfo("hidden", "String", true, null, null, List.of(), null);
-        when(scanner.getRawSchema()).thenReturn(new AiSchema(Map.of(
-                "entityA", new AiEntityInfo(mc, "entityA", null, List.of(a1, a2)))));
-
-        lenient().when(messageTools.getEntityCaption(Mockito.any())).thenReturn("A");
-        lenient().when(messageTools.getPropertyCaption(Mockito.any())).thenReturn("label");
+        MetaClass mc = entityMock("entityA", "visible", "hidden");
+        Metadata metadata = metadataWith(mc);
 
         try (MockedConstruction<CrudEntityContext> crud = Mockito.mockConstruction(
                 CrudEntityContext.class,
@@ -126,36 +104,30 @@ class EffectiveSchemaComputerTest {
              MockedConstruction<EntityAttributeContext> attr = Mockito.mockConstruction(
                      EntityAttributeContext.class,
                      (mockCtx, ctx) -> {
-                         // argument 1 (index 1) is the attribute name
                          String n = (String) ctx.arguments().get(1);
                          when(mockCtx.canView()).thenReturn(!"hidden".equals(n));
                      })) {
 
-            EffectiveSchemaComputer computer =
-                    new EffectiveSchemaComputer(accessManager, scanner, messageTools);
-            AiSchema effective = computer.forCurrentUser();
+            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
+            Map<MetaClass, Set<String>> out = computer.forCurrentUser();
 
-            AiEntityInfo kept = effective.entities().get("entityA");
-            assertThat(kept).isNotNull();
-            assertThat(kept.attributes()).extracting(AiAttributeInfo::name)
-                    .containsExactly("visible")
-                    .doesNotContain("hidden");
+            assertThat(out).hasSize(1);
+            Set<String> visible = out.values().iterator().next();
+            assertThat(visible).containsExactly("visible").doesNotContain("hidden");
         }
     }
 
     @Test
     void canReadEntityDelegatesToAccessManager() {
         AccessManager accessManager = mock(AccessManager.class);
-        MessageTools messageTools = mock(MessageTools.class);
-        MetamodelScanner scanner = mock(MetamodelScanner.class);
+        Metadata metadata = metadataWith();
         MetaClass mc = entityMock("x");
 
         try (MockedConstruction<CrudEntityContext> crud = Mockito.mockConstruction(
                 CrudEntityContext.class,
                 (mockCtx, ctx) -> when(mockCtx.isReadPermitted()).thenReturn(false))) {
 
-            EffectiveSchemaComputer computer =
-                    new EffectiveSchemaComputer(accessManager, scanner, messageTools);
+            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
             assertThat(computer.canReadEntity(mc)).isFalse();
         }
     }
@@ -163,16 +135,14 @@ class EffectiveSchemaComputerTest {
     @Test
     void canReadAttributeDelegatesToAccessManager() {
         AccessManager accessManager = mock(AccessManager.class);
-        MessageTools messageTools = mock(MessageTools.class);
-        MetamodelScanner scanner = mock(MetamodelScanner.class);
+        Metadata metadata = metadataWith();
         MetaClass mc = entityMock("x");
 
         try (MockedConstruction<EntityAttributeContext> attr = Mockito.mockConstruction(
                 EntityAttributeContext.class,
                 (mockCtx, ctx) -> when(mockCtx.canView()).thenReturn(true))) {
 
-            EffectiveSchemaComputer computer =
-                    new EffectiveSchemaComputer(accessManager, scanner, messageTools);
+            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
             assertThat(computer.canReadAttribute(mc, "someAttr")).isTrue();
         }
     }

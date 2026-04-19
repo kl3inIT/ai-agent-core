@@ -3,13 +3,12 @@ package com.vn.agent.tools;
 import com.vn.agent.filter.FilterDslMapper;
 import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.LiteralCoercer;
-import com.vn.agent.metadata.AiEntityInfo;
-import com.vn.agent.metadata.AiSchema;
 import com.vn.agent.metadata.EffectiveSchemaComputer;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
 import io.jmix.core.LoadContext;
+import io.jmix.core.MessageTools;
 import io.jmix.core.Metadata;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
@@ -22,8 +21,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The six read-only @Tool methods the LLM can call (TOOL-03). A single {@link Component} so
@@ -47,6 +48,7 @@ public class BuiltInDataTools {
     private final DataManager dataManager;
     private final Metadata metadata;
     private final MetadataTools metadataTools;
+    private final MessageTools messageTools;
     private final FetchPlans fetchPlans;
     private final EffectiveSchemaComputer schemaComputer;
     private final FilterDslMapper filterMapper;
@@ -56,6 +58,7 @@ public class BuiltInDataTools {
     public BuiltInDataTools(DataManager dataManager,
                             Metadata metadata,
                             MetadataTools metadataTools,
+                            MessageTools messageTools,
                             FetchPlans fetchPlans,
                             EffectiveSchemaComputer schemaComputer,
                             FilterDslMapper filterMapper,
@@ -64,6 +67,7 @@ public class BuiltInDataTools {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
+        this.messageTools = messageTools;
         this.fetchPlans = fetchPlans;
         this.schemaComputer = schemaComputer;
         this.filterMapper = filterMapper;
@@ -77,13 +81,13 @@ public class BuiltInDataTools {
             description = "List entities the current user can read. Returns a JSON array of {name, label}.")
     public String listEntities() {
         try {
-            AiSchema eff = schemaComputer.forCurrentUser();
-            List<Map<String, Object>> out = new ArrayList<>(eff.entities().size());
-            for (AiEntityInfo e : eff.entities().values()) {
-                out.add(Map.of(
-                        "name", e.entityName(),
-                        "label", e.localizedLabel() == null ? e.entityName() : e.localizedLabel()
-                ));
+            Map<MetaClass, Set<String>> eff = schemaComputer.forCurrentUser();
+            List<Map<String, Object>> out = new ArrayList<>(eff.size());
+            for (MetaClass mc : eff.keySet()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", mc.getName());
+                row.put("label", messageTools.getEntityCaption(mc));
+                out.add(row);
             }
             return formatter.toJson(out);
         } catch (ToolUserError e) {
@@ -100,11 +104,11 @@ public class BuiltInDataTools {
             String entityName) {
         try {
             MetaClass mc = resolveOrError(entityName);
-            AiEntityInfo info = schemaComputer.forCurrentUser().entities().get(mc.getName());
-            if (info == null) {
+            Set<String> allowed = schemaComputer.forCurrentUser().get(mc);
+            if (allowed == null) {
                 throw new ToolUserError("access_denied", "no read access to " + entityName);
             }
-            return formatter.describe(info);
+            return formatter.describe(mc, allowed);
         } catch (ToolUserError e) {
             return formatter.error(e);
         }

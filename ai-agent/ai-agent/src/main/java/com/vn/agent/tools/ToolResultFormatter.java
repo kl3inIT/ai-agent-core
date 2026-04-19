@@ -2,14 +2,14 @@ package com.vn.agent.tools;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.metadata.AiAttributeInfo;
-import com.vn.agent.metadata.AiEntityInfo;
 import com.vn.agent.metadata.MetamodelScanner;
 import io.jmix.core.EntityStates;
+import io.jmix.core.MessageTools;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
+import io.jmix.core.metamodel.model.Range;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -36,15 +36,18 @@ public class ToolResultFormatter {
     private final MetamodelScanner scanner;
     private final EntityStates entityStates;
     private final MetadataTools metadataTools;
+    private final MessageTools messageTools;
 
     public ToolResultFormatter(ObjectMapper objectMapper,
                                MetamodelScanner scanner,
                                EntityStates entityStates,
-                               MetadataTools metadataTools) {
+                               MetadataTools metadataTools,
+                               MessageTools messageTools) {
         this.objectMapper = objectMapper;
         this.scanner = scanner;
         this.entityStates = entityStates;
         this.metadataTools = metadataTools;
+        this.messageTools = messageTools;
     }
 
     // ---- public API ----
@@ -66,27 +69,67 @@ public class ToolResultFormatter {
         return writeJson(e.toDto());
     }
 
-    /** describe_entity response (D-02). */
-    public String describe(AiEntityInfo info) {
+    /**
+     * describe_entity response (D-02). Computed live off {@link MetaClass} +
+     * {@link MessageTools} rather than a cached snapshot — captions are locale-sensitive and
+     * the metamodel is already authoritative. {@code allowedAttrs} is the access-filtered
+     * subset from {@code EffectiveSchemaComputer.forCurrentUser()}.
+     */
+    public String describe(MetaClass mc, Set<String> allowedAttrs) {
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("entityName", info.entityName());
-        out.put("label", info.localizedLabel());
-        List<Map<String, Object>> attrs = new ArrayList<>(info.attributes().size());
-        for (AiAttributeInfo a : info.attributes()) {
+        out.put("entityName", mc.getName());
+        out.put("label", messageTools.getEntityCaption(mc));
+        List<Map<String, Object>> attrs = new ArrayList<>();
+        for (MetaProperty mp : mc.getProperties()) {
+            if (!allowedAttrs.contains(mp.getName())) {
+                continue;
+            }
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("name", a.name());
-            m.put("type", a.typeLabel());
-            m.put("nullable", a.nullable());
-            m.put("label", a.localizedLabel());
-            if (a.enumValues() != null) m.put("enumValues", a.enumValues());
-            if (a.relationshipTarget() != null) m.put("relationshipTarget", a.relationshipTarget());
-            if (a.validationConstraints() != null && !a.validationConstraints().isEmpty()) {
-                m.put("constraints", a.validationConstraints());
+            m.put("name", mp.getName());
+            m.put("type", typeLabel(mp));
+            m.put("nullable", !mp.isMandatory());
+            m.put("label", messageTools.getPropertyCaption(mp));
+            Range range = mp.getRange();
+            if (range.isEnum()) {
+                List<String> names = new ArrayList<>();
+                for (Object c : range.asEnumeration().getValues()) {
+                    names.add(((Enum<?>) c).name());
+                }
+                m.put("enumValues", names);
+            }
+            if (range.isClass()) {
+                m.put("relationshipTarget", range.asClass().getName());
+            }
+            if (range.isDatatype() && range.asDatatype().getJavaClass() == String.class) {
+                Integer maxLength = columnLength(mp);
+                if (maxLength != null) {
+                    m.put("maxLength", maxLength);
+                }
             }
             attrs.add(m);
         }
         out.put("attributes", attrs);
         return writeJson(out);
+    }
+
+    private String typeLabel(MetaProperty mp) {
+        Range range = mp.getRange();
+        if (range.isEnum()) return "enum:" + range.asEnumeration().getJavaClass().getSimpleName();
+        if (range.isClass()) return "ref:" + range.asClass().getName();
+        if (range.isDatatype()) return range.asDatatype().getJavaClass().getSimpleName();
+        return "unknown";
+    }
+
+    private Integer columnLength(MetaProperty mp) {
+        java.lang.reflect.AnnotatedElement el = mp.getAnnotatedElement();
+        if (el == null) return null;
+        jakarta.persistence.Column col = el.getAnnotation(jakarta.persistence.Column.class);
+        if (col == null) return null;
+        int len = col.length();
+        // JPA default is 255 — emit only when explicitly set (non-default). Most app entities
+        // set an explicit @Column(length=…) when they care; returning 255 for every String
+        // attribute would add noise.
+        return len == 255 ? null : len;
     }
 
     /** get_record response — one entity row. */
