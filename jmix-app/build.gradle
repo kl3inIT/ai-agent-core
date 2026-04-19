@@ -14,12 +14,24 @@ jmix {
 group = 'com.vn'
 version = '0.0.1-SNAPSHOT'
 
+ext {
+    set('springAiVersion', "1.1.4")
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
     maven {
         url = 'https://global.repo.jmix.io/repository/public'
     }
+    maven { url = 'https://repo.spring.io/milestone' }
+    maven { url = 'https://repo.spring.io/snapshot' }
 }
 
 dependencies {
