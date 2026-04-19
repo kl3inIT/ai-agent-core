@@ -3,8 +3,11 @@ package com.vn.agent.tools;
 import java.util.List;
 
 /**
- * Unchecked exception thrown from deep inside the tool machinery (e.g. {@code FilterDslMapper},
- * {@code LiteralCoercer}, and in Plan 03 {@code BuiltInDataTools.resolveOrError}). Caught at
+ * Unchecked exception thrown from deep inside the tool machinery (e.g.
+ * {@code StructuredFilterConditionMapper},
+ * {@code FilterLiteralValueConverter}, and in Plan 03
+ * {@code BuiltInDataTools.resolveReadableEntityOrThrow}).
+ * Caught at
  * the {@code @Tool} method boundary where {@code ToolResultFormatter} converts it into a
  * {@link ToolErrorDto} JSON string returned to the LLM.
  *

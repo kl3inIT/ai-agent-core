@@ -23,22 +23,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Pins every D-07 coercion path of {@link LiteralCoercer}: success + fail-closed
+ * Pins every D-07 conversion path of {@link FilterLiteralValueConverter}: success + fail-closed
  * {@link ToolUserError} for UUID, Long, Integer, BigDecimal, Boolean, LocalDate,
  * LocalDateTime, Enum, and the {@code unsupported_type} fallback. No Spring context —
  * pure JUnit 5 + Mockito (matches {@code ChatServiceMockTest} style).
  *
- * <p>After the finding #1 fix the coercer delegates scalar datatype parsing to
+ * <p>After the finding #1 fix the converter delegates scalar datatype parsing to
  * {@link Datatype#parse(String)}; the mocks stub that method to return typed values
  * or throw {@link ParseException} to exercise the fail-closed path.</p>
  */
-class LiteralCoercerTest {
+class FilterLiteralValueConverterTest {
 
-    private LiteralCoercer coercer;
+    private FilterLiteralValueConverter filterLiteralValueConverter;
 
     @BeforeEach
     void setUp() {
-        coercer = new LiteralCoercer();
+        filterLiteralValueConverter = new FilterLiteralValueConverter();
     }
 
     // --------- helpers ---------
@@ -124,24 +124,24 @@ class LiteralCoercerTest {
     @Test
     void coercesStringPassesThrough() {
         MetaProperty mp = datatypeProp(String.class, "name", "alice");
-        assertThat(coercer.coerce("alice", mp)).isEqualTo("alice");
+        assertThat(filterLiteralValueConverter.convertValue("alice", mp)).isEqualTo("alice");
     }
 
     // --------- UUID via datatype ---------
 
     @Test
     void coercesUuidGood() {
-        // UUID uses the coerceUuidString path (special case in coerceDatatype), not Datatype.parse.
+        // UUID uses the dedicated UUID conversion path, not Datatype.parse.
         MetaProperty mp = datatypeProp(UUID.class, "id", null);
         UUID expected = UUID.fromString("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88");
-        assertThat(coercer.coerce("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88", mp))
+        assertThat(filterLiteralValueConverter.convertValue("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88", mp))
                 .isEqualTo(expected);
     }
 
     @Test
     void coercesUuidBad() {
         MetaProperty mp = datatypeProp(UUID.class, "id", null);
-        assertThatThrownBy(() -> coercer.coerce("not-a-uuid", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("not-a-uuid", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
@@ -152,14 +152,14 @@ class LiteralCoercerTest {
     void coercesAssociationUsesUuidRule() {
         MetaProperty mp = classProp("customer");
         UUID expected = UUID.fromString("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88");
-        assertThat(coercer.coerce("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88", mp))
+        assertThat(filterLiteralValueConverter.convertValue("4f2b8a90-9c8a-4f74-9a5f-3b7a2e4c1d88", mp))
                 .isEqualTo(expected);
     }
 
     @Test
     void coercesAssociationRejectsNonString() {
         MetaProperty mp = classProp("customer");
-        assertThatThrownBy(() -> coercer.coerce(42, mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(42, mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
@@ -170,19 +170,19 @@ class LiteralCoercerTest {
     void coercesLongFromNumber() {
         // Number short-circuit: does not touch Datatype.parse.
         MetaProperty mp = datatypeProp(Long.class, "seq", null);
-        assertThat(coercer.coerce(42, mp)).isEqualTo(42L);
+        assertThat(filterLiteralValueConverter.convertValue(42, mp)).isEqualTo(42L);
     }
 
     @Test
     void coercesLongFromString() {
         MetaProperty mp = datatypeProp(Long.class, "seq", 42L);
-        assertThat(coercer.coerce("42", mp)).isEqualTo(42L);
+        assertThat(filterLiteralValueConverter.convertValue("42", mp)).isEqualTo(42L);
     }
 
     @Test
     void coercesLongBad() {
         MetaProperty mp = datatypePropFailing(Long.class, "seq");
-        assertThatThrownBy(() -> coercer.coerce("not-a-long", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("not-a-long", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;
@@ -196,13 +196,13 @@ class LiteralCoercerTest {
     @Test
     void coercesIntegerFromNumber() {
         MetaProperty mp = datatypeProp(Integer.class, "qty", null);
-        assertThat(coercer.coerce(7L, mp)).isEqualTo(7);
+        assertThat(filterLiteralValueConverter.convertValue(7L, mp)).isEqualTo(7);
     }
 
     @Test
     void coercesIntegerBad() {
         MetaProperty mp = datatypePropFailing(Integer.class, "qty");
-        assertThatThrownBy(() -> coercer.coerce("xyz", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("xyz", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
@@ -212,13 +212,13 @@ class LiteralCoercerTest {
     @Test
     void coercesBigDecimalGood() {
         MetaProperty mp = datatypeProp(BigDecimal.class, "amount", new BigDecimal("12.34"));
-        assertThat(coercer.coerce("12.34", mp)).isEqualTo(new BigDecimal("12.34"));
+        assertThat(filterLiteralValueConverter.convertValue("12.34", mp)).isEqualTo(new BigDecimal("12.34"));
     }
 
     @Test
     void coercesBigDecimalBad() {
         MetaProperty mp = datatypePropFailing(BigDecimal.class, "amount");
-        assertThatThrownBy(() -> coercer.coerce("not-a-number", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("not-a-number", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;
@@ -232,20 +232,20 @@ class LiteralCoercerTest {
     @Test
     void coercesBooleanFromBoolean() {
         MetaProperty mp = datatypeProp(Boolean.class, "active", null);
-        assertThat(coercer.coerce(true, mp)).isEqualTo(Boolean.TRUE);
+        assertThat(filterLiteralValueConverter.convertValue(true, mp)).isEqualTo(Boolean.TRUE);
     }
 
     @Test
     void coercesBooleanFromString() {
         MetaProperty mp = datatypeProp(Boolean.class, "active", null);
-        assertThat(coercer.coerce("true", mp)).isEqualTo(Boolean.TRUE);
-        assertThat(coercer.coerce("False", mp)).isEqualTo(Boolean.FALSE);
+        assertThat(filterLiteralValueConverter.convertValue("true", mp)).isEqualTo(Boolean.TRUE);
+        assertThat(filterLiteralValueConverter.convertValue("False", mp)).isEqualTo(Boolean.FALSE);
     }
 
     @Test
     void coercesBooleanBad() {
         MetaProperty mp = datatypeProp(Boolean.class, "active", null);
-        assertThatThrownBy(() -> coercer.coerce("yes", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("yes", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;
@@ -259,13 +259,13 @@ class LiteralCoercerTest {
     @Test
     void coercesLocalDateGood() {
         MetaProperty mp = datatypeProp(LocalDate.class, "birthday", LocalDate.of(2026, 1, 15));
-        assertThat(coercer.coerce("2026-01-15", mp)).isEqualTo(LocalDate.of(2026, 1, 15));
+        assertThat(filterLiteralValueConverter.convertValue("2026-01-15", mp)).isEqualTo(LocalDate.of(2026, 1, 15));
     }
 
     @Test
     void coercesLocalDateBad() {
         MetaProperty mp = datatypePropFailing(LocalDate.class, "birthday");
-        assertThatThrownBy(() -> coercer.coerce("01/15/2026", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("01/15/2026", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;
@@ -280,14 +280,14 @@ class LiteralCoercerTest {
     void coercesLocalDateTimeGood() {
         MetaProperty mp = datatypeProp(LocalDateTime.class, "createdAt",
                 LocalDateTime.of(2026, 1, 15, 10, 30));
-        assertThat(coercer.coerce("2026-01-15T10:30:00", mp))
+        assertThat(filterLiteralValueConverter.convertValue("2026-01-15T10:30:00", mp))
                 .isEqualTo(LocalDateTime.of(2026, 1, 15, 10, 30));
     }
 
     @Test
     void coercesLocalDateTimeBad() {
         MetaProperty mp = datatypePropFailing(LocalDateTime.class, "createdAt");
-        assertThatThrownBy(() -> coercer.coerce("yesterday", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("yesterday", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
@@ -299,13 +299,13 @@ class LiteralCoercerTest {
     @Test
     void coercesEnumGood() {
         MetaProperty mp = enumProp(SampleStatus.class, "status");
-        assertThat(coercer.coerce("ACTIVE", mp)).isEqualTo(SampleStatus.ACTIVE);
+        assertThat(filterLiteralValueConverter.convertValue("ACTIVE", mp)).isEqualTo(SampleStatus.ACTIVE);
     }
 
     @Test
     void coercesEnumBad() {
         MetaProperty mp = enumProp(SampleStatus.class, "status");
-        assertThatThrownBy(() -> coercer.coerce("UNKNOWN", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("UNKNOWN", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;
@@ -317,7 +317,7 @@ class LiteralCoercerTest {
     @Test
     void coercesEnumRejectsNonString() {
         MetaProperty mp = enumProp(SampleStatus.class, "status");
-        assertThatThrownBy(() -> coercer.coerce(1, mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(1, mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
@@ -327,48 +327,48 @@ class LiteralCoercerTest {
     @Test
     void rejectsNull() {
         MetaProperty mp = datatypeProp(String.class, "name", null);
-        assertThatThrownBy(() -> coercer.coerce(null, mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(null, mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
 
-    // --------- coerceList ---------
+    // --------- convertListValues ---------
 
     @Test
-    void coerceListWrapsEach() {
+    void convertListValuesWrapsEach() {
         MetaProperty mp = datatypeProp(Long.class, "ids", 3L);
-        List<Object> out = coercer.coerceList(List.of(1, 2, "3"), mp);
+        List<Object> out = filterLiteralValueConverter.convertListValues(List.of(1, 2, "3"), mp);
         assertThat(out).containsExactly(1L, 2L, 3L);
     }
 
     @Test
-    void coerceListRejectsScalar() {
+    void convertListValuesRejectsScalar() {
         MetaProperty mp = datatypeProp(Long.class, "ids", null);
-        assertThatThrownBy(() -> coercer.coerceList("42", mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertListValues("42", mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
 
     @Test
-    void coerceListRejectsEmpty() {
+    void convertListValuesRejectsEmpty() {
         MetaProperty mp = datatypeProp(Long.class, "ids", null);
-        assertThatThrownBy(() -> coercer.coerceList(List.of(), mp))
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertListValues(List.of(), mp))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
     }
 
-    // --------- coerceBoolean ---------
+    // --------- convertBooleanValue ---------
 
     @Test
-    void coerceBooleanGood() {
-        assertThat(coercer.coerceBoolean(true, "active")).isEqualTo(Boolean.TRUE);
-        assertThat(coercer.coerceBoolean("TRUE", "active")).isEqualTo(Boolean.TRUE);
-        assertThat(coercer.coerceBoolean("false", "active")).isEqualTo(Boolean.FALSE);
+    void convertBooleanValueGood() {
+        assertThat(filterLiteralValueConverter.convertBooleanValue(true, "active")).isEqualTo(Boolean.TRUE);
+        assertThat(filterLiteralValueConverter.convertBooleanValue("TRUE", "active")).isEqualTo(Boolean.TRUE);
+        assertThat(filterLiteralValueConverter.convertBooleanValue("false", "active")).isEqualTo(Boolean.FALSE);
     }
 
     @Test
-    void coerceBooleanBad() {
-        assertThatThrownBy(() -> coercer.coerceBoolean("maybe", "active"))
+    void convertBooleanValueBad() {
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertBooleanValue("maybe", "active"))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> {
                     ToolUserError tue = (ToolUserError) e;

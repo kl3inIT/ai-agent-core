@@ -1,6 +1,6 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.metadata.EffectiveSchemaComputer;
+import com.vn.agent.metadata.CurrentUserSchemaAccess;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.datatype.Datatype;
 import io.jmix.core.metamodel.model.MetaClass;
@@ -25,16 +25,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Pins every branch of {@link FilterDslMapper}: all 13 D-05 operators, DeMorgan NOT
+ * Pins every branch of {@link StructuredFilterConditionMapper}: all 13 D-05 operators, DeMorgan NOT
  * expansion over AND/OR and leaves, depth-cap rejection, denied-attribute rejection,
  * unknown-op rejection, NOT-over-STARTS_WITH/ENDS_WITH rejection. Mocks
- * {@link EffectiveSchemaComputer} to exercise access-denied paths without Spring.
+ * {@link CurrentUserSchemaAccess} to exercise access-denied paths without Spring.
  */
-class FilterDslMapperTest {
+class StructuredFilterConditionMapperTest {
 
-    private LiteralCoercer literalCoercer;
-    private EffectiveSchemaComputer schemaComputer;
-    private FilterDslMapper mapper;
+    private FilterLiteralValueConverter filterLiteralValueConverter;
+    private CurrentUserSchemaAccess currentUserSchemaAccess;
+    private StructuredFilterConditionMapper mapper;
     private MetaClass orderMc;
     private MetaProperty nameProp;
     private MetaProperty amountProp;
@@ -42,15 +42,15 @@ class FilterDslMapperTest {
 
     @BeforeEach
     void setUp() {
-        literalCoercer = new LiteralCoercer();
-        schemaComputer = mock(EffectiveSchemaComputer.class);
+        filterLiteralValueConverter = new FilterLiteralValueConverter();
+        currentUserSchemaAccess = mock(CurrentUserSchemaAccess.class);
         // Default: every attribute is readable. Individual tests override.
-        lenient().when(schemaComputer.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))
+        lenient().when(currentUserSchemaAccess.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))
                 .thenReturn(true);
-        lenient().when(schemaComputer.canReadEntity(org.mockito.ArgumentMatchers.any()))
+        lenient().when(currentUserSchemaAccess.canReadEntity(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(true);
 
-        mapper = new FilterDslMapper(literalCoercer, schemaComputer, 3);
+        mapper = new StructuredFilterConditionMapper(filterLiteralValueConverter, currentUserSchemaAccess, 3);
 
         orderMc = mock(MetaClass.class);
         lenient().when(orderMc.getName()).thenReturn("Order");
@@ -80,7 +80,7 @@ class FilterDslMapperTest {
         @SuppressWarnings({"unchecked", "rawtypes"})
         Class raw = javaClass;
         lenient().when(dt.getJavaClass()).thenReturn(raw);
-        // LiteralCoercer (after finding #1) delegates scalar datatype parsing to Datatype.parse.
+        // FilterLiteralValueConverter delegates scalar datatype parsing to Datatype.parse.
         // For test fixtures using BigDecimal amount with string values like "10", stub parse
         // to echo back a BigDecimal. String and Boolean short-circuit inside the coercer.
         try {
@@ -122,8 +122,8 @@ class FilterDslMapperTest {
             "STARTS_WITH,      STARTS_WITH,      name,    al",
             "ENDS_WITH,        ENDS_WITH,        name,    al"
     })
-    void eachOperatorMapsToMatchingJmixConstant(String dslOp, String jmixOp, String propName, String rawValue) {
-        LeafNode leaf = new LeafNode(propName, dslOp, rawValue);
+    void eachOperatorMapsToMatchingJmixConstant(String operationName, String jmixOp, String propName, String rawValue) {
+        LeafNode leaf = new LeafNode(propName, operationName, rawValue);
         Condition out = mapper.map(leaf, orderMc);
         PropertyCondition pc = asProperty(out);
         assertThat(pc.getProperty()).isEqualTo(propName);
@@ -252,7 +252,7 @@ class FilterDslMapperTest {
 
     @Test
     void deniedAttributeRejects() {
-        when(schemaComputer.canReadAttribute(eq(orderMc), eq("name"))).thenReturn(false);
+        when(currentUserSchemaAccess.canReadAttribute(eq(orderMc), eq("name"))).thenReturn(false);
         LeafNode leaf = new LeafNode("name", "EQUAL", "alice");
         assertThatThrownBy(() -> mapper.map(leaf, orderMc))
                 .isInstanceOf(ToolUserError.class)

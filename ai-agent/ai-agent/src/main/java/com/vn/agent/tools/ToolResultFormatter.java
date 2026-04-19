@@ -71,45 +71,21 @@ public class ToolResultFormatter {
      * describe_entity response (D-02). Computed live off {@link MetaClass} +
      * {@link MessageTools} rather than a cached snapshot — captions are locale-sensitive and
      * the metamodel is already authoritative. {@code readableAttributeNames} is the access-filtered
-     * subset from {@code EffectiveSchemaComputer.forCurrentUser()}.
+     * subset returned by the current-user schema access component.
      */
     public String describe(MetaClass metaClass, Set<String> readableAttributeNames) {
-        Map<String, Object> entityDescription = new LinkedHashMap<>();
-        entityDescription.put("entityName", metaClass.getName());
-        entityDescription.put("label", messageTools.getEntityCaption(metaClass));
-
-        List<Map<String, Object>> attributeDescriptions = new ArrayList<>();
+        List<AttributeDescription> attributeDescriptions = new ArrayList<>();
         for (MetaProperty metaProperty : metaClass.getProperties()) {
             if (!readableAttributeNames.contains(metaProperty.getName())) {
                 continue;
             }
-            Map<String, Object> attributeDescription = new LinkedHashMap<>();
-            attributeDescription.put("name", metaProperty.getName());
-            attributeDescription.put("type", typeLabel(metaProperty));
-            attributeDescription.put("nullable", !metaProperty.isMandatory());
-            attributeDescription.put("label", messageTools.getPropertyCaption(metaProperty));
-
-            Range range = metaProperty.getRange();
-            if (range.isEnum()) {
-                List<String> enumValueNames = new ArrayList<>();
-                for (Object enumValue : range.asEnumeration().getValues()) {
-                    enumValueNames.add(((Enum<?>) enumValue).name());
-                }
-                attributeDescription.put("enumValues", enumValueNames);
-            }
-            if (range.isClass()) {
-                attributeDescription.put("relationshipTarget", range.asClass().getName());
-            }
-            if (range.isDatatype() && range.asDatatype().getJavaClass() == String.class) {
-                Integer maxLength = columnLength(metaProperty);
-                if (maxLength != null) {
-                    attributeDescription.put("maxLength", maxLength);
-                }
-            }
-            attributeDescriptions.add(attributeDescription);
+            attributeDescriptions.add(buildAttributeDescription(metaProperty));
         }
-        entityDescription.put("attributes", attributeDescriptions);
-        return writeJson(entityDescription);
+        return writeJson(new DescribeEntityResult(
+                metaClass.getName(),
+                messageTools.getEntityCaption(metaClass),
+                attributeDescriptions
+        ));
     }
 
     private String typeLabel(MetaProperty metaProperty) {
@@ -139,46 +115,69 @@ public class ToolResultFormatter {
 
     /** find_records response — rows + limit + truncated flag + optional hint (D-14). */
     public String records(List<?> rows, MetaClass metaClass, int limit, boolean truncated) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("entityName", metaClass.getName());
-        List<Map<String, Object>> serializedRows = new ArrayList<>(rows.size());
-        for (Object row : rows) {
-            serializedRows.add(buildFormattedEntityRow(row, metaClass));
-        }
-        response.put("rows", serializedRows);
-        response.put("limit", limit);
-        response.put("truncated", truncated);
-        if (truncated) {
-            response.put("hint",
-                    "result was truncated to the limit; call count_records for the exact total or narrow the filter");
-        }
-        return writeJson(response);
+        String hint = truncated
+                ? "result was truncated to the limit; call count_records for the exact total or narrow the filter"
+                : null;
+        return writeJson(new RecordsResult(
+                metaClass.getName(),
+                serializeRows(rows, metaClass),
+                limit,
+                truncated,
+                hint
+        ));
     }
 
     /** get_related_records response. */
-    public String related(Object root, MetaProperty relationProperty, List<?> relatedRows) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("entityName", relationProperty.getDomain().getName());
-        response.put("relationship", relationProperty.getName());
+    public String related(MetaProperty relationProperty, List<?> relatedRows) {
         MetaClass targetMetaClass = relationProperty.getRange().asClass();
-        response.put("targetEntity", targetMetaClass.getName());
-        List<Map<String, Object>> serializedRows = new ArrayList<>(relatedRows.size());
-        for (Object relatedRow : relatedRows) {
-            serializedRows.add(buildFormattedEntityRow(relatedRow, targetMetaClass));
-        }
-        response.put("rows", serializedRows);
-        return writeJson(response);
+        return writeJson(new RelatedRecordsResult(
+                relationProperty.getDomain().getName(),
+                relationProperty.getName(),
+                targetMetaClass.getName(),
+                serializeRows(relatedRows, targetMetaClass)
+        ));
     }
 
     /** count_records response. */
     public String count(MetaClass metaClass, long count) {
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("entityName", metaClass.getName());
-        response.put("count", count);
-        return writeJson(response);
+        return writeJson(new CountResult(metaClass.getName(), count));
     }
 
     // ---- internals ----
+
+    private AttributeDescription buildAttributeDescription(MetaProperty metaProperty) {
+        Range range = metaProperty.getRange();
+        List<String> enumValueNames = range.isEnum() ? enumValueNames(range) : null;
+        String relationshipTarget = range.isClass() ? range.asClass().getName() : null;
+        Integer maxLength = range.isDatatype() && range.asDatatype().getJavaClass() == String.class
+                ? columnLength(metaProperty)
+                : null;
+        return new AttributeDescription(
+                metaProperty.getName(),
+                typeLabel(metaProperty),
+                !metaProperty.isMandatory(),
+                messageTools.getPropertyCaption(metaProperty),
+                enumValueNames,
+                relationshipTarget,
+                maxLength
+        );
+    }
+
+    private List<String> enumValueNames(Range range) {
+        List<String> enumValueNames = new ArrayList<>();
+        for (Object enumValue : range.asEnumeration().getValues()) {
+            enumValueNames.add(((Enum<?>) enumValue).name());
+        }
+        return enumValueNames;
+    }
+
+    private List<Map<String, Object>> serializeRows(List<?> rows, MetaClass metaClass) {
+        List<Map<String, Object>> serializedRows = new ArrayList<>(rows.size());
+        for (Object row : rows) {
+            serializedRows.add(buildFormattedEntityRow(row, metaClass));
+        }
+        return serializedRows;
+    }
 
     /**
      * Build a JSON-ready Map of the entity's attributes. The D-13 rule is:

@@ -15,9 +15,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * TOOL-02 per-request effective-schema filter. Stateless {@link Component} — {@code AccessManager}
- * resolves the caller's authentication per call, so there is no class-level cache (per threat
- * model T-03-01 + Open-Question #6 recommendation).
+ * TOOL-02 per-request read-access view of the Jmix metamodel for the current user.
+ * Stateless {@link Component} — {@code AccessManager} resolves the caller's authentication per
+ * call, so there is no class-level cache (per threat model T-03-01 + Open-Question #6
+ * recommendation).
  *
  * <p>Returns a {@code Map<MetaClass, Set<String>>} whose keys are entities visible to the
  * current user and whose values are the subset of attribute names the user can read. Tools
@@ -25,12 +26,12 @@ import java.util.Set;
  * {@code MessageTools} at call time (locale-sensitive).</p>
  */
 @Component
-public class EffectiveSchemaComputer {
+public class CurrentUserSchemaAccess {
 
     private final AccessManager accessManager;
     private final Metadata metadata;
 
-    public EffectiveSchemaComputer(AccessManager accessManager, Metadata metadata) {
+    public CurrentUserSchemaAccess(AccessManager accessManager, Metadata metadata) {
         this.accessManager = accessManager;
         this.metadata = metadata;
     }
@@ -38,9 +39,9 @@ public class EffectiveSchemaComputer {
     /**
      * Build a fresh map of {@link MetaClass} → readable attribute names, filtered by the
      * current user's {@link AccessManager} view. Never cached (TOOL-02). Excludes
-     * {@code @SystemLevel} entities (same policy as the scanner).
+     * {@code @SystemLevel} entities.
      */
-    public Map<MetaClass, Set<String>> forCurrentUser() {
+    public Map<MetaClass, Set<String>> getReadableSchema() {
         Map<MetaClass, Set<String>> readableAttributeNamesByEntity = new LinkedHashMap<>();
         for (MetaClass metaClass : metadata.getSession().getClasses()) {
             if (isSystemLevelEntity(metaClass)) {
@@ -55,7 +56,8 @@ public class EffectiveSchemaComputer {
     }
 
     /**
-     * Per-request attribute-path access check. Consumed by {@code FilterDslMapper}
+     * Per-request attribute-path access check. Consumed by
+     * {@code StructuredFilterConditionMapper}
      * during depth-cap path validation (D-08). {@code attrPath} may be a dotted path (e.g.
      * {@code "customer.region.code"}) — {@code EntityAttributeContext} accepts property paths.
      */
@@ -65,10 +67,10 @@ public class EffectiveSchemaComputer {
         accessManager.applyRegisteredConstraints(attributeAccessContext);
         return attributeAccessContext.canView();
     }
-    
+
     /**
      * Per-request entity read-access check. Used by the filter mapper when walking relationship
-     * hops and by {@code BuiltInDataTools.resolveOrError(...)}.
+     * hops and by {@code BuiltInDataTools.resolveReadableEntityOrThrow(...)}.
      */
     public boolean canReadEntity(MetaClass metaClass) {
         CrudEntityContext entityAccessContext = new CrudEntityContext(metaClass);

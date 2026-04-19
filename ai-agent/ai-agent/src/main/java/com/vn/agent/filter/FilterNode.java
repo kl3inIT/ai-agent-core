@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 /**
- * Structured filter DSL root (TOOL-05, D-06). JSON shapes:
+ * Structured filter root (TOOL-05, D-06). JSON shapes:
  * <ul>
  *   <li>{@link AndNode}  — {@code {"and": [child, child, ...]}}</li>
  *   <li>{@link OrNode}   — {@code {"or":  [child, child, ...]}}</li>
@@ -15,8 +15,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  * {@link JsonSubTypes} registered here: the presence of the distinguishing property
  * ({@code and}, {@code or}, {@code not}, or {@code property}) selects the record type.
  *
- * <p>Sealed: exactly four permitted subtypes. The {@code FilterDslMapper} relies on exhaustive
- * {@code switch} over this hierarchy; the Java compiler enforces exhaustiveness.</p>
+ * <p>Sealed: exactly four permitted subtypes. The
+ * {@code StructuredFilterConditionMapper} relies on exhaustive {@code switch} over this
+ * hierarchy; the Java compiler enforces exhaustiveness.</p>
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.DEDUCTION)
 @JsonSubTypes({

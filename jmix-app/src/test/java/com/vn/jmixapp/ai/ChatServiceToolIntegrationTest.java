@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ol>
  *
  * <p><b>Restricted-user denied-attribute absence</b> — success criterion #3's second half — is
- * covered authoritatively at unit level by Plan 04's {@code EffectiveSchemaComputerTest}
+ * covered authoritatively at unit level by Plan 04's {@code CurrentUserSchemaAccessTest}
  * (see 03-CONTEXT.md `## Deferred Ideas`). This class intentionally does NOT add a
  * restricted-user {@code @SpringBootTest} variant.</p>
  *
@@ -116,7 +116,7 @@ class ChatServiceToolIntegrationTest {
         // Admin context (from AuthenticatedAsAdmin) should permit Order at the entity level
         // and surface its attributes. This is a smoke assertion that describe_entity plumbing
         // works end-to-end in @SpringBootTest. Denied-attribute absence (success criterion
-        // #3 second half) is covered authoritatively by EffectiveSchemaComputerTest (Plan 04
+         // #3 second half) is covered authoritatively by CurrentUserSchemaAccessTest (Plan 04
         // Task 2) at unit level — see 03-CONTEXT.md `## Deferred Ideas`. Do NOT add a
         // restricted-user integration variant here.
         String json = builtInDataTools.describeEntity("jmixapp_Order");

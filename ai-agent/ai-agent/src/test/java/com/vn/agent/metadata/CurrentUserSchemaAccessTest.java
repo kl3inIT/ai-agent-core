@@ -21,13 +21,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit test for {@link EffectiveSchemaComputer} — stateless per-request filter.
+ * Unit test for {@link CurrentUserSchemaAccess} — stateless per-request read-access filter.
  * Uses {@link Mockito#mockConstruction(Class, MockedConstruction.MockInitializer)} to
  * control {@link CrudEntityContext#isReadPermitted()} / {@link EntityAttributeContext#canView()}
- * by-MetaClass, so denied entities are proved absent from {@code forCurrentUser()}
+ * by-MetaClass, so denied entities are proved absent from {@code getReadableSchema()}
  * (success criterion #2 — restricted user sees zero entities).
  */
-class EffectiveSchemaComputerTest {
+class CurrentUserSchemaAccessTest {
 
     private static MetaClass entityMock(String name, String... attrNames) {
         MetaClass mc = mock(MetaClass.class);
@@ -69,8 +69,8 @@ class EffectiveSchemaComputerTest {
                      EntityAttributeContext.class,
                      (mockCtx, ctx) -> when(mockCtx.canView()).thenReturn(true))) {
 
-            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
-            Map<MetaClass, Set<String>> out = computer.forCurrentUser();
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            Map<MetaClass, Set<String>> out = currentUserSchemaAccess.getReadableSchema();
 
             assertThat(out.keySet()).extracting(MetaClass::getName)
                     .containsExactly("entityB")
@@ -87,8 +87,8 @@ class EffectiveSchemaComputerTest {
                 CrudEntityContext.class,
                 (mockCtx, ctx) -> when(mockCtx.isReadPermitted()).thenReturn(false))) {
 
-            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
-            assertThat(computer.forCurrentUser()).isEmpty();
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            assertThat(currentUserSchemaAccess.getReadableSchema()).isEmpty();
         }
     }
 
@@ -108,8 +108,8 @@ class EffectiveSchemaComputerTest {
                          when(mockCtx.canView()).thenReturn(!"hidden".equals(n));
                      })) {
 
-            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
-            Map<MetaClass, Set<String>> out = computer.forCurrentUser();
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            Map<MetaClass, Set<String>> out = currentUserSchemaAccess.getReadableSchema();
 
             assertThat(out).hasSize(1);
             Set<String> visible = out.values().iterator().next();
@@ -127,8 +127,8 @@ class EffectiveSchemaComputerTest {
                 CrudEntityContext.class,
                 (mockCtx, ctx) -> when(mockCtx.isReadPermitted()).thenReturn(false))) {
 
-            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
-            assertThat(computer.canReadEntity(mc)).isFalse();
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            assertThat(currentUserSchemaAccess.canReadEntity(mc)).isFalse();
         }
     }
 
@@ -142,8 +142,8 @@ class EffectiveSchemaComputerTest {
                 EntityAttributeContext.class,
                 (mockCtx, ctx) -> when(mockCtx.canView()).thenReturn(true))) {
 
-            EffectiveSchemaComputer computer = new EffectiveSchemaComputer(accessManager, metadata);
-            assertThat(computer.canReadAttribute(mc, "someAttr")).isTrue();
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            assertThat(currentUserSchemaAccess.canReadAttribute(mc, "someAttr")).isTrue();
         }
     }
 }

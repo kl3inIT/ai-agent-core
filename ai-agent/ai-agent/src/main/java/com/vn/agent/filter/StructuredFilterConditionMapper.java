@@ -1,6 +1,6 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.metadata.EffectiveSchemaComputer;
+import com.vn.agent.metadata.CurrentUserSchemaAccess;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Structured filter DSL → Jmix {@link Condition} mapper (TOOL-05, D-05/D-06/D-08).
+ * Structured filter → Jmix {@link Condition} mapper (TOOL-05, D-05/D-06/D-08).
  *
  * <p>Responsibilities:</p>
  * <ul>
@@ -24,10 +24,10 @@ import java.util.Locale;
  *       raw-JPQL escape hatch in v1. The negation flag XORs through
  *       {@code AND}/{@code OR} and flips leaf operators where a mirror exists.</li>
  *   <li>Every attribute path validated per-hop against
- *       {@link EffectiveSchemaComputer#canReadAttribute}/{@link
- *       EffectiveSchemaComputer#canReadEntity} — denied hop ⇒ rejected filter (D-08).</li>
+ *       {@link CurrentUserSchemaAccess#canReadAttribute}/{@link
+ *       CurrentUserSchemaAccess#canReadEntity} — denied hop ⇒ rejected filter (D-08).</li>
  *   <li>Depth cap from {@code jmix.ai-agent.tools.max-filter-depth} (default 3).</li>
- *   <li>Literal values coerced via {@link LiteralCoercer}; failure ⇒ structured
+ *   <li>Literal values converted via {@link FilterLiteralValueConverter}; failure ⇒ structured
  *       {@link ToolUserError} (D-07). JPQL/SQL injection is impossible by construction —
  *       every leaf is {@link PropertyCondition#createWithValue} with a typed param.</li>
  * </ul>
@@ -35,17 +35,17 @@ import java.util.Locale;
  * <p>Plan 03 consumes {@link #map(FilterNode, MetaClass)} inside each @Tool body.</p>
  */
 @Component
-public class FilterDslMapper {
+public class StructuredFilterConditionMapper {
 
-    private final LiteralCoercer coercer;
-    private final EffectiveSchemaComputer schemaComputer;
+    private final FilterLiteralValueConverter filterLiteralValueConverter;
+    private final CurrentUserSchemaAccess currentUserSchemaAccess;
     private final int maxFilterDepth;
 
-    public FilterDslMapper(LiteralCoercer coercer,
-                           EffectiveSchemaComputer schemaComputer,
-                           @Value("${jmix.ai-agent.tools.max-filter-depth:3}") int maxFilterDepth) {
-        this.coercer = coercer;
-        this.schemaComputer = schemaComputer;
+    public StructuredFilterConditionMapper(FilterLiteralValueConverter filterLiteralValueConverter,
+                                           CurrentUserSchemaAccess currentUserSchemaAccess,
+                                           @Value("${jmix.ai-agent.tools.max-filter-depth:3}") int maxFilterDepth) {
+        this.filterLiteralValueConverter = filterLiteralValueConverter;
+        this.currentUserSchemaAccess = currentUserSchemaAccess;
         this.maxFilterDepth = maxFilterDepth;
     }
 
@@ -54,70 +54,72 @@ public class FilterDslMapper {
      * Throws {@link ToolUserError} on any failure (unknown op, denied attribute, bad literal,
      * depth exceeded).
      */
-    public Condition map(FilterNode root, MetaClass mc) {
+    public Condition map(FilterNode root, MetaClass rootMetaClass) {
         if (root == null) {
             throw new ToolUserError("invalid_filter", "filter root must not be null");
         }
-        return mapInternal(root, mc, false);
+        return mapInternal(root, rootMetaClass, false);
     }
 
-    private Condition mapInternal(FilterNode node, MetaClass mc, boolean negated) {
+    private Condition mapInternal(FilterNode node, MetaClass rootMetaClass, boolean negated) {
         return switch (node) {
-            case AndNode a -> mapLogical(a.and(), mc, negated, true);
-            case OrNode o -> mapLogical(o.or(), mc, negated, false);
-            case NotNode n -> mapInternal(n.not(), mc, !negated);
-            case LeafNode l -> mapLeaf(l, mc, negated);
+            case AndNode(List<FilterNode> children) -> mapLogical(children, rootMetaClass, negated, true);
+            case OrNode(List<FilterNode> children) -> mapLogical(children, rootMetaClass, negated, false);
+            case NotNode(FilterNode negatedNode) -> mapInternal(negatedNode, rootMetaClass, !negated);
+            case LeafNode(String property, String operation, Object value) ->
+                    mapLeaf(property, operation, value, rootMetaClass, negated);
         };
     }
 
-    private Condition mapLogical(List<FilterNode> children, MetaClass mc,
+    private Condition mapLogical(List<FilterNode> children, MetaClass rootMetaClass,
                                  boolean negated, boolean isAnd) {
         if (children == null || children.isEmpty()) {
             throw new ToolUserError("invalid_filter",
                     "AND/OR node requires at least one child");
         }
         boolean asAnd = isAnd ^ negated; // DeMorgan: NOT(AND)→OR(NOT…), NOT(OR)→AND(NOT…)
-        Condition[] mapped = new Condition[children.size()];
+        Condition[] mappedConditions = new Condition[children.size()];
         for (int i = 0; i < children.size(); i++) {
-            mapped[i] = mapInternal(children.get(i), mc, negated);
+            mappedConditions[i] = mapInternal(children.get(i), rootMetaClass, negated);
         }
-        return asAnd ? LogicalCondition.and(mapped) : LogicalCondition.or(mapped);
+        return asAnd ? LogicalCondition.and(mappedConditions) : LogicalCondition.or(mappedConditions);
     }
 
-    private Condition mapLeaf(LeafNode l, MetaClass mc, boolean negated) {
-        if (l.property() == null || l.property().isBlank()) {
+    private Condition mapLeaf(String property, String operationName, Object value,
+                              MetaClass rootMetaClass, boolean negated) {
+        if (property == null || property.isBlank()) {
             throw new ToolUserError("invalid_filter", "leaf property must not be blank");
         }
-        if (l.operation() == null || l.operation().isBlank()) {
+        if (operationName == null || operationName.isBlank()) {
             throw new ToolUserError("invalid_filter",
-                    "leaf operation must not be blank for " + l.property());
+                    "leaf operation must not be blank for " + property);
         }
-        MetaProperty terminal = validatePath(l.property(), mc);
-        String op = resolveOperation(l.operation(), negated);
+        MetaProperty terminalProperty = validatePath(property, rootMetaClass);
+        String propertyConditionOperation = resolveOperation(operationName, negated);
 
         Object coerced;
-        if (PropertyCondition.Operation.IN_LIST.equals(op)
-                || PropertyCondition.Operation.NOT_IN_LIST.equals(op)) {
-            coerced = coercer.coerceList(l.value(), terminal);
-        } else if (PropertyCondition.Operation.IS_SET.equals(op)) {
-            Boolean b = coercer.coerceBoolean(l.value(), l.property());
-            coerced = negated ? !b : b;
+        if (PropertyCondition.Operation.IN_LIST.equals(propertyConditionOperation)
+                || PropertyCondition.Operation.NOT_IN_LIST.equals(propertyConditionOperation)) {
+            coerced = filterLiteralValueConverter.convertListValues(value, terminalProperty);
+        } else if (PropertyCondition.Operation.IS_SET.equals(propertyConditionOperation)) {
+            Boolean booleanValue = filterLiteralValueConverter.convertBooleanValue(value, property);
+            coerced = negated ? !booleanValue : booleanValue;
         } else {
-            coerced = coercer.coerce(l.value(), terminal);
+            coerced = filterLiteralValueConverter.convertValue(value, terminalProperty);
         }
-        return PropertyCondition.createWithValue(l.property(), op, coerced);
+        return PropertyCondition.createWithValue(property, propertyConditionOperation, coerced);
     }
 
     /**
-     * Resolve the caller-supplied D-05 operator string (case-insensitive) to the
+     * Resolve the caller-supplied structured-filter operator string (case-insensitive) to the
      * {@link PropertyCondition.Operation} constant. When {@code negated} is true, applies
      * DeMorgan leaf-level negation by returning the complementary op (e.g. {@code EQUAL} →
      * {@code NOT_EQUAL}). STARTS_WITH/ENDS_WITH under NOT is explicitly rejected (v1
      * limitation — DeMorgan cannot express it without regex).
      */
-    private String resolveOperation(String dslOp, boolean negated) {
-        String key = dslOp.toUpperCase(Locale.ROOT);
-        return switch (key) {
+    private String resolveOperation(String operationName, boolean negated) {
+        String normalizedOperationName = operationName.toUpperCase(Locale.ROOT);
+        return switch (normalizedOperationName) {
             case "EQUAL" -> negated ? PropertyCondition.Operation.NOT_EQUAL
                     : PropertyCondition.Operation.EQUAL;
             case "NOT_EQUAL" -> negated ? PropertyCondition.Operation.EQUAL
@@ -132,8 +134,8 @@ public class FilterDslMapper {
                     : PropertyCondition.Operation.LESS_OR_EQUAL;
             case "CONTAINS" -> negated ? PropertyCondition.Operation.NOT_CONTAINS
                     : PropertyCondition.Operation.CONTAINS;
-            // D-05 DSL name "DOES_NOT_CONTAIN" maps to Jmix 2.8 op constant NOT_CONTAINS
-            // (Jmix renamed the constant; DSL surface preserved for LLM).
+            // D-05 structured-filter name "DOES_NOT_CONTAIN" maps to Jmix 2.8 op constant
+            // NOT_CONTAINS (Jmix renamed the constant; tool input stays stable for the LLM).
             case "DOES_NOT_CONTAIN", "NOT_CONTAINS" -> negated ? PropertyCondition.Operation.CONTAINS
                     : PropertyCondition.Operation.NOT_CONTAINS;
             case "STARTS_WITH" -> {
@@ -156,7 +158,7 @@ public class FilterDslMapper {
                     : PropertyCondition.Operation.NOT_IN_LIST;
             case "IS_SET" -> PropertyCondition.Operation.IS_SET;
             default -> throw new ToolUserError("unknown_operation",
-                    "operator " + dslOp + " not supported",
+                    "operator " + operationName + " not supported",
                     List.of("EQUAL", "NOT_EQUAL", "GREATER", "GREATER_OR_EQUAL",
                             "LESS", "LESS_OR_EQUAL", "CONTAINS", "DOES_NOT_CONTAIN",
                             "STARTS_WITH", "ENDS_WITH", "IN_LIST", "NOT_IN_LIST", "IS_SET"));
@@ -164,38 +166,38 @@ public class FilterDslMapper {
     }
 
     /**
-     * Walk the dotted attribute path against {@code mc}, enforcing the depth cap (D-08) and
-     * per-hop {@link EffectiveSchemaComputer#canReadAttribute}/{@link
-     * EffectiveSchemaComputer#canReadEntity} checks. Returns the terminal {@link MetaProperty}
-     * which the caller needs for literal coercion.
+     * Walk the dotted attribute path against {@code rootMetaClass}, enforcing the depth cap
+     * (D-08) and per-hop {@link CurrentUserSchemaAccess#canReadAttribute}/{@link
+     * CurrentUserSchemaAccess#canReadEntity} checks. Returns the terminal
+     * {@link MetaProperty} which the caller needs for literal coercion.
      */
-    private MetaProperty validatePath(String path, MetaClass mc) {
+    private MetaProperty validatePath(String path, MetaClass rootMetaClass) {
         String[] segments = path.split("\\.");
         if (segments.length > maxFilterDepth) {
             throw new ToolUserError("filter_depth_exceeded",
                     "path " + path + " exceeds depth " + maxFilterDepth);
         }
-        MetaClass currentMc = mc;
-        MetaProperty mp = null;
+        MetaClass currentMetaClass = rootMetaClass;
+        MetaProperty currentProperty = null;
         for (int i = 0; i < segments.length; i++) {
             String segment = segments[i];
-            mp = currentMc.findProperty(segment);
-            if (mp == null) {
+            currentProperty = currentMetaClass.findProperty(segment);
+            if (currentProperty == null) {
                 throw new ToolUserError("unknown_attribute",
-                        "no attribute " + segment + " on " + currentMc.getName());
+                        "no attribute " + segment + " on " + currentMetaClass.getName());
             }
-            if (!schemaComputer.canReadAttribute(currentMc, segment)) {
+            if (!currentUserSchemaAccess.canReadAttribute(currentMetaClass, segment)) {
                 throw new ToolUserError("access_denied",
-                        "attribute not readable: " + currentMc.getName() + "." + segment);
+                        "attribute not readable: " + currentMetaClass.getName() + "." + segment);
             }
-            if (mp.getRange().isClass() && i < segments.length - 1) {
-                currentMc = mp.getRange().asClass();
-                if (!schemaComputer.canReadEntity(currentMc)) {
+            if (currentProperty.getRange().isClass() && i < segments.length - 1) {
+                currentMetaClass = currentProperty.getRange().asClass();
+                if (!currentUserSchemaAccess.canReadEntity(currentMetaClass)) {
                     throw new ToolUserError("access_denied",
-                            "entity not readable along path: " + currentMc.getName());
+                            "entity not readable along path: " + currentMetaClass.getName());
                 }
             }
         }
-        return mp;
+        return currentProperty;
     }
 }

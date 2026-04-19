@@ -13,8 +13,9 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
  * AFTER {@link SpiDefaultsAutoConfiguration} so the no-op {@code ToolContributor} default is
  * available when {@code AgentToolCallbacks} is wired.
  *
- * <p>The Phase 3 beans ({@code MetamodelScanner}, {@code EffectiveSchemaComputer},
- * {@code FilterDslMapper}, {@code LiteralCoercer}, {@code ToolResultFormatter},
+ * <p>The Phase 3 beans ({@code CurrentUserSchemaAccess},
+ * {@code StructuredFilterConditionMapper}, {@code FilterLiteralValueConverter},
+ * {@code ToolResultFormatter},
  * {@code BuiltInDataTools}, {@code AgentToolCallbacks}) are discovered via the
  * {@code @ComponentScan} on {@code com.vn.agent.AIConfiguration} (base package
  * {@code com.vn.agent}). This class exists solely for the explicit {@code @AutoConfigureAfter}

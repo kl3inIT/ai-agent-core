@@ -1,9 +1,9 @@
 package com.vn.agent.tools;
 
-import com.vn.agent.filter.FilterDslMapper;
 import com.vn.agent.filter.FilterNode;
-import com.vn.agent.filter.LiteralCoercer;
-import com.vn.agent.metadata.EffectiveSchemaComputer;
+import com.vn.agent.filter.FilterLiteralValueConverter;
+import com.vn.agent.filter.StructuredFilterConditionMapper;
+import com.vn.agent.metadata.CurrentUserSchemaAccess;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
@@ -21,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,13 +33,14 @@ import java.util.Set;
  * <p><b>Read-only contract</b> (TOOL-04): every method body delegates to
  * {@link DataManager#load} / {@link DataManager#getCount} only. No {@code save},
  * {@code saveContext}, {@code remove}, no direct JPA persistence-context access, no JPQL
- * strings built from LLM input. The JPQL template in {@link #countRecords} is parameterized over {@code mc.getName()}
- * which is itself whitelisted via {@link Metadata#getClass(Object)}. Plan 04's ASM test enforces
- * this at build time.
+ * strings built from LLM input. The JPQL template in {@link #countRecords} is parameterized
+ * over {@code metaClass.getName()}, which is itself whitelisted via
+ * {@link Metadata#getClass(Object)}. Plan 04's ASM test enforces this at build time.
  *
  * <p><b>Security</b>: Jmix entity-, attribute-, and row-level security apply automatically via
- * {@link DataManager}; {@link EffectiveSchemaComputer} gates entity/attribute visibility on top.
- * Fail-closed errors leave this class as {@link ToolUserError} → {@code ToolResultFormatter.error}.
+ * {@link DataManager}; {@link CurrentUserSchemaAccess} gates entity/attribute visibility on top.
+ * Fail-closed errors leave this class as {@link ToolUserError} →
+ * {@code ToolResultFormatter.error}.
  */
 @Component
 public class BuiltInDataTools {
@@ -50,29 +50,29 @@ public class BuiltInDataTools {
     private final MetadataTools metadataTools;
     private final MessageTools messageTools;
     private final FetchPlans fetchPlans;
-    private final EffectiveSchemaComputer schemaComputer;
-    private final FilterDslMapper filterMapper;
-    private final LiteralCoercer literalCoercer;
-    private final ToolResultFormatter formatter;
+    private final CurrentUserSchemaAccess currentUserSchemaAccess;
+    private final StructuredFilterConditionMapper structuredFilterConditionMapper;
+    private final FilterLiteralValueConverter filterLiteralValueConverter;
+    private final ToolResultFormatter toolResultFormatter;
 
     public BuiltInDataTools(DataManager dataManager,
                             Metadata metadata,
                             MetadataTools metadataTools,
                             MessageTools messageTools,
                             FetchPlans fetchPlans,
-                            EffectiveSchemaComputer schemaComputer,
-                            FilterDslMapper filterMapper,
-                            LiteralCoercer literalCoercer,
-                            ToolResultFormatter formatter) {
+                            CurrentUserSchemaAccess currentUserSchemaAccess,
+                            StructuredFilterConditionMapper structuredFilterConditionMapper,
+                            FilterLiteralValueConverter filterLiteralValueConverter,
+                            ToolResultFormatter toolResultFormatter) {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
         this.messageTools = messageTools;
         this.fetchPlans = fetchPlans;
-        this.schemaComputer = schemaComputer;
-        this.filterMapper = filterMapper;
-        this.literalCoercer = literalCoercer;
-        this.formatter = formatter;
+        this.currentUserSchemaAccess = currentUserSchemaAccess;
+        this.structuredFilterConditionMapper = structuredFilterConditionMapper;
+        this.filterLiteralValueConverter = filterLiteralValueConverter;
+        this.toolResultFormatter = toolResultFormatter;
     }
 
     // -------- Tool 1: list_entities (D-01) --------
@@ -81,17 +81,17 @@ public class BuiltInDataTools {
             description = "List entities the current user can read. Returns a JSON array of {name, label}.")
     public String listEntities() {
         try {
-            Map<MetaClass, Set<String>> eff = schemaComputer.forCurrentUser();
-            List<Map<String, Object>> out = new ArrayList<>(eff.size());
-            for (MetaClass mc : eff.keySet()) {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("name", mc.getName());
-                row.put("label", messageTools.getEntityCaption(mc));
-                out.add(row);
+            Map<MetaClass, Set<String>> readableSchemaByEntity = currentUserSchemaAccess.getReadableSchema();
+            List<ReadableEntitySummary> entities = new ArrayList<>(readableSchemaByEntity.size());
+            for (MetaClass metaClass : readableSchemaByEntity.keySet()) {
+                entities.add(new ReadableEntitySummary(
+                        metaClass.getName(),
+                        messageTools.getEntityCaption(metaClass)
+                ));
             }
-            return formatter.toJson(out);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            return toolResultFormatter.toJson(entities);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
@@ -103,43 +103,43 @@ public class BuiltInDataTools {
             @ToolParam(description = "Jmix entity name from list_entities, e.g. 'jmixapp_Order'")
             String entityName) {
         try {
-            MetaClass mc = resolveOrError(entityName);
-            Set<String> allowed = schemaComputer.forCurrentUser().get(mc);
-            if (allowed == null) {
+            MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
+            Set<String> readableAttributeNames = currentUserSchemaAccess.getReadableSchema().get(metaClass);
+            if (readableAttributeNames == null) {
                 throw new ToolUserError("access_denied", "no read access to " + entityName);
             }
-            return formatter.describe(mc, allowed);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            return toolResultFormatter.describe(metaClass, readableAttributeNames);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
     // -------- Tool 3: find_records (TOOL-05, TOOL-06, D-12, D-14) --------
 
     @Tool(name = "find_records",
-            description = "Find records matching a structured filter DSL. Default limit 20, max 100. "
+            description = "Find records matching a structured filter object. Default limit 20, max 100. "
                     + "When results exceed the limit, response includes truncated=true and a hint to use count_records.")
     public String findRecords(
             @ToolParam(description = "Jmix entity name from list_entities") String entityName,
             @ToolParam(required = false,
-                    description = "Filter DSL: {and:[...]} | {or:[...]} | {not:{...}} | {property,operation,value}")
+                    description = "Structured filter: {and:[...]} | {or:[...]} | {not:{...}} | {property,operation,value}")
             FilterNode filter,
             @ToolParam(required = false, description = "Max rows (1..100, default 20)") Integer limit) {
         try {
-            MetaClass mc = resolveOrError(entityName);
+            MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
             int clampedLimit = ToolLimits.clampLimit(limit);
-            Condition cond = filter == null ? null : filterMapper.map(filter, mc);
+            Condition condition = filter == null ? null : structuredFilterConditionMapper.map(filter, metaClass);
 
             List<?> rows;
-            if (cond == null) {
-                rows = dataManager.load(mc.getJavaClass())
+            if (condition == null) {
+                rows = dataManager.load(metaClass.getJavaClass())
                         .all()
                         .fetchPlan(FetchPlan.INSTANCE_NAME)
-                        .maxResults(clampedLimit + 1) // +1 to detect truncation
+                        .maxResults(clampedLimit + 1)
                         .list();
             } else {
-                rows = dataManager.load(mc.getJavaClass())
-                        .condition(cond)
+                rows = dataManager.load(metaClass.getJavaClass())
+                        .condition(condition)
                         .fetchPlan(FetchPlan.INSTANCE_NAME)
                         .maxResults(clampedLimit + 1)
                         .list();
@@ -149,9 +149,9 @@ public class BuiltInDataTools {
             if (truncated) {
                 rows = rows.subList(0, clampedLimit);
             }
-            return formatter.records(rows, mc, clampedLimit, truncated);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            return toolResultFormatter.records(rows, metaClass, clampedLimit, truncated);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
@@ -161,14 +161,14 @@ public class BuiltInDataTools {
             description = "Count records matching a filter. Use when find_records returned truncated=true.")
     public String countRecords(
             @ToolParam(description = "Jmix entity name") String entityName,
-            @ToolParam(required = false, description = "Same filter DSL as find_records") FilterNode filter) {
+            @ToolParam(required = false, description = "Same structured filter shape as find_records") FilterNode filter) {
         try {
-            MetaClass mc = resolveOrError(entityName);
-            Condition cond = filter == null ? null : filterMapper.map(filter, mc);
-            long n = dataManager.getCount(buildCountContext(mc, cond));
-            return formatter.count(mc, n);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
+            Condition condition = filter == null ? null : structuredFilterConditionMapper.map(filter, metaClass);
+            long recordCount = dataManager.getCount(buildCountContext(metaClass, condition));
+            return toolResultFormatter.count(metaClass, recordCount);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
@@ -180,19 +180,19 @@ public class BuiltInDataTools {
             @ToolParam(description = "Jmix entity name") String entityName,
             @ToolParam(description = "Record id (UUID string for entities using UUID ids)") String id) {
         try {
-            MetaClass mc = resolveOrError(entityName);
-            Object parsedId = parseId(id, mc);
-            Object entity = dataManager.load(mc.getJavaClass())
+            MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
+            Object parsedId = parseEntityId(id, metaClass);
+            Object entity = dataManager.load(metaClass.getJavaClass())
                     .id(parsedId)
                     .fetchPlan(FetchPlan.INSTANCE_NAME)
                     .optional()
                     .orElse(null);
             if (entity == null) {
-                return formatter.error("not_found", "no record with id " + id);
+                return toolResultFormatter.error("not_found", "no record with id " + id);
             }
-            return formatter.record(entity, mc);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            return toolResultFormatter.record(entity, metaClass);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
@@ -205,51 +205,52 @@ public class BuiltInDataTools {
             @ToolParam(description = "Root entity id") String id,
             @ToolParam(description = "Relationship attribute name (from describe_entity)") String relationship) {
         try {
-            MetaClass mc = resolveOrError(entityName);
-            MetaProperty mp = mc.findProperty(relationship);
-            if (mp == null) {
+            MetaClass rootMetaClass = resolveReadableEntityOrThrow(entityName);
+            MetaProperty relationshipProperty = rootMetaClass.findProperty(relationship);
+            if (relationshipProperty == null) {
                 throw new ToolUserError("unknown_attribute",
-                        "no attribute " + relationship + " on " + mc.getName());
+                        "no attribute " + relationship + " on " + rootMetaClass.getName());
             }
-            if (!mp.getRange().isClass()) {
+            if (!relationshipProperty.getRange().isClass()) {
                 throw new ToolUserError("not_a_relationship",
                         relationship + " is not an association");
             }
-            if (!schemaComputer.canReadAttribute(mc, relationship)) {
+            if (!currentUserSchemaAccess.canReadAttribute(rootMetaClass, relationship)) {
                 throw new ToolUserError("access_denied",
-                        "cannot read " + mc.getName() + "." + relationship);
-            }
-            MetaClass targetMc = mp.getRange().asClass();
-            if (!schemaComputer.canReadEntity(targetMc)) {
-                throw new ToolUserError("access_denied",
-                        "cannot read target entity " + targetMc.getName());
+                        "cannot read " + rootMetaClass.getName() + "." + relationship);
             }
 
-            FetchPlan fp = fetchPlans.builder(mc.getJavaClass())
+            MetaClass targetMetaClass = relationshipProperty.getRange().asClass();
+            if (!currentUserSchemaAccess.canReadEntity(targetMetaClass)) {
+                throw new ToolUserError("access_denied",
+                        "cannot read target entity " + targetMetaClass.getName());
+            }
+
+            FetchPlan fetchPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
                     .addFetchPlan(FetchPlan.INSTANCE_NAME)
-                    .add(relationship, fpb -> fpb.addFetchPlan(FetchPlan.INSTANCE_NAME))
+                    .add(relationship, fetchPlanBuilder -> fetchPlanBuilder.addFetchPlan(FetchPlan.INSTANCE_NAME))
                     .build();
-            Object root = dataManager.load(mc.getJavaClass())
-                    .id(parseId(id, mc))
-                    .fetchPlan(fp)
+            Object rootEntity = dataManager.load(rootMetaClass.getJavaClass())
+                    .id(parseEntityId(id, rootMetaClass))
+                    .fetchPlan(fetchPlan)
                     .optional()
                     .orElse(null);
-            if (root == null) {
-                return formatter.error("not_found", "no record with id " + id);
+            if (rootEntity == null) {
+                return toolResultFormatter.error("not_found", "no record with id " + id);
             }
 
-            Object relatedValue = EntityValues.getValue(root, relationship);
+            Object relatedValue = EntityValues.getValue(rootEntity, relationship);
             List<?> relatedRows;
-            if (relatedValue instanceof Collection<?> col) {
-                relatedRows = new ArrayList<>(col);
+            if (relatedValue instanceof Collection<?> relatedCollection) {
+                relatedRows = new ArrayList<>(relatedCollection);
             } else if (relatedValue == null) {
                 relatedRows = List.of();
             } else {
                 relatedRows = List.of(relatedValue);
             }
-            return formatter.related(root, mp, relatedRows);
-        } catch (ToolUserError e) {
-            return formatter.error(e);
+            return toolResultFormatter.related(relationshipProperty, relatedRows);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
         }
     }
 
@@ -260,23 +261,25 @@ public class BuiltInDataTools {
      * the current user's Jmix security (D-11). Fail-closed: unknown names and denied entities
      * both produce {@link ToolUserError}.
      */
-    private MetaClass resolveOrError(String entityName) {
+    private MetaClass resolveReadableEntityOrThrow(String entityName) {
         if (entityName == null || entityName.isBlank()) {
             throw new ToolUserError("unknown_entity", "entity name must not be blank");
         }
-        MetaClass mc;
+
+        MetaClass metaClass;
         try {
-            mc = metadata.getClass(entityName);
-        } catch (RuntimeException e) {
+            metaClass = metadata.getClass(entityName);
+        } catch (RuntimeException runtimeException) {
             throw new ToolUserError("unknown_entity", "no entity named " + entityName);
         }
-        if (mc == null) {
+
+        if (metaClass == null) {
             throw new ToolUserError("unknown_entity", "no entity named " + entityName);
         }
-        if (!schemaComputer.canReadEntity(mc)) {
+        if (!currentUserSchemaAccess.canReadEntity(metaClass)) {
             throw new ToolUserError("access_denied", "no read access to " + entityName);
         }
-        return mc;
+        return metaClass;
     }
 
     /**
@@ -284,31 +287,32 @@ public class BuiltInDataTools {
      * 2.8 requires a JPQL query on the LoadContext — the fluent loader has no {@code getCount}
      * — so we build a minimal template whose only interpolated token is
      * {@link MetaClass#getName()}, which came from {@link Metadata#getClass(String)} via
-     * {@link #resolveOrError} and therefore is a Jmix-whitelisted entity name by construction.
-     * Zero LLM input flows into the JPQL string; Plan 04's ASM test only needs to whitelist
-     * this one call site.
+     * {@link #resolveReadableEntityOrThrow(String)} and therefore is a Jmix-whitelisted entity
+     * name by construction. Zero LLM input flows into the JPQL string; Plan 04's ASM test only
+     * needs to whitelist this one call site.
      */
-    private LoadContext<?> buildCountContext(MetaClass mc, Condition cond) {
-        LoadContext.Query q = new LoadContext.Query("select e from " + mc.getName() + " e");
-        if (cond != null) {
-            q.setCondition(cond);
+    private LoadContext<?> buildCountContext(MetaClass metaClass, Condition condition) {
+        LoadContext.Query query = new LoadContext.Query("select e from " + metaClass.getName() + " e");
+        if (condition != null) {
+            query.setCondition(condition);
         }
-        return new LoadContext<>(mc).setQuery(q);
+        return new LoadContext<>(metaClass).setQuery(query);
     }
 
     /**
-     * Coerce an LLM-supplied id string to the Java type of the entity's primary-key property.
+     * Convert an LLM-supplied id string to the Java type of the entity's primary-key property.
      * For Jmix apps using UUID ids this parses the string via {@link java.util.UUID#fromString}.
-     * Delegates to {@link LiteralCoercer} so non-UUID ids (long, String) are also handled.
+     * Delegates to {@link FilterLiteralValueConverter} so non-UUID ids (long, String) are also
+     * handled.
      */
-    private Object parseId(String id, MetaClass mc) {
+    private Object parseEntityId(String id, MetaClass metaClass) {
         if (id == null || id.isBlank()) {
             throw new ToolUserError("invalid_id", "id must not be blank");
         }
-        MetaProperty pk = metadataTools.getPrimaryKeyProperty(mc);
-        if (pk == null) {
-            throw new ToolUserError("invalid_id", "entity " + mc.getName() + " has no primary key");
+        MetaProperty primaryKeyProperty = metadataTools.getPrimaryKeyProperty(metaClass);
+        if (primaryKeyProperty == null) {
+            throw new ToolUserError("invalid_id", "entity " + metaClass.getName() + " has no primary key");
         }
-        return literalCoercer.coerce(id, pk);
+        return filterLiteralValueConverter.convertValue(id, primaryKeyProperty);
     }
 }

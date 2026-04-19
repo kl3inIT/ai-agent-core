@@ -87,6 +87,31 @@ class ToolResultFormatterTest {
     }
 
     @Test
+    void recordsWithoutTruncationOmitsHint() {
+        MetaClass metaClass = mock(MetaClass.class);
+        when(metaClass.getName()).thenReturn("jmixapp_Order");
+
+        String json = newFormatter().records(List.of(), metaClass, 20, false);
+        assertThat(json)
+                .contains("\"entityName\":\"jmixapp_Order\"")
+                .contains("\"rows\":[]")
+                .contains("\"limit\":20")
+                .contains("\"truncated\":false")
+                .doesNotContain("\"hint\"");
+    }
+
+    @Test
+    void recordsWithTruncationIncludesHint() {
+        MetaClass metaClass = mock(MetaClass.class);
+        when(metaClass.getName()).thenReturn("jmixapp_Order");
+
+        String json = newFormatter().records(List.of(), metaClass, 20, true);
+        assertThat(json)
+                .contains("\"truncated\":true")
+                .contains("\"hint\":\"result was truncated to the limit; call count_records for the exact total or narrow the filter\"");
+    }
+
+    @Test
     void stringAttributeAlwaysWrappedInDataAndEscapes() {
         ObjectMapper mapper = new ObjectMapper();
         EntityStates entityStates = mock(EntityStates.class);
