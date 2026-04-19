@@ -200,3 +200,20 @@
 - Audit DTO emission from tool bodies — Phase 4.
 - Mutation tools — v2.
 - ArchUnit rules — dropped per D-09.
+
+---
+
+## 2026-04-20 — Post-execute refactor doc resync
+
+**Trigger:** User feedback absorbed during Phase 3 execution — "Reuse Jmix built-ins over parallel layers" (see `memory/feedback_reuse_jmix_builtins.md`).
+
+**Code changes applied post-execute (commits already on branch, tests green):**
+- Metadata layer collapsed: 6 files (`AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex`, `MetamodelScanner`, `EffectiveSchemaComputer`) -> 1 adapter (`CurrentUserSchemaAccess`). TOOL-01 / TOOL-02 surface identical; only the shape changed.
+- Filter DSL renames: `LiteralCoercer` -> `FilterLiteralValueConverter`; `FilterDslMapper` -> `StructuredFilterConditionMapper`. Tests renamed to match.
+- New files surfaced in code: `com.vn.agent.tools.ToolResultPayloads` (add-on), `com.vn.jmixapp.ai.ChatServiceSmokeRunner` (host — note: this may predate Phase 3; documented here only if Phase 3 referenced it).
+
+**Docs resynced (this entry):**
+- 03-01-SUMMARY, 03-02-SUMMARY, 03-03-SUMMARY, 03-04-SUMMARY, 03-05-SUMMARY: factual references (class names, file paths, test names, "What Was Built" prose) updated to match current code. Decisions, rationale, commit hashes, completed_dates preserved.
+- 03-AI-SPEC, 03-PATTERNS: class-name references updated; design intent preserved.
+
+**Verification:** `./gradlew :ai-agent:ai-agent:test` and `./gradlew :jmix-app:test` BUILD SUCCESSFUL at time of resync. Consistency grep for old class names across `.planning/phases/03-*/` returns zero hits outside intentional historical callouts.
