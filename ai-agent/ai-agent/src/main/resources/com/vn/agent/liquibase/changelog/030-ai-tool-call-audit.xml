@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <createTable tableName="AI_AGENT_TOOL_CALL_AUDIT">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CONVERSATION_ID" type="${uuid.type}">
+                <constraints foreignKeyName="FK_AI_AGENT_TOOL_CALL_AUDIT__ON_CONVERSATION"
+                             references="AI_AGENT_CONVERSATION(ID)"/>
+            </column>
+            <column name="USER_USERNAME" type="varchar(255)"/>
+            <column name="TOOL_NAME" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ARGUMENTS_JSON" type="clob"/>
+            <column name="RESULT_SUMMARY" type="clob"/>
+            <column name="OUTCOME" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="DENIAL_REASON" type="varchar(512)"/>
+            <column name="LATENCY_MS" type="bigint"/>
+            <column name="STARTED_AT" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="FINISHED_AT" type="datetime"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createIndex indexName="IDX_AI_AGENT_TOOL_CALL_AUDIT__ON_CONVERSATION"
+                     tableName="AI_AGENT_TOOL_CALL_AUDIT">
+            <column name="CONVERSATION_ID"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_AGENT_TOOL_CALL_AUDIT__ON_STARTED_AT"
+                     tableName="AI_AGENT_TOOL_CALL_AUDIT">
+            <column name="STARTED_AT"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

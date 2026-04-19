@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <createTable tableName="AI_AGENT_KNOWLEDGE_DOCUMENT">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="FILE_NAME" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="MIME_TYPE" type="varchar(128)"/>
+            <column name="SIZE_BYTES" type="bigint"/>
+            <column name="STATUS" type="varchar(16)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ERROR_MESSAGE" type="varchar(1024)"/>
+            <column name="ALLOWED_ROLES_JSON" type="clob"/>
+            <column name="CREATED_BY" type="varchar(255)"/>
+            <column name="CREATED_DATE" type="datetime"/>
+            <column name="LAST_MODIFIED_BY" type="varchar(255)"/>
+            <column name="LAST_MODIFIED_DATE" type="datetime"/>
+            <column name="INGESTED_AT" type="datetime"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createIndex indexName="IDX_AI_AGENT_KNOWLEDGE_DOCUMENT__ON_STATUS"
+                     tableName="AI_AGENT_KNOWLEDGE_DOCUMENT">
+            <column name="STATUS"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_AGENT_KNOWLEDGE_DOCUMENT__ON_CREATED_BY"
+                     tableName="AI_AGENT_KNOWLEDGE_DOCUMENT">
+            <column name="CREATED_BY"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

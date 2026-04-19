@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <createTable tableName="AI_AGENT_PARAMETERS">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="PROFILE_NAME" type="varchar(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ACTIVE_" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="BODY_YAML" type="clob"/>
+            <column name="CREATED_BY" type="varchar(255)"/>
+            <column name="CREATED_DATE" type="datetime"/>
+            <column name="LAST_MODIFIED_BY" type="varchar(255)"/>
+            <column name="LAST_MODIFIED_DATE" type="datetime"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createIndex indexName="IDX_AI_AGENT_PARAMETERS__ON_PROFILE_NAME"
+                     tableName="AI_AGENT_PARAMETERS" unique="true">
+            <column name="PROFILE_NAME"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
