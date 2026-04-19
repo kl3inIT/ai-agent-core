@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-last_updated: "2026-04-19T03:31:00.000Z"
+last_updated: "2026-04-19T12:00:00.000Z"
 progress:
-  total_phases: 2
-  completed_phases: 1
+  total_phases: 8
+  completed_phases: 2
   total_plans: 15
-  completed_plans: 5
-  percent: 33
+  completed_plans: 15
+  percent: 25
 ---
 
 # Project State
@@ -22,14 +22,14 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 02 — Foundations (in progress — plan 02-01 complete)
+**Current focus:** Phase 02 — Foundations (all 11 plans complete; static verification PASS; human-verify Gradle test + boot pending merge)
 
 ## Phase Status
 
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
-| 2 | Foundations | In progress (1/11 plans) |
+| 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
 | 3 | Metadata-First Runtime & Six Tools | Not started |
 | 4 | Orchestration Core | Not started |
 | 5 | RAG Layer | Not started |
@@ -58,12 +58,27 @@ All 4 plans completed and merged into master:
 
 ## Phase 02 Progress
 
-- 02-01: ✅ Three EnumClass<String> enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + EN/VI i18n. Decision: enum ids frozen to upper-case to match Spring AI 1.1.4 chat-memory CHECK constraint.
+All 11 plans complete on branch `gsd/phase-02-foundations`:
+
+- 02-01: ✅ 3 EnumClass<String> enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + EN/VI i18n. Enum ids upper-case to match Spring AI 1.1.4 chat-memory CHECK constraint.
+- 02-02: ✅ 6 SPI interfaces + ToolVetoedException in com.vn.agent.spi (signatures + Javadoc only)
+- 02-03: ✅ 5 JPA entities (AiConversation composes AiMessage via @Composition+CASCADE; enum adapters; no Lombok) + i18n
+- 02-04: ✅ 5 entity DDL Liquibase changelogs (010-050) + add-on master + host jmix-app explicit `<include>` (D-02)
+- 02-05: ✅ SPRING_AI_CHAT_MEMORY DDL (postgres+hsqldb gated) + `initialize-schema=never`
+- 02-06: ✅ pgvector 070 DDL (vector(1536) + HNSW vector_cosine_ops) postgres-gated belt-and-suspenders
+- 02-07: ✅ SpiDefaultsAutoConfiguration with 6 @ConditionalOnMissingBean no-op defaults + AutoConfiguration.imports
+- 02-08: ✅ 3 Jmix roles (AiAgentUserRole, AiAgentAdminRole, AiAgentUserRowLevelRole with :current_user_username JPQL) + i18n
+- 02-09: ✅ @JmixModule(dependsOn) widened to include DataConfiguration + SecurityConfiguration
+- 02-10: ✅ FoundationsBootSmokeTest @SpringBootTest (5 assertions: Liquibase, entity round-trip, row-level isolation, SPI defaults, role catalog)
+- 02-11: ✅ D-10 scope reductions + D-02 include correction synced to REQUIREMENTS/ROADMAP/PROJECT/STACK docs
+
+**Static verification:** PASS (16/16 must-haves — see `.planning/phases/02-foundations/VERIFICATION.md`)
 
 ## Next Steps
 
-1. Continue Phase 2 — next plan 02-02 (SPI interfaces + ToolVetoedException).
-2. Phase 2 depends on Phase 1's `ChatService` SPI and the 1.0.2 BOM pin.
+1. **Human-verify Phase 2:** run `./gradlew :ai-agent:ai-agent:test --tests "com.vn.agent.FoundationsBootSmokeTest"` and `./gradlew :jmix-app:bootRun` to confirm the phase gate passes on a real JVM.
+2. Merge `gsd/phase-02-foundations` → `master` once human-verified.
+3. Start Phase 3 — Metadata-First Runtime & Six Tools.
 
 ## Key Artifacts
 
