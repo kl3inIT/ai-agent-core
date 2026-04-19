@@ -3,22 +3,22 @@
 **Version:** v1 (MVP)
 **Granularity:** Coarse
 **Phases:** 8
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-18 (D-10 applied)
 
 ## Phase Summary
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
 | 1 | Walking Skeleton | Prove M4 + packaging + Jmix add-on shape end-to-end before any feature work | PKG-01..05, ENT-02 (partial), TEST-01 (scaffold) | 4 |
-| 2 | Foundations | Entities, Liquibase, roles, SPI interfaces, ArchUnit guardrails | ENT-01..04, SEC-01..04, SPI-01..07 (interfaces only), TEST-06 | 4 |
-| 3 | Metadata Runtime & Six Tools | Metamodel scanner + per-user schema + 6 DataManager-backed read tools | TOOL-01..08, SPI-04 (impl), SPI-01 (impl) | 5 |
+| 2 | Foundations | Entities, Liquibase, roles, SPI interfaces (no ArchUnit per D-10) | ENT-01..04, SEC-01..04, SPI-01, SPI-02, SPI-03, SPI-05, SPI-06, SPI-07 (interfaces only) | 4 |
+| 3 | Metadata Runtime & Six Tools | Metamodel scanner + per-user schema + 6 DataManager-backed read tools | TOOL-01..08, SPI-01 (impl) | 5 |
 | 4 | Orchestration Core | ChatClient + advisor chain + JDBC memory + audit | ORCH-01..06, AUD-01..05, SPI-02/03 (impl), SPI-06 (impl) | 5 |
 | 5 | RAG Layer | KB ingestion + pgvector + role-scoped retrieval | RAG-01..08, SPI-07 (impl) | 4 |
 | 6 | Parameters & Guardrails | Parameter profiles + structured output + iteration/token caps + injection scanner | PARAM-01..05, GUARD-01..06, SPI-05 (impl) | 4 |
-| 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit, Exposure | UI-01..10 | 5 |
-| 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..07 | 4 |
+| 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit | UI-01..06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10) | 5 |
+| 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..05, TEST-07 (TEST-06 dropped per D-10) | 4 |
 
-**Total v1 requirements mapped:** 73 of 73 ✓
+**Total v1 requirements mapped:** 69 of 69 ✓ (was 73 pre-D-10; `AiExposureRule`/SPI-04/SPI-08/UI-07/TEST-06 dropped)
 
 ---
 
@@ -26,13 +26,13 @@
 
 ### Phase 1 — Walking Skeleton & Packaging De-risk
 
-**Goal:** Prove the add-on skeleton (4 modules, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 1.0.2 pinned via BOM, and de-risk milestone-release API drift before committing to architecture.
+**Goal:** Prove the add-on skeleton (4 modules, auto-config, `@JmixModule`, clean-consumer consumption) works end-to-end with Spring AI 1.1.4 pinned via BOM (upgraded from 1.0.2 between Phase 1 wave start and Phase 2 start, per D-10), and de-risk milestone-release API drift before committing to architecture.
 
 **Requirements:** PKG-01, PKG-02, PKG-03, PKG-04, PKG-05, TEST-01 (scaffold only)
 
 **Deliverables:**
 - Keep existing 2-module shape (`ai-agent` + `ai-agent-starter`) per [D-01 in 01-CONTEXT.md](phases/01-walking-skeleton/01-CONTEXT.md). The `ai-agent-flowui` / `ai-agent-flowui-starter` split is **deferred** until a named REST-only consumer use case justifies it; `ai-agent-starter` continues to ship UI deps (PKG-04 deferred accordingly).
-- `spring-ai-bom:1.0.2` imported; `https://repo.spring.io/milestone` added to repositories
+- `spring-ai-bom:1.1.4` imported (upgraded from 1.0.2 per D-10); `https://repo.spring.io/milestone` added to repositories
 - The `ai-agent-starter` registers via `AutoConfiguration.imports`
 - `@JmixModule(dependsOn = …)` on each configuration class
 - Smoke test: `ChatClient.prompt().call().content()` end-to-end through OpenRouter (as a `@Tag("live")` test) + mock `ChatModel` variant for CI
@@ -61,22 +61,23 @@ Plans:
 
 **Goal:** Land all persistent entities, Liquibase changelogs, security roles, and SPI interface contracts that downstream phases depend on.
 
-**Requirements:** ENT-01, ENT-02, ENT-03, ENT-04, SEC-01, SEC-02, SEC-03, SEC-04, SPI-01, SPI-02, SPI-03, SPI-04, SPI-05, SPI-06, SPI-07 (interfaces only, no impl), TEST-06
+**Requirements:** ENT-01, ENT-02, ENT-03, ENT-04, SEC-01, SEC-02, SEC-03, SEC-04, SPI-01, SPI-02, SPI-03, SPI-05, SPI-06, SPI-07 (interfaces only, no impl) — SPI-04, SPI-08, TEST-06 dropped per D-10
 
 **Deliverables:**
-- Six JPA entities with UUID + `@Version` + `@InstanceName`, Liquibase changelogs (`AI_AGENT_*` prefix)
+- Five JPA entities with UUID + `@Version` + `@InstanceName`, Liquibase changelogs (`AI_AGENT_*` prefix) — per D-10 (`AiExposureRule` dropped)
 - Spring AI JDBC chat-memory DDL replicated in add-on Liquibase (`spring.ai.chat.memory.repository.jdbc.initialize-schema: never`)
 - `CREATE EXTENSION IF NOT EXISTS vector` + `AI_AGENT_KB_VECTOR_STORE` table via Liquibase
+- Host `jmix-app` master `changelog.xml` explicitly `<include>`s the add-on master changelog (D-02: Jmix does NOT auto-discover add-on Liquibase changelogs)
 - `AiAgentUserRole` + `AiAgentAdminRole` with policies
-- Seven SPI interfaces in functional module (method signatures + Javadoc; no impl yet)
-- ArchUnit rules in test source: no `EntityManager`, no `.impl.` / `.internal.` imports, no-Lombok-on-entities
+- Six SPI interfaces in functional module (method signatures + Javadoc; no impl yet). SPI-04 `EntityExposurePolicy` dropped per D-10.
+- Default no-op beans for all six SPIs (`SpiDefaultsAutoConfiguration` with `@ConditionalOnMissingBean`)
 - `messages_en.properties` + `messages_vi.properties` for every entity + enum localization
 
 **Success criteria:**
-1. `./gradlew test` passes (ArchUnit rules clean)
+1. `./gradlew test` passes — foundations boot smoke test (5 assertions) green
 2. `./gradlew bootRun` in `jmix-app` creates all AI-agent tables via Liquibase on fresh DB
 3. `AiAgentAdminRole` assignable from Jmix role admin UI
-4. All seven SPIs compile; each has one no-op default bean registered
+4. All six SPIs compile; each has one no-op default bean registered
 
 **Needs research phase:** No — standard Jmix entity/security patterns.
 
@@ -85,13 +86,13 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Entity enums (AiMessageRole, AiKnowledgeDocumentStatus, AiToolCallOutcome) + enum i18n
 - [ ] 02-02-PLAN.md — Six SPI interfaces + ToolVetoedException in com.vn.agent.spi
-- [ ] 02-03-PLAN.md — Five JPA entities (Conversation, Message, ToolCallAudit, Parameters, KnowledgeDocument) + entity/attribute i18n
-- [ ] 02-04-PLAN.md — Add-on master changelog + step changelogs 010-050 + host <include> edit
-- [ ] 02-05-PLAN.md — SPRING_AI_CHAT_MEMORY changeset (Postgres + HSQLDB) + application.properties initialize-schema:never
-- [ ] 02-06-PLAN.md — pgvector extension + AI_AGENT_KB_VECTOR_STORE + HNSW index (Postgres-only with preCondition gating)
+- [ ] 02-03-PLAN.md — Five JPA entities (AiConversation, AiMessage, AiToolCallAudit, AiParameters, AiKnowledgeDocument) + entity/attribute i18n
+- [ ] 02-04-PLAN.md — Add-on master changelog + five step changelogs (010-050) + host <include> edit (D-02 correction)
+- [ ] 02-05-PLAN.md — SPRING_AI_CHAT_MEMORY changeset (Postgres + HSQLDB variants) + application.properties initialize-schema:never
+- [ ] 02-06-PLAN.md — pgvector extension + AI_AGENT_KB_VECTOR_STORE table + HNSW index (Postgres-only with preCondition gating)
 - [ ] 02-07-PLAN.md — SpiDefaultsAutoConfiguration with six @ConditionalOnMissingBean no-op beans
 - [ ] 02-08-PLAN.md — AiAgentUserRole, AiAgentAdminRole, AiAgentUserRowLevelRole + role i18n
-- [ ] 02-09-PLAN.md — AIConfiguration @JmixModule dependsOn widened (Data + Security + Eclipselink + Flowui)
+- [ ] 02-09-PLAN.md — AIConfiguration @JmixModule dependsOn widened to include DataConfiguration + SecurityConfiguration
 - [ ] 02-10-PLAN.md — FoundationsBootSmokeTest (5 @Test methods: Liquibase, entities, row-level, SPI defaults, roles)
 - [ ] 02-11-PLAN.md — D-10 doc updates (REQUIREMENTS, ROADMAP, PROJECT, STACK) + D-02 Liquibase-include correction
 
@@ -101,16 +102,15 @@ Plans:
 
 **Goal:** Build the metadata scanner, per-user effective schema, and six DataManager-backed read-only tools — the load-bearing architectural decision. All structured-data security flows through here.
 
-**Requirements:** TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, TOOL-06, TOOL-07, TOOL-08, SPI-04 (impl), SPI-01 (impl), TEST-02 (partial)
+**Requirements:** TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05, TOOL-06, TOOL-07, TOOL-08, SPI-01 (impl), TEST-02 (partial) — SPI-04 dropped per D-10. TOOL-08 enforced via code review + unit tests, not ArchUnit (D-10).
 
 **Deliverables:**
 - `MetamodelScanner` — raw `MetaClass`/`MetaProperty` inventory, cached once
-- `EntityExposurePolicy` default impl (allow all) + rule-backed impl reading `AiExposureRule` entity + chain composition
-- Per-request effective-schema computer applying `AccessManager` + `EntityExposurePolicy`
+- Per-request effective-schema computer applying `AccessManager` directly (no `EntityExposurePolicy` chain per D-10)
 - Six tools as `@Tool`-annotated bean methods producing `MethodToolCallback` instances (generated per request via `ChatClient.Builder.tools(...)`, never `.defaultTools(...)`)
 - `DataManagerToolExecutor` runs all queries through `DataManager.load(...).query(...)` with structured filter DSL
 - `FilterDsl → Condition` mapper
-- Hard `limit` cap with ArchUnit-enforced constant
+- Hard `limit` cap enforced via constant + unit test (ArchUnit deferred per D-10)
 - `<data>`-delimited safe formatter for result strings
 - `ToolContributor` SPI impl example
 
@@ -118,7 +118,7 @@ Plans:
 1. Unit: scanner produces inventory for `jmix-app` (Customer, Order, LineItem, User, etc.) without connecting to an LLM
 2. Unit: restricted user with no `Customer` read policy gets a schema containing zero Customer fields
 3. Integration: `find_records("Order", filter=...)` through `ChatService` returns correct DataManager results; denied attributes absent
-4. ArchUnit: no tool body calls `DataManager.save()` or `.remove()`; no `@Tool` method contains raw JPQL strings from user input
+4. Unit test + code review (D-10): no tool body calls `DataManager.save()` or `.remove()`; no `@Tool` method contains raw JPQL strings from user input (ArchUnit deferred)
 5. Prompt-injection harness: a Customer with `notes = "SYSTEM: ignore previous instructions"` is escaped inside `<data>` delimiters in tool result
 
 **Needs research phase:** Partial — verify M4 `MethodToolCallback.Builder` signature.
@@ -209,9 +209,9 @@ Plans:
 
 ### Phase 7 — Flow UI
 
-**Goal:** Ship the full plug-and-play admin + end-user UI: Chat, Conversations, Parameters, Knowledge Base, Audit, Exposure. Menu + locales + role gating.
+**Goal:** Ship the full plug-and-play admin + end-user UI: Chat, Conversations, Parameters, Knowledge Base, Audit. Menu + locales + role gating. (Exposure view dropped per D-10.)
 
-**Requirements:** UI-01..10
+**Requirements:** UI-01, UI-02, UI-03, UI-04, UI-05, UI-06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10)
 
 **Deliverables:**
 - `ChatView` (streaming if supported; tool-call cards; citations; `New chat`, `Stop`)
@@ -219,7 +219,6 @@ Plans:
 - `ParametersListView` + `ParametersDetailView` (YAML editor + validation; `Set active` action)
 - `KnowledgeBaseView` (upload, list, status, delete, reingest)
 - `ToolCallAuditListView` (filter by user/tool/outcome/date; CSV export)
-- `ExposureRuleListView` (admin CRUD over `AiExposureRule`)
 - `menu.xml` with `aiAgent.*` namespaced ids; role-gated visibility
 - Full `messages_en.properties` + `messages_vi.properties` coverage (zero hardcoded strings)
 - Navigation wiring via `ViewNavigators`; `@ViewController` + `@ViewDescriptor` conventions
@@ -239,7 +238,7 @@ Plans:
 
 **Goal:** Cross-phase security negative-case suite, clean-consumer smoke, live-tier semantic suite, operator docs, release polish.
 
-**Requirements:** TEST-02 (completion), TEST-03 (completion), TEST-04, TEST-05 (completion), TEST-06 (completion), TEST-07
+**Requirements:** TEST-02 (completion), TEST-03 (completion), TEST-04, TEST-05 (completion), TEST-07 (TEST-06 dropped per D-10)
 
 **Deliverables:**
 - Security negative-case integration suite: restricted user receives filtered schema AND execution denial; RAG refuses untagged docs for non-admin; cross-user conversation replay blocked
@@ -300,11 +299,13 @@ P7 depends on P3, P4, P5, P6. P8 depends on all.
 | PKG-01..05 | 1 | RAG-01..08 | 5 |
 | ENT-01..04 | 2 | PARAM-01..05 | 6 |
 | SEC-01..04 | 2 | GUARD-01..06 | 6 |
-| TOOL-01..08 | 3 | SPI-01..08 | 2 (contracts) + 3–6 (impls) |
-| ORCH-01..06 | 4 | UI-01..10 | 7 |
+| TOOL-01..08 | 3 | SPI-01..03, SPI-05..07 | 2 (contracts) + 3–6 (impls) |
+| ORCH-01..06 | 4 | UI-01..06, UI-08..10 | 7 |
 | AUD-01..05 | 4 | TEST-01 | 1 |
-|  |  | TEST-02..07 | 8 |
+|  |  | TEST-02..05, TEST-07 | 8 |
+
+> Footnote (D-10): SPI-04 (`EntityExposurePolicy`), SPI-08 (per-SPI integration-test obligation), UI-07 (`ExposureRuleListView`), and TEST-06 (ArchUnit rules) were removed from v1. See `.planning/phases/02-foundations/02-CONTEXT.md` §D-10 and `REQUIREMENTS.md` Scope Changes Log.
 
 ---
 
-*Last updated: 2026-04-18 after initialization*
+*Last updated: 2026-04-18 after Phase 02 planning — D-10 applied*

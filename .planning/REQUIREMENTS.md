@@ -1,7 +1,7 @@
 # Requirements — Jmix AI Copilot (ai-agent-core)
 
 **Version:** v1 (MVP)
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-18 (D-10 applied)
 
 ## v1 Requirements
 
@@ -15,25 +15,25 @@
 
 ### Entities, Data & Security
 
-- [ ] **ENT-01**: Six Jmix JPA entities: `AiConversation`, `AiMessage`, `AiToolCallAudit`, `AiParameters`, `AiKnowledgeDocument`, `AiExposureRule` — UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`, no Lombok
+- [ ] **ENT-01**: Five Jmix JPA entities: `AiConversation`, `AiMessage`, `AiToolCallAudit`, `AiParameters`, `AiKnowledgeDocument` — UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`, no Lombok. (`AiExposureRule` dropped per D-10 in Phase 02 CONTEXT; see MEMORY note "AI is just another Jmix client".)
 - [ ] **ENT-02**: All DDL owned by add-on Liquibase changelogs with `AI_AGENT_*` table-name prefix (no collisions with host)
 - [ ] **ENT-03**: Spring AI JDBC chat-memory DDL ported into add-on Liquibase (do not rely on `initialize-schema: true`)
 - [ ] **ENT-04**: pgvector extension created via Liquibase (`CREATE EXTENSION IF NOT EXISTS vector`) and distinct vector table name (e.g. `AI_AGENT_KB_VECTOR_STORE`)
-- [ ] **SEC-01**: Ship `AiAgentUserRole` (Chat view access) and `AiAgentAdminRole` (Parameters / KB / Audit / Exposure views)
+- [ ] **SEC-01**: Ship `AiAgentUserRole` (Chat view access) and `AiAgentAdminRole` (Parameters / KB / Audit views). (Exposure view dropped per D-10.)
 - [ ] **SEC-02**: Any authenticated Jmix user has Chat view by default; admin views gated to `AiAgentAdminRole`
-- [ ] **SEC-03**: All entity persistence via `DataManager` only — ArchUnit rule forbids `EntityManager` in add-on code
+- [ ] **SEC-03**: All entity persistence via `DataManager` only — `EntityManager` forbidden in add-on code, enforced by code review + CLAUDE.md convention (ArchUnit deferred per D-10)
 - [ ] **SEC-04**: `AiConversation.createdBy` scoped to user; conversation replay and list filter by ownership at DataManager level
 
 ### Metadata-First Runtime & Tools
 
 - [ ] **TOOL-01**: `MetamodelScanner` reads Jmix `Metadata`/`MetaClass`/`MetaProperty` and produces raw inventory (cached once)
-- [ ] **TOOL-02**: Effective per-user schema computed per request via `AccessManager` + `EntityExposurePolicy` chain — never cached per-app
+- [ ] **TOOL-02**: Effective per-user schema computed per request via `AccessManager` directly — never cached per-app. (`EntityExposurePolicy` chain dropped per D-10; Jmix native security is authoritative.)
 - [ ] **TOOL-03**: Six generic read-only tools auto-generated: `list_entities`, `describe_entity`, `find_records`, `get_record`, `count_records`, `get_related_records`
 - [ ] **TOOL-04**: All tool bodies call `DataManager` (inheriting Jmix entity/attribute/row security); no native SQL, no JPQL authored by the LLM
 - [ ] **TOOL-05**: `find_records` accepts a structured filter DSL (attribute + operator + literal) mapped to `Condition.createAnd(...)` — not free-text JPQL
 - [ ] **TOOL-06**: Hard row-count cap (default 20, max 100) on every collection-returning tool; LLM cannot override
 - [ ] **TOOL-07**: Tool result formatter wraps user-editable string fields in `<data>…</data>` delimiters with escaping to defuse prompt injection
-- [ ] **TOOL-08**: Read-only posture enforced by ArchUnit: no `DataManager.save()` / `.remove()` in tool bodies
+- [ ] **TOOL-08**: Read-only posture enforced by code review + unit tests asserting each tool class's public methods call only `DataManager` read-path operations (`DataManager.load` / `DataManager.getCount` / `DataManager.loadValues`). (ArchUnit deferred per D-10 and MEMORY note "Avoid ArchUnit until drift".)
 
 ### Orchestration (ChatClient + Advisors + Memory)
 
@@ -50,7 +50,7 @@
 - [ ] **AUD-02**: Audit persistence in `@Transactional(propagation = REQUIRES_NEW)` so tool rollback does not lose audit
 - [ ] **AUD-03**: Audit records include: conversationId, userId, tool name, input JSON, output summary, latency, outcome, denial reason
 - [ ] **AUD-04**: `AuditListener` SPI fires after each audit write (for Slack/SIEM/metrics side-channels); listener exceptions must not fail the main flow
-- [ ] **AUD-05**: Audit cannot be silently disabled (ArchUnit forbids conditional short-circuit of `AuditAdvisor`)
+- [ ] **AUD-05**: Audit cannot be silently disabled — enforced by unit tests on `AuditAdvisor` + code review (ArchUnit deferred per D-10)
 
 ### RAG (Knowledge Base)
 
@@ -85,11 +85,11 @@
 - [ ] **SPI-01**: `ToolContributor` — hosts register additional `@Tool`-annotated beans
 - [ ] **SPI-02**: `ContextContributor` — inject per-request context (user, tenant, env) into prompt
 - [ ] **SPI-03**: `PromptContextContributor` — augment system prompt with host-specific instructions
-- [ ] **SPI-04**: `EntityExposurePolicy` — narrow which `MetaClass`/`MetaProperty` the agent sees
 - [ ] **SPI-05**: `ToolGuard` — veto tool calls
 - [ ] **SPI-06**: `AuditListener` — observe audit writes for side-channels
 - [ ] **SPI-07**: `CustomIngester` — plug in additional KB sources
-- [ ] **SPI-08**: Each SPI has a default implementation + at least one integration test exercising a custom host impl
+
+> Note: SPI-04 (`EntityExposurePolicy`) dropped per D-10. SPI-08 (per-SPI integration test with custom host impl) dropped per D-10; each SPI has a default no-op bean and is smoke-tested via the Phase 02 foundations boot test asserting defaults auto-wire.
 
 ### Built-in Flow UI
 
@@ -99,7 +99,9 @@
 - [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
 - [ ] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
 - [ ] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); CSV export
-- [ ] **UI-07**: `ExposureRuleListView` — admin CRUD over `AiExposureRule` (entity/attribute allow/deny)
+
+> Note: UI-07 (`ExposureRuleListView`) dropped per D-10 (`AiExposureRule` entity removed). UI-08..UI-10 numbering preserved for cross-doc reference stability.
+
 - [ ] **UI-08**: Menu entries namespaced `aiAgent.*` in add-on `menu.xml`; labels in both `messages_en.properties` and `messages_vi.properties`
 - [ ] **UI-09**: All user-facing strings use `msg://` keys — zero hardcoded UI text
 - [ ] **UI-10**: Admin views visibility gated to `AiAgentAdminRole`
@@ -111,7 +113,7 @@
 - [ ] **TEST-03**: Integration tests in `jmix-app` harness cover: auto-config boots; `ChatService.ask` round-trips with mock ChatModel; advisor ordering preserved; tool call audited
 - [ ] **TEST-04**: Security negative-case suite: user without read access to an entity receives filtered schema AND execution is denied; RAG retrieval filters out forbidden roles; cross-user conversation access denied
 - [ ] **TEST-05**: `@Tag("live")` opt-in tier uses semantic-similarity assertions (`spring-ai-test`) — no brittle exact-text asserts
-- [ ] **TEST-06**: ArchUnit rules enforced in CI: no `EntityManager`, no `io.jmix...impl.` / `...internal.` imports in add-on, no `DataManager.save/remove` in `@Tool` bodies
+- [ ] **TEST-06**: (removed per D-10 — ArchUnit rules deferred per MEMORY note "Avoid ArchUnit until drift"). Code review + the existing forbidden-import convention in CLAUDE.md remain authoritative until rule drift justifies ArchUnit.
 - [ ] **TEST-07**: Clean-consumer smoke: `publishToMavenLocal` → fresh minimal Jmix app consumes `ai-agent-flowui-starter` → boots + menu registers (runs in CI on release)
 
 ## v2 Requirements (deferred)
@@ -131,7 +133,7 @@
 - Mutation tools enabled by default — too dangerous; host must opt in after v2 ships
 - Auto-ingesting host entity records into the vector store — freshness and authorization complexity; `DataManager` is the source of truth for structured data
 - Custom `VectorStore` or `ChatModel` abstractions over Spring AI primitives — adds upgrade tax; use 2.x APIs directly
-- Jmix internal/impl-package APIs — forbidden by ArchUnit; only public APIs
+- Jmix internal/impl-package APIs — forbidden by convention (code review + CLAUDE.md); only public APIs (ArchUnit enforcement deferred per D-10)
 - Universal/generic agent framework positioning — this is specifically a Jmix add-on
 - Jailbreak-proof or "SOC2-compliant" guarantees — honest security posture only
 - Personas, voice, image generation, fine-tuning UI, plugin marketplace, public conversation sharing, end-user model sliders — not aligned with enterprise copilot positioning
@@ -144,5 +146,11 @@
 | REQ | Phase |
 |-----|-------|
 
+## Scope Changes Log
+
+| Date | Decision | Change |
+|------|----------|--------|
+| 2026-04-18 | D-10 (Phase 02 CONTEXT) | ENT-01 6→5 entities (`AiExposureRule` dropped); SPI-04 (`EntityExposurePolicy`) + SPI-08 (per-SPI integration-test obligation) removed; UI-07 (`ExposureRuleListView`) removed; TEST-06 converted to convention (ArchUnit deferred); TOOL-08 de-ArchUnit'd; SEC-01 Exposure view dropped; SEC-03/AUD-05/TOOL-02 wording aligned with D-10; Spring AI version pinned at 1.1.4 |
+
 ---
-*Last updated: 2026-04-18 after initialization*
+*Last updated: 2026-04-18 after Phase 02 planning — D-10 applied*

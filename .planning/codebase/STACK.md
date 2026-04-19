@@ -114,6 +114,13 @@
 - Requires writable working directory for HSQLDB file storage (`.jmix/hsqldb/`) and local filesystem storage (Jmix LocalFS)
 - Publishing target configured as Maven repository at `https://myrepo/releases/` (placeholder) in `ai-agent/build.gradle`
 
+## Spring AI (add-on surface)
+
+- **Spring AI version:** 1.1.4 — pinned via `org.springframework.ai:spring-ai-bom:1.1.4` in the add-on functional module's `dependencyManagement` block. Version upgraded between Phase 1 wave start and Phase 2 start per D-10 (see `.planning/phases/02-foundations/02-CONTEXT.md`). All `spring-ai-starter-*` artifacts resolve without explicit versions.
+- **Milestone repo required:** `https://repo.spring.io/milestone` is added to repositories since 1.1.4 is a milestone release.
+
+> Footnote: BOM upgraded to 1.1.4 between Phase 1 wave start and Phase 2 start. BOM pinned in `ai-agent/build.gradle`. Table deltas verified in `.planning/phases/02-foundations/02-RESEARCH.md` §"Spring AI version delta". See `.planning/REQUIREMENTS.md` Scope Changes Log (D-10).
+
 ---
 
-*Stack analysis: 2026-04-18*
+*Stack analysis: 2026-04-18 (Spring AI pinned at 1.1.4 per D-10)*
