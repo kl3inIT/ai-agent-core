@@ -27,6 +27,14 @@ repositories {
 dependencies {
     implementation 'com.vn:ai-agent-starter:0.0.1-SNAPSHOT'
 
+    // Phase 3 Plan 05 (D-15 / SPI-01): host-side OrderSummaryToolContributor uses Spring AI's
+    // @Tool / @ToolParam annotations. The add-on declares spring-ai-client-chat as
+    // `implementation` only (not `api`), so the annotations aren't transitively visible on
+    // jmix-app's compile classpath. Declaring it here is the correct host-side dependency —
+    // any host wiring a ToolContributor needs Spring AI's tool annotations (Rule 3 deviation
+    // recorded in 03-05-SUMMARY.md).
+    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
+
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
     implementation 'io.jmix.security:jmix-security-starter'
