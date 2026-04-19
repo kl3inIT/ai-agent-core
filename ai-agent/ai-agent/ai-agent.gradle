@@ -29,7 +29,11 @@ dependencies {
     testRuntimeOnly 'org.hsqldb:hsqldb'
 
     // Phase 3 Plan 04 (D-16): bytecode scan of BuiltInDataTools for read-only enforcement.
-    testImplementation 'org.ow2.asm:asm:9.7'
+    // 9.9 is required because this project builds under JDK 25 (class file major version 69);
+    // the plan-specified 9.7 throws UnsupportedClassVersion on the built class. ASM 9.9 is
+    // backward-compatible and adds major-version 69 support (Rule 3 deviation recorded in
+    // 03-04-SUMMARY.md).
+    testImplementation 'org.ow2.asm:asm:9.9'
 }
 
 configurations.implementation {
