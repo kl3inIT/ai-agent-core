@@ -10,12 +10,10 @@ dependency_graph:
     - com.vn.agent.tools.ToolResultFormatter
     - com.vn.agent.tools.ToolLimits
     - com.vn.agent.tools.ToolUserError
-    - com.vn.agent.filter.FilterDslMapper
+    - com.vn.agent.filter.StructuredFilterConditionMapper
     - com.vn.agent.filter.FilterNode
-    - com.vn.agent.filter.LiteralCoercer
-    - com.vn.agent.metadata.MetamodelScanner
-    - com.vn.agent.metadata.EffectiveSchemaComputer
-    - com.vn.agent.metadata.UserEditableStringIndex
+    - com.vn.agent.filter.FilterLiteralValueConverter
+    - com.vn.agent.metadata.CurrentUserSchemaAccess  # post-execute: collapsed from MetamodelScanner + EffectiveSchemaComputer + UserEditableStringIndex
     - com.vn.agent.entity.AiMessage
     - org.ow2.asm:asm:9.9
     - org.mockito:mockito-core (mockConstruction)
@@ -26,10 +24,9 @@ dependency_graph:
     - PromptInjectionHarnessTest (success criterion #5 + Pitfall 4 contract)
     - ToolResultFormatterTest (escape + error + count unit coverage)
     - ToolLimitsTest (TOOL-06 / D-14 constant pinning)
-    - FilterDslMapperTest (all 13 operators + DeMorgan + rejections)
-    - LiteralCoercerTest (every coercion branch + fail-closed)
-    - MetamodelScannerTest (@SystemLevel exclusion + user-editable index filter)
-    - EffectiveSchemaComputerTest (ACL filter with mocked CrudEntityContext)
+    - StructuredFilterConditionMapperTest (all 13 operators + DeMorgan + rejections)  # renamed post-execute from FilterDslMapperTest
+    - FilterLiteralValueConverterTest (every coercion branch + fail-closed)  # renamed post-execute from LiteralCoercerTest
+    - CurrentUserSchemaAccessTest (@SystemLevel exclusion + ACL filter with mocked CrudEntityContext)  # collapsed post-execute from MetamodelScannerTest + EffectiveSchemaComputerTest
   affects:
     - Plan 03-05 integration suite (consumes same test infra)
     - Phase 4 regression safety net
@@ -43,15 +40,14 @@ tech_stack:
     - "Sabotage-and-revert validation of enforcement tests"
     - "@SpringBootTest with systemAuthenticator.runWithSystem(Runnable) for entity-create fixtures"
 key_files:
-  created:
+  created:  # file names reflect current src/test tree (post-execute renames/collapse)
     - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/ToolLimitsTest.java
     - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/ToolResultFormatterTest.java
     - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/PromptInjectionHarnessTest.java
     - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/BuiltInDataToolsReadOnlyTest.java
-    - ai-agent/ai-agent/src/test/java/com/vn/agent/filter/FilterDslMapperTest.java
-    - ai-agent/ai-agent/src/test/java/com/vn/agent/filter/LiteralCoercerTest.java
-    - ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/MetamodelScannerTest.java
-    - ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/EffectiveSchemaComputerTest.java
+    - ai-agent/ai-agent/src/test/java/com/vn/agent/filter/StructuredFilterConditionMapperTest.java  # renamed post-execute from FilterDslMapperTest.java
+    - ai-agent/ai-agent/src/test/java/com/vn/agent/filter/FilterLiteralValueConverterTest.java     # renamed post-execute from LiteralCoercerTest.java
+    - ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/CurrentUserSchemaAccessTest.java       # collapsed post-execute from MetamodelScannerTest + EffectiveSchemaComputerTest
   modified:
     - ai-agent/ai-agent/ai-agent.gradle
 key_decisions:
@@ -72,23 +68,26 @@ Locked in every Phase 3 behavior with 8 new test files and enforced the TOOL-08 
 
 ## Outcome
 
-- 8 test files created across `tools/`, `filter/`, `metadata/` packages
+- 8 test files originally created across `tools/`, `filter/`, `metadata/` packages; post-execute refactor collapsed the two `metadata/` tests (MetamodelScannerTest + EffectiveSchemaComputerTest) into a single `CurrentUserSchemaAccessTest` and renamed the two `filter/` tests (LiteralCoercerTest → FilterLiteralValueConverterTest, FilterDslMapperTest → StructuredFilterConditionMapperTest). Current on-disk count: 7 test files.
 - `./gradlew :ai-agent:ai-agent:test` exits 0 — all new tests pass, no existing test broken
 - TOOL-08 now enforced at compile-time-adjacent (test-run) granularity: a future `DataManager.save` / `EntityManager.*` call or LLM-parameter JPQL concat inside a `@Tool` method fails the build before merge
 - Success criterion #5 (prompt-injection wrap) and Pitfall 4 (delimiter-escape bypass) have red-line regression tests
 
 ## Task-by-Task
 
-### Task 1 — ToolLimits + LiteralCoercer + FilterDslMapper (commit `7dedbd5`)
+### Task 1 — ToolLimits + filter-literal-converter + filter-condition-mapper (commit `7dedbd5`) — post-execute: filter classes renamed
 
 - **ToolLimitsTest**: pins `DEFAULT_LIMIT=20`, `MAX_LIMIT=100`, `DEFAULT_MAX_FILTER_DEPTH=3`; clampLimit(null)=20, (0)=1, (1000)=100, (50)=50.
-- **LiteralCoercerTest**: mocked MetaProperty/Range/Datatype; good+bad paths for UUID, Long, Integer, BigDecimal, Boolean, LocalDate, LocalDateTime, Enum, String, association, null; `coerceList` + `coerceBoolean`. Uses raw `Datatype` cast to sidestep generic wildcard issue in `thenReturn`.
-- **FilterDslMapperTest**: @ParameterizedTest CsvSource over 10 binary ops; dedicated cases for IN_LIST / NOT_IN_LIST / IS_SET; AND/OR nesting; DeMorgan NOT (leaf, AND, double-NOT); rejections: depth cap, unknown op, denied attribute, unknown attribute, NOT over STARTS_WITH/ENDS_WITH, null root, empty AND.
+- **FilterLiteralValueConverterTest** (previously `LiteralCoercerTest`): mocked MetaProperty/Range/Datatype; good+bad paths for UUID, Long, Integer, BigDecimal, Boolean, LocalDate, LocalDateTime, Enum, String, association, null; `coerceList` + `coerceBoolean`. Uses raw `Datatype` cast to sidestep generic wildcard issue in `thenReturn`.
+- **StructuredFilterConditionMapperTest** (previously `FilterDslMapperTest`): @ParameterizedTest CsvSource over 10 binary ops; dedicated cases for IN_LIST / NOT_IN_LIST / IS_SET; AND/OR nesting; DeMorgan NOT (leaf, AND, double-NOT); rejections: depth cap, unknown op, denied attribute, unknown attribute, NOT over STARTS_WITH/ENDS_WITH, null root, empty AND.
 
-### Task 2 — MetamodelScanner + EffectiveSchemaComputer (commit `cfffc6f`)
+### Task 2 — metadata-surface tests (commit `cfffc6f`) — post-execute: collapsed into CurrentUserSchemaAccessTest
 
-- **MetamodelScannerTest**: `@SpringBootTest` boot-test verifying AI-visible entities present, any `@SystemLevel` classes absent, UserEditableStringIndex excludes framework-managed fields (id, version, createdBy, etc.).
-- **EffectiveSchemaComputerTest**: `Mockito.mockConstruction(CrudEntityContext.class)` + `EntityAttributeContext.class` with initializer that toggles `isReadPermitted()` per MetaClass argument. Critical pattern: extract `argName` and `permitted` to locals BEFORE the `when()` call — nested mock calls inside `when()` corrupt Mockito state. `findProperty` returns null to avoid nested stubbing.
+Originally two tests (`MetamodelScannerTest` + `EffectiveSchemaComputerTest`); post-execute they were collapsed into a single `CurrentUserSchemaAccessTest` matching the `CurrentUserSchemaAccess` adapter.
+
+- Pre-refactor `MetamodelScannerTest`: `@SpringBootTest` boot-test verifying AI-visible entities present, any `@SystemLevel` classes absent, user-editable-string index excludes framework-managed fields (id, version, createdBy, etc.).
+- Pre-refactor `EffectiveSchemaComputerTest`: `Mockito.mockConstruction(CrudEntityContext.class)` + `EntityAttributeContext.class` with initializer that toggles `isReadPermitted()` per MetaClass argument. Critical pattern: extract `argName` and `permitted` to locals BEFORE the `when()` call — nested mock calls inside `when()` corrupt Mockito state. `findProperty` returns null to avoid nested stubbing.
+- Post-refactor `CurrentUserSchemaAccessTest` preserves both sets of assertions against the single adapter.
 
 ### Task 3 — ToolResultFormatter + PromptInjectionHarness (commit `b83d58f`)
 
@@ -118,7 +117,7 @@ Locked in every Phase 3 behavior with 8 new test files and enforced the TOOL-08 
 - **Files modified:** `ai-agent/ai-agent/ai-agent.gradle`
 - **Commit:** `51ac8f8`
 
-**2. [Rule 1 - Bug] Mockito UnfinishedStubbingException in EffectiveSchemaComputerTest**
+**2. [Rule 1 - Bug] Mockito UnfinishedStubbingException in EffectiveSchemaComputerTest** (previously; pattern preserved in the collapsed `CurrentUserSchemaAccessTest` post-execute)
 - **Found during:** Task 2 test authoring.
 - **Issue:** Calling a mock method (`arg.getName()`) inside `when(mockCtx.isReadPermitted()).thenReturn(...)` corrupts Mockito's internal stubbing state. Also `when(mc.findProperty(...)).thenAnswer(lambda-that-creates-more-mocks)` has the same failure mode.
 - **Fix:** Extract `argName` and `permitted` to locals BEFORE `when()`; make `findProperty` return null to avoid nested stubbing. Documented as a pattern in key_decisions.
@@ -146,18 +145,17 @@ None — scope contained and all 8 plan-listed files delivered.
 
 ## Self-Check: PASSED
 
-Files exist:
+Files exist (as of current on-disk state after post-execute renames/collapse):
 - FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/tools/ToolLimitsTest.java
 - FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/tools/ToolResultFormatterTest.java
 - FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/tools/PromptInjectionHarnessTest.java
 - FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/tools/BuiltInDataToolsReadOnlyTest.java
-- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/filter/FilterDslMapperTest.java
-- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/filter/LiteralCoercerTest.java
-- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/MetamodelScannerTest.java
-- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/EffectiveSchemaComputerTest.java
+- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/filter/StructuredFilterConditionMapperTest.java  (renamed post-execute from FilterDslMapperTest.java)
+- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/filter/FilterLiteralValueConverterTest.java      (renamed post-execute from LiteralCoercerTest.java)
+- FOUND: ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/CurrentUserSchemaAccessTest.java        (collapsed post-execute from MetamodelScannerTest + EffectiveSchemaComputerTest)
 
-Commits exist:
-- FOUND: 7dedbd5 (Task 1 — ToolLimits + LiteralCoercer + FilterDslMapper)
-- FOUND: cfffc6f (Task 2 — MetamodelScanner + EffectiveSchemaComputer)
+Commits exist (commit messages below are verbatim historical — pre-refactor class names are preserved per the rename-table exception):
+- FOUND: 7dedbd5 (Task 1 — ToolLimits + LiteralCoercer + FilterDslMapper; previously, collapsed post-execute)
+- FOUND: cfffc6f (Task 2 — MetamodelScanner + EffectiveSchemaComputer; previously, collapsed post-execute)
 - FOUND: b83d58f (Task 3 — ToolResultFormatter + PromptInjection)
 - FOUND: 51ac8f8 (Task 4 — ASM read-only scan + ASM 9.9 upgrade)
