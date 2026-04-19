@@ -161,17 +161,7 @@ public class BuiltInDataTools {
         try {
             MetaClass mc = resolveOrError(entityName);
             Condition cond = filter == null ? null : filterMapper.map(filter, mc);
-
-            // JPQL template ONLY references mc.getName() from the whitelist (resolveOrError →
-            // Metadata.getClass throws if unknown). Zero LLM input flows into the string.
-            // Plan 04's ASM test enforces no LLM param → createQuery concat.
-            LoadContext<?> ctx = new LoadContext<>(mc);
-            LoadContext.Query q = new LoadContext.Query("select e from " + mc.getName() + " e");
-            if (cond != null) {
-                q.setCondition(cond);
-            }
-            ctx.setQuery(q);
-            long n = dataManager.getCount(ctx);
+            long n = dataManager.getCount(buildCountContext(mc, cond));
             return formatter.count(mc, n);
         } catch (ToolUserError e) {
             return formatter.error(e);
@@ -283,6 +273,23 @@ public class BuiltInDataTools {
             throw new ToolUserError("access_denied", "no read access to " + entityName);
         }
         return mc;
+    }
+
+    /**
+     * Build a {@link LoadContext} suitable for {@link DataManager#getCount(LoadContext)}. Jmix
+     * 2.8 requires a JPQL query on the LoadContext — the fluent loader has no {@code getCount}
+     * — so we build a minimal template whose only interpolated token is
+     * {@link MetaClass#getName()}, which came from {@link Metadata#getClass(String)} via
+     * {@link #resolveOrError} and therefore is a Jmix-whitelisted entity name by construction.
+     * Zero LLM input flows into the JPQL string; Plan 04's ASM test only needs to whitelist
+     * this one call site.
+     */
+    private LoadContext<?> buildCountContext(MetaClass mc, Condition cond) {
+        LoadContext.Query q = new LoadContext.Query("select e from " + mc.getName() + " e");
+        if (cond != null) {
+            q.setCondition(cond);
+        }
+        return new LoadContext<>(mc).setQuery(q);
     }
 
     /**
