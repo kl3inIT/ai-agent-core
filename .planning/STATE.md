@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 03
-last_updated: "2026-04-19T20:15:00.000Z"
+last_updated: "2026-04-19T17:33:05.469Z"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -14,7 +14,7 @@ progress:
 
 # Project State
 
-**Last updated:** 2026-04-19
+**Last updated:** 2026-04-20
 
 ## Project Reference
 
@@ -108,3 +108,13 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
 - 2026-04-19 19:30 +07:00 — Plan 03-04 complete (8 test files + TOOL-08 ASM enforcement). Next: 03-05 (final phase plan — integration test in jmix-app).
 - 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS — pending human Gradle verify + merge to master.
+- 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings to `.planning/phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
+- 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
+
+**Last activity:** 2026-04-19 — Completed quick task 260420-09p (Phase 3 docs resync).
