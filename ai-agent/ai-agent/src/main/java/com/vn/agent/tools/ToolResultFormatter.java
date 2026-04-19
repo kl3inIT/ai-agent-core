@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.metadata.AiAttributeInfo;
 import com.vn.agent.metadata.AiEntityInfo;
 import com.vn.agent.metadata.MetamodelScanner;
+import io.jmix.core.EntityStates;
 import io.jmix.core.entity.EntityValues;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
@@ -32,10 +33,14 @@ public class ToolResultFormatter {
 
     private final ObjectMapper objectMapper;
     private final MetamodelScanner scanner;
+    private final EntityStates entityStates;
 
-    public ToolResultFormatter(ObjectMapper objectMapper, MetamodelScanner scanner) {
+    public ToolResultFormatter(ObjectMapper objectMapper,
+                               MetamodelScanner scanner,
+                               EntityStates entityStates) {
         this.objectMapper = objectMapper;
         this.scanner = scanner;
+        this.entityStates = entityStates;
     }
 
     // ---- public API ----
@@ -137,6 +142,16 @@ public class ToolResultFormatter {
         Set<String> userEditable = scanner.getUserEditableStringIndex().forEntity(mc);
         Map<String, Object> row = new LinkedHashMap<>();
         for (MetaProperty mp : mc.getProperties()) {
+            // Skip attributes not present in the entity's fetch plan — calling
+            // EntityValues.getValue on an unfetched attribute of a detached entity throws
+            // "Cannot get unfetched attribute". FetchPlan.INSTANCE_NAME only loads the
+            // properties listed in @InstanceName / @DependsOnProperties, so most other
+            // attributes are unfetched. Rendering them as null is the correct read-only
+            // behavior; callers drill further via get_record / get_related_records (D-12).
+            if (!entityStates.isLoaded(entity, mp.getName())) {
+                row.put(mp.getName(), null);
+                continue;
+            }
             Object v = EntityValues.getValue(entity, mp.getName());
             if (v instanceof String s && userEditable.contains(mp.getName())) {
                 row.put(mp.getName(), "<data>" + escapeDataDelimiters(s) + "</data>");
