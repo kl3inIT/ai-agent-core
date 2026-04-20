@@ -99,7 +99,7 @@ public class KnowledgeDocumentUploadService {
             }
         }
 
-        // PATTERNS: entity instantiation via Metadata.create — never `new AiKnowledgeDocument()`.
+        // PATTERNS: entity instantiation via Metadata.create (constructor path is forbidden).
         AiKnowledgeDocument document = metadata.create(AiKnowledgeDocument.class);
         document.setFileName(sourceUri);
         document.setMimeType(sourceKind);
