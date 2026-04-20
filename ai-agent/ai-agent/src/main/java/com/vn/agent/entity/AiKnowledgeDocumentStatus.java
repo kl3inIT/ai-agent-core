@@ -8,7 +8,8 @@ public enum AiKnowledgeDocumentStatus implements EnumClass<String> {
     PENDING("PENDING"),
     PROCESSING("PROCESSING"),
     READY("READY"),
-    FAILED("FAILED");
+    FAILED("FAILED"),
+    CANCELLED("CANCELLED");
 
     private final String id;
 
