@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 04
-last_updated: "2026-04-20T05:40:00.000Z"
-last_activity: 2026-04-20 — Plan 04-02 complete (orchestration foundations — AiAgentDefaultsProperties, RunContext, ConversationNotFoundException, AiParametersResolver, BaselineContextProvider with compose/renderAsText + 6 unit tests; 8 new application.properties keys). Next: 04-03 (audit pipeline — AuditWriter REQUIRES_NEW + AuditAdvisor + ToolCallbackAuditDecorator + AuditListenerFanOut).
+last_updated: "2026-04-20T06:30:00.000Z"
+last_activity: 2026-04-20 — Plan 04-03 complete (audit pipeline — AuditWriter REQUIRES_NEW + AuditListenerFanOut per-listener try/catch fan-out + AuditAdvisor HIGHEST_PRECEDENCE CallAdvisor + ToolCallbackAuditDecorator PRE/POST tool rows + ToolCallAdvisorBuilderProbe OQ-1 closure). Next: 04-04 (orchestration wiring — ChatClientFactory + ConversationGateway + ProjectingChatMemoryRepository + DefaultChatServiceImpl rewrite).
 progress:
   total_phases: 4
   completed_phases: 3
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
 | 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
 | 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
-| 4 | Orchestration Core | 🚧 In progress (2/5 plans) |
+| 4 | Orchestration Core | 🚧 In progress (3/5 plans) |
 | 5 | RAG Layer | Not started |
 | 6 | Parameters, Structured Output & Guardrails | Not started |
 | 7 | Flow UI | Not started |
@@ -102,6 +102,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 - 04-01: ✅ AiToolCallAudit runId/kind/phase/promptHash/errorClass schema + entity + EN/VI i18n. Commits 8181ff4, 1789b7e.
 - 04-02: ✅ Orchestration foundations — 5 classes under `com.vn.agent.orchestration`: `AiAgentDefaultsProperties` (@ConfigurationProperties record, `jmix.ai-agent.defaults.*`, D-04), `RunContext` (ThreadLocal<UUID>, D-12), `ConversationNotFoundException` (single-literal message for D-09 opacity + i18n key), `AiParametersResolver` (DataManager active-row read with Metadata.create() fallback synthesising defaults YAML; effectiveModel/Temperature/TopP/MaxTokens/SystemPrompt accessors; OpenRouter slug validation), `BaselineContextProvider` (compose(UUID) returns agent.* keyed map; renderAsText(UUID) sorts alphabetically for deterministic prompt composition — D-15). 6 unit tests (3 resolver + 3 baseline, incl. renderAsText determinism). 8 new host application.properties keys (5 defaults + 3 spring.ai.openai). Commits 586ef7a, 5a0e4be. Deviations: (1) Rule 1 — plan test snippet typed `dataManager.load(...).query(...)` mock as FluentLoader.ByCondition; Jmix 2.8 returns FluentLoader.ByQuery; (2) Rule 2 — wrapped CurrentAuthentication.getUser()/getLocale() in try/catch for genuine anonymous contexts at runtime (not just mocks); (3) Plan gap — added `maxTokens` line to fallback YAML for accessor symmetry.
+- 04-03: ✅ Audit pipeline — 5 classes under `com.vn.agent.audit`: `ToolCallAdvisorBuilderProbe` (OQ-1 closure constants: RESOLVED_BUILDER_METHOD="disableMemory", ORDER_SETTER_METHOD="advisorOrder", INTERNAL_FLAG_FIELD="conversationHistoryEnabled"), `AuditListenerFanOut` (@Component; List<AuditListener> auto-collect; per-listener try/catch(Throwable) — D-13/SPI-06), `AuditWriter` (@Component; sole @Transactional(REQUIRES_NEW) surface — D-11; three methods writeChatPre/writeChatPost/writeToolCall; writeToolCall registers TransactionSynchronization.afterCommit → fanOut.fireToolCallAudited — D-14; chat-level rows use sentinel toolName="<chat>" + sentinel outcome), `AuditAdvisor` (@Component; implements CallAdvisor; Ordered.HIGHEST_PRECEDENCE — ORCH-02/AUD-01; B8 reads runId from advisor context "audit.runId" with UUID.randomUUID() fallback; SHA-256 promptHash of last USER message; RunContext.set/clear in try/finally; no @Transactional, no this.write self-calls — Pitfall #3 closed), `ToolCallbackAuditDecorator` (implements ToolCallback — AUD-04/AUD-02; overrides call(String) and call(String, ToolContext); PRE row eager, POST row in finally; resultSummary truncated to 4096 chars; no @Transactional). EN/VI i18n key com.vn.agent.audit/AuditWriteFailed. Commits 463115a, 13939cd, 70eb934. Deviations: none — plan executed exactly as written; compileJava green on first try.
 
 ## Phase 03 Progress (archived)
 
@@ -120,6 +121,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
 - 2026-04-20 11:55 +07:00 — Plan 04-01 complete (Liquibase 080 + AiToolCallAudit entity fields + EN/VI i18n; compileJava green). Commits 8181ff4, 1789b7e. Next: 04-02.
 - 2026-04-20 12:40 +07:00 — Plan 04-02 complete (orchestration foundations: 5 orchestration classes + 2 unit test classes; 6 tests green; 8 new application.properties keys for defaults + OpenRouter; EN/VI ConversationNotFound i18n key). Commits 586ef7a, 5a0e4be. Next: 04-03.
+- 2026-04-20 13:30 +07:00 — Plan 04-03 complete (audit pipeline: ToolCallAdvisorBuilderProbe + AuditListenerFanOut + AuditWriter REQUIRES_NEW + AuditAdvisor HIGHEST_PRECEDENCE + ToolCallbackAuditDecorator; EN/VI AuditWriteFailed i18n key; compileJava green). Commits 463115a, 13939cd, 70eb934. Next: 04-04.
 
 ### Quick Tasks Completed
 
