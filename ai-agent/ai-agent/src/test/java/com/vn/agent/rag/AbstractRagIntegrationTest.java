@@ -50,7 +50,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * concrete test class's {@code @AfterEach}.</p>
  */
 @Tag("rag-it")
-@SpringBootTest(classes = RagItTestApp.class)
+@SpringBootTest(
+        classes = RagItTestApp.class,
+        properties = "spring.main.allow-bean-definition-overriding=true")
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
