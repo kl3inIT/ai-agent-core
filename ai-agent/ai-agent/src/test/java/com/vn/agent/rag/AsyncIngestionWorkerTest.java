@@ -221,6 +221,29 @@ class AsyncIngestionWorkerTest {
     }
 
     @Test
+    void document_exceeding_max_chars_fails_before_vector_add() {
+        // WR-02: configure a 1-char cap — any real fixture text exceeds it. The worker must
+        // NEVER call vectorStore.add and must flip status to FAILED with a clear message.
+        UUID id = UUID.randomUUID();
+        stubLoad(id, doc(id, "classpath:ai-kb/fixture-alpha.md", "[\"ai-agent-user\"]"));
+        AiAgentRagProperties capped = new AiAgentRagProperties(
+                null, null, null,
+                new AiAgentRagProperties.Splitter(200, null, 10),
+                null, null, null,
+                new AiAgentRagProperties.Ingest(1),
+                null);
+        AsyncIngestionWorker cappedWorker = new AsyncIngestionWorker(statusWriter, cancellationRegistry,
+                dataManager, vectorStore, capped, embeddingProps, resourceLoader);
+
+        cappedWorker.ingest(id);
+
+        ArgumentCaptor<String> msg = ArgumentCaptor.forClass(String.class);
+        verify(statusWriter).markFailed(eq(id), msg.capture());
+        assertThat(msg.getValue()).contains("max-document-chars");
+        verify(vectorStore, never()).add(any());
+    }
+
+    @Test
     void unknown_uri_scheme_is_rejected_and_becomes_FAILED() {
         UUID id = UUID.randomUUID();
         stubLoad(id, doc(id, "ftp://somewhere/file.md", "[\"ai-agent-user\"]"));

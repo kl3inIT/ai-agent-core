@@ -133,6 +133,11 @@ public class AsyncIngestionWorker {
             Resource resource = resolveResource(document.getFileName());
             List<Document> raw = new TikaDocumentReader(resource).get();
 
+            // WR-02: enforce jmix.ai-agent.rag.ingest.max-document-chars BEFORE splitting /
+            // embedding. Tika has already materialised the text so we can size it accurately;
+            // exceeding the cap fails the document with a clear message and skips vectorStore.add.
+            enforceMaxDocumentChars(raw);
+
             TokenTextSplitter splitter = buildSplitter();
             List<Document> chunks = splitter.apply(raw);
 
@@ -188,6 +193,35 @@ public class AsyncIngestionWorker {
             location = DEFAULT_RESOURCE_ROOT + fileName;
         }
         return resourceLoader.getResource(location);
+    }
+
+    /**
+     * WR-02: enforce the documented {@code jmix.ai-agent.rag.ingest.max-document-chars}
+     * cap before splitting / embedding. {@code null} means no cap configured; any other
+     * value aborts ingest with {@link IllegalArgumentException} so the catch block flips
+     * status to FAILED with a clear message.
+     */
+    private void enforceMaxDocumentChars(List<Document> raw) {
+        AiAgentRagProperties.Ingest cfg = ragProperties == null ? null : ragProperties.ingest();
+        if (cfg == null || cfg.maxDocumentChars() == null) {
+            return;
+        }
+        int cap = cfg.maxDocumentChars();
+        if (cap <= 0) {
+            return;
+        }
+        long total = 0L;
+        for (Document d : raw) {
+            String text = d.getText();
+            if (text != null) {
+                total += text.length();
+                if (total > cap) {
+                    throw new IllegalArgumentException(
+                            "Document exceeds jmix.ai-agent.rag.ingest.max-document-chars=" + cap
+                                    + " (observed > " + total + " characters)");
+                }
+            }
+        }
     }
 
     private TokenTextSplitter buildSplitter() {
