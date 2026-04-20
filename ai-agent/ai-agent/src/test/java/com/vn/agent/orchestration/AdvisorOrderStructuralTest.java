@@ -4,11 +4,13 @@ import com.vn.agent.AITestConfiguration;
 import com.vn.agent.audit.AuditAdvisor;
 import com.vn.agent.audit.ToolCallAdvisorBuilderConstants;
 import com.vn.agent.test_support.StubChatModelConfiguration;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,12 +25,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Structural assertion that the default {@link ChatClient} carries the three Phase-4 advisors in
- * the locked order with the locked order values:
+ * Structural assertion that the default {@link ChatClient} carries the four advisors in the locked
+ * order with the locked order values (Phase 4 baseline + Phase 5 RAG slot at +250):
  *
  * <ol>
  *   <li>{@link AuditAdvisor} at {@link Ordered#HIGHEST_PRECEDENCE}</li>
  *   <li>{@code MessageChatMemoryAdvisor} at {@code HIGHEST_PRECEDENCE + 200}</li>
+ *   <li>{@link RetrievalAugmentationAdvisor} at {@code HIGHEST_PRECEDENCE + 250} — Phase 5 RAG-04</li>
  *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300}</li>
  * </ol>
  *
@@ -43,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(StubChatModelConfiguration.class)
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
 class AdvisorOrderStructuralTest {
 
     @Autowired ChatClient chatClient;
@@ -61,12 +64,14 @@ class AdvisorOrderStructuralTest {
         callAdvisors.sort(Comparator.comparingInt(CallAdvisor::getOrder));
 
         assertThat(callAdvisors)
-                .as("Default advisor list must contain exactly the three Phase-4 advisors")
-                .hasSize(3);
+                .as("Default advisor list must contain the four advisors "
+                        + "(Phase 4 audit/memory/tool + Phase 5 rag at +250)")
+                .hasSize(4);
 
         CallAdvisor audit = callAdvisors.get(0);
         CallAdvisor memory = callAdvisors.get(1);
-        CallAdvisor tool = callAdvisors.get(2);
+        CallAdvisor rag = callAdvisors.get(2);
+        CallAdvisor tool = callAdvisors.get(3);
 
         assertThat(audit)
                 .as("First advisor (HIGHEST_PRECEDENCE) must be AuditAdvisor")
@@ -75,6 +80,11 @@ class AdvisorOrderStructuralTest {
 
         assertThat(memory.getClass().getSimpleName()).isEqualTo("MessageChatMemoryAdvisor");
         assertThat(memory.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 200);
+
+        assertThat(rag)
+                .as("Third advisor must be RetrievalAugmentationAdvisor at +250 (Phase 5 RAG-04)")
+                .isInstanceOf(RetrievalAugmentationAdvisor.class);
+        assertThat(rag.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 250);
 
         assertThat(tool).isInstanceOf(ToolCallAdvisor.class);
         assertThat(tool.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 300);

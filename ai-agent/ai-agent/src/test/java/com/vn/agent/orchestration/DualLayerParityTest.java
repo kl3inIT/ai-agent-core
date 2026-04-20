@@ -4,6 +4,7 @@ import com.vn.agent.AITestConfiguration;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.test_support.StubChatModelConfiguration;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
 import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(StubChatModelConfiguration.class)
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
 class DualLayerParityTest {
 
     @Autowired ChatService chatService;
