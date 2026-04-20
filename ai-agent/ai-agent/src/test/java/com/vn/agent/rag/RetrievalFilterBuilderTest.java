@@ -34,7 +34,7 @@ class RetrievalFilterBuilderTest {
     }
 
     private static AiAgentRagProperties ragProps(boolean adminBypass) {
-        return new AiAgentRagProperties(adminBypass, 5, 0.5, null, null, null, null, null);
+        return new AiAgentRagProperties(adminBypass, 5, 0.5, null, null, null, null, null, null);
     }
 
     private static Authentication authWith(String... authorities) {

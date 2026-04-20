@@ -49,7 +49,8 @@ public record AiAgentRagProperties(
         EmbedRetry embedRetry,
         SampleIngester sampleIngester,
         IngestExecutor ingestExecutor,
-        Ingest ingest) {
+        Ingest ingest,
+        Upload upload) {
 
     /** {@code TokenTextSplitter} sizing — see D-13 and RESEARCH Pitfall #5. */
     public record Splitter(Integer chunkSize, Integer chunkOverlap, Integer minChunkSizeChars) {}
@@ -65,6 +66,27 @@ public record AiAgentRagProperties(
 
     /** Pre-embed admission guards. */
     public record Ingest(Integer maxDocumentChars) {}
+
+    /**
+     * Upload-source URI validation (threat T-05-03-05 hardening, CR-01 fix).
+     *
+     * <p>Callers of {@link com.vn.agent.rag.KnowledgeDocumentUploadService#upload} may only
+     * supply {@code sourceUri} values that fall inside one of these allowlists:</p>
+     * <ul>
+     *   <li>{@code classpathAllowedPrefixes} — each {@code classpath:} URI must start with
+     *       one of these prefixes (default {@code classpath:ai-kb/} — the shipped fixtures
+     *       / sample ingester root). Additional prefixes can be opted in by the host.</li>
+     *   <li>{@code fileStagingRoot} — a single absolute directory (canonicalised) inside
+     *       which every {@code file:} URI must resolve. Default {@code null} means
+     *       {@code file:} URIs are refused outright. Phase 7 Flow UI sets this to the
+     *       temp-staging directory it owns for admin uploads.</li>
+     * </ul>
+     *
+     * <p>Without this guard a caller with access to {@code upload()} could ingest
+     * arbitrary server-side files (e.g. {@code file:/etc/passwd}, classpath config
+     * resources) into the vector store and exfiltrate them via retrieval.</p>
+     */
+    public record Upload(java.util.List<String> classpathAllowedPrefixes, String fileStagingRoot) {}
 
     /** D-06: admin bypass default is {@code true}. */
     public boolean isAdminBypass() {

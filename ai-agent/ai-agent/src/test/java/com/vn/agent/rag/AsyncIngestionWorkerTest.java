@@ -59,7 +59,7 @@ class AsyncIngestionWorkerTest {
         ragProps = new AiAgentRagProperties(
                 null, null, null,
                 new AiAgentRagProperties.Splitter(200, null, 10),
-                null, null, null, null);
+                null, null, null, null, null);
         embeddingProps = new AiAgentEmbeddingProperties(
                 "openai/text-embedding-3-small", 1536, null);
         resourceLoader = new DefaultResourceLoader();

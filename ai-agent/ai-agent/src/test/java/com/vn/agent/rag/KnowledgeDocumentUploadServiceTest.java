@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
+import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
 import io.jmix.security.model.ResourceRole;
@@ -68,8 +69,13 @@ class KnowledgeDocumentUploadServiceTest {
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
+        // CR-01: AiAgentRagProperties is required so the allowlist validator can resolve
+        // the default classpath:ai-kb/ prefix used by every fixture URI in this suite.
+        AiAgentRagProperties ragProperties = new AiAgentRagProperties(
+                null, null, null, null, null, null, null, null, null);
+
         service = new KnowledgeDocumentUploadService(
-                metadata, dataManager, roleRepository, asyncIngestionWorker, embeddingProperties);
+                metadata, dataManager, roleRepository, asyncIngestionWorker, embeddingProperties, ragProperties);
     }
 
     @AfterEach
@@ -174,6 +180,45 @@ class KnowledgeDocumentUploadServiceTest {
         // Now run the registered synchronization — this is the moment the worker should fire.
         captureOnlySynchronization().afterCommit();
         verify(asyncIngestionWorker, times(1)).ingest(any());
+    }
+
+    // --- CR-01 sourceUri allowlist tests --------------------------------------
+
+    @Test
+    void rejects_file_uri_pointing_outside_staging_root_by_default() {
+        // No staging root configured → all file: URIs must be rejected before persistence.
+        assertThatThrownBy(() -> service.upload(
+                "file:/etc/passwd", "text/plain", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    }
+
+    @Test
+    void rejects_file_uri_even_to_application_properties_form() {
+        assertThatThrownBy(() -> service.upload(
+                "file:/tmp/application.properties", "text/plain", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    }
+
+    @Test
+    void rejects_classpath_uri_outside_default_ai_kb_allowlist() {
+        // An ai-kb-adjacent secret / internal resource must NOT be ingestible.
+        assertThatThrownBy(() -> service.upload(
+                "classpath:application.properties", "text/plain", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    }
+
+    @Test
+    void rejects_other_schemes() {
+        assertThatThrownBy(() -> service.upload(
+                "ftp://example.com/foo.md", "text/markdown", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.upload(
+                "http://example.com/foo.md", "text/markdown", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
     }
 
     @Test

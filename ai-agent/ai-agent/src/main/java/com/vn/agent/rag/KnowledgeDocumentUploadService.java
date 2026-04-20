@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
+import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
 import io.jmix.security.model.ResourceRole;
@@ -16,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -57,22 +62,31 @@ public class KnowledgeDocumentUploadService {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeDocumentUploadService.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    private static final String CLASSPATH_PREFIX = "classpath:";
+    private static final String FILE_PREFIX = "file:";
+    /** Default classpath allowlist — fixtures & shipped sample ingester root. */
+    private static final List<String> DEFAULT_CLASSPATH_ALLOWED_PREFIXES =
+            List.of("classpath:ai-kb/");
+
     private final Metadata metadata;
     private final DataManager dataManager;
     private final ResourceRoleRepository roleRepository;
     private final AsyncIngestionWorker asyncIngestionWorker;
     private final AiAgentEmbeddingProperties embeddingProperties;
+    private final AiAgentRagProperties ragProperties;
 
     public KnowledgeDocumentUploadService(Metadata metadata,
                                           DataManager dataManager,
                                           ResourceRoleRepository roleRepository,
                                           AsyncIngestionWorker asyncIngestionWorker,
-                                          AiAgentEmbeddingProperties embeddingProperties) {
+                                          AiAgentEmbeddingProperties embeddingProperties,
+                                          AiAgentRagProperties ragProperties) {
         this.metadata = metadata;
         this.dataManager = dataManager;
         this.roleRepository = roleRepository;
         this.asyncIngestionWorker = asyncIngestionWorker;
         this.embeddingProperties = embeddingProperties;
+        this.ragProperties = ragProperties;
     }
 
     /**
@@ -88,6 +102,13 @@ public class KnowledgeDocumentUploadService {
     @Transactional
     public AiKnowledgeDocument upload(String sourceUri, String sourceKind, Collection<String> allowedRoles) {
         Objects.requireNonNull(sourceUri, "sourceUri must not be null");
+
+        // CR-01: reject arbitrary server-side URIs (threat T-05-03-05 hardening). Only
+        // accept classpath: values inside the configured allowlist, and file: values
+        // inside the configured staging root. Anything else — including raw classpath:
+        // or file: targeting application config, secrets, or arbitrary filesystem paths —
+        // is refused before persistence.
+        validateSourceUri(sourceUri);
 
         List<String> roles = allowedRoles == null ? List.of() : new ArrayList<>(allowedRoles);
 
@@ -131,6 +152,95 @@ public class KnowledgeDocumentUploadService {
         }
 
         return saved;
+    }
+
+    /**
+     * CR-01 allowlist validator. Only {@code classpath:} URIs matching a configured
+     * prefix and {@code file:} URIs resolving inside the configured staging root are
+     * accepted. Anything else — including raw {@code file:} with no staging root
+     * configured, other schemes, or classpath resources outside the allowlist — is
+     * rejected as an {@link IllegalArgumentException}. Bare filenames (no scheme)
+     * are treated as an implicit {@code classpath:ai-kb/<name>} which must also fall
+     * inside the allowlist to succeed.
+     */
+    private void validateSourceUri(String sourceUri) {
+        String trimmed = sourceUri.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("sourceUri must not be blank");
+        }
+        if (trimmed.startsWith(CLASSPATH_PREFIX)) {
+            List<String> prefixes = effectiveClasspathAllowedPrefixes();
+            for (String prefix : prefixes) {
+                if (trimmed.startsWith(prefix)) {
+                    return;
+                }
+            }
+            throw new IllegalArgumentException(
+                    "sourceUri classpath location is not allowed: " + trimmed
+                            + " (allowed prefixes: " + prefixes + ")");
+        }
+        if (trimmed.startsWith(FILE_PREFIX)) {
+            String stagingRoot = effectiveFileStagingRoot();
+            if (stagingRoot == null || stagingRoot.isBlank()) {
+                throw new IllegalArgumentException(
+                        "file: sourceUri is not accepted — no jmix.ai-agent.rag.upload.file-staging-root configured");
+            }
+            File staging;
+            File target;
+            try {
+                staging = new File(stagingRoot).getCanonicalFile();
+                target = new File(new URI(trimmed)).getCanonicalFile();
+            } catch (URISyntaxException | IOException | IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                        "file: sourceUri is not a valid URI or cannot be resolved: " + trimmed, e);
+            }
+            if (!isUnder(staging, target)) {
+                throw new IllegalArgumentException(
+                        "file: sourceUri must resolve inside configured staging root (" + stagingRoot + "): " + trimmed);
+            }
+            return;
+        }
+        if (trimmed.contains("://")) {
+            throw new IllegalArgumentException("Unsupported sourceUri scheme: " + trimmed);
+        }
+        // Bare filename — defer to AsyncIngestionWorker's default classpath:ai-kb/ root
+        // which must also be in the allowlist for this call to succeed.
+        String implied = "classpath:ai-kb/" + trimmed;
+        List<String> prefixes = effectiveClasspathAllowedPrefixes();
+        for (String prefix : prefixes) {
+            if (implied.startsWith(prefix)) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException(
+                "sourceUri bare filename resolves outside allowed classpath prefixes: " + trimmed);
+    }
+
+    private List<String> effectiveClasspathAllowedPrefixes() {
+        if (ragProperties == null || ragProperties.upload() == null
+                || ragProperties.upload().classpathAllowedPrefixes() == null
+                || ragProperties.upload().classpathAllowedPrefixes().isEmpty()) {
+            return DEFAULT_CLASSPATH_ALLOWED_PREFIXES;
+        }
+        return ragProperties.upload().classpathAllowedPrefixes();
+    }
+
+    private String effectiveFileStagingRoot() {
+        if (ragProperties == null || ragProperties.upload() == null) {
+            return null;
+        }
+        return ragProperties.upload().fileStagingRoot();
+    }
+
+    private static boolean isUnder(File root, File candidate) {
+        File cur = candidate;
+        while (cur != null) {
+            if (cur.equals(root)) {
+                return true;
+            }
+            cur = cur.getParentFile();
+        }
+        return false;
     }
 
     private static String writeRolesJson(List<String> roles) {
