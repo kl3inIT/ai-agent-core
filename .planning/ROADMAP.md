@@ -164,7 +164,7 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md — Schema migration: AiToolCallAudit runId/kind/phase/promptHash/errorClass columns + i18n (AUD-03)
-- [ ] 04-02-PLAN.md — Foundations: AiAgentDefaultsProperties, RunContext, ConversationNotFoundException, AiParametersResolver, BaselineContextProvider (SPI-02, SPI-03, ORCH-06)
+- [x] 04-02-PLAN.md — Foundations: AiAgentDefaultsProperties, RunContext, ConversationNotFoundException, AiParametersResolver, BaselineContextProvider (SPI-02, SPI-03, ORCH-06)
 - [ ] 04-03-PLAN.md — Audit pipeline: AuditWriter REQUIRES_NEW + AuditAdvisor + ToolCallbackAuditDecorator + AuditListenerFanOut + OQ-1 closure (AUD-01, AUD-02, AUD-04, AUD-05, SPI-06)
 - [ ] 04-04-PLAN.md — Orchestration wiring: ChatClientFactory advisor chain, ConversationGateway opacity, ProjectingChatMemoryRepository dual-layer, DefaultChatServiceImpl rewrite (ORCH-01..05)
 - [ ] 04-05-PLAN.md — Integration tests: advisor ordering, ownership opacity, audit durability, dual-layer parity, listener fan-out, live OpenRouter (TEST-02, TEST-03, TEST-05)
