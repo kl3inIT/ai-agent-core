@@ -67,7 +67,7 @@ public class BaselineContextProvider {
         boolean first = true;
         for (Map.Entry<String, Object> e : sorted.entrySet()) {
             if (!first) sb.append('\n');
-            sb.append(e.getKey()).append('=').append(String.valueOf(e.getValue()));
+            sb.append(e.getKey()).append('=').append(e.getValue());
             first = false;
         }
         return sb.toString();
