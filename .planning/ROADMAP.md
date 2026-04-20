@@ -13,7 +13,7 @@
 | 2 | Foundations | Entities, Liquibase, roles, SPI interfaces (no ArchUnit per D-10) | ENT-01..04, SEC-01..04, SPI-01, SPI-02, SPI-03, SPI-05, SPI-06, SPI-07 (interfaces only) | 4 |
 | 3 | Metadata Runtime & Six Tools | Metamodel scanner + per-user schema + 6 DataManager-backed read tools | TOOL-01..08, SPI-01 (impl) | 5 |
 | 4 | Orchestration Core | ChatClient + advisor chain + JDBC memory + audit | ORCH-01..06, AUD-01..05, SPI-02/03 (impl), SPI-06 (impl) | 5 |
-| 5 | RAG Layer | 3/5 | In Progress|  |
+| 5 | RAG Layer | 5/5 | ✅ Complete |  |
 | 6 | Parameters & Guardrails | Parameter profiles + structured output + iteration/token caps + injection scanner | PARAM-01..05, GUARD-01..06, SPI-05 (impl) | 4 |
 | 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit | UI-01..06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10) | 5 |
 | 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..05, TEST-07 (TEST-06 dropped per D-10) | 4 |
@@ -201,8 +201,8 @@ Plans:
 - [x] 05-01-PLAN.md — pgvector + EmbeddingModel bean wiring + config props + bean-collision test (RAG-02)
 - [x] 05-02-PLAN.md — RetrievalFilterBuilder + RetrievalAugmentationAdvisor + DefaultChatServiceImpl per-request FILTER_EXPRESSION (RAG-04, RAG-05)
 - [x] 05-03-PLAN.md — Ingestion pipeline: IngestionStatusWriter, CancellationRegistry, AsyncIngestionWorker, MdcPropagatingTaskDecorator, aiAgentIngestExecutor (RAG-01, RAG-03)
-- [ ] 05-04-PLAN.md — Services + SPI: KnowledgeDocumentUploadService, KnowledgeDocumentService delete/reingest, IngesterManager, ClasspathMarkdownIngester, i18n (RAG-06, RAG-07, RAG-08, SPI-07)
-- [ ] 05-05-PLAN.md — Integration tests: upload→READY, role-scoped retrieval, atomic delete, fail-closed, retry+failure, FILTER_EXPRESSION contract, sample ingester default-off (RAG-01, RAG-03..08)
+- [x] 05-04-PLAN.md — Services + SPI: KnowledgeDocumentUploadService, KnowledgeDocumentService delete/reingest, IngesterManager, ClasspathMarkdownIngester, i18n (RAG-06, RAG-07, RAG-08, SPI-07)
+- [x] 05-05-PLAN.md — Integration tests: upload→READY, role-scoped retrieval, atomic delete, fail-closed, retry+failure, FILTER_EXPRESSION contract, sample ingester default-off (RAG-01, RAG-03..08)
 
 ---
 

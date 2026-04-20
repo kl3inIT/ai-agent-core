@@ -57,11 +57,11 @@
 - [x] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
 - [ ] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
 - [x] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
-- [ ] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
-- [ ] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
-- [ ] **RAG-06**: Untagged documents refused for non-admin users (fail closed)
-- [ ] **RAG-07**: `CustomIngester` SPI + one example (e.g. URL-less markdown file) so hosts can plug in domain-specific sources
-- [ ] **RAG-08**: Admin can delete a document → corresponding vector chunks removed atomically
+- [x] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
+- [x] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
+- [x] **RAG-06**: Untagged documents refused for non-admin users (fail closed)
+- [x] **RAG-07**: `CustomIngester` SPI + one example (e.g. URL-less markdown file) so hosts can plug in domain-specific sources
+- [x] **RAG-08**: Admin can delete a document → corresponding vector chunks removed atomically
 
 ### Parameters & Configuration
 
