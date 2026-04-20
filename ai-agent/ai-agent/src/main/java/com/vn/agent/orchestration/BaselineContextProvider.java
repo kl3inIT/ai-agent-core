@@ -99,13 +99,22 @@ public class BaselineContextProvider {
      * Best-effort extraction of a stable user key. Jmix's {@code User} entity exposes a UUID via
      * a {@code getKey()} accessor on its base class; we reflectively attempt it to avoid a hard
      * compile dep on {@code jmix-security}'s user package shape.
+     *
+     * <p>LO-04: only accept {@link UUID} or {@link String} return values. If a host swaps
+     * {@link UserDetails} for a class whose {@code getKey()} returns something else (e.g. an AES
+     * key, an internal handle), we must NOT publish it into the {@code agent.userId} slot — that
+     * value flows into the LLM-facing system prompt.
      */
     private static Object extractUserKey(UserDetails user) {
         try {
-            var m = user.getClass().getMethod("getKey");
-            return m.invoke(user);
+            var method = user.getClass().getMethod("getKey");
+            Object result = method.invoke(user);
+            if (result instanceof UUID || result instanceof String) {
+                return result;
+            }
         } catch (Exception ignore) {
-            return user.getUsername();
+            // Fall through to username fallback.
         }
+        return user.getUsername();
     }
 }
