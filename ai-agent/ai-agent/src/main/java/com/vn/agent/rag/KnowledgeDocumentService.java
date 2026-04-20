@@ -102,9 +102,12 @@ public class KnowledgeDocumentService {
         Objects.requireNonNull(documentId, "documentId must not be null");
         loadOrThrow(documentId); // existence check — result unused
 
-        // Cancel any in-flight worker from a prior generation, then clear the flag so
-        // the newly-dispatched worker is not aborted on its entry guard.
-        cancellationRegistry.cancel(documentId);
+        // WR-01: bump the generation counter so any in-flight worker from a prior
+        // generation observes cancellation at its next batch boundary, WITHOUT racing
+        // the newly-scheduled worker's entry guard. The new worker captures the
+        // post-bump generation and runs cleanly; stale chunks from the prior worker
+        // can no longer appear after the purge below.
+        cancellationRegistry.bumpGeneration(documentId);
         cancellationRegistry.clear(documentId);
 
         // Purge old chunks (D-15). If this throws, the status writer below is not

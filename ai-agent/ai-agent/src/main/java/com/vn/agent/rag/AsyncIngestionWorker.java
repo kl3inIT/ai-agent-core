@@ -104,6 +104,12 @@ public class AsyncIngestionWorker {
 
     @Async("aiAgentIngestExecutor")
     public void ingest(UUID documentId) {
+        // WR-01: capture the generation at entry so later reingest() bumps mark THIS
+        // worker as cancelled even if the legacy boolean flag is cleared between
+        // scheduling and polling. Generation captured BEFORE markProcessing so a
+        // racing cancel() called immediately after dispatch is still observed.
+        final long generation = cancellationRegistry.currentGeneration(documentId);
+
         // markProcessing is OUTSIDE the try — writer runs in its own REQUIRES_NEW and its row
         // should commit even if the read/parse/embed block below throws immediately.
         ingestionStatusWriter.markProcessing(documentId);
@@ -117,7 +123,7 @@ public class AsyncIngestionWorker {
             return;
         }
 
-        if (cancellationRegistry.isCancelled(documentId)) {
+        if (cancellationRegistry.isCancelled(documentId, generation)) {
             ingestionStatusWriter.markCancelled(documentId);
             cancellationRegistry.clear(documentId);
             return;
@@ -140,7 +146,7 @@ public class AsyncIngestionWorker {
 
             int written = 0;
             for (int i = 0; i < enriched.size(); i += VECTOR_STORE_BATCH_SIZE) {
-                if (cancellationRegistry.isCancelled(documentId)) {
+                if (cancellationRegistry.isCancelled(documentId, generation)) {
                     ingestionStatusWriter.markCancelled(documentId);
                     cancellationRegistry.clear(documentId);
                     return;

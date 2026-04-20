@@ -57,6 +57,29 @@ class CancellationRegistryTest {
     }
 
     @Test
+    void bumpGeneration_marks_prior_generation_as_cancelled_but_not_new_generation() {
+        // WR-01 race proof: reingest() bumps the generation. A worker that captured the
+        // OLD generation sees isCancelled(id, old) == true, while the worker that captured
+        // the NEW (post-bump) generation sees isCancelled(id, new) == false even after
+        // clear() is called (clear only wipes the legacy boolean flag).
+        CancellationRegistry registry = new CancellationRegistry();
+        UUID id = UUID.randomUUID();
+
+        long genBeforeBump = registry.currentGeneration(id);
+        registry.bumpGeneration(id);
+        registry.clear(id); // mirrors reingest(): clears legacy flag AFTER bump
+        long genAfterBump = registry.currentGeneration(id);
+
+        assertThat(genAfterBump).isGreaterThan(genBeforeBump);
+        assertThat(registry.isCancelled(id, genBeforeBump))
+                .as("old-generation worker MUST observe cancellation after bump+clear")
+                .isTrue();
+        assertThat(registry.isCancelled(id, genAfterBump))
+                .as("new-generation worker MUST NOT observe cancellation after bump+clear")
+                .isFalse();
+    }
+
+    @Test
     void concurrent_register_and_cancel_is_thread_safe() {
         CancellationRegistry registry = new CancellationRegistry();
         List<UUID> ids = IntStream.range(0, 100).mapToObj(i -> UUID.randomUUID()).toList();

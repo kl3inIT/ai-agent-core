@@ -156,8 +156,10 @@ class KnowledgeDocumentServiceTest {
 
         service.reingest(id);
 
+        // WR-01: reingest uses bumpGeneration (not cancel) so the new worker's captured
+        // generation is not races-cancelled by a prior generation's lingering flag.
         InOrder order = inOrder(cancellationRegistry, vectorStore, ingestionStatusWriter);
-        order.verify(cancellationRegistry).cancel(id);
+        order.verify(cancellationRegistry).bumpGeneration(id);
         order.verify(cancellationRegistry).clear(id);
         order.verify(vectorStore).delete(any(Filter.Expression.class));
         order.verify(ingestionStatusWriter).markPending(id);
@@ -195,8 +197,8 @@ class KnowledgeDocumentServiceTest {
         assertThatThrownBy(() -> service.reingest(id))
                 .isInstanceOf(RuntimeException.class);
 
-        // Cancel + clear happened BEFORE the throwing delete; they must not leak.
-        verify(cancellationRegistry).cancel(id);
+        // Bump + clear happened BEFORE the throwing delete; they must not leak.
+        verify(cancellationRegistry).bumpGeneration(id);
         verify(cancellationRegistry).clear(id);
         verify(ingestionStatusWriter, never()).markPending(any());
         verify(asyncIngestionWorker, never()).ingest(any());

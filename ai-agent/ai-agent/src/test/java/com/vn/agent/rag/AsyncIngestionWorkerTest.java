@@ -189,7 +189,10 @@ class AsyncIngestionWorkerTest {
         stubLoad(id, doc(id, "classpath:ai-kb/fixture-alpha.md", "[\"ai-agent-user\"]"));
         // First cancellation check (entry-guard) returns false; subsequent per-batch
         // checks return true so we cancel before any batch is actually written.
-        when(cancellationRegistry.isCancelled(id))
+        // WR-01: worker now polls isCancelled(id, generation); stub the generation-
+        // aware overload used by production code.
+        when(cancellationRegistry.isCancelled(org.mockito.ArgumentMatchers.eq(id),
+                org.mockito.ArgumentMatchers.anyLong()))
                 .thenReturn(false)  // entry guard
                 .thenReturn(true);  // first batch guard — cancel immediately
 
