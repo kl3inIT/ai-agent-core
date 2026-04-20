@@ -37,11 +37,11 @@
 
 ### Orchestration (ChatClient + Advisors + Memory)
 
-- [ ] **ORCH-01**: `ChatClientFactory` builds a `ChatClient` per request with the caller's effective tool set and parameter profile (never `.defaultTools(...)` for auto-generated tools)
-- [ ] **ORCH-02**: Advisor chain ordered: `MessageChatMemoryAdvisor` (`HIGHEST_PRECEDENCE+200`) → RAG advisor (`+250`) → `ToolCallAdvisor` with `.disableInternalConversationHistory()` (`+300`) → `AuditAdvisor` (around-chain)
-- [ ] **ORCH-03**: JDBC-backed `ChatMemoryRepository` is authoritative for the model; `ConversationProjector` decorator synchronously mirrors each turn into `AiConversation`/`AiMessage` entities via `DataManager`
-- [ ] **ORCH-04**: `conversationId` scoped to user; `ChatService` rejects replay/continuation of a conversation not owned by the current user
-- [ ] **ORCH-05**: `ChatService` public API supports `ask(conversationId, question)` (blocking) and `stream(conversationId, question)` (if streaming works with tool calls in M4; otherwise graceful fallback to blocking)
+- [x] **ORCH-01**: `ChatClientFactory` builds a `ChatClient` per request with the caller's effective tool set and parameter profile (never `.defaultTools(...)` for auto-generated tools)
+- [x] **ORCH-02**: Advisor chain ordered: `MessageChatMemoryAdvisor` (`HIGHEST_PRECEDENCE+200`) → RAG advisor (`+250`) → `ToolCallAdvisor` with `.disableInternalConversationHistory()` (`+300`) → `AuditAdvisor` (around-chain)
+- [x] **ORCH-03**: JDBC-backed `ChatMemoryRepository` is authoritative for the model; `ConversationProjector` decorator synchronously mirrors each turn into `AiConversation`/`AiMessage` entities via `DataManager`
+- [x] **ORCH-04**: `conversationId` scoped to user; `ChatService` rejects replay/continuation of a conversation not owned by the current user
+- [x] **ORCH-05**: `ChatService` public API supports `ask(conversationId, question)` (blocking) and `stream(conversationId, question)` (if streaming works with tool calls in M4; otherwise graceful fallback to blocking)
 - [ ] **ORCH-06**: Default LLM provider: OpenAI-compatible via OpenRouter, configured through `spring.ai.openai.*` with `base-url` override; provider swappable by host replacing `ChatModel` bean
 
 ### Audit
