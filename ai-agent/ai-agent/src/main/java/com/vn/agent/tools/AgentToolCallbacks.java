@@ -1,6 +1,9 @@
 package com.vn.agent.tools;
 
+import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.audit.ToolCallbackAuditDecorator;
 import com.vn.agent.spi.ToolContributor;
+import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.stereotype.Component;
@@ -27,15 +30,25 @@ public class AgentToolCallbacks {
 
     private final BuiltInDataTools builtIns;
     private final List<ToolContributor> contributors;
+    private final AuditWriter auditWriter;
+    private final CurrentAuthentication currentAuthentication;
 
-    public AgentToolCallbacks(BuiltInDataTools builtIns, List<ToolContributor> contributors) {
+    public AgentToolCallbacks(BuiltInDataTools builtIns,
+                              List<ToolContributor> contributors,
+                              AuditWriter auditWriter,
+                              CurrentAuthentication currentAuthentication) {
         this.builtIns = builtIns;
         this.contributors = contributors;
+        this.auditWriter = auditWriter;
+        this.currentAuthentication = currentAuthentication;
     }
 
     /**
-     * Build a fresh {@link ToolCallback} array per request. Do NOT cache the returned array —
-     * ToolContributor output and effective schema can change across invocations.
+     * Build a fresh {@link ToolCallback} array per request (AUD-04). Every callback is wrapped in
+     * a {@link ToolCallbackAuditDecorator} so each tool invocation produces PRE/POST audit rows
+     * via the REQUIRES_NEW {@code AuditWriter} boundary — rows survive even when a tool rolls
+     * back its own transaction. Do NOT cache the returned array — ToolContributor output and
+     * effective schema can change across invocations.
      */
     public ToolCallback[] forCurrentUser() {
         List<ToolCallback> all = new ArrayList<>();
@@ -49,7 +62,20 @@ public class AgentToolCallbacks {
                 Collections.addAll(all, fromBean(bean));
             }
         }
-        return all.toArray(ToolCallback[]::new);
+        ToolCallback[] out = new ToolCallback[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            out[i] = new ToolCallbackAuditDecorator(all.get(i), auditWriter, currentAuthentication);
+        }
+        return out;
+    }
+
+    /**
+     * Per-request assembly used by {@code DefaultChatServiceImpl} (Plan 04-04 Task 3). The
+     * {@code userId} and {@code conversationId} parameters are accepted for future per-user tool
+     * filtering (Phase 5+); today the implementation delegates to {@link #forCurrentUser()}.
+     */
+    public ToolCallback[] callbacksFor(String userId, java.util.UUID conversationId) {
+        return forCurrentUser();
     }
 
     /** Spring AI 1.1.4 replacement for the plan's {@code ToolCallbacks.from(bean)}. */

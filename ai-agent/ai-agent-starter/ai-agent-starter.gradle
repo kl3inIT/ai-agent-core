@@ -15,6 +15,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-autoconfigure'
     implementation 'org.springframework.ai:spring-ai-starter-model-openai:1.1.4'
 
+    // Plan 04-04: dual-layer chat memory (D-08) — ProjectingChatMemoryRepository decorates this.
+    implementation 'org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc:1.1.4'
+
     testImplementation 'org.springframework.ai:spring-ai-test:1.1.4'
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
