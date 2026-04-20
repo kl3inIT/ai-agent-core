@@ -1014,7 +1014,16 @@ NOTE: the `jmix.ai-agent.rag.embed-retry.*` surface and the built-in `spring.ai.
 
 **Planner action:** A1, A2, A3 should be resolved by concrete file-read/grep tasks at the start of Wave 0 before any new code is written. A4, A5, A6 can be validated by integration tests (bean-collision test surfaces A4; atomic-delete test surfaces A5; role-scoped retrieval test surfaces A6).
 
-## Open Questions
+## Open Questions (RESOLVED — checker iteration 1, 2026-04-20)
+
+**Resolutions applied to Phase 5 plans:**
+- **Q1 — pgvector `table-name` override:** Resolved by not relying on the auto-config property key. Plan 05-01 Task 3 registers an explicit `@Bean PgVectorStore` that calls `PgVectorStore.builder(jdbc, embeddingModel).vectorTableName("AI_AGENT_KB_VECTOR_STORE")...` — the builder supports `vectorTableName(String)` in Spring AI 1.1.4. `@ConditionalOnMissingBean` still allows host override. No dependency on the `spring.ai.vectorstore.pgvector.table-name` auto-config key.
+- **Q2 — `advisors(a -> a.param(FILTER_EXPRESSION, null))` semantics:** Resolved conservatively. Plan 05-02 Task 4 adopts the `if (filter != null)` guard: `DefaultChatServiceImpl` only calls `.param(FILTER_EXPRESSION, ...)` when `RetrievalFilterBuilder.buildFor(auth)` returns non-null. Admin-bypass path does NOT set the param at all. This matches the Code Examples guidance and avoids any "param present but null" ambiguity.
+- **Q3 — `TokenTextSplitter` tokenizer flavour:** Accepted as default (cl100k_base via jtokkit, aligns with `text-embedding-3-small`). No explicit override. Plan 05-05 integration tests implicitly verify chunk counts stay under the 8191-token OpenAI input limit by successfully embedding the committed fixtures; any regression there would surface at ingestion time.
+
+---
+
+### Original questions (for historical reference)
 
 1. **Does the pgvector starter in 1.1.4 support `table-name` override via `spring.ai.vectorstore.pgvector.table-name`?**
    - What we know: The `PgVectorStore.builder().vectorTableName("vector_store")` method exists.

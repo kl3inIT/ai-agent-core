@@ -205,6 +205,7 @@ Land the knowledge-base ingestion + pgvector retrieval path with role-scoped fil
 - **URL/web crawling ingester** — explicitly out of scope per `PROJECT.md`.
 - **Auto-ingest of host entity records into the vector store** — explicitly out of scope per `PROJECT.md`; `DataManager` remains source of truth for structured data.
 - **PII redaction / content ACL beyond role tagging** — not modelled; revisit when a host surfaces a concrete scrubbing requirement.
+- **D-19 UUIDv5 synthetic IDs for SPI-ingested docs** — deferred from Phase 5 per checker iteration 1 review. The D-19 decision (stable UUIDv5 keys so ingester re-runs update rather than duplicate) requires extending `KnowledgeDocumentUploadService` with an id-aware upsert overload + UUIDv5 helper; out of scope for Phase 5 plan bandwidth. In v1, re-running a CustomIngester creates duplicate `AiKnowledgeDocument` rows; operator workaround is delete-then-reingest. Revisit when a host surfaces a concrete ingester-rerun use case.
 - **Partial-ingestion resume semantics** — D-14 is doc-level atomic; resume deferred to avoid "half-indexed document" retrieval footguns.
 - **Stale-chunk admin banner UI** — metadata supports it (D-03) but presentation is Phase 7.
 - **Dimension migration tooling** — v1 pins 1536 (D-01); larger/smaller dimensions require DDL change + full reingest, deferred until a concrete embedding-model upgrade drives it.
