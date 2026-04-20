@@ -29,5 +29,6 @@
     <include file="/com/vn/agent/liquibase/changelog/050-ai-knowledge-document.xml"/>
     <include file="/com/vn/agent/liquibase/changelog/060-ai-chat-memory.xml"/>
     <include file="/com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml"/>
+    <include file="/com/vn/agent/liquibase/changelog/080-ai-tool-call-audit-runid.xml"/>
 
 </databaseChangeLog>

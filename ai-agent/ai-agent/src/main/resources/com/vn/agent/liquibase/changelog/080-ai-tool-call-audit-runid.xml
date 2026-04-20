@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- Phase 4 (D-12): runId threads pre/post chat rows AND every tool-call row of the same
+         AskService.ask() invocation. KIND discriminates CHAT-level vs TOOL-level rows.
+         PHASE discriminates PRE vs POST. PROMPT_HASH = SHA-256 hex of user message text.
+         ERROR_CLASS = simple class name of any thrown Throwable. -->
+
+    <changeSet id="1" author="ai-agent">
+        <addColumn tableName="AI_AGENT_TOOL_CALL_AUDIT">
+            <column name="RUN_ID" type="${uuid.type}"/>
+            <column name="KIND" type="varchar(8)"/>
+            <column name="PHASE" type="varchar(8)"/>
+            <column name="PROMPT_HASH" type="varchar(64)"/>
+            <column name="ERROR_CLASS" type="varchar(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createIndex indexName="IDX_AI_AGENT_TOOL_CALL_AUDIT__ON_RUN_ID"
+                     tableName="AI_AGENT_TOOL_CALL_AUDIT">
+            <column name="RUN_ID"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
