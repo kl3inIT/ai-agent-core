@@ -8,6 +8,7 @@ import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -26,6 +27,10 @@ import org.springframework.core.Ordered;
  *       PRE/POST audit rows correlated by runId.</li>
  *   <li>{@link MessageChatMemoryAdvisor} at {@code HIGHEST_PRECEDENCE + 200} — uses
  *       {@code .order(int)} setter on its builder.</li>
+ *   <li>{@link RetrievalAugmentationAdvisor} at {@code HIGHEST_PRECEDENCE + 250} — built by
+ *       {@code RetrievalAugmentationAdvisorFactory}; per-request role-scoped retrieval filter is
+ *       supplied by {@code DefaultChatServiceImpl} via the
+ *       {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param.</li>
  *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300} with internal memory disabled
  *       via {@code .disableMemory()}; order setter on this builder is named
  *       {@code .advisorOrder(int)} (different from MessageChatMemoryAdvisor).</li>
@@ -39,7 +44,8 @@ public class ChatClientFactory {
                                         ChatMemory chatMemory,
                                         AuditAdvisor auditAdvisor,
                                         AiParametersResolver parametersResolver,
-                                        ToolCallingManager toolCallingManager) {
+                                        ToolCallingManager toolCallingManager,
+                                        RetrievalAugmentationAdvisor ragAdvisor) {
         AiParameters active = parametersResolver.resolveActive();
         String systemPrompt = parametersResolver.effectiveSystemPrompt(active);
 
@@ -55,7 +61,7 @@ public class ChatClientFactory {
 
         return ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt != null ? systemPrompt : AiAgentDefaultsProperties.FALLBACK_SYSTEM_PROMPT)
-                .defaultAdvisors(auditAdvisor, memoryAdvisor, toolCallAdvisor)
+                .defaultAdvisors(auditAdvisor, memoryAdvisor, ragAdvisor, toolCallAdvisor)
                 .build();
     }
 }

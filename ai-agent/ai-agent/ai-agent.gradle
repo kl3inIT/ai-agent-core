@@ -26,6 +26,13 @@ dependencies {
     api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4'
     implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.4'
 
+    // Plan 05-02 (RAG-04): RetrievalAugmentationAdvisor + VectorStoreDocumentRetriever
+    // live in spring-ai-rag (aligned to Spring AI 1.1.4 BOM — version 2.0.0-M2 per
+    // BOM resolution). Declared at `api` scope because RetrievalAugmentationAdvisorFactory
+    // exposes RetrievalAugmentationAdvisor as a public @Bean and ChatClientFactory accepts
+    // it as a parameter — both are visible to the ai-agent-starter module.
+    api 'org.springframework.ai:spring-ai-rag'
+
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
