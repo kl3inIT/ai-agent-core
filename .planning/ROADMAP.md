@@ -195,6 +195,15 @@ Plans:
 
 **Needs research phase:** YES — verify `QuestionAnswerAdvisor` vs `RetrievalAugmentationAdvisor` in M4; confirm `FILTER_EXPRESSION` API shape.
 
+**Plans:** 5 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — pgvector + EmbeddingModel bean wiring + config props + bean-collision test (RAG-02)
+- [ ] 05-02-PLAN.md — RetrievalFilterBuilder + RetrievalAugmentationAdvisor + DefaultChatServiceImpl per-request FILTER_EXPRESSION (RAG-04, RAG-05)
+- [ ] 05-03-PLAN.md — Ingestion pipeline: IngestionStatusWriter, CancellationRegistry, AsyncIngestionWorker, MdcPropagatingTaskDecorator, aiAgentIngestExecutor (RAG-01, RAG-03)
+- [ ] 05-04-PLAN.md — Services + SPI: KnowledgeDocumentUploadService, KnowledgeDocumentService delete/reingest, IngesterManager, ClasspathMarkdownIngester, i18n (RAG-06, RAG-07, RAG-08, SPI-07)
+- [ ] 05-05-PLAN.md — Integration tests: upload→READY, role-scoped retrieval, atomic delete, fail-closed, retry+failure, FILTER_EXPRESSION contract, sample ingester default-off (RAG-01, RAG-03..08)
+
 ---
 
 ### Phase 6 — Parameters, Structured Output & Guardrails
