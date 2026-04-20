@@ -75,7 +75,12 @@ configurations.implementation {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'live'
+        // Default test task excludes:
+        //  - @Tag("live")   — requires OPENROUTER_API_KEY (see liveTest task)
+        //  - @Tag("rag-it") — requires Docker for Testcontainers pgvector (see integrationTest)
+        // Integration tests are additionally gated at class level by an isDockerAvailable()
+        // condition so sandboxed / forensic runs skip them cleanly without stack traces.
+        excludeTags 'live', 'rag-it'
     }
 }
 
@@ -84,6 +89,17 @@ tasks.register('liveTest', Test) {
     group = 'verification'
     useJUnitPlatform {
         includeTags 'live'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Run @Tag("rag-it") Phase-5 integration tests (require Docker for Testcontainers pgvector).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'rag-it'
     }
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
