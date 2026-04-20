@@ -137,11 +137,14 @@ public class AuditAdvisor implements CallAdvisor {
             if (text == null && !instructions.isEmpty()) {
                 text = instructions.get(instructions.size() - 1).getText();
             }
+            // LO-03: never fall back to Prompt#toString() — it embeds framework metadata
+            // (options, tool-call results) and would break the "same user text => same hash"
+            // invariant. Zero instructions => hash over the empty string.
             if (text == null) {
-                text = request.prompt().toString();
+                text = "";
             }
         } catch (RuntimeException e) {
-            text = String.valueOf(request.prompt());
+            text = "";
         }
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
