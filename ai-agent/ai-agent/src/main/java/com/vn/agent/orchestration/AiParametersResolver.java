@@ -50,14 +50,10 @@ public class AiParametersResolver {
         AiParameters synthetic = metadata.create(AiParameters.class);
         synthetic.setProfileName("__defaults__");
         synthetic.setActive(Boolean.TRUE);
-        // Encode defaults as YAML so consumers' single accessor path (effectiveXxx) works uniformly.
-        StringBuilder yaml = new StringBuilder();
-        if (defaults.model() != null) yaml.append("model: ").append(defaults.model()).append('\n');
-        if (defaults.temperature() != null) yaml.append("temperature: ").append(defaults.temperature()).append('\n');
-        if (defaults.topP() != null) yaml.append("topP: ").append(defaults.topP()).append('\n');
-        if (defaults.maxTokens() != null) yaml.append("maxTokens: ").append(defaults.maxTokens()).append('\n');
-        if (defaults.systemPrompt() != null) yaml.append("systemPrompt: ").append(defaults.systemPrompt()).append('\n');
-        synthetic.setBodyYaml(yaml.toString());
+        // Do NOT encode defaults as a synthetic YAML blob — string concatenation cannot safely
+        // quote arbitrary operator-supplied values (MD-02). The effective* accessors fall through
+        // to {@link AiAgentDefaultsProperties} directly when bodyYaml is null/blank.
+        synthetic.setBodyYaml(null);
         return synthetic;
     }
 
@@ -75,8 +71,14 @@ public class AiParametersResolver {
     }
 
     public String effectiveModel(AiParameters params) {
-        Object v = parseBody(params).get("model");
-        String model = v != null ? String.valueOf(v) : defaults.model();
+        String body = params.getBodyYaml();
+        String model;
+        if (body != null && !body.isBlank()) {
+            Object v = parseBody(params).get("model");
+            model = v != null ? String.valueOf(v) : defaults.model();
+        } else {
+            model = defaults.model();
+        }
         if (model == null || !model.contains("/")) {
             throw new IllegalStateException("Model id must follow OpenRouter slug format provider/model: " + model);
         }
@@ -84,22 +86,38 @@ public class AiParametersResolver {
     }
 
     public Double effectiveTemperature(AiParameters params) {
-        Object v = parseBody(params).get("temperature");
-        return v instanceof Number n ? n.doubleValue() : defaults.temperature();
+        String body = params.getBodyYaml();
+        if (body != null && !body.isBlank()) {
+            Object v = parseBody(params).get("temperature");
+            if (v instanceof Number n) return n.doubleValue();
+        }
+        return defaults.temperature();
     }
 
     public Double effectiveTopP(AiParameters params) {
-        Object v = parseBody(params).get("topP");
-        return v instanceof Number n ? n.doubleValue() : defaults.topP();
+        String body = params.getBodyYaml();
+        if (body != null && !body.isBlank()) {
+            Object v = parseBody(params).get("topP");
+            if (v instanceof Number n) return n.doubleValue();
+        }
+        return defaults.topP();
     }
 
     public Integer effectiveMaxTokens(AiParameters params) {
-        Object v = parseBody(params).get("maxTokens");
-        return v instanceof Number n ? n.intValue() : defaults.maxTokens();
+        String body = params.getBodyYaml();
+        if (body != null && !body.isBlank()) {
+            Object v = parseBody(params).get("maxTokens");
+            if (v instanceof Number n) return n.intValue();
+        }
+        return defaults.maxTokens();
     }
 
     public String effectiveSystemPrompt(AiParameters params) {
-        Object v = parseBody(params).get("systemPrompt");
-        return v != null ? String.valueOf(v) : defaults.systemPrompt();
+        String body = params.getBodyYaml();
+        if (body != null && !body.isBlank()) {
+            Object v = parseBody(params).get("systemPrompt");
+            if (v != null) return String.valueOf(v);
+        }
+        return defaults.systemPrompt();
     }
 }
