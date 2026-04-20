@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 04
-last_updated: "2026-04-20T05:50:00.000Z"
-last_activity: 2026-04-20 — Plan 04-05 complete (Phase 4 verification suite — 9 test classes + StubChatModelConfiguration: AdvisorOrderStructuralTest reflective advisor-order guard HIGHEST_PRECEDENCE→MIN+200→MIN+300, OrchestrationIntegrationTest happy-path + two-turn audit pairs, OwnershipOpacityTest D-09 identical-message proof, AuditDurabilityTest REQUIRES_NEW survives outer rollback, DualLayerParityTest JDBC↔AiMessage row parity, AuditListenerFanOutTest @ConditionalOnProperty-gated TwoListeners, AuditWriterFieldMappingTest W14/B1 reflective guard, ChatServiceLiveSemanticTest @Tag('live') double-gated). Rule 1 fixes: ProjectingChatMemoryRepository.saveAll now delete-then-insert mirroring JDBC semantics (was appending, broke DualLayerParity); AuditListenerFanOutTest nested config gated so AIConfiguration @ComponentScan does not leak listeners. Default ./gradlew :ai-agent:ai-agent:test PASS (18 test classes, 0 failures). Next: Phase 4 verification + merge.
+status: Ready to execute
+last_updated: "2026-04-20T12:12:21.375Z"
+last_activity: 2026-04-20
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 5
+  completed_phases: 4
+  total_plans: 30
+  completed_plans: 28
+  percent: 93
 ---
 
 # Project State
@@ -33,7 +33,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
 | 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
-| 5 | RAG Layer | Not started |
+| 5 | RAG Layer | In Progress (3/5 plans — 05-01/05-02/05-03 complete) |
 | 6 | Parameters, Structured Output & Guardrails | Not started |
 | 7 | Flow UI | Not started |
 | 8 | Integration Hardening & Release Readiness | Not started |
@@ -98,6 +98,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 03-01: ✅ Metadata core — 6 files under `com.vn.agent.metadata`: `AiSchema`, `AiEntityInfo`, `AiAttributeInfo`, `UserEditableStringIndex` (DTOs); `MetamodelScanner` (TOOL-01, `ApplicationReadyEvent`, MetadataTools.isJpa-backed D-13 index); `EffectiveSchemaComputer` (TOOL-02, stateless AccessManager filter + per-request MessageTools labels). Commits `fec54d5`, `0856763`, `00960b7`. Deviation: plan said `io.jmix.core.security.AccessManager`; Jmix 2.8 ships it at `io.jmix.core.AccessManager` (Rule 1 bug-fix applied at Task 3 write time).
 - 03-02: ✅ Filter DSL + tool primitives — 10 files under `com.vn.agent.filter` and `com.vn.agent.tools`: sealed `FilterNode` (+ `AndNode`/`OrNode`/`NotNode`/`LeafNode`); `LiteralCoercer` (strict fail-closed D-07); `FilterDslMapper` (TOOL-05, DeMorgan NOT, 13 D-05 operators, depth cap + per-hop AccessManager from D-08); `ToolLimits` (TOOL-06 DEFAULT_LIMIT=20/MAX_LIMIT=100/DEFAULT_MAX_FILTER_DEPTH=3); `ToolErrorDto` + `ToolUserError`. `module.properties` gains `jmix.ai-agent.tools.max-filter-depth = 3`. Commits `998c500`, `c08d8d3`, `542891b`. Deviations: (1) Jmix 2.8 op constant is `NOT_CONTAINS`, not `DOES_NOT_CONTAIN` — mapper accepts both DSL spellings, emits real Jmix constant (Rule 1 bug); (2) renamed a Javadoc mention of `JpqlCondition` to `raw-JPQL` to satisfy acceptance grep (Rule 3).
 - 03-03: ✅ LLM-facing tool surface — 4 files added / 2 modified: `ToolResultFormatter` (`<data>` wrap + literal-delimiter HTML escape, D-13/Pitfall 4), `BuiltInDataTools` (single @Component, six @Tool methods — `list_entities`/`describe_entity`/`find_records`/`count_records`/`get_record`/`get_related_records` — all read-only via `DataManager.load`/`.getCount`, `FetchPlan.INSTANCE_NAME`, `ToolLimits.clampLimit`), `AgentToolCallbacks` (per-request `ToolCallback[]` via `MethodToolCallbackProvider` — Phase 4 entry point), `AiToolsAutoConfiguration` (`@AutoConfigureAfter` AI + SPI defaults). `AutoConfiguration.imports` now 3 lines. `ai-agent.gradle` adds `org.ow2.asm:asm:9.7` testImplementation for Plan 04 D-16. Commits `d4f3e98`, `bfd76c9`, `ece124c`. Deviations: (1) Spring AI 1.1.4 has no `ToolCallbacks.from(bean)` — replaced with `MethodToolCallbackProvider.builder().toolObjects(bean).build().getToolCallbacks()` (Rule 1 bug in plan interfaces); (2) `LoadContext.createQuery(...)` is not a static factory — used `new LoadContext.Query(...)` (Rule 1 bug in plan interfaces).
+
 ## Phase 04 Progress
 
 - 04-01: ✅ AiToolCallAudit runId/kind/phase/promptHash/errorClass schema + entity + EN/VI i18n. Commits 8181ff4, 1789b7e.
@@ -126,6 +127,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-20 13:30 +07:00 — Plan 04-03 complete (audit pipeline: ToolCallAdvisorBuilderProbe + AuditListenerFanOut + AuditWriter REQUIRES_NEW + AuditAdvisor HIGHEST_PRECEDENCE + ToolCallbackAuditDecorator; EN/VI AuditWriteFailed i18n key; compileJava green). Commits 463115a, 13939cd, 70eb934. Next: 04-04.
 - 2026-04-20 12:22 +07:00 — Plan 04-04 complete (orchestration wiring: ChatResponseDto + ConversationGateway + ChatClientFactory + ProjectingChatMemoryRepository; DefaultChatServiceImpl full rewrite with B8 runId advisor context + B-NEW-1 text baseline; AgentToolCallbacks wraps every callback in ToolCallbackAuditDecorator; AIAutoConfiguration drops ChatClient @Bean moves to ChatClientFactory; adds JDBC chat-memory deps + InvalidUserId EN/VI; compileJava green). Commits 8ceeee5, e353bf3, ef013e4. Next: 04-05 (integration tests + evaluation).
 - 2026-04-20 12:50 +07:00 — Plan 04-05 complete (Phase 4 verification suite: StubChatModelConfiguration + 8 test classes covering advisor order, D-08 parity, D-09 opacity, AUD-02 durability, SPI-06/D-13 fan-out, W14/B1 field mapping, TEST-05 live wire). Rule 1 fix to ProjectingChatMemoryRepository (delete-then-insert) + test-isolation fix to AuditListenerFanOutTest. ./gradlew :ai-agent:ai-agent:test PASS (18 suites, 0 failures). Commits 2edbc34, a7810a4, 866f62e, bcfc3c7. **Phase 4 complete (5/5 plans).** Next: Phase 4 merge + Phase 5 (RAG layer).
+- 2026-04-20 14:30 +07:00 — Plan 05-03 complete (async ingestion pipeline: IngestionStatusWriter REQUIRES_NEW + CancellationRegistry + MdcPropagatingTaskDecorator + aiAgentIngestExecutor bean + AsyncIngestionWorker Tika→TokenTextSplitter→metadata-enriched VectorStore.add; CANCELLED enum added; Option A flattened role_<code>=true flags; spring.ai.retry.* defaults wired). 18 unit tests green. Commits f316f77, b75b443, 97d60f3. Decisions: REQUIRES_NEW writer isolates status commits from @Async (D-14); built-in spring.ai.retry.* replaces spring-retry (D-17); flattened role flags portable across vector stores; CANCELLED enum value for D-20 terminal state. Next: 05-04 (knowledge-document upload service) or 05-05 (integration tests).
 
 ### Quick Tasks Completed
 
@@ -133,4 +135,4 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 |---|-------------|------|--------|--------|-----------|
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 
-**Last activity:** 2026-04-20 — Plan 04-05 complete (Phase 4 verification suite, 9 test classes, ./gradlew :ai-agent:ai-agent:test green). Phase 4 complete.
+**Last activity:** 2026-04-20

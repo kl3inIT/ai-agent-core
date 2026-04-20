@@ -54,9 +54,9 @@
 
 ### RAG (Knowledge Base)
 
-- [ ] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
+- [x] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
 - [ ] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
-- [ ] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
+- [x] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
 - [ ] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
 - [ ] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
 - [ ] **RAG-06**: Untagged documents refused for non-admin users (fail closed)
