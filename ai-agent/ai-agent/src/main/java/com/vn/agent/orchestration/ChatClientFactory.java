@@ -19,7 +19,7 @@ import org.springframework.core.Ordered;
  * {@code .toolCallbacks()}, {@code .advisors()}, and {@code .options()}.
  *
  * <p>Advisor ordering (D-02, verified via {@code javap} probes against
- * {@code spring-ai-client-chat-1.1.4.jar} — see {@code ToolCallAdvisorBuilderProbe}):</p>
+ * {@code spring-ai-client-chat-1.1.4.jar} — see {@code ToolCallAdvisorBuilderConstants}):</p>
  *
  * <ol>
  *   <li>{@link AuditAdvisor} at {@code Ordered.HIGHEST_PRECEDENCE} — outermost; records chat-level

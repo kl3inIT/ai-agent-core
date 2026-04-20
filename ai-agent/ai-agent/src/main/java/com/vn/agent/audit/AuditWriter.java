@@ -29,7 +29,7 @@ import java.util.UUID;
  * would bypass the proxy and silently dissolve REQUIRES_NEW.
  *
  * <p>D-14 afterCommit fan-out: {@link #writeToolCall} registers a
- * {@link TransactionSynchronization} so {@link AuditListenerFanOut#fireToolCallAudited(UUID)}
+ * {@link TransactionSynchronization} so {@link AuditListenerDispatcher#dispatchToolCallAudited(UUID)}
  * runs only after the REQUIRES_NEW transaction commits — listeners observe rows that are
  * already durable.
  */
@@ -43,12 +43,12 @@ public class AuditWriter {
 
     private final DataManager dataManager;
     private final Metadata metadata;
-    private final AuditListenerFanOut fanOut;
+    private final AuditListenerDispatcher dispatcher;
 
-    public AuditWriter(DataManager dataManager, Metadata metadata, AuditListenerFanOut fanOut) {
+    public AuditWriter(DataManager dataManager, Metadata metadata, AuditListenerDispatcher dispatcher) {
         this.dataManager = dataManager;
         this.metadata = metadata;
-        this.fanOut = fanOut;
+        this.dispatcher = dispatcher;
     }
 
     /**
@@ -156,13 +156,13 @@ public class AuditWriter {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    fanOut.fireToolCallAudited(auditId);
+                    dispatcher.dispatchToolCallAudited(auditId);
                 }
             });
         } else {
             // Defensive — REQUIRES_NEW should always have an active synchronization here.
             log.warn("No active synchronization for runId={} auditId={}; firing inline", runId, auditId);
-            fanOut.fireToolCallAudited(auditId);
+            dispatcher.dispatchToolCallAudited(auditId);
         }
         return auditId;
     }

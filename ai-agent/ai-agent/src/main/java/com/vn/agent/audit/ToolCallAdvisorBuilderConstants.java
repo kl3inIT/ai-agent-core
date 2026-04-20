@@ -10,7 +10,7 @@ package com.vn.agent.audit;
  * as a compile-time failure rather than a silent change.
  */
 @SuppressWarnings("unused") // Symbolic drift-detection constants (see class javadoc).
-public final class ToolCallAdvisorBuilderProbe {
+public final class ToolCallAdvisorBuilderConstants {
 
     /** Verified FQN of ToolCallAdvisor in 1.1.4. */
     public static final String TOOL_CALL_ADVISOR_FQN =
@@ -31,5 +31,5 @@ public final class ToolCallAdvisorBuilderProbe {
     //   public T advisorOrder(int);
     //   public org.springframework.ai.chat.client.advisor.ToolCallAdvisor build();
 
-    private ToolCallAdvisorBuilderProbe() {}
+    private ToolCallAdvisorBuilderConstants() {}
 }

@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @Import(StubChatModelConfiguration.class)
 @TestPropertySource(properties = "ai-agent.test.fanout-listeners=true")
-class AuditListenerFanOutTest {
+class AuditListenerDispatcherTest {
 
     @Autowired AuditWriter auditWriter;
     @Autowired PlatformTransactionManager transactionManager;

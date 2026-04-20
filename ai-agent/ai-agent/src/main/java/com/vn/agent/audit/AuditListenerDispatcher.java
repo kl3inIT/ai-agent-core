@@ -19,13 +19,13 @@ import java.util.UUID;
  * {@code List} (empty list when none registered — no NPE risk).
  */
 @Component
-public class AuditListenerFanOut {
+public class AuditListenerDispatcher {
 
-    private static final Logger log = LoggerFactory.getLogger(AuditListenerFanOut.class);
+    private static final Logger log = LoggerFactory.getLogger(AuditListenerDispatcher.class);
 
     private final List<AuditListener> listeners;
 
-    public AuditListenerFanOut(List<AuditListener> listeners) {
+    public AuditListenerDispatcher(List<AuditListener> listeners) {
         this.listeners = listeners;
     }
 
@@ -33,7 +33,7 @@ public class AuditListenerFanOut {
      * Notify every registered {@link AuditListener} that a tool-call audit row has been written.
      * Any {@link Throwable} from a listener is caught and logged — it never propagates.
      */
-    public void fireToolCallAudited(UUID auditId) {
+    public void dispatchToolCallAudited(UUID auditId) {
         for (AuditListener listener : listeners) {
             try {
                 listener.onToolCallAudited(auditId);

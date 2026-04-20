@@ -2,7 +2,7 @@ package com.vn.agent.orchestration;
 
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.audit.AuditAdvisor;
-import com.vn.agent.audit.ToolCallAdvisorBuilderProbe;
+import com.vn.agent.audit.ToolCallAdvisorBuilderConstants;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
@@ -80,14 +80,14 @@ class AdvisorOrderStructuralTest {
         assertThat(tool.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 300);
 
         // Reflectively assert the disabled internal-memory flag on ToolCallAdvisor. Field name is
-        // captured in ToolCallAdvisorBuilderProbe (OQ-1 closure constants).
+        // captured in ToolCallAdvisorBuilderConstants (OQ-1 closure constants).
         Field internalFlag = tool.getClass().getDeclaredField(
-                ToolCallAdvisorBuilderProbe.INTERNAL_FLAG_FIELD);
+                ToolCallAdvisorBuilderConstants.INTERNAL_FLAG_FIELD);
         internalFlag.setAccessible(true);
         Object value = internalFlag.get(tool);
         assertThat(value)
                 .as("ToolCallAdvisor.%s must be false after .disableMemory()",
-                        ToolCallAdvisorBuilderProbe.INTERNAL_FLAG_FIELD)
+                        ToolCallAdvisorBuilderConstants.INTERNAL_FLAG_FIELD)
                 .isEqualTo(Boolean.FALSE);
     }
 

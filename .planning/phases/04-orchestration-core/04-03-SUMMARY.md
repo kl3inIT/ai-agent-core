@@ -11,10 +11,10 @@ dependency-graph:
     - Spring AI 1.1.4 CallAdvisor + ToolCallback interfaces
   provides:
     - com.vn.agent.audit.AuditWriter (sole @Transactional(REQUIRES_NEW) surface)
-    - com.vn.agent.audit.AuditListenerFanOut (per-listener try/catch fan-out)
+    - com.vn.agent.audit.AuditListenerDispatcher (per-listener try/catch fan-out)
     - com.vn.agent.audit.AuditAdvisor (outermost CallAdvisor at HIGHEST_PRECEDENCE)
     - com.vn.agent.audit.ToolCallbackAuditDecorator (wraps ToolCallback; PRE/POST rows)
-    - com.vn.agent.audit.ToolCallAdvisorBuilderProbe (OQ-1 closure constants)
+    - com.vn.agent.audit.ToolCallAdvisorBuilderConstants (OQ-1 closure constants)
     - EN/VI i18n key com.vn.agent.audit/AuditWriteFailed
   affects:
     - Plan 04-04 (ChatClientFactory wires AuditAdvisor into defaultAdvisors; AgentToolCallbacks wraps each ToolCallback with ToolCallbackAuditDecorator)
