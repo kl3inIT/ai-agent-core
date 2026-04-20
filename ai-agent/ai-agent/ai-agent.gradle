@@ -16,7 +16,14 @@ dependencies {
     // spring-ai-starter-model-openai here — Phase 4 brings it transitively via
     // spring-ai-client-chat. Do NOT add spring-retry — RESEARCH D-16 override uses
     // built-in spring.ai.retry.* instead of hand-rolled @Retryable.
-    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4'
+    //
+    // pgvector is declared at `api` scope because AIAutoConfiguration (in the sibling
+    // ai-agent-starter module, which declares `api project(':ai-agent')`) references
+    // VectorStore / PgVectorStore types on its public API surface (bean signatures).
+    // Without `api`, those types would not be visible on the starter's compile
+    // classpath. Rule 3 deviation recorded in 05-01-SUMMARY.md. Tika stays at
+    // `implementation` scope because it's only referenced from internal workers.
+    api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4'
     implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.4'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
