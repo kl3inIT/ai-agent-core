@@ -105,3 +105,30 @@ tasks.register('integrationTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
     shouldRunAfter tasks.named('test')
 }
+
+// WR-03: wire integrationTest into `check` when Docker is available so the phase-5
+// contracts (upload → READY, role-scoped retrieval, atomic delete, failure cleanup)
+// are part of the normal verification path on CI and any developer machine that has
+// Docker running. Gating on isDockerAvailable keeps ./gradlew check green on boxes
+// that cannot run Testcontainers without adding an opt-in env var.
+//
+// CI MUST run ./gradlew check (or ./gradlew integrationTest explicitly) on a host
+// with Docker so pgvector-backed assertions gate every PR.
+tasks.named('check') {
+    if (isDockerAvailableForCheck()) {
+        dependsOn tasks.named('integrationTest')
+    } else {
+        logger.lifecycle("[ai-agent] Docker not detected — skipping integrationTest in `check`. " +
+                "Run `./gradlew integrationTest` on a host with Docker (required before merge).")
+    }
+}
+
+static boolean isDockerAvailableForCheck() {
+    try {
+        Process p = new ProcessBuilder('docker', 'info').redirectErrorStream(true).start()
+        boolean done = p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+        return done && p.exitValue() == 0
+    } catch (Throwable ignored) {
+        return false
+    }
+}
