@@ -63,6 +63,21 @@ public class AiToolCallAudit {
     @Column(name = "FINISHED_AT")
     private OffsetDateTime finishedAt;
 
+    @Column(name = "RUN_ID")
+    private UUID runId;
+
+    @Column(name = "KIND", length = 8)
+    private String kind;
+
+    @Column(name = "PHASE", length = 8)
+    private String phase;
+
+    @Column(name = "PROMPT_HASH", length = 64)
+    private String promptHash;
+
+    @Column(name = "ERROR_CLASS", length = 255)
+    private String errorClass;
+
     @InstanceName
     @DependsOnProperties({"toolName", "outcome"})
     public String getDisplayName() {
@@ -94,4 +109,14 @@ public class AiToolCallAudit {
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
     public OffsetDateTime getFinishedAt() { return finishedAt; }
     public void setFinishedAt(OffsetDateTime finishedAt) { this.finishedAt = finishedAt; }
+    public UUID getRunId() { return runId; }
+    public void setRunId(UUID runId) { this.runId = runId; }
+    public String getKind() { return kind; }
+    public void setKind(String kind) { this.kind = kind; }
+    public String getPhase() { return phase; }
+    public void setPhase(String phase) { this.phase = phase; }
+    public String getPromptHash() { return promptHash; }
+    public void setPromptHash(String promptHash) { this.promptHash = promptHash; }
+    public String getErrorClass() { return errorClass; }
+    public void setErrorClass(String errorClass) { this.errorClass = errorClass; }
 }
