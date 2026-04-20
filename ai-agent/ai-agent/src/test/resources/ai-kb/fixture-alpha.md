@@ -1,23 +1,32 @@
-# Fixture Alpha
+# Fixture Alpha — Alpha Corp Onboarding Checklist
 
-This document is a deterministic fixture used by AsyncIngestionWorkerTest to exercise
-the Tika → splitter → metadata-enrichment → VectorStore pipeline without requiring a
-live embedding provider.
+This deterministic fixture is used by the Phase 5 RAG integration tests to exercise
+the Tika → TokenTextSplitter → embedding → VectorStore.add pipeline. It is synthetic
+content (Alpha Corp is not a real organisation) and contains no PII.
 
-## Section One
+## Day One
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+New hires at Alpha Corp complete orientation on their first day. This includes a
+welcome session with the HR team, a tour of the office, a review of the employee
+handbook, and an introduction to the benefits portal. All onboarding materials are
+delivered through the internal learning platform with role-scoped access.
 
-## Section Two
+## Week One Checklist
 
-Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-culpa qui officia deserunt mollit anim id est laborum.
+During week one, new hires complete compliance training, set up their development
+environment, and shadow a senior team member for at least three working days.
+Managers are expected to schedule a thirty-minute one-on-one at the end of week one
+to gather feedback and adjust the ramp plan if necessary.
 
-## Section Three
+## Month One Goals
 
-Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium
-doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore
-veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+By the end of month one, new hires should have completed all mandatory training
+modules, delivered their first small code change to production, and presented a
+brief onboarding retrospective to their team. Retrospectives feed directly into
+improvements for the next cohort of Alpha Corp employees.
+
+## Escalation
+
+If any onboarding step cannot be completed on time, the new hire and their manager
+should jointly file a short note in the onboarding tracker. HR business partners
+review the tracker weekly and coordinate follow-up with leadership as needed.

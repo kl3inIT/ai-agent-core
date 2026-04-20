@@ -1,0 +1,34 @@
+Fixture Epsilon — Epsilon Operational Runbook
+
+This plain-text fixture exercises the Tika TXT path for RAG-01. It is deterministic
+synthetic content (Epsilon is not a real service) and contains no secrets.
+
+Service Overview
+
+The Epsilon service is a request-driven batch processor that consumes work items
+from a durable queue and writes results to object storage. It runs on a horizontally
+scaled worker pool behind a health-checked load balancer. Operational ownership
+belongs to the platform reliability team, with secondary ownership from the data
+engineering team for format and schema concerns.
+
+Routine Health Checks
+
+Operators inspect the service dashboard at the start of every shift. Key signals
+include queue depth, worker saturation, error rate over the last fifteen minutes,
+and output freshness. Any signal above its yellow threshold for more than five
+minutes is escalated to the on-call engineer for investigation.
+
+Incident Response
+
+When the queue depth exceeds the critical threshold or the error rate exceeds two
+percent, the on-call engineer begins the standard triage runbook. Step one is to
+confirm that upstream producers have not accidentally flooded the queue. Step two
+is to check for a recent deploy. Step three is to scale the worker pool while root
+cause analysis continues in a dedicated incident channel.
+
+Post-Incident Review
+
+Every Sev1 or Sev2 incident generates a timeline document and a review meeting
+within five working days. Findings are tracked in the shared action tracker with
+named owners and target dates. The review is blameless and focused on systemic
+improvement rather than individual conduct.
