@@ -66,6 +66,9 @@ public class AuditWriter {
             AiConversation conv = dataManager.load(AiConversation.class).id(conversationId).optional().orElse(null);
             if (conv != null) {
                 row.setConversation(conv);
+            } else {
+                log.warn("writeChatPre: conversation {} not found; row will have null FK (runId={})",
+                        conversationId, runId);
             }
         }
         row.setToolName(CHAT_TOOL_NAME_SENTINEL);      // sentinel — entity @NotNull
@@ -93,6 +96,9 @@ public class AuditWriter {
             AiConversation conv = dataManager.load(AiConversation.class).id(conversationId).optional().orElse(null);
             if (conv != null) {
                 row.setConversation(conv);
+            } else {
+                log.warn("writeChatPost: conversation {} not found; row will have null FK (runId={})",
+                        conversationId, runId);
             }
         }
         row.setToolName(CHAT_TOOL_NAME_SENTINEL);
@@ -137,6 +143,9 @@ public class AuditWriter {
             AiConversation conv = dataManager.load(AiConversation.class).id(conversationId).optional().orElse(null);
             if (conv != null) {
                 row.setConversation(conv);
+            } else {
+                log.warn("writeToolCall: conversation {} not found; row will have null FK (runId={})",
+                        conversationId, runId);
             }
         }
         dataManager.save(row);
