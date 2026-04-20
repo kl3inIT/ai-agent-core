@@ -33,7 +33,7 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     static final int ARGUMENTS_JSON_MAX_CHARS = 4096;
 
     /** Suffix appended when a captured value is truncated, so the truncation is observable. */
-    static final String TRUNCATION_SUFFIX = "\u2026[truncated]";
+    static final String TRUNCATION_SUFFIX = "…[truncated]";
 
     private static String cap(String value, int maxChars) {
         if (value == null || value.length() <= maxChars) {
