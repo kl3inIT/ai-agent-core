@@ -55,7 +55,7 @@
 ### RAG (Knowledge Base)
 
 - [x] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
-- [ ] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
+- [x] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
 - [x] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
 - [x] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
 - [x] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
@@ -87,7 +87,7 @@
 - [ ] **SPI-03**: `PromptContextContributor` — augment system prompt with host-specific instructions
 - [ ] **SPI-05**: `ToolGuard` — veto tool calls
 - [ ] **SPI-06**: `AuditListener` — observe audit writes for side-channels
-- [ ] **SPI-07**: `CustomIngester` — plug in additional KB sources
+- [x] **SPI-07**: `CustomIngester` — plug in additional KB sources
 
 > Note: SPI-04 (`EntityExposurePolicy`) dropped per D-10. SPI-08 (per-SPI integration test with custom host impl) dropped per D-10; each SPI has a default no-op bean and is smoke-tested via the Phase 02 foundations boot test asserting defaults auto-wire.
 
