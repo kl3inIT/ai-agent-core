@@ -29,6 +29,19 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     /** Cap on {@code resultSummary} written into the LOB column — keeps rows reasonable. */
     static final int RESULT_SUMMARY_MAX_CHARS = 4096;
 
+    /** Cap on {@code argumentsJson} (model-supplied tool input) written into the LOB column (MD-04). */
+    static final int ARGUMENTS_JSON_MAX_CHARS = 4096;
+
+    /** Suffix appended when a captured value is truncated, so the truncation is observable. */
+    static final String TRUNCATION_SUFFIX = "\u2026[truncated]";
+
+    private static String cap(String value, int maxChars) {
+        if (value == null || value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, maxChars) + TRUNCATION_SUFFIX;
+    }
+
     private final ToolCallback delegate;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
@@ -63,10 +76,12 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
         String toolName = delegate.getToolDefinition().name();
         long startNanos = System.nanoTime();
 
+        String cappedInput = cap(toolInput, ARGUMENTS_JSON_MAX_CHARS);
+
         // PRE row — write eagerly so it survives even if delegate throws AND its tx rolls back.
         try {
             auditWriter.writeToolCall(runId, userUsername, conversationId, toolName,
-                    toolInput, /*resultSummary*/ null, 0L,
+                    cappedInput, /*resultSummary*/ null, 0L,
                     AiToolCallOutcome.SUCCESS,  // sentinel; POST records real outcome
                     /*denialReason*/ null, /*errorClass*/ null, "PRE");
         } catch (Throwable t) {
@@ -90,12 +105,10 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             try {
                 AiToolCallOutcome outcome = success ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
                 String resultSummary = output == null
-                        ? errorMessage
-                        : (output.length() > RESULT_SUMMARY_MAX_CHARS
-                                ? output.substring(0, RESULT_SUMMARY_MAX_CHARS)
-                                : output);
+                        ? cap(errorMessage, RESULT_SUMMARY_MAX_CHARS)
+                        : cap(output, RESULT_SUMMARY_MAX_CHARS);
                 auditWriter.writeToolCall(runId, userUsername, conversationId, toolName,
-                        toolInput, resultSummary, latencyMs, outcome,
+                        cappedInput, resultSummary, latencyMs, outcome,
                         /*denialReason*/ null, errorClass, "POST");
             } catch (Throwable t2) {
                 log.warn("Tool POST audit failed runId={} tool={}", runId, toolName, t2);
