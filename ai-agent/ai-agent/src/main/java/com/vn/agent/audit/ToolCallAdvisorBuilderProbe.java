@@ -9,6 +9,7 @@ package com.vn.agent.audit;
  * {@link #RESOLVED_BUILDER_METHOD} symbolically so any future API drift surfaces
  * as a compile-time failure rather than a silent change.
  */
+@SuppressWarnings("unused") // Symbolic drift-detection constants (see class javadoc).
 public final class ToolCallAdvisorBuilderProbe {
 
     /** Verified FQN of ToolCallAdvisor in 1.1.4. */
