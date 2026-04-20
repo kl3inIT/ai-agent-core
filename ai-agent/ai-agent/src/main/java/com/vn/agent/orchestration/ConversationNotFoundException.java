@@ -16,7 +16,8 @@ import java.util.UUID;
  */
 public class ConversationNotFoundException extends RuntimeException {
 
-    /** i18n key for the user-facing message. */
+    /** i18n key for the user-facing message. Exposed for external i18n consumers. */
+    @SuppressWarnings("unused")
     public static final String MESSAGE_KEY = "com.vn.agent.orchestration/ConversationNotFound";
 
     /** Literal English fallback — also the default used by ConversationGateway tests. */
