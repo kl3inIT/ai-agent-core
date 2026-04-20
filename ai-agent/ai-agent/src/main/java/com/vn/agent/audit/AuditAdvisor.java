@@ -11,6 +11,7 @@ import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.core.Ordered;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -60,6 +61,7 @@ public class AuditAdvisor implements CallAdvisor {
     }
 
     @Override
+    @NonNull
     public String getName() {
         return "AuditAdvisor";
     }
@@ -70,7 +72,8 @@ public class AuditAdvisor implements CallAdvisor {
     }
 
     @Override
-    public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
+    @NonNull
+    public ChatClientResponse adviseCall(@NonNull ChatClientRequest request, @NonNull CallAdvisorChain chain) {
         Map<String, Object> context = request.context();
         Object preAllocated = context.get(RUN_ID_CONTEXT_KEY);
         UUID runId = (preAllocated instanceof UUID uuid) ? uuid : UUID.randomUUID();
@@ -135,7 +138,7 @@ public class AuditAdvisor implements CallAdvisor {
                 }
             }
             if (text == null && !instructions.isEmpty()) {
-                text = instructions.get(instructions.size() - 1).getText();
+                text = instructions.getLast().getText();
             }
             // LO-03: never fall back to Prompt#toString() — it embeds framework metadata
             // (options, tool-call results) and would break the "same user text => same hash"

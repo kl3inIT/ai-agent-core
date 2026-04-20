@@ -2,6 +2,7 @@ package com.vn.agent.rag;
 
 import org.slf4j.MDC;
 import org.springframework.core.task.TaskDecorator;
+import org.springframework.lang.NonNull;
 
 import java.util.Map;
 
@@ -17,7 +18,8 @@ import java.util.Map;
 public class MdcPropagatingTaskDecorator implements TaskDecorator {
 
     @Override
-    public Runnable decorate(Runnable runnable) {
+    @NonNull
+    public Runnable decorate(@NonNull Runnable runnable) {
         Map<String, String> parentMdc = MDC.getCopyOfContextMap();
         return () -> {
             Map<String, String> previous = MDC.getCopyOfContextMap();

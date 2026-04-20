@@ -219,7 +219,7 @@ public class AsyncIngestionWorker {
             return List.of();
         }
         try {
-            List<String> roles = JSON.readValue(json, new TypeReference<List<String>>() {});
+            List<String> roles = JSON.readValue(json, new TypeReference<>() {});
             return roles == null ? List.of() : roles;
         } catch (Exception e) {
             log.warn("Failed to parse allowedRolesJson; treating as empty: {}", json, e);

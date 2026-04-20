@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -88,7 +89,7 @@ public class OrderSummaryToolContributor implements ToolContributor {
 
         BigDecimal grand = orders.stream()
                 .map(Order::getTotalAmount)
-                .filter(v -> v != null)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<String, Object> out = new LinkedHashMap<>();

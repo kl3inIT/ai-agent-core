@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.UUID;
@@ -55,17 +56,20 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     }
 
     @Override
+    @NonNull
     public ToolDefinition getToolDefinition() {
         return delegate.getToolDefinition();
     }
 
     @Override
-    public String call(String toolInput) {
+    @NonNull
+    public String call(@NonNull String toolInput) {
         return callInternal(toolInput, null, false);
     }
 
     @Override
-    public String call(String toolInput, ToolContext toolContext) {
+    @NonNull
+    public String call(@NonNull String toolInput, ToolContext toolContext) {
         return callInternal(toolInput, toolContext, true);
     }
 

@@ -8,6 +8,7 @@ import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.context.annotation.Primary;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,13 +47,14 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Message> findByConversationId(String conversationId) {
+    @NonNull
+    public List<Message> findByConversationId(@NonNull String conversationId) {
         return delegate.findByConversationId(conversationId);
     }
 
     @Override
     @Transactional
-    public void saveAll(String conversationId, List<Message> messages) {
+    public void saveAll(@NonNull String conversationId, @NonNull List<Message> messages) {
         delegate.saveAll(conversationId, messages);
         if (messages == null) {
             return;
@@ -91,7 +93,7 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
 
     @Override
     @Transactional
-    public void deleteByConversationId(String conversationId) {
+    public void deleteByConversationId(@NonNull String conversationId) {
         delegate.deleteByConversationId(conversationId);
         UUID convUuid = UUID.fromString(conversationId);
         dataManager.load(AiMessage.class)
@@ -102,6 +104,7 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
     }
 
     @Override
+    @NonNull
     public List<String> findConversationIds() {
         return delegate.findConversationIds();
     }

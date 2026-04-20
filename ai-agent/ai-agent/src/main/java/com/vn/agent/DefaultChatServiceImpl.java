@@ -137,7 +137,7 @@ public class DefaultChatServiceImpl implements ChatService {
 
     /**
      * Null-safe bridge to {@link CurrentAuthentication#getAuthentication()}. Matches
-     * {@link BaselineContextProvider#safeGetUser()}'s anonymous-caller posture: if the
+     * {@code BaselineContextProvider#safeGetUser()}'s anonymous-caller posture: if the
      * Jmix security context is not established (anonymous runtime), we return {@code null}
      * and {@link RetrievalFilterBuilder} collapses to its fail-closed empty-roles branch.
      */

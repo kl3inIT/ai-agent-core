@@ -1,6 +1,7 @@
 package com.vn.agent.entity;
 
 import io.jmix.core.metamodel.datatype.EnumClass;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 public enum AiMessageRole implements EnumClass<String> {
@@ -17,6 +18,7 @@ public enum AiMessageRole implements EnumClass<String> {
     }
 
     @Override
+    @NonNull
     public String getId() {
         return id;
     }
