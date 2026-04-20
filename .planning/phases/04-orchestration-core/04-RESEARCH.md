@@ -666,7 +666,7 @@ Phase 1 D-04 already split `test` (excludes `@Tag("live")`) from `liveTest`. Reu
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | `ToolCallAdvisor.builder()` exposes a method to disable internal conversation-history management when an outer `MessageChatMemoryAdvisor` is present. AI-SPEC names it `.disableMemory()`; Phase 4 CONTEXT D-02 assumes it exists. | Standard Stack §"ToolCallAdvisor"; Pitfall #1; Pattern 1 | HIGH — if no such method exists in 1.1.4, the double-history pitfall goes unmitigated. Planner MUST verify method availability at Task 1 via IDE completion on `ToolCallAdvisor.Builder` or by opening the jar. Options if the method is absent: (a) configure `ToolCallingManager` to opt out of internal history at the manager level, (b) pre-filter messages before they enter the memory advisor, (c) accept the double-write and document it. See Open Question OQ-1. `[ASSUMED: .disableMemory() exists]` |
+| A1 | `ToolCallAdvisor.builder()` exposes a method to disable internal conversation-history management when an outer `MessageChatMemoryAdvisor` is present. AI-SPEC names it `.disableMemory()`; Phase 4 CONTEXT D-02 assumes it exists. | Standard Stack §"ToolCallAdvisor"; Pitfall #1; Pattern 1 | HIGH — if no such method exists in 1.1.4, the double-history pitfall goes unmitigated. Planner MUST verify method availability at Task 1 via IDE completion on `ToolCallAdvisor.Builder` or by opening the jar. Options if the method is absent: (a) configure `ToolCallingManager` to opt out of internal history at the manager level, (b) pre-filter messages before they enter the memory advisor, (c) accept the double-write and document it. See Open Question OQ-1. `[VERIFIED 2026-04-20: javap on spring-ai-client-chat-1.1.4.jar confirms ToolCallAdvisor.Builder.disableMemory() — see OQ-1 RESOLUTION]` |
 | A2 | `ChatMemoryRepository.saveAll(conversationId, List<Message>)` is the exact method signature Phase 4's decorator overrides. Context7 confirmed `findConversationIds()` and `deleteByConversationId()` but not `saveAll`'s signature. | Pattern 3 | LOW — the shape is standard, but the method name might be `add(conversationId, messages)` or `saveAll(conversationId, messages)` depending on version. Planner opens `ChatMemoryRepository.class` via IDE at Task 1 and matches. `[ASSUMED: saveAll name]` |
 | A3 | `spring-ai-test` is available in 1.1.4. AI-SPEC lists it as optional for semantic-similarity assertions. | Supporting libs | LOW — fallback to literal `.contains("pong")` on the live smoke is trivial. `[ASSUMED: module availability]` |
 | A4 | OpenRouter accepts requests on OpenAI-compatible `/v1/chat/completions` path — exactly the default `spring.ai.openai.chat.completions-path`. | Pitfall #6 | LOW — OpenRouter's public docs describe themselves as OpenAI-compatible; Phase 1 already proved this works end-to-end (smoke). `[VERIFIED: Phase 1 live smoke passed per STATE.md "Human-verify confirmed 2026-04-18"]` Elevated to VERIFIED. |
@@ -675,13 +675,24 @@ Phase 1 D-04 already split `test` (excludes `@Tag("live")`) from `liveTest`. Reu
 | A7 | `BaseAdvisor.HIGHEST_PRECEDENCE` equals `Ordered.HIGHEST_PRECEDENCE` (`Integer.MIN_VALUE`). AI-SPEC uses both interchangeably. | Pattern 2, Pitfall #5 | LOW — `BaseAdvisor` extends the `Ordered` hierarchy. `[VERIFIED: Context7 example uses `BaseAdvisor.HIGHEST_PRECEDENCE + 300`]` confirms the constant exists on that class. |
 | A8 | `CurrentAuthentication.getUser().getKey()` returns the Jmix user key (typically UUID) suitable for `AiToolCallAudit.userId`. | Pattern 2 | LOW — standard Jmix API. Planner confirms the exact method (`getUser()` vs `getUser(Class)`) in the `jmix-security` skill. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 ### OQ-1: What is the exact `ToolCallAdvisor` API to disable internal conversation history?
 
 - **What we know:** The AI-SPEC claims `ToolCallAdvisor.builder().disableMemory()` exists in 1.1.4. Context7's 1.1.2 docs do NOT show this method; the docs instead mention `setInternalToolExecutionEnabled(false)` on `ToolCallingChatOptions` (which is a DIFFERENT concern — it disables **in-model** tool execution so the framework's manager runs tools; it is NOT the memory-history disable). The ROADMAP Phase 4 deliverable explicitly mentions `.disableInternalConversationHistory()` as the method name — yet another candidate.
 - **What's unclear:** The exact method name on `ToolCallAdvisor.Builder` in 1.1.4 for disabling the advisor's internal conversation-history tracking (when an outer `MessageChatMemoryAdvisor` is already present).
 - **Recommendation:** Planner adds a Task 1 verification step: open `ToolCallAdvisor.Builder` via IDE completion, enumerate its methods, find the one that names "memory"/"history"/"conversation", and use it. Record the verified method name as a Rule 1 deviation in the task summary. If NO such method exists, escalate to a design decision: either configure the `ToolCallingManager` at bean-creation time to skip history, OR live with the double-write and add a deduplication step in `ProjectingChatMemoryRepository.saveAll(...)` that drops messages already written in the same tx.
+- **RESOLVED 2026-04-20:** `javap -p` on `spring-ai-client-chat-1.1.4.jar` (`org/springframework/ai/chat/client/advisor/ToolCallAdvisor$Builder.class`) shows the verified API surface. **VERIFIED javap output:**
+  ```
+  public T disableMemory();
+  public T conversationHistoryEnabled(boolean);
+  public T advisorOrder(int);                       // NOTE: order setter is advisorOrder(int), NOT order(int)
+  public T toolCallingManager(ToolCallingManager);
+  public T streamToolCallResponses(boolean);
+  public T suppressToolCallStreaming();
+  public ToolCallAdvisor build();
+  ```
+  Use `ToolCallAdvisor.builder().disableMemory().advisorOrder(BaseAdvisor.HIGHEST_PRECEDENCE + 300).build()`. Both `disableMemory()` and `conversationHistoryEnabled(false)` achieve the same end; `disableMemory()` is the literal AI-SPEC name and is canonical. The internal field is `private final boolean conversationHistoryEnabled` on `ToolCallAdvisor` itself — `AdvisorOrderStructuralTest` can reflect on that field to assert the disabled state.
 
 ### OQ-2: Does `JdbcChatMemoryRepository` autoconfiguration conflict with the decorator bean?
 
@@ -749,7 +760,7 @@ This makes the decorator's role explicit, doesn't rely on auto-config behavior, 
 - Spring Framework `TransactionSynchronizationManager` / `TransactionSynchronization.afterCommit` semantics — well-documented, standard
 
 ### Tertiary (LOW confidence — flagged as ASSUMED)
-- `ToolCallAdvisor.disableMemory()` / `.disableInternalConversationHistory()` / equivalent — AI-SPEC asserts, Context7 does not confirm. See OQ-1 and Assumption A1.
+- ~~`ToolCallAdvisor.disableMemory()`~~ — **RESOLVED 2026-04-20** to HIGH confidence via javap verification (see OQ-1 RESOLUTION). Method confirmed present in 1.1.4 jar.
 - OpenRouter model slug format `provider/model` — from general OpenRouter docs knowledge, NOT Spring AI docs. Assumption A4/A5.
 - Exact column set of `AiToolCallAudit` matching D-12 — assumed to exist from Phase 2 DDL; planner confirms at Task 0 (Assumption A6).
 
@@ -758,9 +769,9 @@ This makes the decorator's role explicit, doesn't rely on auto-config behavior, 
 **Confidence breakdown:**
 - Standard stack: **HIGH** — all deps already on classpath; versions pinned; Phase 1 smoke proved the OpenRouter wire-up end-to-end.
 - Architecture: **HIGH** — advisor chain, dual-layer projection, REQUIRES_NEW audit pipeline, and afterCommit fan-out are all standard Spring AI + Spring Framework patterns. CallAdvisor interface signature verified against Context7 1.1.2.
-- Pitfalls: **MEDIUM-HIGH** — nine of ten pitfalls are verified against Spring AI / Spring Framework docs or are mechanical consequences of the decisions in CONTEXT. Pitfall #1 (ToolCallAdvisor double-history) is correctly identified but the mitigation API name is unverified (OQ-1).
+- Pitfalls: **HIGH** — all ten pitfalls are verified against Spring AI / Spring Framework docs or are mechanical consequences of the decisions in CONTEXT. Pitfall #1 (ToolCallAdvisor double-history) mitigation API name verified via javap on 2026-04-20 (OQ-1 RESOLVED).
 - Pattern 3 (ProjectingChatMemoryRepository): **MEDIUM** — `saveAll(...)` method signature is ASSUMED from standard naming; planner confirms at Task 1.
-- OQ-1 (ToolCallAdvisor memory-disable API): **UNRESOLVED** — Context7 gap; planner resolves at code time via IDE completion.
+- OQ-1 (ToolCallAdvisor memory-disable API): **RESOLVED 2026-04-20 — verified via javap on spring-ai-client-chat-1.1.4.jar: `ToolCallAdvisor.builder().disableMemory()` (also `conversationHistoryEnabled(boolean)`); order setter is `advisorOrder(int)` not `order(int)`. See OQ-1 section.
 
 **Research date:** 2026-04-20
 **Valid until:** 2026-05-20 (30 days — Spring AI 1.1.x is the GA line and stable; revisit if a BOM bump to 1.2.x / 2.x is proposed)
