@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 03
-last_updated: "2026-04-19T18:05:55.914Z"
-last_activity: 2026-04-19 — Completed quick task 260420-09p (Phase 3 docs resync).
+status: Executing Phase 04
+last_updated: "2026-04-20T04:55:00.000Z"
+last_activity: 2026-04-20 — Plan 04-01 complete (AiToolCallAudit runId/kind/phase/promptHash/errorClass schema + entity + i18n). Next: 04-02 (foundations — AiAgentDefaultsProperties, RunContext, AiParametersResolver, BaselineContextProvider).
 progress:
   total_phases: 4
   completed_phases: 3
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 03 — metadata-first-runtime-six-tools
+**Current focus:** Phase 04 — orchestration-core
 
 ## Phase Status
 
@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
 | 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
 | 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
-| 4 | Orchestration Core | Not started |
+| 4 | Orchestration Core | 🚧 In progress (1/5 plans) |
 | 5 | RAG Layer | Not started |
 | 6 | Parameters, Structured Output & Guardrails | Not started |
 | 7 | Flow UI | Not started |
@@ -111,6 +111,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS — pending human Gradle verify + merge to master.
 - 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings to `.planning/phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
 - 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
+- 2026-04-20 11:55 +07:00 — Plan 04-01 complete (Liquibase 080 + AiToolCallAudit entity fields + EN/VI i18n; compileJava green). Commits 8181ff4, 1789b7e. Next: 04-02.
 
 ### Quick Tasks Completed
 
