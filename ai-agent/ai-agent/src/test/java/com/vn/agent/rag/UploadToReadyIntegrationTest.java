@@ -30,7 +30,15 @@ class UploadToReadyIntegrationTest extends AbstractRagIntegrationTest {
 
     @AfterEach
     void cleanVectors() {
-        systemAuthenticator.runWithSystem(this::deleteAllVectors);
+        systemAuthenticator.runWithSystem(() -> {
+            deleteAllVectors();
+            // AiKnowledgeDocument rows are not part of the vector store — wipe them explicitly
+            // so order-dependent assertions (e.g., "unknown role roll-back leaves empty table")
+            // start from a clean slate.
+            dataManager.load(AiKnowledgeDocument.class)
+                    .query("select d from ai_AiKnowledgeDocument d").list()
+                    .forEach(dataManager::remove);
+        });
     }
 
     @Test

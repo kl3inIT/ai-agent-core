@@ -66,7 +66,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
         systemAuthenticator.runWithSystem(() -> {
             // Document gated on the row-level role; user holds the plain user role only.
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-beta.md",
-                    List.of("ai-agent-user-row-level"));
+                    List.of(AiAgentTestBetaRole.CODE));
 
             Authentication user = authWith(AiAgentUserRole.CODE);
             Filter.Expression filter = retrievalFilterBuilder.buildFor(user);

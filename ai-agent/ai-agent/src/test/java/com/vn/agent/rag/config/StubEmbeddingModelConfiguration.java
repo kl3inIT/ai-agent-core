@@ -58,8 +58,11 @@ public class StubEmbeddingModelConfiguration {
             private float[] deterministicVector(String text) {
                 float[] v = new float[DIMENSIONS];
                 int hash = text == null ? 0 : text.hashCode();
+                // Math.floorMod keeps values in [0, 999] regardless of hash sign — otherwise
+                // Java's signed % can produce negative components and cosine similarity drops
+                // below the default 0.0 threshold, making some chunks vanish from topK results.
                 for (int i = 0; i < v.length; i++) {
-                    v[i] = ((hash + i) % 1000) / 1000.0f;
+                    v[i] = Math.floorMod(hash + i, 1000) / 1000.0f;
                 }
                 return v;
             }

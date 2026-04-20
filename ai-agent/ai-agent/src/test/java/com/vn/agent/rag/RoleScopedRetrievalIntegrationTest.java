@@ -42,14 +42,13 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
     @BeforeEach
     void seed() {
         systemAuthenticator.runWithSystem(() -> {
-            // Beta uses a made-up role code that MUST be registered by the test context. Since we
-            // cannot register a new @ResourceRole at runtime without boot-time scanning, we use
-            // AiAgentUserRowLevelRole as a proxy for "not the user's role" — this is a real
-            // registered role code that AiAgentUserRole holders do NOT normally hold.
+            // Beta uses AiAgentTestBetaRole, a test-scoped @ResourceRole registered under the
+            // test classpath — a real resolvable role code that AiAgentUserRole holders do NOT
+            // hold, so user→beta visibility must fail-closed.
             alphaId = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                     List.of(AiAgentUserRole.CODE));
             betaId = uploadAndAwaitReady("classpath:ai-kb/fixture-beta.md",
-                    List.of("ai-agent-user-row-level"));
+                    List.of(AiAgentTestBetaRole.CODE));
             gammaId = uploadAndAwaitReady("classpath:ai-kb/fixture-gamma.md",
                     List.of(AiAgentAdminRole.CODE));
         });

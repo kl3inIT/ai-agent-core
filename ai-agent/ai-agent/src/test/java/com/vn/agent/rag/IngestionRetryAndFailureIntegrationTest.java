@@ -144,14 +144,13 @@ class IngestionRetryAndFailureIntegrationTest extends AbstractRagIntegrationTest
         systemAuthenticator.runWithSystem(() -> {
             AtomicInteger calls = new AtomicInteger(0);
 
-            // First add() succeeds (partial write), second throws — models a mid-stream failure
-            // that leaves stray vectors. The worker's catch block MUST delete them.
+            // Write the batch for real (partial state), then throw — models a mid-stream
+            // failure where chunks are committed before an error surfaces. The worker's
+            // catch block MUST delete them via the documentId filter.
             doAnswer(inv -> {
                 int n = calls.incrementAndGet();
-                if (n == 1) {
-                    return inv.callRealMethod();
-                }
-                throw new RuntimeException("induced mid-stream failure on batch " + n);
+                inv.callRealMethod();
+                throw new RuntimeException("induced mid-stream failure after batch " + n);
             }).when(vectorStoreSpy).add(any(List.class));
 
             AiKnowledgeDocument saved = uploadService.upload(
