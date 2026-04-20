@@ -54,7 +54,7 @@ public class ChatClientFactory {
                 .build();
 
         return ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt != null ? systemPrompt : "You are a helpful assistant.")
+                .defaultSystem(systemPrompt != null ? systemPrompt : AiAgentDefaultsProperties.FALLBACK_SYSTEM_PROMPT)
                 .defaultAdvisors(auditAdvisor, memoryAdvisor, toolCallAdvisor)
                 .build();
     }

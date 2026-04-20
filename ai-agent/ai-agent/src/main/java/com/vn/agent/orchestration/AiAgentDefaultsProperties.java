@@ -20,4 +20,12 @@ public record AiAgentDefaultsProperties(
         Double topP,
         Integer maxTokens,
         String systemPrompt) {
+
+    /**
+     * Last-resort system prompt used by {@link ChatClientFactory} when neither the active
+     * {@code AiParameters} profile nor {@code jmix.ai-agent.defaults.system-prompt} produce a
+     * value. Kept non-i18n intentionally (LO-01): this is a model-directed instruction, not a
+     * user-facing UI string, so {@code msg://} keys do not apply.
+     */
+    public static final String FALLBACK_SYSTEM_PROMPT = "You are a helpful assistant.";
 }
