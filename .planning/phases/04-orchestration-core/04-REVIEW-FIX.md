@@ -19,7 +19,7 @@ status: partial
 - Findings in scope: 8 (4 Medium + 4 Low)
 - Fixed: 7
 - Skipped: 1 (MD-01 — false premise; see below)
-- Additional IntelliJ/inspection fixes: 0 (JetBrains MCP not available in this session; manual review of Phase 04 files surfaced no legitimate issues beyond the review findings)
+- Additional IntelliJ/inspection fixes: 5 (follow-up pass with JetBrains MCP live — see section below)
 
 All fixes compile cleanly (`./gradlew :ai-agent:ai-agent:compileJava` and `compileTestJava` both exit 0) and the full `:ai-agent:ai-agent:test` suite passes.
 
@@ -82,16 +82,28 @@ All fixes compile cleanly (`./gradlew :ai-agent:ai-agent:compileJava` and `compi
 
 **Original issue:** On auto-create, the gateway sets `fresh.setCreatedDate(OffsetDateTime.now())` explicitly. Reviewer suggested dropping this and relying on Jmix `@CreatedDate` auditing.
 
-## Additional IntelliJ / Inspection Fixes
+## Additional IntelliJ / Inspection Fixes (2026-04-20, follow-up pass)
 
-**JetBrains MCP availability:** The `mcp__jetbrains__*` tool family was NOT exposed in this session's tool list (only standard Read/Edit/Write/Bash/Grep/Glob were available). Per the scope instructions, I performed a manual inspection pass over the Phase 04 production files (19 Java files across `orchestration/`, `audit/`, plus the spot-checked `ChatResponseDto`, `ConversationNotFoundException`, `RunContext`, `ToolCallAdvisorBuilderProbe`, `AuditListenerFanOut`) looking for:
+**JetBrains MCP now live** — re-scanned all 18 Phase 04 production files via `mcp__jetbrains__get_file_problems` (errorsOnly=false). Findings and resolutions:
 
-- **Unused imports:** none found — every import statement is referenced.
-- **Abbreviated identifiers (per user memory: no `uei`, `mc`, `mp`, `dt`, etc.):** none found. Locals use `user`, `method`, `result`, `instructions`, `context`, `runId`, `conversationId`, etc. — all fully spelled.
-- **Obviously dead code:** none found. `ToolCallAdvisorBuilderProbe` is documentation-only constants (intentional — referenced symbolically to surface Spring AI API drift as compile errors) and not dead.
-- **Style nits (`var`, wildcard imports, redundant modifiers):** none found. No wildcard imports. Effective use of `var` for local type inference.
+| File | Issue | Severity | Action | Commit |
+|---|---|---|---|---|
+| `audit/AuditWriter.java` | `{@link AuditListener}` unresolved in javadoc | ERROR | Added import | `de6b4d0` |
+| `orchestration/BaselineContextProvider.java` | Redundant `String.valueOf()` on `StringBuilder.append(Object)` | WARNING | Removed | `a9d2f60` |
+| `audit/ToolCallbackAuditDecorator.java` | `\u2026` escape can be literal `…` | WARNING | Replaced | `ca0dcdc` |
+| `orchestration/ConversationNotFoundException.java` | Public `MESSAGE_KEY` flagged unused | WARNING | `@SuppressWarnings("unused")` (intentional public i18n API) | `801a4c7` |
+| `audit/ToolCallAdvisorBuilderProbe.java` | 3 constants flagged unused | WARNING | `@SuppressWarnings("unused")` on class (intentional drift-detection per javadoc) | `63674c4` |
 
-Zero additional fixes applied. If the developer wants a proper SonarQube / IntelliJ inspection sweep, re-run this pass in a session where the JetBrains MCP is exposed.
+**Skipped (intentional / spec-required, not defects):**
+
+- `catch (Throwable t)` in `ToolCallbackAuditDecorator` (3 sites) — required by D-13/D-14 fan-out fault isolation; catching `Exception` would let `Error` subclasses escape.
+- `@NonNullApi` annotation drift (Spring packages) — cosmetic; adding `@NonNull` everywhere would bloat signatures without behavioral change.
+- Defensive `null` checks flagged "always true/false" by DFA (`ProjectingChatMemoryRepository` lines 57/115/116, `DefaultChatServiceImpl` lines 103/104, `AuditAdvisor:105`, `ToolCallbackAuditDecorator:122`) — retained as belt-and-suspenders against future API changes in Spring AI / Jmix.
+- `WEAK WARNING: conversationId always null` in `ToolCallbackAuditDecorator` (lines 83, 110) — already addressed by MD-03 (method accepts conversationId parameter but tool-layer callers don't currently have one; null is the documented contract).
+- `if` → `switch` in `AuditAdvisor.java:113` — opinionated; existing chain is clearer for three cases.
+- `List.get(size()-1)` → `getLast()` in `AuditAdvisor.java:138` — `getLast()` is Java 21+; project targets Java 17.
+
+**Verification:** `./gradlew :ai-agent:ai-agent:compileJava` → SUCCESS. `./gradlew :ai-agent:ai-agent:test` → SUCCESS (full suite). Post-fix re-scan of all 5 touched files via JetBrains MCP shows all targeted warnings cleared.
 
 ## Test Status
 
