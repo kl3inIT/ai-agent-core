@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
@@ -55,6 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
 @Import(RagTestConfiguration.class)
+@ActiveProfiles("rag-it")
 @Testcontainers
 @EnabledIf("com.vn.agent.rag.AbstractRagIntegrationTest#isDockerAvailable")
 public abstract class AbstractRagIntegrationTest {
