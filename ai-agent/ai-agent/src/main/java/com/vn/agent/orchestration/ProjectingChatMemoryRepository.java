@@ -54,20 +54,38 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
     @Transactional
     public void saveAll(String conversationId, List<Message> messages) {
         delegate.saveAll(conversationId, messages);
-        if (messages == null || messages.isEmpty()) {
+        if (messages == null) {
             return;
         }
         UUID convUuid = UUID.fromString(conversationId);
+        // Mirror JdbcChatMemoryRepository.saveAll semantics: delete-then-insert the whole
+        // conversation. MessageWindowChatMemory calls saveAll with the CUMULATIVE list each turn,
+        // so an append-only projection would duplicate rows; JDBC replaces the set atomically.
+        dataManager.load(AiMessage.class)
+                .query("select m from ai_AiMessage m where m.conversation.id = :cid")
+                .parameter("cid", convUuid)
+                .list()
+                .forEach(dataManager::remove);
+        if (messages.isEmpty()) {
+            return;
+        }
         AiConversation conv = dataManager.load(AiConversation.class).id(convUuid).one();
+        OffsetDateTime base = OffsetDateTime.now();
+        int seq = 0;
         for (Message m : messages) {
             AiMessage row = metadata.create(AiMessage.class);
             row.setConversation(conv);
             row.setContent(m.getText());
-            row.setCreatedDate(OffsetDateTime.now());
+            // Preserve insertion order by giving each row a monotonically increasing timestamp.
+            // MessageWindowChatMemory supplies the cumulative list in conversation order, so the
+            // ORDER BY createdDate query in DualLayerParityTest lines up with JDBC's native order.
+            row.setCreatedDate(base.plusNanos(seq));
+            row.setSeq(seq);
             // AiMessage exposes role only through the AiMessageRole enum setter; the message's
             // MessageType value (USER/ASSISTANT/SYSTEM/TOOL) maps 1:1 by uppercase id.
             row.setRole(resolveRole(m));
             dataManager.save(row);
+            seq++;
         }
     }
 
