@@ -4,9 +4,14 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.security.SystemAuthenticator;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -104,6 +109,58 @@ public abstract class AbstractRagIntegrationTest {
     @Autowired protected DataManager dataManager;
     @Autowired protected VectorStore vectorStore;
     @Autowired protected Metadata metadata;
+    @Autowired protected SystemAuthenticator systemAuthenticator;
+
+    /**
+     * WR-04: centralised hermetic cleanup. Every test class that extends this base runs
+     * {@link #purgeAllVectorsAndDocuments()} in {@code @BeforeEach} AND {@code @AfterEach}
+     * so the next test starts from a provably empty pgvector store AND empty
+     * {@link AiKnowledgeDocument} table. Also fails fast if either store is non-empty at
+     * the start of a test — catching leaks from a crashed prior run.
+     */
+    @BeforeEach
+    void purgeBeforeTest() {
+        systemAuthenticator.runWithSystem(this::purgeAllVectorsAndDocuments);
+        assertEmptyStateOrFail();
+    }
+
+    @AfterEach
+    void purgeAfterTest() {
+        systemAuthenticator.runWithSystem(this::purgeAllVectorsAndDocuments);
+    }
+
+    /**
+     * Delete every chunk regardless of embedding model (WR-04 fix: the previous helper
+     * filtered by the current model and left "other-model-not-current" synthetic chunks
+     * behind) AND every {@link AiKnowledgeDocument} row.
+     */
+    protected void purgeAllVectorsAndDocuments() {
+        // Delete every vector: the filter matches any document_id that is "not empty",
+        // i.e. everything. There is no truncate() on VectorStore, so this is the
+        // coarsest available delete that still goes through Spring AI's abstraction.
+        Filter.Expression everything = new FilterExpressionBuilder()
+                .ne(ChunkMetadata.DOCUMENT_ID, "__nonexistent_sentinel__").build();
+        vectorStore.delete(everything);
+
+        dataManager.load(AiKnowledgeDocument.class)
+                .query("select d from ai_AiKnowledgeDocument d").list()
+                .forEach(dataManager::remove);
+    }
+
+    private void assertEmptyStateOrFail() {
+        // Any residue here means the previous test (possibly in a different class)
+        // did not clean up — integration assertions that depend on counts would be
+        // order-dependent without this guard.
+        long docs = dataManager.load(AiKnowledgeDocument.class)
+                .query("select d from ai_AiKnowledgeDocument d").list().size();
+        assertThat(docs).as("AiKnowledgeDocument table must be empty at test start").isEqualTo(0);
+
+        List<org.springframework.ai.document.Document> leakProbe = vectorStore.similaritySearch(
+                SearchRequest.builder().query("leak-probe").topK(1).build());
+        assertThat(leakProbe)
+                .as("pgvector store must be empty at test start (found %s leaked chunks)", leakProbe.size())
+                .isEmpty();
+    }
 
     /**
      * Upload a document and assert the sync-executor path drove it to READY. Returns the id so
@@ -124,10 +181,13 @@ public abstract class AbstractRagIntegrationTest {
      * Wipe every chunk from the underlying pgvector store so the next test starts from an empty
      * index. pgvector-level truncation is NOT part of the JPA transaction and must be done
      * explicitly between tests.
+     *
+     * <p>WR-04: delegates to {@link #purgeAllVectorsAndDocuments()} so synthetic chunks with
+     * a non-default {@code embeddingModel} (e.g. the "other-model-not-current" drift fixture
+     * in {@code RoleScopedRetrievalIntegrationTest}) are removed too.</p>
      */
     protected void deleteAllVectors() {
-        vectorStore.delete(new FilterExpressionBuilder()
-                .eq(ChunkMetadata.EMBEDDING_MODEL, "openai/text-embedding-3-small").build());
+        purgeAllVectorsAndDocuments();
     }
 
     /** Convenience: similarity-search with no filter and return the raw document list. */
