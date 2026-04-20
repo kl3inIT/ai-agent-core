@@ -45,7 +45,7 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public List<Message> findByConversationId(String conversationId) {
         return delegate.findByConversationId(conversationId);
     }
