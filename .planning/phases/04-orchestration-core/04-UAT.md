@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 04-orchestration-core
 source:
   - 04-01-SUMMARY.md
@@ -8,12 +8,12 @@ source:
   - 04-04-SUMMARY.md
   - 04-05-SUMMARY.md
 started: 2026-04-20T14:39:32.1182234+07:00
-updated: 2026-04-20T14:42:57.7629586+07:00
+updated: 2026-04-20T14:49:02.3835079+07:00
 ---
 
 ## Current Test
 
-[testing paused — 1 items outstanding]
+[testing complete]
 
 ## Tests
 
@@ -39,17 +39,15 @@ result: pass
 
 ### 6. Live Provider Smoke Test
 expected: With a real `OPENROUTER_API_KEY` configured and the live path enabled, a real `ChatService.ask(...)` call returns non-blank assistant content plus valid `conversationId` and `runId`.
-result: blocked
-blocked_by: third-party
-reason: "OPENROUTER_API_KEY is not set in the current environment, so the real provider smoke test could not be executed."
+result: pass
 
 ## Summary
 
 total: 6
-passed: 5
+passed: 6
 issues: 0
 pending: 0
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps
