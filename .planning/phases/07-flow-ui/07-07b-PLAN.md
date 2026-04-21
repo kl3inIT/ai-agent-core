@@ -89,57 +89,77 @@ Reactor test utility: `reactor.test.StepVerifier` for Flux-based tests.
 <tasks>
 
 <task type="auto">
-  <name>Task 0: Un-disable skeletons — strip @Disabled + fail() placeholders from 07-07a</name>
+  <name>Task 0: Un-disable skeletons — strip @Disabled("07-07b…") + identify fail() stubs from 07-07a</name>
   <read_first>
-    - .planning/phases/07-flow-ui/07-07a-PLAN.md
-    - All 11 test files listed in files_modified
+    - .planning/phases/07-flow-ui/07-07a-PLAN.md (lists the sentinel markers `@Disabled("07-07b…")` and `fail("not yet implemented — 07-07b")` that Wave 0 seeded)
+    - All 11 test files listed in files_modified (for visual sanity after sed)
   </read_first>
   <files>
-    (same 11 test files as files_modified)
+    ai-agent/ai-agent/src/test/java/com/vn/agent/i18n/LocaleParityTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/security/AdminViewAccessTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/MarkdownRendererXssTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStreamTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStopTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/knowledge/KnowledgeBaseUploadTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/push/DocumentStatusPushTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/parameters/ParametersDetailYamlPreviewTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/audit/ToolCallAuditListViewTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/view/conversation/ConversationListRoleFilterTest.java,
+    ai-agent/ai-agent/src/test/java/com/vn/agent/push/PushAutoConfigTest.java
   </files>
   <action>
-    Before writing real assertions, the executor MUST:
-    1. Delete every class-level  annotation added by 07-07a. Grep target: .
-    2. Remove every  line. Each will be replaced by the real assertion body in Tasks 1–3 below.
-    3. Remove the  line from any class that no longer calls .
+    Sentinel markers Wave 0 seeded (per 07-07a):
+    - Class-level / method-level annotation: `@Disabled("07-07b — scaffold only; green-fill in 07-07b")`
+    - Method body placeholder: `fail("not yet implemented — 07-07b")`
 
-    Verification after Task 0 (before Task 1 writes real code):
-    -  prints NOTHING.
-    - > Task :ai-agent:ai-agent:compileJava
-> Task :ai-agent:ai-agent:processResources UP-TO-DATE
+    Two concrete shell operations, then a compile check. Do NOT touch fail() bodies in this task — Tasks 1–3 replace them with real assertions. Task 0 is strictly: strip @Disabled, survey fail() locations, keep the test sources compiling.
 
-> Task :ai-agent:ai-agent:enhanceJmixMain
-Enhancing entities in project ':ai-agent:ai-agent' for source set 'main'
-Project entities:
-    JPA: [com.vn.agent.entity.AiParameters, com.vn.agent.entity.AiMessage, com.vn.agent.entity.AiToolCallAudit, com.vn.agent.entity.AiKnowledgeDocument, com.vn.agent.entity.AiConversation];
-    DTO: [];
-Project converters: [].
-Running EclipseLink enhancer in project ':ai-agent:ai-agent' for source set 'main'
-Running Jmix enhancer in project ':ai-agent:ai-agent' for source set 'main'
+    Step 1 — Strip every `@Disabled("07-07b…")` annotation. Use grep to find files, sed to delete matching annotation lines (plus any stray `import org.junit.jupiter.api.Disabled;` left unused):
 
-> Task :ai-agent:ai-agent:copyJmixEnhancingResourcesMain
-> Task :ai-agent:ai-agent:classes
-> Task :ai-agent:ai-agent-starter:compileJava UP-TO-DATE
-> Task :ai-agent:ai-agent:compileTestJava UP-TO-DATE
+    ```bash
+    # Find files containing the sentinel
+    grep -rl '@Disabled("07-07b' ai-agent/ai-agent/src/test jmix-app/src/test 2>/dev/null
 
-[Incubating] Problems report is available at: file:///D:/DTH/ai-agent-core/build/reports/problems/problems-report.html
+    # Delete any line containing @Disabled("07-07b  (handles class-level and method-level; whole-line delete)
+    grep -rl '@Disabled("07-07b' ai-agent/ai-agent/src/test jmix-app/src/test 2>/dev/null \
+      | xargs sed -i '/@Disabled("07-07b/d'
 
-Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+    # After annotation removal, if any file no longer references Disabled anywhere, drop the unused import.
+    # (safe — unused imports are only stripped when grep proves the symbol is gone)
+    for f in $(grep -rl 'import org\.junit\.jupiter\.api\.Disabled;' ai-agent/ai-agent/src/test jmix-app/src/test 2>/dev/null); do
+      if ! grep -q '@Disabled' "$f"; then
+        sed -i '/import org\.junit\.jupiter\.api\.Disabled;/d' "$f"
+      fi
+    done
+    ```
 
-You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+    Step 2 — Survey (do NOT remove) every `fail("not yet implemented — 07-07b")` line. These will be replaced with real assertion bodies in Tasks 1–3; Task 0 only logs locations to a scratch file so Tasks 1–3 have a checklist:
 
-For more on this, please refer to https://docs.gradle.org/8.14.4/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+    ```bash
+    # Locate + count fail() stubs; save the location list for downstream tasks.
+    grep -rln 'fail("not yet implemented — 07-07b")' ai-agent/ai-agent/src/test jmix-app/src/test \
+      | tee .planning/phases/07-flow-ui/.07-07b-fail-stub-locations.txt
+    grep -rc 'fail("not yet implemented — 07-07b")' ai-agent/ai-agent/src/test jmix-app/src/test \
+      | grep -v ':0$' \
+      | tee .planning/phases/07-flow-ui/.07-07b-fail-stub-counts.txt
+    ```
 
-BUILD SUCCESSFUL in 22s
-6 actionable tasks: 3 executed, 3 up-to-date still succeeds (files temporarily have empty @Test bodies — tasks 1–3 fill them).
+    Step 3 — Compile check. Test classes must keep compiling after Step 1 (empty test bodies are legal; `fail(...)` still present is legal).
+
+    ```bash
+    ./gradlew :ai-agent:ai-agent:compileTestJava
+    ```
+
+    If compileTestJava fails because removing `@Disabled` exposed a missing import elsewhere or a syntax leftover, fix the specific file (do not re-introduce @Disabled). Do NOT proceed to Task 1 until compileTestJava exits 0.
   </action>
   <verify>
-    <automated>./gradlew :ai-agent:ai-agent:compileTestJava</automated>
+    <automated>grep -rn '@Disabled("07-07b' ai-agent/ai-agent/src/test jmix-app/src/test; test $? -eq 1 && ./gradlew :ai-agent:ai-agent:compileTestJava</automated>
   </verify>
   <done>
-    - zero remaining  markers
-    - zero remaining  markers
-    - compileTestJava green
+    - `grep -rn '@Disabled("07-07b' ai-agent/ai-agent/src/test jmix-app/src/test` returns NOTHING (exit code 1 = no matches)
+    - `.planning/phases/07-flow-ui/.07-07b-fail-stub-locations.txt` exists and is non-empty (fail() stubs catalogued for Tasks 1–3 to replace — NOT yet removed)
+    - `grep -rn 'fail("not yet implemented — 07-07b")' ai-agent/ai-agent/src/test jmix-app/src/test` still returns matches (Tasks 1–3 will consume them)
+    - `./gradlew :ai-agent:ai-agent:compileTestJava` exits 0
   </done>
 </task>
 
