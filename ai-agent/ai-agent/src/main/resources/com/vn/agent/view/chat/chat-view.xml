@@ -4,10 +4,10 @@
     <layout padding="true" spacing="true">
         <hbox id="headerBar" width="100%" alignItems="CENTER" justifyContent="END" padding="false">
             <button id="newChatButton"
-                    text="msg://chatView.action.newChat"
+                    text="msg://chatView.newChat.label"
                     themeNames="tertiary"/>
         </hbox>
-        <fragment id="chatPanel"
+        <fragment id="chatPanelFragment"
                   class="com.vn.agent.view.chat.fragment.ChatPanelFragment"
                   width="100%"
                   height="100%"/>
