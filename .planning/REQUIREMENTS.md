@@ -67,8 +67,8 @@
 
 - [x] **PARAM-01**: `AiParameters` entity stores multiple profiles (YAML blob) with exactly one marked active
 - [ ] **PARAM-02**: Profile fields: model id, temperature, max tokens, system prompt, enabled tool names, RAG top-k, RAG similarity threshold
-- [ ] **PARAM-03**: Per-conversation parameter override supported by `ChatService` API
-- [ ] **PARAM-04**: `default-params.yaml` bundled with starter; seeded on first startup if table empty
+- [x] **PARAM-03**: Per-conversation parameter override supported by `ChatService` API
+- [x] **PARAM-04**: `default-params.yaml` bundled with starter; seeded on first startup if table empty
 - [x] **PARAM-05**: Host can contribute additional system-prompt fragments via `PromptContextContributor` SPI
 
 ### Guardrails

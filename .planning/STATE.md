@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 06
-last_updated: "2026-04-21T04:50:00.000Z"
-last_activity: 2026-04-21 (06-04 runtime chat path wiring)
+last_updated: "2026-04-21T04:57:20.778Z"
+last_activity: 2026-04-21 (06-05 eval rubrics & integration tests complete)
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 35
   completed_plans: 35
   percent: 100
@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
-| 6 | Parameters, Structured Output & Guardrails | In progress (4/5 plans — 06-01 foundation types + 06-02 parameters layer + 06-03 runtime guardrails + 06-04 runtime chat path wiring shipped) |
+| 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | Not started |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
