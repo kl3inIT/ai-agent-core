@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -26,7 +27,7 @@ class AiParametersResolverTest {
         metadata = Mockito.mock(Metadata.class);
         defaults = new AiAgentDefaultsProperties("openai/gpt-4o-mini", 0.2, 1.0, 1500, "You are an assistant.");
         Mockito.when(metadata.create(AiParameters.class)).thenAnswer(inv -> new AiParameters());
-        resolver = new AiParametersResolver(dataManager, metadata, defaults);
+        resolver = new AiParametersResolver(dataManager, metadata, defaults, List.of());
     }
 
     @Test
