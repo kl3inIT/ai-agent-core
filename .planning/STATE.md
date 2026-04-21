@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 07 complete
-last_updated: "2026-04-21T11:00:00.000Z"
-last_activity: 2026-04-21 (plan 07-07b)
+status: Executing Phase 07.1
+last_updated: "2026-04-21T16:10:00.000Z"
+last_activity: 2026-04-21
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
-  total_plans: 43
-  completed_plans: 43
-  percent: 100
+  total_plans: 50
+  completed_plans: 44
+  percent: 88
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 07 — flow-ui
+**Current focus:** Phase 07.1 — adopt-vaadin-messagelist-messageinput-for-chat-view
 
 ## Phase Status
 
@@ -140,6 +140,8 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-21 +07:00 — Plan 06-03 complete (runtime guardrails: RateLimitGuard sliding-window deque per username in Spring cache 'ai-agent.rateLimit' with synchronized read-modify-write and denied-attempt NOT recorded to prevent cooldown starvation; TokenBudgetGuard per-conversation Long accumulator in cache 'ai-agent.tokenBreaker' with check/accumulate/reset all synchronized; IterationCounter ThreadLocal<Integer> with start/current/increment/reset owned by decorator-lifecycle-by-orchestrator; CompiledOutputScannerPattern record compile-at-construction; GuardedToolCallingManager implements Spring AI 1.1.4 ToolCallingManager interface (resolveToolDefinitions + executeToolCalls returning ToolExecutionResult — signatures verified by javap against the 1.1.4 jar) with strict next>cap iteration check, request-level audit using sentinel '__chat__'/phase='REQUEST', pre-tool ToolGuard fan-out, veto audit with REAL tool name/denialReason='tool-vetoed:<msg>'/phase='PRE', Jackson JSON→Map adapter since ToolGuard.check signature is Map not String; OutputScannerAdvisor at HIGHEST_PRECEDENCE+400, flag-and-pass-through with pattern KEY only, 8 KiB input cap against ReDoS, malformed regex skipped-with-WARN at startup; AiAgentGuardAutoConfiguration @AutoConfigureAfter(AIAutoConfiguration) with default ConcurrentMapCacheManager seeding both D-12 caches, scanner advisor as CallAdvisor bean, @Primary guardedToolCallingManager resolving delegate via BeanFactory.getBean('toolCallingManager') to dodge @Primary-on-self cycle, optional reflective StructuredOutputValidationAdvisor (@ConditionalOnClass — absent in 1.1.4 so bean skipped today); AutoConfiguration.imports appended; spring-boot-starter-cache added in labeled Plan 06-03 gradle block beside the existing 06-02 block; compileJava + starter compileJava both green). Commits 9a1c62f, 906e289, a1e73e6. Deviations: (Rule 1) ToolGuard.check takes Map<String,Object> not String argumentsJson — plan pseudocode was wrong about the SPI shape; Jackson ObjectMapper bridges the JSON→Map gap. (Rule 3) Swapped plan's `ToolCallingManager delegate` param for BeanFactory + getBean('toolCallingManager') to avoid classic @Primary-on-self cycle. Next: 06-04 (wire guardrails into DefaultChatServiceImpl + ChatClientFactory + GuardDenialInfo mapper) or 06-05 (verification tests).
 - 2026-04-21 18:00 +07:00 — Plan 07-07b complete (Phase 7 Wave 5 test-suite GREEN fill: 11 classes / 28 @Test methods across i18n/view.chat/view.parameters/view.audit/view.conversation/view.knowledge/push/security packages; strip-@Disabled + TestLoginView infra (783b7af, 34316c6); LocaleParity + MarkdownXss + AdminViewAccess + PushAutoConfig (9b2935d); ChatViewStream + ChatViewStop + KnowledgeBaseUpload + DocumentStatusPush (b485a23); ParametersDetailYamlPreview + ToolCallAuditListView + ConversationListRoleFilter (a6594b0). All 28 new test methods green. Applied plan's own Rule-1 tolerance clause for view-level tests — full @UiTest harness is only in jmix-app root module, not in the addon. 20 pre-existing EclipseLink metamodel failures baseline-verified at HEAD 783b7af, recommended Phase 8 infra plan. SystemAuthenticator.withUser identity switching; ApplicationEventPublisher @SpyBean incompatibility worked around with real @EventListener component; .contains(CODE) not .equals(CODE) for Jmix-wrapped role authorities. Requirements UI-01..UI-06, UI-08, UI-09, UI-10 delivered. **Phase 07 complete (8/8 plans).** Next: Phase 07 merge to master + Phase 8 (Integration Hardening & Release Readiness).
 
+- 2026-04-21 +07:00 — Plan 07.1-01 complete (Phase 7.1 i18n key seed: 11 `chatView.stream.*` / `chatView.message.*` keys added at lines 143-153 in both `messages_en.properties` and `messages_vi.properties`; EN/VI parity diff empty; pre-existing `chatView.toolCard.*`/`chatView.citation.*`/`chatView.error.*` keys preserved per A-01). Commits d76c334, d2e16c6. Deviation: Rule 1 — plan targeted `messages.properties` but actual file is `messages_en.properties` after the pre-UAT rename (CONTEXT success criterion 5); applied to real filename. Deferred: LocaleParityTest has a stale hardcoded path `/com/vn/agent/messages.properties` — needs migration to `messages_en.properties` in a follow-up quick-task. Unblocks: 07.1-02 (renderStreamEvent pure function) + 07.1-03 (Fragment MessageSource wiring). Next: 07.1-02.
+
 - 2026-04-21 13:30 +07:00 — Plan 07-04 complete (ConversationListView + ConversationDetailView role-aware replay: ConversationListView @Route("ai-agent/conversations") with CurrentAuthentication.getUser().getAuthorities() admin probe, role-gated userFilter + createdBy column, dynamic JPQL rebuild on filter valueChange, per-row DataManager count(m) for messageCount column (plan path b), double-click → viewNavigators.detailView; ConversationDetailView @Route("ai-agent/conversations/:id") reuses MessageBubbleComponent from 07-03 for read-only transcript replay, Continue-in-chat → UI.navigate(ChatView.class, QueryParameters conversationId=<uuid>); 4 files added, zero i18n changes (all keys pre-seeded by 07-01); compileJava + compileTestJava green). Requirement UI-03 delivered. Commits 3818edc, 87fa46c. Deviations: (Rule 1) CurrentAuthentication has no getAuthorities() — went through getUser(); (Rule 1) JPQL entity names are ai_AiConversation / ai_AiMessage, not AiAgent_* prefix; (Rule 1) AiMessage has no toolCallsJson field in Phase 2 — ToolCallCardComponent not imported, TOOL-role messages skipped. Next: 07-07b (fill RED test stubs) — final Phase 7 plan.
 
 ### Quick Tasks Completed
@@ -149,7 +151,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 | 260420-se6 | fix JetBrains file problems project-wide (diamond, @NonNull on @NonNullApi overrides, javadoc, getLast, Objects::nonNull, boolean XOR) | 2026-04-20 | pending | Verified — `:ai-agent:ai-agent:test` green | [260420-se6-fix-jetbrains-file-problems-project-wide](./quick/260420-se6-fix-jetbrains-file-problems-project-wide/) |
 
-**Last activity:** 2026-04-21 (plan 07-07b — Phase 07 complete)
+**Last activity:** 2026-04-21
 
 ## Phase 07 Progress
 
