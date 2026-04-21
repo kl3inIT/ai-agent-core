@@ -1,6 +1,8 @@
 package com.vn.agent.view.conversation;
 
+import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
@@ -10,7 +12,6 @@ import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.view.chat.ChatView;
 import com.vn.agent.view.chat.MarkdownRenderer;
 import com.vn.agent.view.chat.fragment.MessageBubbleComponent;
-import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
@@ -55,16 +56,9 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
     private CollectionContainer<AiMessage> messagesDc;
     @ViewComponent
     private VerticalLayout transcriptList;
-    @ViewComponent
-    private JmixButton continueInChatButton;
 
     @Autowired
     private MarkdownRenderer markdownRenderer;
-
-    @Subscribe
-    public void onInit(final InitEvent event) {
-        continueInChatButton.addClickListener(e -> onContinueInChat());
-    }
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
@@ -74,7 +68,8 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
         renderTranscript(messagesDc.getItems());
     }
 
-    private void onContinueInChat() {
+    @Subscribe("continueInChatButton")
+    public void onContinueInChatClick(final ClickEvent<Button> event) {
         AiConversation conv = getEditedEntity();
         if (conv == null || conv.getId() == null) {
             return;

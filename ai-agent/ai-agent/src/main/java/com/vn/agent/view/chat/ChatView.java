@@ -1,6 +1,8 @@
 package com.vn.agent.view.chat;
 
+import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.QueryParameters;
@@ -11,7 +13,6 @@ import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.kit.action.ActionVariant;
-import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardView;
 import io.jmix.flowui.view.Subscribe;
@@ -46,8 +47,6 @@ public class ChatView extends StandardView implements BeforeEnterObserver {
 
     @ViewComponent
     private ChatPanelFragment chatPanel;
-    @ViewComponent
-    private JmixButton newChatButton;
 
     @Autowired
     private Dialogs dialogs;
@@ -56,9 +55,9 @@ public class ChatView extends StandardView implements BeforeEnterObserver {
     @Autowired
     private Notifications notifications;
 
-    @Subscribe
-    public void onInit(final InitEvent event) {
-        newChatButton.addClickListener(e -> onNewChatClick());
+    @Subscribe("newChatButton")
+    public void onNewChatButtonClick(final ClickEvent<Button> event) {
+        onNewChatClick();
     }
 
     @Override

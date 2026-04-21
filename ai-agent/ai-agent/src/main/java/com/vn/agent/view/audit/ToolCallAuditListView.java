@@ -1,5 +1,7 @@
 package com.vn.agent.view.audit;
 
+import com.vaadin.flow.component.AbstractField;
+import com.vaadin.flow.component.HasValue;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datetimepicker.DateTimePicker;
@@ -35,16 +37,18 @@ import java.util.Locale;
  *
  * <p>Wires:
  * <ul>
- *     <li>D-19 — typed filter bar (user / tool / outcome / date range) with explicit
- *         valueChangeListeners that rebuild the loader's JPQL and reload. Jmix
- *         {@code <genericFilter>} is also declared in XML so admins have the full
- *         condition-builder for ad-hoc queries.</li>
+ *     <li>D-19 — typed filter bar (user / tool / outcome / date range) with declarative
+ *         {@code @Subscribe("<fieldId>")} valueChange handlers that rebuild the loader's
+ *         JPQL and reload. Jmix {@code <genericFilter>} is also declared in XML so admins
+ *         have the full condition-builder for ad-hoc queries.</li>
  *     <li>D-20 — grid actions {@code grdexp_excelExport} / {@code grdexp_jsonExport}
  *         wired via XML {@code type=} attribute. Toolbar buttons bind to these actions
  *         via {@code action="auditsDataGrid.excelExport"}. Both exports honour the
  *         active filter bar automatically because gridexport streams through the
  *         DataProvider (RESEARCH Pitfall §gridexport).</li>
- *     <li>D-21 — row-click opens a {@link ToolCallAuditDetailDialog} modal.</li>
+ *     <li>D-21 — row-click opens a {@link ToolCallAuditDetailDialog} modal. Retained
+ *         as a raw {@code addItemClickListener} because ItemClickEvent carries the
+ *         per-row entity needed for the dialog (dynamic grid-row wiring carve-out).</li>
  *     <li>D-22 — Outcome column renders as a themed Vaadin Badge.</li>
  * </ul>
  * </p>
@@ -94,23 +98,45 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
                 null, o.name(), UI.getCurrent().getLocale()));
 
         userFilter.setValueChangeMode(com.vaadin.flow.data.value.ValueChangeMode.LAZY);
-        userFilter.addValueChangeListener(e -> rebuildQuery());
-        toolFilter.addValueChangeListener(e -> rebuildQuery());
-        outcomeFilter.addValueChangeListener(e -> rebuildQuery());
-        dateFromFilter.addValueChangeListener(e -> rebuildQuery());
-        dateToFilter.addValueChangeListener(e -> rebuildQuery());
 
         // D-22 Outcome badge renderer.
         auditsDataGrid.getColumnByKey("outcome")
                 .setRenderer(new ComponentRenderer<>(this::renderOutcomeBadge));
 
-        // D-21 Row-click opens detail dialog.
+        // D-21 Row-click opens detail dialog. Retained as a raw listener because the
+        // ItemClickEvent carries the per-row entity the dialog needs.
         auditsDataGrid.addItemClickListener(e -> {
             AiToolCallAudit row = e.getItem();
             if (row != null) {
                 new ToolCallAuditDetailDialog(row, messageSource, UI.getCurrent().getLocale()).open();
             }
         });
+    }
+
+    @Subscribe("userFilter")
+    public void onUserFilterChange(
+            final AbstractField.ComponentValueChangeEvent<TextField, String> event) {
+        rebuildQuery();
+    }
+
+    @Subscribe("toolFilter")
+    public void onToolFilterChange(final HasValue.ValueChangeEvent<?> event) {
+        rebuildQuery();
+    }
+
+    @Subscribe("outcomeFilter")
+    public void onOutcomeFilterChange(final HasValue.ValueChangeEvent<?> event) {
+        rebuildQuery();
+    }
+
+    @Subscribe("dateFromFilter")
+    public void onDateFromFilterChange(final HasValue.ValueChangeEvent<?> event) {
+        rebuildQuery();
+    }
+
+    @Subscribe("dateToFilter")
+    public void onDateToFilterChange(final HasValue.ValueChangeEvent<?> event) {
+        rebuildQuery();
     }
 
     private Span renderOutcomeBadge(AiToolCallAudit row) {

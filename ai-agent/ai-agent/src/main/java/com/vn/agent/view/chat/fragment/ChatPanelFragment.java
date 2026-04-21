@@ -1,8 +1,10 @@
 package com.vn.agent.view.chat.fragment;
 
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -103,14 +105,24 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
-        sendButton.addClickListener(e -> onSendClick());
-        stopButton.addClickListener(e -> onStopClick());
         // Enter → send; Shift+Enter → newline (chat UX convention). The text area's
         // default Enter behaviour inserts a newline, so we must preventDefault when
-        // firing the send to stop the newline from being appended first.
+        // firing the send to stop the newline from being appended first. This remains
+        // a raw DOM listener because it wires a JS-side filter (preventDefault +
+        // keyboard-shortcut semantics) that @Subscribe does not model.
         messageInput.getElement().addEventListener("keydown", ev -> onSendClick())
                 .setFilter("event.key === 'Enter' && !event.shiftKey && !event.isComposing")
                 .addEventData("event.preventDefault()");
+    }
+
+    @Subscribe("sendButton")
+    public void onSendButtonClick(final ClickEvent<Button> event) {
+        onSendClick();
+    }
+
+    @Subscribe("stopButton")
+    public void onStopButtonClick(final ClickEvent<Button> event) {
+        onStopClick();
     }
 
     @Override

@@ -1,6 +1,8 @@
 package com.vn.agent.view.parameters;
 
+import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -70,10 +72,10 @@ public class ParametersListView extends StandardListView<AiParameters> {
     public void onInit(final InitEvent event) {
         setActiveBtn.setEnabled(false);
 
+        // Grid selection → button enabled state: kept raw per the review's carve-out
+        // for dynamic grid selection wiring.
         parametersDataGrid.addSelectionListener(e ->
                 setActiveBtn.setEnabled(e.getFirstSelectedItem().isPresent()));
-
-        setActiveBtn.addClickListener(e -> onSetActiveClick());
 
         // Model column — parsed from bodyYaml, NEVER raw blob.
         parametersDataGrid.getColumnByKey("model")
@@ -102,6 +104,11 @@ public class ParametersListView extends StandardListView<AiParameters> {
 
         // Invalidate parsed cache on any reload so renderers re-read fresh bodyYaml.
         parametersDl.addPostLoadListener(e -> parsedCache.clear());
+    }
+
+    @Subscribe("setActiveBtn")
+    public void onSetActiveBtnClick(final ClickEvent<Button> event) {
+        onSetActiveClick();
     }
 
     /** D-14: immediate commit, no confirm dialog. */

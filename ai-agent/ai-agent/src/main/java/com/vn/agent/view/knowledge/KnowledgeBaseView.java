@@ -1,8 +1,10 @@
 package com.vn.agent.view.knowledge;
 
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -113,6 +115,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
     public void onInit(final InitEvent event) {
         reingestBtn.setEnabled(false);
         deleteBtn.setEnabled(false);
+        // Selection → action-button enabled state: kept raw because this is the
+        // "dynamic grid selection → button enabled" carve-out allowed by the review.
         documentsDataGrid.addSelectionListener(e -> {
             boolean selected = e.getFirstSelectedItem().isPresent();
             reingestBtn.setEnabled(selected);
@@ -123,13 +127,20 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         documentsDataGrid.getColumnByKey("status")
                 .setRenderer(new ComponentRenderer<>(doc -> renderStatusBadge(doc)));
 
-        // Wire row actions (D-18) via toolbar buttons — keeps the layout tree in XML and
-        // the click handlers in the controller (Jmix-first: no programmatic UI construction).
-        reingestBtn.addClickListener(e -> onReingestClick());
-        deleteBtn.addClickListener(e -> onDeleteClick());
-
-        // Upload wiring — D-15 / RESEARCH Pitfall #3 multi-file receiver.
+        // Upload wiring — D-15 / RESEARCH Pitfall #3 multi-file receiver. Upload
+        // succeed/fail/reject events are component-specific (not ClickEvent), so
+        // they continue to be wired via explicit listener calls.
         configureUploadListeners();
+    }
+
+    @Subscribe("reingestBtn")
+    public void onReingestButtonClick(final ClickEvent<Button> event) {
+        onReingestClick();
+    }
+
+    @Subscribe("deleteBtn")
+    public void onDeleteButtonClick(final ClickEvent<Button> event) {
+        onDeleteClick();
     }
 
     @Subscribe

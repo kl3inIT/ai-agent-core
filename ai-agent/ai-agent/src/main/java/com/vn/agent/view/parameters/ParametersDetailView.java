@@ -1,6 +1,10 @@
 package com.vn.agent.view.parameters;
 
+import com.vaadin.flow.component.AbstractField;
+import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.HasValue;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiParameters;
@@ -119,19 +123,54 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
         }
         registryToolNames = List.copyOf(toolNames);
         enabledToolsField.setItems(registryToolNames);
+    }
 
-        // ---- Live YAML preview: every form field value-change refreshes the preview (D-12) ----
-        modelField.addValueChangeListener(e -> refreshYamlPreview());
-        temperatureField.addValueChangeListener(e -> refreshYamlPreview());
-        topPField.addValueChangeListener(e -> refreshYamlPreview());
-        maxTokensField.addValueChangeListener(e -> refreshYamlPreview());
-        systemPromptField.addValueChangeListener(e -> refreshYamlPreview());
-        enabledToolsField.addValueChangeListener(e -> refreshYamlPreview());
-        ragTopKField.addValueChangeListener(e -> refreshYamlPreview());
-        ragSimilarityThresholdField.addValueChangeListener(e -> refreshYamlPreview());
+    // ---- D-12 Live YAML preview: each field's @Subscribe("fieldId") valueChange handler ----
+    // Each field has its own handler method so the wiring is declarative per Jmix convention.
 
-        // ---- Set active button (D-14 immediate commit) ----
-        setActiveBtn.addClickListener(e -> onSetActiveClick());
+    @Subscribe("modelField")
+    public void onModelFieldChange(final AbstractField.ComponentValueChangeEvent<?, ?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("temperatureField")
+    public void onTemperatureFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("topPField")
+    public void onTopPFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("maxTokensField")
+    public void onMaxTokensFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("systemPromptField")
+    public void onSystemPromptFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("enabledToolsField")
+    public void onEnabledToolsFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("ragTopKField")
+    public void onRagTopKFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("ragSimilarityThresholdField")
+    public void onRagSimilarityThresholdFieldChange(final HasValue.ValueChangeEvent<?> event) {
+        refreshYamlPreview();
+    }
+
+    @Subscribe("setActiveBtn")
+    public void onSetActiveBtnClick(final ClickEvent<Button> event) {
+        onSetActiveClick();
     }
 
     @Subscribe
