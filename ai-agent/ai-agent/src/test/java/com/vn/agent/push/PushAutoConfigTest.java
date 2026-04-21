@@ -1,6 +1,5 @@
 package com.vn.agent.push;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,7 +14,6 @@ class PushAutoConfigTest {
 
     @Nested
     @SpringBootTest
-    @Disabled("07-07b will enable once 07-02 push autoconfig lands")
     class DefaultEnabled {
 
         @Test
@@ -26,7 +24,6 @@ class PushAutoConfigTest {
 
     @Nested
     @SpringBootTest(properties = "jmix.ai-agent.flowui.push-autoconfigure=false")
-    @Disabled("07-07b will enable once 07-02 push autoconfig lands")
     class DisabledByProperty {
 
         @Test
