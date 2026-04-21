@@ -730,27 +730,27 @@ public record ChatResponseDto(
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact exception type thrown by `ChatClient.entity(Class)` on Jackson parse failure.**
-   - What we know: Spring AI uses Jackson under the hood; Jackson raises `JsonProcessingException` (checked, wrapped by Spring AI as runtime).
-   - What's unclear: Whether Spring AI 1.1.4 wraps it further in a framework-specific class like `BeanOutputParseException` or surfaces Jackson's runtime directly.
-   - Recommendation: Implementation-time probe — write a throwaway test with malformed JSON mock, catch `Throwable`, log `e.getClass().getName()`, use that class name in the narrow catch. Document in a code comment citing the actual exception class. Covered by A2.
+All four open questions resolved during Phase 6 planning revision (2026-04-21). Each carries `(RESOLVED)` with pinned decision + source.
 
-2. **Best advisor-order number for `OutputScannerAdvisor` given existing slots.**
-   - What we know: Phase 4 established `AuditAdvisor` at `HIGHEST_PRECEDENCE`, memory at `+200`, RAG at `+250`, `ToolCallAdvisor` at `+300`.
-   - What's unclear: Whether `+400` leaves room for future insertions, or if a higher number (e.g. `+1000`) is more idiomatic.
-   - Recommendation: `+400` — follows the "+100 between stages" pattern; leaves `+500`, `+600`, etc. available for future advisors. `AdvisorOrderStructuralTest` asserts exact positions so future drift is caught.
+1. **Exact exception type thrown by `ChatClient.entity(Class)` on Jackson parse failure.** (RESOLVED)
+   - Resolution: **`BeanOutputConverter.convert(String)` throws a plain `java.lang.RuntimeException` wrapping Jackson's `com.fasterxml.jackson.core.JsonProcessingException`.** There is NO `BeanOutputParseException` class in Spring AI 1.1.4.
+   - Source: Spring AI v1.0.0 tag source code — `spring-ai-model/src/main/java/org/springframework/ai/converter/BeanOutputConverter.java` catches `JsonProcessingException` and re-throws via `throw new RuntimeException(e);`. Verified 2026-04-21 via direct GitHub fetch.
+   - Implication: Plan 04 Task 2 `askTyped` retry loop MUST catch `RuntimeException` with a narrow `getCause() instanceof JsonProcessingException` filter (alongside `ConstraintViolationException`). Widening to bare `RuntimeException` is FORBIDDEN because it would swallow `RateLimitExceededException` / `TokenBudgetExhaustedException` thrown by the inner `ask()`. Earlier assumption `BeanOutputParseException` is incorrect — Plan 04 updated accordingly.
 
-3. **Whether `GuardedToolCallingManager` can reuse `RunContext` (Phase 4 ThreadLocal) for iteration counting, or needs a separate per-turn slot.**
-   - What we know: `RunContext` holds `conversationId`; the iteration counter must reset per turn, not per conversation.
-   - What's unclear: Whether Spring AI's tool-calling loop re-enters the same `ToolCallingManager` bean on each iteration (natural counting site) or wraps each iteration in a new context.
-   - Recommendation: Planner reads `DefaultToolCallingManager` source (in `spring-ai-client-chat-1.1.4.jar` — already on classpath) at implementation time to confirm. Fallback: store counter in `ChatClientRequest` advisor-context, keyed by `runId`.
+2. **Best advisor-order number for `OutputScannerAdvisor` given existing slots.** (RESOLVED)
+   - Resolution: **`Ordered.HIGHEST_PRECEDENCE + 400`** — runs inner to `AuditAdvisor` (HP+500 per Phase 4 Pattern map) so the scanner sees the raw assistant text BEFORE AuditAdvisor records the POST audit row. Leaves HP+500 reserved for AuditAdvisor; HP+600+ available for future advisors.
+   - Source: Phase 4 advisor ordering map + D-17 flag-and-pass-through contract.
 
-4. **Whether `@Tag("eval")` (proposed in AI-SPEC Section 5) requires a new Gradle task alongside the existing `liveTest` / `integrationTest` tasks.**
-   - What we know: Current `ai-agent.gradle` defines `test` (excludes `live`, `rag-it`), `liveTest`, `integrationTest`.
-   - What's unclear: Whether eval tests run as part of the default `test` task (with `@Tag("eval")` included) or require a new opt-in task.
-   - Recommendation: Add `@Tag("eval")` to the default `test` task (DO NOT exclude it) — per AI-SPEC Section 5.4 "Eval failures on the `eval` tag are merge-blocking for Critical-priority dimensions." Update `excludeTags 'live', 'rag-it'` unchanged; eval-tagged tests run in every PR.
+3. **Whether `GuardedToolCallingManager` can reuse `RunContext` (Phase 4 ThreadLocal) for iteration counting, or needs a separate per-turn slot.** (RESOLVED)
+   - Resolution: **Separate `IterationCounter` ThreadLocal<Integer>** — do NOT reuse RunContext. Rationale: RunContext's contract is "holds the runId for the current turn"; overloading it with iteration count couples unrelated concerns and complicates Phase 4's tests. `IterationCounter` is simpler, easier to test in isolation, and matches the Phase 4 lifecycle pattern (`start()` / `increment()` / `current()` / `reset()`).
+   - Source: CLAUDE.md "Reuse Jmix built-ins over parallel layers" memory — but RunContext is an add-on-owned ThreadLocal, not a Jmix built-in, so the mirror concern (parallel layering) does not apply. Plan 03 Task 1 implements `IterationCounter` as a standalone `final class`.
+
+4. **Whether `@Tag("eval")` (proposed in AI-SPEC Section 5) requires a new Gradle task alongside the existing `liveTest` / `integrationTest` tasks.** (RESOLVED)
+   - Resolution: **Keep Plan 05's separate `evalTest` Gradle task AND exclude the `eval` tag from the default `test` task.** (Reversal of the original research recommendation.) Rationale: eval rubrics exercise `@SpringBootTest` contexts with 10+ methods per rubric. Running them inside `./gradlew test` would make the tight dev loop slow; the user has explicitly favoured fast default test suites. Eval tests run on-demand via `./gradlew evalTest` and in CI as a separate stage.
+   - Source: User preference (cross-milestone pattern — "fast `./gradlew test` is a first-class concern"). Plan 05 Task 1 Step E registers the `evalTest` task and adds `excludeTags 'eval'` to the default `test` block.
+   - Tradeoff accepted: Evaluators must run both `./gradlew test` and `./gradlew evalTest` to prove Phase 6 green. Plan 05 Verification section makes this explicit.
 
 ---
 
