@@ -4,12 +4,14 @@ import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
 import com.vn.agent.guard.IterationCounter;
 import com.vn.agent.guard.OutputScannerAdvisor;
 import com.vn.agent.guard.RateLimitExceededException;
 import com.vn.agent.guard.RateLimitGuard;
+import com.vn.agent.guard.StructuredOutputException;
 import com.vn.agent.guard.TokenBudgetExhaustedException;
 import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.orchestration.AiParametersResolver;
@@ -21,6 +23,7 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -28,6 +31,7 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.security.core.Authentication;
@@ -251,13 +255,68 @@ public class DefaultChatServiceImpl implements ChatService {
 
     @Override
     public <T> T askTyped(String userId, UUID conversationId, String message, Class<T> targetType) {
-        throw new UnsupportedOperationException("Task 2b pending");
+        return askTyped(userId, conversationId, message, Overrides.NONE, targetType);
     }
 
     @Override
     public <T> T askTyped(String userId, UUID conversationId, String message,
                           Overrides overrides, Class<T> targetType) {
-        throw new UnsupportedOperationException("Task 2b pending");
+        BeanOutputConverter<T> converter = new BeanOutputConverter<>(targetType);
+        String formatHint = converter.getFormat();
+        final int maxAttempts = 2; // D-19 / ROADMAP §06 success criterion #4: initial + 1 retry.
+        String lastRaw = null;
+        String enrichedUserMessage = message + "\n\n" + formatHint;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            ChatResponseDto resp = ask(userId, conversationId, enrichedUserMessage, overrides);
+            if (resp.guardDenial() != null) {
+                // Guard denial short-circuits typed calls — surface as a typed exception
+                // keyed off the denial message key (D-10 / AI-SPEC §4.4).
+                throw mapDenialToTypedException(resp.guardDenial(), targetType);
+            }
+            lastRaw = resp.content();
+            try {
+                T parsed = converter.convert(lastRaw);
+                var violations = validator.validate(parsed);
+                if (!violations.isEmpty()) {
+                    throw new ConstraintViolationException(violations);
+                }
+                return parsed;
+            } catch (ConstraintViolationException validation) {
+                log.warn("askTyped validation attempt {}/{} failed for {}: {}",
+                        attempt, maxAttempts, targetType.getSimpleName(), validation.getMessage());
+            } catch (RuntimeException ex) {
+                // Spring AI 1.1.4 BeanOutputConverter wraps Jackson JsonProcessingException in a
+                // plain RuntimeException (no BeanOutputParseException class exists — RESEARCH
+                // Open Question 1 resolved). Narrow-by-cause so guard exceptions thrown by the
+                // inner ask() bubble out cleanly instead of being swallowed by the retry loop.
+                if (!(ex.getCause() instanceof JsonProcessingException)) {
+                    throw ex;
+                }
+                log.warn("askTyped parse attempt {}/{} failed for {}: {}",
+                        attempt, maxAttempts, targetType.getSimpleName(), ex.getMessage());
+                enrichedUserMessage = message
+                        + "\n\nYour previous reply could not be parsed. Strictly follow this format:\n"
+                        + formatHint;
+            }
+        }
+        throw new StructuredOutputException(lastRaw, targetType);
+    }
+
+    /**
+     * Maps a {@link ChatResponseDto.GuardDenialInfo} produced by the inner {@link #ask} call
+     * into a typed guard exception so {@code askTyped} callers can use per-exception-type
+     * {@code catch} clauses. The synthesised exceptions carry audit-only ceilings of {@code 0}
+     * (the real numeric ceilings stay at the guard layer — D-10).
+     */
+    private RuntimeException mapDenialToTypedException(ChatResponseDto.GuardDenialInfo info,
+                                                        Class<?> targetType) {
+        return switch (info.messageKey()) {
+            case "ai-agent.guard.rate-limit-exceeded"    -> new RateLimitExceededException(0);
+            case "ai-agent.guard.token-budget-exhausted" -> new TokenBudgetExhaustedException(0L);
+            case "ai-agent.guard.iteration-cap-exceeded" -> new IterationCapExceededException(0);
+            case "ai-agent.guard.tool-vetoed"            -> new ToolVetoedException("tool-vetoed");
+            default                                       -> new StructuredOutputException(null, targetType);
+        };
     }
 
     /**

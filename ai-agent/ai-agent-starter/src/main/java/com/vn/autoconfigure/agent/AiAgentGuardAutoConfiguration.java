@@ -13,6 +13,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cache.CacheManager;
@@ -96,6 +97,7 @@ public class AiAgentGuardAutoConfiguration {
      */
     @Bean(name = GUARDED_TOOL_CALLING_MANAGER_BEAN)
     @Primary
+    @ConditionalOnBean(name = "toolCallingManager")
     @ConditionalOnMissingBean(name = GUARDED_TOOL_CALLING_MANAGER_BEAN)
     public ToolCallingManager guardedToolCallingManager(
             BeanFactory beanFactory,

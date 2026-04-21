@@ -7,8 +7,13 @@ import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.rag.RetrievalFilterBuilder;
+import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.guard.RateLimitGuard;
+import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
+import jakarta.validation.Validator;
+import org.springframework.ai.chat.client.ChatClientResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -53,7 +58,12 @@ class ChatServiceFilterParamContractTest {
     BaselineContextProvider baselineContextProvider;
     RetrievalFilterBuilder retrievalFilterBuilder;
     CurrentAuthentication currentAuthentication;
+    RateLimitGuard rateLimitGuard;
+    TokenBudgetGuard tokenBudgetGuard;
+    AuditWriter auditWriter;
+    Validator validator;
     ChatClient.AdvisorSpec advisorSpec;
+    ChatClientResponse chatClientResponse;
 
     DefaultChatServiceImpl service;
 
@@ -70,7 +80,12 @@ class ChatServiceFilterParamContractTest {
         baselineContextProvider = mock(BaselineContextProvider.class);
         retrievalFilterBuilder = mock(RetrievalFilterBuilder.class);
         currentAuthentication = mock(CurrentAuthentication.class);
+        rateLimitGuard = mock(RateLimitGuard.class);
+        tokenBudgetGuard = mock(TokenBudgetGuard.class);
+        auditWriter = mock(AuditWriter.class);
+        validator = mock(Validator.class);
         advisorSpec = mock(ChatClient.AdvisorSpec.class);
+        chatClientResponse = mock(ChatClientResponse.class);
 
         AiConversation conv = mock(AiConversation.class);
         convId = UUID.randomUUID();
@@ -79,8 +94,8 @@ class ChatServiceFilterParamContractTest {
 
         AiParameters active = mock(AiParameters.class);
         when(parametersResolver.resolveActive()).thenReturn(active);
-        when(parametersResolver.effectiveModel(any())).thenReturn("openai/gpt-4o-mini");
-        when(parametersResolver.effectiveSystemPrompt(any())).thenReturn("system");
+        when(parametersResolver.effectiveModel(any(), any())).thenReturn("openai/gpt-4o-mini");
+        when(parametersResolver.effectiveSystemPrompt(any(), anyString(), any(), any())).thenReturn("system");
         when(parametersResolver.effectiveTemperature(any())).thenReturn(0.7);
         when(parametersResolver.effectiveTopP(any())).thenReturn(0.9);
         when(parametersResolver.effectiveMaxTokens(any())).thenReturn(2048);
@@ -95,14 +110,16 @@ class ChatServiceFilterParamContractTest {
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.options(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);
-        when(callSpec.chatResponse()).thenReturn(null);
+        when(callSpec.chatClientResponse()).thenReturn(chatClientResponse);
+        when(chatClientResponse.chatResponse()).thenReturn(null);
+        when(chatClientResponse.context()).thenReturn(new java.util.HashMap<>());
 
         // advisorSpec is fluent — every .param(...) returns itself.
         when(advisorSpec.param(anyString(), any())).thenReturn(advisorSpec);
 
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder,
-                currentAuthentication);
+                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator);
     }
 
     @Test
