@@ -2,10 +2,10 @@
  * AI Agent chat styles.
  *
  * Packaged on the library classpath under META-INF/resources/frontend/styles/ so
- * Vaadin's frontend scanner picks them up via @CssImport on MessageBubbleComponent
- * and ToolCallCardComponent. Keeps the Java controllers layout-free per the Jmix-first
- * UI guideline (CLAUDE.md: "Jmix-first UI over raw Vaadin"); programmatic Java style
- * mutations on these components are forbidden going forward.
+ * Vaadin's frontend scanner picks them up via @CssImport on MessageBubbleComponent.
+ * Keeps the Java controllers layout-free per the Jmix-first UI guideline
+ * (CLAUDE.md: "Jmix-first UI over raw Vaadin"); programmatic Java style mutations
+ * on these components are forbidden going forward.
  *
  * Rule: edit this file — NOT the Java components — when tweaking visuals.
  */
@@ -30,34 +30,4 @@
 
 .ai-agent-bubble--system {
     border-left: 2px solid var(--lumo-contrast-30pct);
-}
-
-/* --- Tool-call card (ToolCallCardComponent) --------------------------------- */
-
-.ai-agent-tool-card__heading {
-    font-weight: 600;
-}
-
-.ai-agent-tool-card__pre {
-    white-space: pre-wrap;
-    max-height: 20em;
-    overflow: auto;
-}
-
-/* --- Shared dialog styles (ToolCallAuditDetailDialog, CitationDialog) ------- */
-/*
- * Shared between the audit-detail and citation dialogs (plus the tool-card `__pre`
- * above). The 14em variant is for the audit dialog's args/result panes, 30em for
- * the citation snippet (longer text payload). Consolidates the IN-05 repeated
- * inline styles flagged in the review.
- */
-
-.ai-agent-scroll-pre {
-    white-space: pre-wrap;
-    max-height: 14em;
-    overflow: auto;
-}
-
-.ai-agent-scroll-pre--tall {
-    max-height: 30em;
 }

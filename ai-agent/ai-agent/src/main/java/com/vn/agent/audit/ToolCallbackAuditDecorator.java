@@ -120,9 +120,10 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             log.warn("Tool PRE audit failed runId={} tool={}", runId, toolName, t);
         }
 
-        // Plan 07-02: correlate ToolCall / ToolResult pair via a single id (ChatView's
-        // ToolCallCardComponent.setResult matches by id). Emission is a no-op when no
-        // streaming run is active (blocking ask() path or non-chat invocation).
+        // Plan 07-02: correlate ToolCall / ToolResult pair via a single id. The pair is
+        // consumed by StreamEventRenderer (Plan 07.1-02) which matches the ToolResult back
+        // to the originating ToolCall by this id. Emission is a no-op when no streaming
+        // run is active (blocking ask() path or non-chat invocation).
         final UUID toolCallId = UUID.randomUUID();
         emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
 

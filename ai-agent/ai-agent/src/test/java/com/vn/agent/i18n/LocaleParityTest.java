@@ -49,7 +49,7 @@ class LocaleParityTest {
 
     @Test
     void bundlesHaveIdenticalKeySets() throws IOException {
-        Properties en = load("/com/vn/agent/messages.properties");
+        Properties en = load("/com/vn/agent/messages_en.properties");
         Properties vi = load("/com/vn/agent/messages_vi.properties");
 
         Set<Object> enKeys = new HashSet<>(en.keySet());
@@ -73,7 +73,7 @@ class LocaleParityTest {
 
     @Test
     void allPhase7KeysPresent() throws IOException {
-        Properties en = load("/com/vn/agent/messages.properties");
+        Properties en = load("/com/vn/agent/messages_en.properties");
 
         List<String> requiredPrefixes = List.of(
                 "chatView.",
