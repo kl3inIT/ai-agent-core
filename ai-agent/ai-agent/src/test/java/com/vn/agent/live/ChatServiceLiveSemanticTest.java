@@ -26,8 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * needs the autoconfigured OpenAI {@code ChatModel} from the starter.
  *
  * <p>Primary value: prove the full wire works (model resolution, OpenRouter slug, ChatClient,
- * advisor chain, audit writes, dual-layer memory, OpenRouter 200 OK). The assistant content
- * assertion is soft (non-blank + one of several common affirmative words) to tolerate model drift.
+ * advisor chain, audit writes, dual-layer memory, OpenRouter 200 OK). The assertion is
+ * intentionally transport-level only: once RAG entered the default advisor chain, a live model
+ * can legitimately decline an empty-knowledge-base prompt instead of echoing "pong", but the
+ * wire is still proven as long as we receive a non-empty assistant response plus ids.
  */
 @SpringBootTest(classes = AITestConfiguration.class)
 @ImportAutoConfiguration({
@@ -47,10 +49,5 @@ class ChatServiceLiveSemanticTest {
         assertThat(resp.content()).isNotBlank();
         assertThat(resp.runId()).isNotNull();
         assertThat(resp.conversationId()).isNotNull();
-
-        // Soft semantic assertion — LLMs may add punctuation/casing variance. The test's PRIMARY
-        // value is proving the wire works, not specific output text.
-        assertThat(resp.content().toLowerCase())
-                .containsAnyOf("pong", "yes", "ok", "sure");
     }
 }

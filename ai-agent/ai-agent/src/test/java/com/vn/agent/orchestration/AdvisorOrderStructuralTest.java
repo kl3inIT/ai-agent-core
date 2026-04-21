@@ -3,6 +3,7 @@ package com.vn.agent.orchestration;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.audit.AuditAdvisor;
 import com.vn.agent.audit.ToolCallAdvisorBuilderConstants;
+import com.vn.agent.guard.OutputScannerAdvisor;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import org.junit.jupiter.api.Test;
@@ -25,14 +26,16 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Structural assertion that the default {@link ChatClient} carries the four advisors in the locked
- * order with the locked order values (Phase 4 baseline + Phase 5 RAG slot at +250):
+ * Structural assertion that the default {@link ChatClient} carries the five advisors in the locked
+ * order with the locked order values (Phase 4 baseline + Phase 5 RAG slot at +250 + Phase 6
+ * OutputScannerAdvisor at +400):
  *
  * <ol>
  *   <li>{@link AuditAdvisor} at {@link Ordered#HIGHEST_PRECEDENCE}</li>
  *   <li>{@code MessageChatMemoryAdvisor} at {@code HIGHEST_PRECEDENCE + 200}</li>
  *   <li>{@link RetrievalAugmentationAdvisor} at {@code HIGHEST_PRECEDENCE + 250} — Phase 5 RAG-04</li>
  *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300}</li>
+ *   <li>{@link OutputScannerAdvisor} at {@code HIGHEST_PRECEDENCE + 400} — Phase 6 (Plan 06-04)</li>
  * </ol>
  *
  * <p>Spring AI's {@code ChatClient} interface does not expose the default advisor list, so the
@@ -64,14 +67,15 @@ class AdvisorOrderStructuralTest {
         callAdvisors.sort(Comparator.comparingInt(CallAdvisor::getOrder));
 
         assertThat(callAdvisors)
-                .as("Default advisor list must contain the four advisors "
-                        + "(Phase 4 audit/memory/tool + Phase 5 rag at +250)")
-                .hasSize(4);
+                .as("Default advisor list must contain the five advisors "
+                        + "(Phase 4 audit/memory/tool + Phase 5 rag at +250 + Phase 6 outputScanner at +400)")
+                .hasSize(5);
 
         CallAdvisor audit = callAdvisors.get(0);
         CallAdvisor memory = callAdvisors.get(1);
         CallAdvisor rag = callAdvisors.get(2);
         CallAdvisor tool = callAdvisors.get(3);
+        CallAdvisor outputScanner = callAdvisors.get(4);
 
         assertThat(audit)
                 .as("First advisor (HIGHEST_PRECEDENCE) must be AuditAdvisor")
@@ -88,6 +92,11 @@ class AdvisorOrderStructuralTest {
 
         assertThat(tool).isInstanceOf(ToolCallAdvisor.class);
         assertThat(tool.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 300);
+
+        assertThat(outputScanner)
+                .as("Fifth advisor must be OutputScannerAdvisor at +400 (Phase 6 Plan 06-04)")
+                .isInstanceOf(OutputScannerAdvisor.class);
+        assertThat(outputScanner.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 400);
 
         // Reflectively assert the disabled internal-memory flag on ToolCallAdvisor. Field name is
         // captured in ToolCallAdvisorBuilderConstants (OQ-1 closure constants).

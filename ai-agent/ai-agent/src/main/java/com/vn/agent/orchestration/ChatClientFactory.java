@@ -1,7 +1,6 @@
 package com.vn.agent.orchestration;
 
 import com.vn.agent.audit.AuditAdvisor;
-import com.vn.agent.entity.AiParameters;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
@@ -20,6 +19,18 @@ import org.springframework.core.Ordered;
  * application instance — thread-safe per Spring AI docs; {@code DefaultChatServiceImpl} calls
  * {@code chatClient.prompt()} per request with per-request {@code .system()}, {@code .user()},
  * {@code .toolCallbacks()}, {@code .advisors()}, and {@code .options()}.
+ *
+ * <p><b>No bean-time {@code DataManager} access.</b> Profile resolution
+ * ({@link AiParametersResolver#resolveActive()}) is intentionally deferred to
+ * {@code DefaultChatServiceImpl.ask(...)} so this {@code @Bean} factory method never triggers
+ * Jmix's {@code eclipselink_JpaDataStore} / {@code eclipselink_QueryCache} bootstrap mid-
+ * context-refresh. Doing a Jmix query here caused
+ * {@code IllegalStateException: Unable to find cache: jmix-eclipselink-query-cache} at
+ * {@code StandardQueryCache.java:52} because the Spring {@code CacheManager} has not yet
+ * registered the {@code jmix-eclipselink-query-cache} bucket when the {@code ChatClient}
+ * bean is instantiated. Per-request resolution in {@code DefaultChatServiceImpl} also
+ * supersedes any baked-in {@code .defaultSystem(...)} via {@code chatClient.prompt().system(...)},
+ * so the earlier bean-time call was functionally dead in addition to being unsafe.</p>
  *
  * <p>Advisor ordering (D-02, verified via {@code javap} probes against
  * {@code spring-ai-client-chat-1.1.4.jar} — see {@code ToolCallAdvisorBuilderConstants}):</p>
@@ -52,13 +63,9 @@ public class ChatClientFactory {
     public ChatClient defaultChatClient(ChatModel chatModel,
                                         ChatMemory chatMemory,
                                         AuditAdvisor auditAdvisor,
-                                        AiParametersResolver parametersResolver,
                                         ToolCallingManager toolCallingManager,
                                         RetrievalAugmentationAdvisor ragAdvisor,
                                         @Qualifier("outputScannerAdvisor") CallAdvisor outputScannerAdvisor) {
-        AiParameters active = parametersResolver.resolveActive();
-        String systemPrompt = parametersResolver.effectiveSystemPrompt(active);
-
         MessageChatMemoryAdvisor memoryAdvisor = MessageChatMemoryAdvisor.builder(chatMemory)
                 .order(Ordered.HIGHEST_PRECEDENCE + 200)
                 .build();
@@ -69,8 +76,14 @@ public class ChatClientFactory {
                 .advisorOrder(Ordered.HIGHEST_PRECEDENCE + 300)
                 .build();
 
+        // .defaultSystem(...) is intentionally the static fallback — DefaultChatServiceImpl
+        // calls chatClient.prompt().system(composedSystemPrompt) per request, which supersedes
+        // whatever is set here. We must NOT resolve the active AiParameters row at bean-factory
+        // time: doing so forces Jmix's JpaDataStore/QueryCache chain to initialize before
+        // Spring's CacheManager has registered jmix-eclipselink-query-cache, crashing context
+        // startup with IllegalStateException at StandardQueryCache.java:52.
         return ChatClient.builder(chatModel)
-                .defaultSystem(systemPrompt != null ? systemPrompt : AiAgentDefaultsProperties.FALLBACK_SYSTEM_PROMPT)
+                .defaultSystem(AiAgentDefaultsProperties.FALLBACK_SYSTEM_PROMPT)
                 .defaultAdvisors(auditAdvisor, memoryAdvisor, ragAdvisor, toolCallAdvisor, outputScannerAdvisor)
                 .build();
     }

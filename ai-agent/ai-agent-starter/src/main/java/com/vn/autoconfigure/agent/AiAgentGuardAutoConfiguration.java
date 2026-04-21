@@ -31,10 +31,14 @@ import org.springframework.context.annotation.Primary;
  *
  * <p>Registrations:</p>
  * <ul>
- *   <li>{@link CacheManager} — default {@link ConcurrentMapCacheManager} pre-registering the two
- *       caches named in D-12 ({@code "ai-agent.rateLimit"} and {@code "ai-agent.tokenBreaker"}).
- *       Hosts declaring their own {@code CacheManager} (Redis, Caffeine, etc.) override this
- *       entirely.</li>
+ *   <li>{@link CacheManager} — default {@link ConcurrentMapCacheManager} in DYNAMIC mode (no
+ *       cacheNames passed to the constructor) so Jmix's expected caches
+ *       ({@code jmix-eclipselink-query-cache}, {@code resource-roles-cache},
+ *       {@code row-level-roles-cache}, etc.) are auto-created on first {@code getCache(name)}.
+ *       The two D-12 caches ({@code ai-agent.rateLimit}, {@code ai-agent.tokenBreaker}) are
+ *       pre-touched so {@code RateLimitGuard}/{@code TokenBudgetGuard} fail-fast lookups
+ *       succeed. Hosts declaring their own {@code CacheManager} (Redis, Caffeine, etc.)
+ *       override this entirely.</li>
  *   <li>{@link OutputScannerAdvisor} — exposed as a {@link CallAdvisor} bean so Plan 04's
  *       {@code ChatClientFactory} can pick it up alongside the existing advisor chain.</li>
  *   <li>{@link GuardedToolCallingManager} — {@code @Primary} ToolCallingManager decorating
@@ -58,15 +62,39 @@ public class AiAgentGuardAutoConfiguration {
     public static final String GUARDED_TOOL_CALLING_MANAGER_BEAN = "guardedToolCallingManager";
 
     /**
-     * Default two-cache CacheManager (D-12). Hosts declaring their own CacheManager
-     * (e.g. Redis, Caffeine) override this entirely.
+     * Default CacheManager (D-12). Created in DYNAMIC mode so Jmix's runtime cache consumers
+     * ({@code jmix-eclipselink-query-cache} via {@code StandardQueryCache},
+     * {@code resource-roles-cache} via {@code ResourceRoleRepositoryImpl}, and similar) can
+     * lazily obtain their caches at context-refresh time.
+     *
+     * <p><b>Critical:</b> do NOT pass cache names to the {@link ConcurrentMapCacheManager}
+     * constructor. Spring Boot's {@code ConcurrentMapCacheManager(String... cacheNames)}
+     * constructor flips the manager into fixed-names mode (dynamic=false), after which
+     * {@code getCache(name)} returns {@code null} for any name not in the constructor
+     * list. That caused {@code IllegalStateException: Unable to find cache:
+     * jmix-eclipselink-query-cache} at {@code StandardQueryCache.java:52} during Spring
+     * context refresh for any test/host that lets this autoconfig provide the primary
+     * {@code CacheManager}. Instead, use the no-args constructor (dynamic mode) and
+     * pre-touch the two D-12 caches so the guard beans' fail-fast lookups still succeed.</p>
+     *
+     * <p>Hosts declaring their own {@code CacheManager} (Redis, Caffeine, Jmix's own) override
+     * this entirely. When they do, they remain responsible for pre-registering
+     * {@code ai-agent.rateLimit} and {@code ai-agent.tokenBreaker} — the guard classes
+     * already document this contract in their Javadoc.</p>
      */
     @Bean
     @ConditionalOnMissingBean
     public CacheManager aiAgentGuardCacheManager() {
-        log.info("No CacheManager bean found — registering default ConcurrentMapCacheManager for "
-                + "caches ai-agent.rateLimit + ai-agent.tokenBreaker");
-        return new ConcurrentMapCacheManager("ai-agent.rateLimit", "ai-agent.tokenBreaker");
+        ConcurrentMapCacheManager mgr = new ConcurrentMapCacheManager();
+        // Pre-touch the D-12 caches so guard beans see them immediately. Dynamic mode stays
+        // ON because we did not pass names to the constructor — Jmix's own caches
+        // (jmix-eclipselink-query-cache, resource-roles-cache, etc.) will be auto-created
+        // on first getCache(name) during context refresh.
+        mgr.getCache("ai-agent.rateLimit");
+        mgr.getCache("ai-agent.tokenBreaker");
+        log.info("No CacheManager bean found — registered default dynamic ConcurrentMapCacheManager "
+                + "(pre-touched ai-agent.rateLimit + ai-agent.tokenBreaker; Jmix caches auto-create on demand)");
+        return mgr;
     }
 
     /**
