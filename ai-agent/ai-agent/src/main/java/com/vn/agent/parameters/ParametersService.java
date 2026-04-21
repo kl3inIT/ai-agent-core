@@ -59,6 +59,9 @@ public class ParametersService {
         AiParameters saved = dataManager.save(row);
         if (active) {
             setActive(saved.getId());
+            // WR-02: setActive() mutates the row but the local `saved` reference is now stale
+            // (still reports active=false). Re-load so callers receive the post-activation state.
+            return loadOrThrow(saved.getId());
         }
         return saved;
     }
