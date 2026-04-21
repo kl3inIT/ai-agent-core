@@ -18,6 +18,7 @@ import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ChatResponseDto;
 import com.vn.agent.orchestration.ConversationGateway;
+import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.parameters.Overrides;
 import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.spi.ToolVetoedException;
@@ -36,6 +37,7 @@ import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.Map;
 import java.util.UUID;
@@ -256,6 +258,12 @@ public class DefaultChatServiceImpl implements ChatService {
             IterationCounter.reset();
             com.vn.agent.orchestration.RunContext.clear();
         }
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides) {
+        // Implemented in Plan 07-02 Task 2 (streaming backbone with Sinks.Many bridge + CancellationRegistry wiring).
+        return Flux.error(new UnsupportedOperationException("stream() not yet implemented — see Plan 07-02 Task 2"));
     }
 
     @Override

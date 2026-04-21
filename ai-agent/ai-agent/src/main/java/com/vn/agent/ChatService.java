@@ -2,7 +2,9 @@ package com.vn.agent;
 
 import com.vn.agent.orchestration.ChatResponseDto;
 import com.vn.agent.orchestration.ConversationNotFoundException;
+import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.parameters.Overrides;
+import reactor.core.publisher.Flux;
 
 import java.util.UUID;
 
@@ -76,4 +78,23 @@ public interface ChatService {
      * {@link #askTyped(String, UUID, String, Class)}.
      */
     <T> T askTyped(String userId, UUID conversationId, String message, Overrides overrides, Class<T> targetType);
+
+    /**
+     * Streaming variant (D-01, D-04). Returns a Flux of {@link StreamingEvent} values
+     * interleaving content chunks, tool-call events (via the Sinks.Many bridge — Spring
+     * AI GH #5167 workaround), citations, and a terminal Final event. Errors during the
+     * stream are delivered as {@link StreamingEvent.Error} with a stable i18n message
+     * key — raw exception text is never emitted.
+     *
+     * <p>Cancellation: the active {@code Flux} subscription is registered in
+     * {@code CancellationRegistry} keyed on the pre-allocated {@code runId}; a
+     * {@code cancel(runId)} call disposes the subscription and audits the run with
+     * outcome {@code CANCELLED} (D-03).</p>
+     *
+     * <p>Non-streaming providers (D-04 graceful fallback) get a single Content chunk
+     * followed by Final — callers do not need to branch on capability.</p>
+     *
+     * @throws ConversationNotFoundException same ownership semantics as {@link #ask}
+     */
+    Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides);
 }
