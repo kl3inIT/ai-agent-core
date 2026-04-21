@@ -79,9 +79,13 @@ public class RateLimitGuard {
         int ceiling = props.resolvedRequestsPerMinute();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache == null) {
-            // Defensive: autoconfig ensures the cache exists; host-supplied CacheManagers that
-            // do not pre-register the name will return null. Fail-open rather than crash.
-            return;
+            // Fail-fast (CR-01): a host-provided CacheManager without the required cache would
+            // silently disable rate limiting. Surface the misconfiguration at request time so
+            // the operator notices immediately rather than discovering it through an outage.
+            throw new IllegalStateException(
+                    "Required AI guard cache missing: " + CACHE_NAME
+                            + ". Pre-register this cache on the host CacheManager "
+                            + "or let the starter's default ConcurrentMapCacheManager apply.");
         }
         Deque<Long> hits = cache.get(username, Deque.class);
         long now = Instant.now().toEpochMilli();

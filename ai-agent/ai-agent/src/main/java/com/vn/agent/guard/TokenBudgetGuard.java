@@ -46,6 +46,7 @@ public class TokenBudgetGuard {
         if (!props.tokenBreakerEnabled() || conversationId == null) {
             return;
         }
+        requireCache(); // Fail-fast (CR-01) if host CacheManager lacks the required cache.
         long total = currentTotal(conversationId);
         long ceiling = props.resolvedTokenCeiling();
         if (total >= ceiling) {
@@ -62,10 +63,7 @@ public class TokenBudgetGuard {
         if (!props.tokenBreakerEnabled() || conversationId == null || tokensUsed <= 0L) {
             return;
         }
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        if (cache == null) {
-            return;
-        }
+        Cache cache = requireCache();
         long newTotal = currentTotal(conversationId) + tokensUsed;
         cache.put(conversationId, newTotal);
     }
@@ -82,11 +80,24 @@ public class TokenBudgetGuard {
     }
 
     private long currentTotal(UUID conversationId) {
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        if (cache == null) {
-            return 0L;
-        }
+        Cache cache = requireCache();
         Long stored = cache.get(conversationId, Long.class);
         return stored == null ? 0L : stored;
+    }
+
+    /**
+     * Fail-fast cache lookup (CR-01). A host-provided {@link CacheManager} that does not
+     * pre-register {@link #CACHE_NAME} would otherwise make token-budget enforcement a silent
+     * no-op. Surfacing the misconfiguration at call time ensures operators notice immediately.
+     */
+    private Cache requireCache() {
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache == null) {
+            throw new IllegalStateException(
+                    "Required AI guard cache missing: " + CACHE_NAME
+                            + ". Pre-register this cache on the host CacheManager "
+                            + "or let the starter's default ConcurrentMapCacheManager apply.");
+        }
+        return cache;
     }
 }
