@@ -2,14 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 07.1
-last_updated: "2026-04-21T17:00:00Z"
+status: "Phase 07.1 awaiting human UAT (Plan 07.1-07 checkpoint:human-verify)"
+last_updated: "2026-04-21T23:59:00Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 50
   completed_plans: 48
+  awaiting_human_verify:
+    - "07.1-07 — UAT-7.1-CHAT-01..07 Playwright / manual smoke against :jmix-app:bootRun"
   percent: 96
 ---
 
