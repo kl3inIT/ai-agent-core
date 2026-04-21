@@ -1,67 +1,107 @@
 package com.vn.agent.view.chat;
 
 import com.vn.agent.ChatService;
+import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.orchestration.StreamingEvent;
+import com.vn.agent.view.chat.fragment.StreamEventRenderer;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
- * Plan 07-07b Task 2 — UI-01 streaming contract.
+ * UI-01 — stream semantics test (Phase 7.1 rewrite).
  *
- * <p>Per plan Rule-1 tolerance clause: direct {@code ChatPanelFragment} instantiation in
- * isolation requires a live Vaadin session + Jmix {@code Fragment} reflection wiring that
- * is not viable from a plain JUnit context inside the {@code ai-agent} addon module
- * ({@code @UiTest} only resolves against the {@code jmix-app} root module). We therefore
- * exercise the streaming contract the fragment depends on — {@link ChatService#stream} —
- * verifying Content events concatenate in arrival order and a Final event terminates the
- * flux. The fragment's {@code handleBatch} method is a pure string-concat over buffered
- * Content events, so asserting the ordering + termination of the {@code Flux} is a
- * sufficient regression guard; a UI-driven assertion is covered by the manual bootRun
- * checklist in the phase SUMMARY.
+ * <p>Pragmatic-unit per Plan 07-07b Rule-1 tolerance: no {@code @UiTest} in the addon
+ * module because the Jmix UI-test harness resolves only in the {@code jmix-app} root
+ * module. Instead, this test exercises the two contracts the Fragment's streaming
+ * pipeline depends on:
+ * <ol>
+ *   <li>{@link ChatService#stream} emits {@link StreamingEvent}s in arrival order;</li>
+ *   <li>{@link StreamEventRenderer#renderStreamEvent} maps each event to a markdown
+ *       fragment, and concatenating the fragments in order produces the expected
+ *       assistant message (the Fragment does exactly this via
+ *       {@code botMsg.appendText(md)} per event).</li>
+ * </ol>
+ * Full Vaadin render-path coverage is deferred to the {@code jmix-app} module's
+ * future {@code @UiTest} harness (Phase 8 infra).
  */
 class ChatViewStreamTest {
 
+    private Map<String, String> labels() {
+        return Map.of(
+                "chatView.stream.sources", "Sources",
+                "chatView.stream.outcome.SUCCESS", "done",
+                "chatView.stream.outcome.BLOCKED", "blocked",
+                "chatView.stream.outcome.ERROR", "error",
+                "chatView.stream.outcome.FLAGGED", "flagged",
+                "chatView.stream.error", "error");
+    }
+
     @Test
-    void contentEventsArriveInOrderAndStreamTerminatesWithFinal() throws InterruptedException {
-        ChatService chatService = mock(ChatService.class);
+    void stream_emitsEventsInOrder_renderedMarkdownConcatenates() {
+        ChatService chatService = Mockito.mock(ChatService.class);
         UUID runId = UUID.randomUUID();
-        when(chatService.stream(anyString(), any(), anyString(), any()))
+        Mockito.when(chatService.stream(
+                        Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(Flux.just(
-                        new StreamingEvent.Content("hello "),
+                        new StreamingEvent.Content("Hello "),
                         new StreamingEvent.Content("world"),
-                        new StreamingEvent.Final(runId, 100L, 0, 0)));
+                        new StreamingEvent.ToolCall(UUID.randomUUID(), "find_records", "{}"),
+                        new StreamingEvent.ToolResult(UUID.randomUUID(), "3 rows", AiToolCallOutcome.SUCCESS),
+                        new StreamingEvent.Final(runId, 150L, 10, 20)
+                ));
 
-        List<StreamingEvent> received = new ArrayList<>();
-        CountDownLatch done = new CountDownLatch(1);
+        StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
+        StringBuilder acc = new StringBuilder();
+        chatService.stream("user-1", null, "ping", null)
+                .map(e -> StreamEventRenderer.renderStreamEvent(e, labels(), state))
+                .toStream()
+                .forEach(acc::append);
 
-        chatService.stream("alice", UUID.randomUUID(), "hi", null)
-                .subscribe(received::add, t -> done.countDown(), done::countDown);
+        String out = acc.toString();
+        assertThat(out).startsWith("Hello world");
+        assertThat(out).contains("**find_records**");
+        assertThat(out).contains("done");
+        assertThat(out).contains("3 rows");
+    }
 
-        assertThat(done.await(2, TimeUnit.SECONDS)).as("stream must complete").isTrue();
+    @Test
+    void stream_citations_firstEmitsSourcesHeader_subsequentOnlyBullet() {
+        ChatService chatService = Mockito.mock(ChatService.class);
+        UUID docA = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        UUID docB = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        Mockito.when(chatService.stream(
+                        Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Flux.just(
+                        new StreamingEvent.Content("answer"),
+                        new StreamingEvent.Citation(0, docA, "snippet A"),
+                        new StreamingEvent.Citation(1, docB, "snippet B")
+                ));
 
-        // Content concatenation — the fragment's handleBatch does exactly this StringBuilder append.
-        StringBuilder concat = new StringBuilder();
-        int finalEvents = 0;
-        for (StreamingEvent event : received) {
-            if (event instanceof StreamingEvent.Content c) {
-                concat.append(c.markdownChunk());
-            } else if (event instanceof StreamingEvent.Final) {
-                finalEvents++;
-            }
-        }
-        assertThat(concat.toString()).isEqualTo("hello world");
-        assertThat(finalEvents).as("exactly one Final event terminates the stream").isEqualTo(1);
+        StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
+        List<String> fragments = new ArrayList<>();
+        chatService.stream("user-1", null, "ping", null)
+                .map(e -> StreamEventRenderer.renderStreamEvent(e, labels(), state))
+                .toStream()
+                .forEach(fragments::add);
+
+        // fragments[0] = "answer"
+        // fragments[1] = first citation (header + bullet, deep-link to docA)
+        // fragments[2] = second citation (only bullet, deep-link to docB, no header)
+        assertThat(fragments).hasSize(3);
+        assertThat(fragments.get(0)).isEqualTo("answer");
+        assertThat(fragments.get(1))
+                .contains("**Sources**")
+                .contains("/ai-agent/knowledge?documentId=" + docA);
+        assertThat(fragments.get(2))
+                .doesNotContain("**Sources**")
+                .contains("/ai-agent/knowledge?documentId=" + docB);
     }
 }
