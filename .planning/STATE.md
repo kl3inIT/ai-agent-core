@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 07.1
-last_updated: "2026-04-21T16:10:00.000Z"
+last_updated: "2026-04-21T16:45:00.000Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 50
-  completed_plans: 44
-  percent: 88
+  completed_plans: 45
+  percent: 90
 ---
 
 # Project State
@@ -141,6 +141,8 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-21 18:00 +07:00 — Plan 07-07b complete (Phase 7 Wave 5 test-suite GREEN fill: 11 classes / 28 @Test methods across i18n/view.chat/view.parameters/view.audit/view.conversation/view.knowledge/push/security packages; strip-@Disabled + TestLoginView infra (783b7af, 34316c6); LocaleParity + MarkdownXss + AdminViewAccess + PushAutoConfig (9b2935d); ChatViewStream + ChatViewStop + KnowledgeBaseUpload + DocumentStatusPush (b485a23); ParametersDetailYamlPreview + ToolCallAuditListView + ConversationListRoleFilter (a6594b0). All 28 new test methods green. Applied plan's own Rule-1 tolerance clause for view-level tests — full @UiTest harness is only in jmix-app root module, not in the addon. 20 pre-existing EclipseLink metamodel failures baseline-verified at HEAD 783b7af, recommended Phase 8 infra plan. SystemAuthenticator.withUser identity switching; ApplicationEventPublisher @SpyBean incompatibility worked around with real @EventListener component; .contains(CODE) not .equals(CODE) for Jmix-wrapped role authorities. Requirements UI-01..UI-06, UI-08, UI-09, UI-10 delivered. **Phase 07 complete (8/8 plans).** Next: Phase 07 merge to master + Phase 8 (Integration Hardening & Release Readiness).
 
 - 2026-04-21 +07:00 — Plan 07.1-01 complete (Phase 7.1 i18n key seed: 11 `chatView.stream.*` / `chatView.message.*` keys added at lines 143-153 in both `messages_en.properties` and `messages_vi.properties`; EN/VI parity diff empty; pre-existing `chatView.toolCard.*`/`chatView.citation.*`/`chatView.error.*` keys preserved per A-01). Commits d76c334, d2e16c6. Deviation: Rule 1 — plan targeted `messages.properties` but actual file is `messages_en.properties` after the pre-UAT rename (CONTEXT success criterion 5); applied to real filename. Deferred: LocaleParityTest has a stale hardcoded path `/com/vn/agent/messages.properties` — needs migration to `messages_en.properties` in a follow-up quick-task. Unblocks: 07.1-02 (renderStreamEvent pure function) + 07.1-03 (Fragment MessageSource wiring). Next: 07.1-02.
+
+- 2026-04-21 +07:00 — Plan 07.1-02 complete (pure StreamEventRenderer + unit test: com.vn.agent.view.chat.fragment.StreamEventRenderer with public static String renderStreamEvent(StreamingEvent, Map<String,String>, CitationState) exhaustive switch over all 6 StreamingEvent variants + nested CitationState.consumeFirst() first-of-turn gate + shortArgs(80 char cap) helper; zero Vaadin imports, zero Spring imports (D-08 pure-function testability); A-03 deep-link locks `/ai-agent/knowledge?documentId=<uuid>` format; A5 null-guard on Citation with null documentId emits unlinked bullet; RenderStreamEventTest plain JUnit 5 + AssertJ, 10 @Test methods covering all 6 variants + first/subsequent citation + null-doc-id + XSS passthrough smoke; RED at b7ecb33 compileTestJava failed on missing StreamEventRenderer symbol, GREEN at 161ac1e 10/10 tests pass). No deviations — plan executed exactly as written. Next: 07.1-03 (ChatPanelFragment rewrite — Vaadin MessageList/MessageInput wiring consuming renderStreamEvent).
 
 - 2026-04-21 13:30 +07:00 — Plan 07-04 complete (ConversationListView + ConversationDetailView role-aware replay: ConversationListView @Route("ai-agent/conversations") with CurrentAuthentication.getUser().getAuthorities() admin probe, role-gated userFilter + createdBy column, dynamic JPQL rebuild on filter valueChange, per-row DataManager count(m) for messageCount column (plan path b), double-click → viewNavigators.detailView; ConversationDetailView @Route("ai-agent/conversations/:id") reuses MessageBubbleComponent from 07-03 for read-only transcript replay, Continue-in-chat → UI.navigate(ChatView.class, QueryParameters conversationId=<uuid>); 4 files added, zero i18n changes (all keys pre-seeded by 07-01); compileJava + compileTestJava green). Requirement UI-03 delivered. Commits 3818edc, 87fa46c. Deviations: (Rule 1) CurrentAuthentication has no getAuthorities() — went through getUser(); (Rule 1) JPQL entity names are ai_AiConversation / ai_AiMessage, not AiAgent_* prefix; (Rule 1) AiMessage has no toolCallsJson field in Phase 2 — ToolCallCardComponent not imported, TOOL-role messages skipped. Next: 07-07b (fill RED test stubs) — final Phase 7 plan.
 
