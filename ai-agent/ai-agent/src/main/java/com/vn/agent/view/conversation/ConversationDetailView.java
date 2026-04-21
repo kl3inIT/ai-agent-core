@@ -71,12 +71,9 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
-        AiConversation conv = getEditedEntity();
-        if (conv == null) {
-            return;
-        }
-        messagesDl.setParameter("conv", conv);
-        messagesDl.load();
+        // The XML <dataLoadCoordinator auto="true"/> already triggers messagesDl once
+        // the :conv parameter is available from conversationDc. Avoid an extra manual
+        // load — just render whatever the container holds after the auto-load fires.
         renderTranscript(messagesDc.getItems());
     }
 
