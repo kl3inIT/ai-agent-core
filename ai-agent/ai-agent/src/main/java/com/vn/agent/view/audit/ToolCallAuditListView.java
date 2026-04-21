@@ -24,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -200,10 +199,5 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     /** Convenience for tests: expose the composed dialog type. */
     static Class<ToolCallAuditDetailDialog> detailDialogType() {
         return ToolCallAuditDetailDialog.class;
-    }
-
-    @SuppressWarnings("unused")
-    private static OffsetDateTime unused() {
-        return null; // imports stability only
     }
 }

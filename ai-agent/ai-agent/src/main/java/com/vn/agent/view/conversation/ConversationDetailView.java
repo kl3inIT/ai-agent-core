@@ -13,7 +13,6 @@ import com.vn.agent.view.chat.fragment.MessageBubbleComponent;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
-import io.jmix.flowui.model.InstanceLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardDetailView;
 import io.jmix.flowui.view.Subscribe;
@@ -50,8 +49,6 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationDetailView.class);
 
-    @ViewComponent
-    private InstanceLoader<AiConversation> conversationDl;
     @ViewComponent
     private CollectionLoader<AiMessage> messagesDl;
     @ViewComponent
@@ -122,11 +119,4 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
         log.debug("Rendered {} message bubbles for conversation replay", transcriptList.getComponentCount());
     }
 
-    // conversationDl is injected to honour Jmix @ViewComponent binding conventions for
-    // the auto-loaded instance container; @SuppressWarnings avoids an "unused" nag if
-    // a future refactor drops the explicit load call.
-    @SuppressWarnings("unused")
-    private InstanceLoader<AiConversation> unusedLoaderReference() {
-        return conversationDl;
-    }
 }

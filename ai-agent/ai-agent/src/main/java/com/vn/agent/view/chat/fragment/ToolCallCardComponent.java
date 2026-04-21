@@ -3,7 +3,6 @@ package com.vn.agent.view.chat.fragment;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.Composite;
-import com.vaadin.flow.component.HasText;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.Pre;
@@ -152,11 +151,5 @@ public class ToolCallCardComponent extends Composite<Details> {
     private static Locale currentLocale() {
         UI ui = UI.getCurrent();
         return ui != null ? ui.getLocale() : Locale.getDefault();
-    }
-
-    // Suppress the unused-HasText warning if the Vaadin version keeps the import path clean.
-    @SuppressWarnings("unused")
-    private static HasText asHasText(Span s) {
-        return s;
     }
 }

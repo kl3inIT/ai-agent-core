@@ -11,9 +11,7 @@ import com.vn.agent.view.knowledge.KnowledgeBaseView;
 import org.springframework.context.MessageSource;
 
 import java.text.MessageFormat;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -75,12 +73,5 @@ public class CitationDialog extends Dialog {
     private static Locale currentLocale() {
         UI ui = UI.getCurrent();
         return ui != null ? ui.getLocale() : Locale.getDefault();
-    }
-
-    // Defensive helper for QueryParameters multi-value construction — exposed as a
-    // single call site so the upgrade to a different Vaadin version only edits here.
-    @SuppressWarnings("unused")
-    private static QueryParameters buildQueryParams(UUID documentId) {
-        return new QueryParameters(Map.of("documentId", List.of(documentId.toString())));
     }
 }
