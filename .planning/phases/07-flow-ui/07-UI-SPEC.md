@@ -89,7 +89,7 @@ Driven entirely by Lumo semantic variables — never hex literals in view code. 
 | Tertiary / muted | `--lumo-tertiary-text-color` | Placeholder text, disabled-state labels |
 
 **Accent reserved for — and ONLY for:**
-1. The single primary action button per view: `Send` in ChatView, `Save` in ParametersDetailView, `Upload files` in KnowledgeBaseView, `Export CSV` in ToolCallAuditListView.
+1. The single primary action button per view: `Send` in ChatView, `Save` in ParametersDetailView, `Upload files` in KnowledgeBaseView, `Export Excel` in ToolCallAuditListView (the primary export; `Export JSON` is a secondary button with no accent).
 2. `Set active` action (list-row + detail button) — `theme="primary success"` on ParametersListView + Detail.
 3. Assistant-role chat bubble left border (2px primary).
 4. Active-profile row highlight in ParametersListView (left border 3px primary + `--lumo-primary-color-10pct` row tint).
@@ -237,7 +237,8 @@ All strings resolved through `msg://` keys in `messages.properties` (en, base) a
 | `auditList.filter.tool` | Tool | Công cụ |
 | `auditList.filter.outcome` | Outcome | Kết quả |
 | `auditList.filter.dateRange` | Date range | Khoảng thời gian |
-| `auditList.action.exportCsv` | Export CSV | Xuất CSV |
+| `auditList.action.exportExcel` | Export Excel | Xuất Excel |
+| `auditList.action.exportJson` | Export JSON | Xuất JSON |
 | `auditList.column.createdDate` | Time | Thời điểm |
 | `auditList.column.user` | User | Người dùng |
 | `auditList.column.tool` | Tool | Công cụ |
@@ -302,7 +303,10 @@ All strings resolved through `msg://` keys in `messages.properties` (en, base) a
 ### Audit list filter + export (CONTEXT D-19..D-22)
 - Above the grid: typed filter row (4 fields, `HorizontalLayout`, wraps on narrow widths).
 - Below: collapsible Jmix `genericFilter` element for ad-hoc.
-- `Export CSV` button (primary theme) uses `GridExportAction` (Jmix `gridexport` add-on) honoring current filter + sort; file name pattern `audit-{yyyyMMdd-HHmmss}.csv`.
+- Two export buttons bound to grid actions via Jmix `gridexport` add-on (`io.jmix.gridexport:jmix-gridexport-flowui-starter`):
+  - `Export Excel` (primary theme) → `<action id="excelExport" type="grdexp_excelExport"/>` on the audit `dataGrid`; filename pattern `audit-{yyyyMMdd-HHmmss}.xlsx`.
+  - `Export JSON` (no theme accent, secondary) → `<action id="jsonExport" type="grdexp_jsonExport"/>` on the audit `dataGrid`; filename pattern `audit-{yyyyMMdd-HHmmss}.json`.
+  - Both honor current filter + sort automatically; audit `dataGrid` uses `selectionMode="MULTI"` so admins can optionally export a selected subset. CSV export is intentionally not shipped (add-on does not provide one; see CONTEXT D-20).
 - Row click → modal `Dialog`, width `var(--lumo-size-xl-plus)` (≈ 960px), close button top-right, `Esc` closes.
 
 ### Admin gating (CONTEXT D-28, UI-10)
@@ -329,7 +333,7 @@ All strings resolved through `msg://` keys in `messages.properties` (en, base) a
 | shadcn official | not applicable — Jmix add-on | not required |
 | Jmix Flow UI 2.8 (`io.jmix.flowui:jmix-flowui-starter`, `jmix-flowui-themes`) | all — already a first-class dep of `ai-agent` | vendored by Jmix upstream, governed by Jmix release cycle; no per-block vetting required |
 | Vaadin Flow 24 (transitively via Jmix) | `VerticalLayout`, `HorizontalLayout`, `Scroller`, `MessageInput`, `Tabs`, `Dialog`, `Upload`, `Grid`, `Html`, `Details`, `Icon`, `Badge` (theme), `Notification`, `ConfirmDialog` | transitive through Jmix — no per-block vetting |
-| Jmix `gridexport` add-on (new — CONTEXT D-20) | `GridExportAction` CSV mode | first-party Jmix add-on; governed by Jmix release cycle; no per-block vetting required |
+| Jmix `gridexport` add-on (new — CONTEXT D-20; `io.jmix.gridexport:jmix-gridexport-flowui-starter`) | `grdexp_excelExport` + `grdexp_jsonExport` actions on `ToolCallAuditListView` dataGrid | first-party Jmix add-on; governed by Jmix release cycle; no per-block vetting required |
 | Flexmark (`com.vladsch.flexmark:flexmark` — new, CONTEXT D-07) | core parser + HTML renderer + sanitizer | Apache 2.0; widely adopted server-side markdown; executor must enable sanitizer (strip `<script>`, `javascript:`, `data:` URIs) before rendering into `Html` |
 | Third-party registries | **none declared** | not applicable — registry vetting gate skipped per CONTEXT D-27 boundaries |
 

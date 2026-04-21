@@ -254,7 +254,7 @@ Plans:
 - `ConversationListView` + `ConversationDetailView` (ownership filter; replay)
 - `ParametersListView` + `ParametersDetailView` (YAML editor + validation; `Set active` action)
 - `KnowledgeBaseView` (upload, list, status, delete, reingest)
-- `ToolCallAuditListView` (filter by user/tool/outcome/date; CSV export)
+- `ToolCallAuditListView` (filter by user/tool/outcome/date; Excel + JSON export via Jmix `gridexport` add-on)
 - `menu.xml` with `aiAgent.*` namespaced ids; role-gated visibility
 - Full `messages_en.properties` + `messages_vi.properties` coverage (zero hardcoded strings)
 - Navigation wiring via `ViewNavigators`; `@ViewController` + `@ViewDescriptor` conventions
@@ -263,7 +263,7 @@ Plans:
 1. Fresh `jmix-app` boot → menu shows `AI Agent` section; `Chat` visible to any user; admin views visible only to `AiAgentAdminRole`
 2. End-to-end Playwright/manual: user sends a chat message → response streams (or renders blocking) → tool calls expand to show args → citation link opens source document
 3. Admin uploads a doc → appears in KB view with status transitioning PENDING → READY
-4. Audit view CSV export produces valid UTF-8 CSV
+4. Audit view Excel export produces a valid `.xlsx` file and JSON export produces valid UTF-8 JSON; both honor current filter + sort
 5. Bilingual smoke: switching locale `en ↔ vi` flips every user-visible label
 
 **Needs research phase:** Partial — reuses P4 streaming validation; Vaadin upload patterns standard.

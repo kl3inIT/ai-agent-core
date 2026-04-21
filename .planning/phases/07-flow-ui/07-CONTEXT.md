@@ -12,7 +12,7 @@ Ship the full plug-and-play Jmix Flow UI layer for the add-on, all inside the ex
 - `ConversationListView` + `ConversationDetailView` — ownership-filtered list and read-only transcript replay; admin-aware (UI-03)
 - `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles with a structured Form (source of truth) and a read-only YAML Preview tab; `Set active` action (UI-04)
 - `KnowledgeBaseView` — multi-file upload, status-aware grid, delete, reingest (UI-05)
-- `ToolCallAuditListView` — typed filter bar + generic filter, CSV export, row-click detail dialog (UI-06)
+- `ToolCallAuditListView` — typed filter bar + generic filter, Excel + JSON export (Jmix `gridexport` add-on), row-click detail dialog (UI-06)
 - Namespaced menu (`aiAgent.*`), full en + vi locale parity, admin role gating on Parameters/KB/Audit (UI-08, UI-09, UI-10)
 
 **In scope:** streaming response path (`.stream()` + Vaadin Push) — deferred here from Phase 4 per D-16.
@@ -62,7 +62,7 @@ Ship the full plug-and-play Jmix Flow UI layer for the add-on, all inside the ex
 ### Audit View
 
 - **D-19:** Filter UX = **typed filter bar + Jmix GenericFilter**. Typed bar: `user` ComboBox, `tool` ComboBox, `outcome` enum select, `date range` picker — covers the 80% case in one click. GenericFilter available below for ad-hoc queries (latencyMs thresholds, denialReason text match).
-- **D-20:** CSV export uses the **Jmix gridexport add-on** (`GridExportAction`) — adds the dependency to `ai-agent` module; honors current filter/sort; gives consistent i18n-aware UX.
+- **D-20:** Audit export uses the **Jmix gridexport add-on** (`io.jmix.gridexport:jmix-gridexport-flowui-starter`) with the two natively supported actions: `grdexp_excelExport` and `grdexp_jsonExport`. Adds the dependency to the `ai-agent` module; both actions are declared on the audit `dataGrid` and honor the current filter/sort; gives consistent i18n-aware UX. CSV is explicitly **not** shipped (the add-on does not provide a CSV action; aligning with the add-on's native formats avoids a hand-rolled `StreamResource` branch). Resolves RESEARCH Open Q#1 via Option A.
 - **D-21:** Row click opens a **modal Dialog** with full audit details (runId, pre/post rows, tool args JSON, tool result, errorClass, latencyMs, denialReason, flagged status). No separate detail view; keeps admins in list context.
 - **D-22:** Outcome column renders as **Vaadin `Badge`** variants: `SUCCESS=success`, `FAILED=error`, `TIMEOUT=contrast`, `CANCELLED=tertiary`. Consistent with KB status rendering (D-17).
 
@@ -119,7 +119,7 @@ Ship the full plug-and-play Jmix Flow UI layer for the add-on, all inside the ex
 ### Framework docs (researcher fetches via Context7)
 - Vaadin Flow — `@Push`, `UI.access()`, `AppShellConfigurator`, `Broadcaster` pattern, Scroller + VerticalLayout composition
 - Jmix Flow UI — `<upload>` component, `@ViewController`/`@ViewDescriptor`, `StandardListView`/`StandardDetailView`, Fragments, GenericFilter, `Badge` styling (Lumo), role-based view policies
-- Jmix gridexport add-on — `GridExportAction` API + CSV mode
+- Jmix gridexport add-on — `grdexp_excelExport` and `grdexp_jsonExport` action types; dependency `io.jmix.gridexport:jmix-gridexport-flowui-starter`; XML declaration under `<dataGrid>/<actions>` with companion button bound via `action="{grid}.excelExport"` / `action="{grid}.jsonExport"`
 - Spring AI 1.1.4 — `ChatClient.stream()` / `Flux<ChatResponse>` shape (verify against M4)
 - Flexmark — core parser config + HTML renderer + sanitizer guidance
 
@@ -178,7 +178,7 @@ Ship the full plug-and-play Jmix Flow UI layer for the add-on, all inside the ex
 - **Admin-configurable chat-surface toggle** — admin setting to pick which chat surface is exposed to end users (full route vs. floating launcher vs. embedded panel). Deferred to v2.
 - **"Continue in chat" was accepted for Phase 7 (D-26)**, but if routing/memory complexity surfaces during planning, the fallback is read-only replay with the button removed.
 - **Mutation tools UI** — confirmation flows, dry-run preview. Post-v1 (mutation tools themselves are v1-deferred).
-- **Scheduled / async CSV export for large audit volumes** — D-20 ships the synchronous gridexport path; if volumes grow, revisit.
+- **Scheduled / async export for large audit volumes** — D-20 ships the synchronous gridexport path (Excel + JSON); if volumes grow, revisit with chunked / async export.
 - **Cross-conversation search** — not in v1 scope; consider post-v1.
 - **VirtualList for very long conversation histories** — revisit if users hit scroll perf issues (D-06).
 
