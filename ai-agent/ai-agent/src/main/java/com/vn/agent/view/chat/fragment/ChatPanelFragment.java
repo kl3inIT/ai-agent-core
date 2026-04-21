@@ -105,6 +105,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     public void onReady(final ReadyEvent event) {
         sendButton.addClickListener(e -> onSendClick());
         stopButton.addClickListener(e -> onStopClick());
+        // Enter → send; Shift+Enter → newline (chat UX convention). The text area's
+        // default Enter behaviour inserts a newline, so we must preventDefault when
+        // firing the send to stop the newline from being appended first.
+        messageInput.getElement().addEventListener("keydown", ev -> onSendClick())
+                .setFilter("event.key === 'Enter' && !event.shiftKey && !event.isComposing")
+                .addEventData("event.preventDefault()");
     }
 
     @Override
