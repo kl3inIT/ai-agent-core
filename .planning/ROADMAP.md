@@ -16,6 +16,7 @@
 | 5 | RAG Layer | 5/5 | ✅ Complete |  |
 | 6 | Parameters & Guardrails | Parameter profiles + structured output + iteration/token caps + injection scanner | PARAM-01..05, GUARD-01..06, SPI-05 (impl) | 4 |
 | 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit | UI-01..06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10) | 5 |
+| 7.1 | Adopt Vaadin MessageList/MessageInput (INSERTED) | Replace custom chat component tree with stock Vaadin messages API per `jmix-ai-backend` reference | UI-01, UI-02 (re-implementation) | 5 |
 | 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..05, TEST-07 (TEST-06 dropped per D-10) | 4 |
 
 **Total v1 requirements mapped:** 69 of 69 ✓ (was 73 pre-D-10; `AiExposureRule`/SPI-04/SPI-08/UI-07/TEST-06 dropped)
@@ -279,6 +280,34 @@ Plans:
 - [x] 07-06-PLAN.md — Wave 2 KnowledgeBaseView + ToolCallAuditListView + detail dialog + gridexport actions (UI-05, UI-06)
 - [x] 07-07a-PLAN.md — Wave 0 test skeletons: 11 failing/disabled JUnit stubs so plans 07-01..07-06 have real test files to target (Nyquist RED)
 - [x] 07-07b-PLAN.md — Wave 5 green fill: un-disable + implement the 11 test bodies scaffolded by 07-07a (UI-08, UI-09, UI-10)
+
+---
+
+### Phase 7.1 — Adopt Vaadin MessageList / MessageInput for Chat View (INSERTED)
+
+**Goal:** Replace the custom chat UI stack (`ChatPanelFragment` + `MessageBubbleComponent` + `ToolCallCardComponent` + `MarkdownRenderer`) with Vaadin's built-in `com.vaadin.flow.component.messages.MessageList` + `MessageInput`, modeled on the `jmix-ai-backend` reference. Meaningful code reduction; stock Vaadin delivers markdown rendering, user colors, timestamps, and auto-scroll for free.
+
+**Why urgent:** Phase 7 UAT surfaced that the custom chat stack is both heavier than needed and regression-prone; the reference implementation shows a ~200-line path covering the same streaming + tool-call + sources behavior. Before shipping phase 8 we want the chat view on the supported Vaadin primitives, not the custom component tree.
+
+**Requirements:** UI-01 (re-implementation), UI-02 (re-implementation) — no new roadmap requirements; scoped as UI architecture refactor of existing ones.
+
+**Deliverables:**
+- Replace `ChatPanelFragment` body with `MessageList` (markdown-enabled) + `MessageInput` composition
+- Delete `MessageBubbleComponent`, `ToolCallCardComponent`, `MarkdownRenderer` (fold responsibilities into a `renderStreamEvent(StreamingEvent) -> String` markdown formatter following the reference)
+- Re-wire `ChatService.stream(...)` subscription to `doOnNext`/`doOnError`/`doOnComplete` with `ui.access(...)` and `MessageListItem.appendText(...)`
+- Preserve phase 7 guarantees: conversation-id query param handling, `New chat` with unsaved-confirm dialog, Stop action, citation deep-link to KB, i18n coverage
+- Update phase 7 tests that referenced the deleted component classes; keep streaming + conversation tests
+
+**Success criteria:**
+1. `ChatView` + fragment ≤ ~250 lines combined (reference parity target)
+2. No references to `MessageBubbleComponent` / `ToolCallCardComponent` / `MarkdownRenderer` remain in source or tests
+3. Playwright UAT for Chat passes: streaming tokens render, tool-call events render as markdown blocks, citations surface as clickable links, `New chat` + conversation-id param work
+4. `./gradlew test` green; existing phase 7 tests updated (not skipped) where they referenced deleted types
+5. i18n keys still resolve (consumes the messages_en.properties rename from pre-UAT fix)
+
+**Needs research phase:** Minimal — reference implementation at `D:\Study materials spring 2026\EXE101\ai\jmix-ai-backend\src\main\java\io\jmix\ai\backend\view\chat\ChatView.java` is the spec. Verify Vaadin `MessageList.setMarkdown(true)` and `MessageListItem.appendText(...)` API surface via Context7 before planning.
+
+**Plans:** not planned yet — run `/gsd-plan-phase 7.1`
 
 ---
 

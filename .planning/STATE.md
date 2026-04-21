@@ -36,6 +36,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
+| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | Not planned yet — urgent refactor to replace custom chat component tree with stock Vaadin messages API per `jmix-ai-backend` reference |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
 ## Active Milestone
