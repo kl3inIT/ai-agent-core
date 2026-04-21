@@ -7,6 +7,7 @@ import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -30,8 +31,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       {@code @Primary ProjectingChatMemoryRepository} in the ai-agent module decorates the raw
  *       JDBC repository so the {@code ChatMemory} builder sees the dual-layer decorator (D-08).</li>
  * </ul>
+ *
+ * <p><b>Ordering note (bean-collision fix):</b> {@code @AutoConfigureAfter(OpenAiEmbeddingAutoConfiguration.class)}
+ * is required so that OpenAI's {@code openAiEmbeddingModel} bean is registered before this
+ * autoconfig's {@code @ConditionalOnMissingBean} passthrough is evaluated. Without the ordering
+ * directive both beans can end up in the context and pgvector's
+ * {@code PgVectorStoreAutoConfiguration.vectorStore(EmbeddingModel)} fails with
+ * {@code NoUniqueBeanDefinitionException}. The {@code spring-ai-starter-model-openai}
+ * dependency in {@code ai-agent-starter.gradle} guarantees the referenced class is on the
+ * classpath.</p>
  */
-@AutoConfiguration
+@AutoConfiguration(after = OpenAiEmbeddingAutoConfiguration.class)
 @Import({AIConfiguration.class})
 public class AIAutoConfiguration {
 
