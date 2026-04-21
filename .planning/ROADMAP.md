@@ -268,6 +268,17 @@ Plans:
 
 **Needs research phase:** Partial — reuses P4 streaming validation; Vaadin upload patterns standard.
 
+**Plans:** 7 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Wave 1 foundations: deps, @Push AppShell, MarkdownRenderer, StreamingEvent sealed DTOs, menu.xml, AiAgentAdminRole @ViewPolicy, bilingual messages bundles
+- [ ] 07-02-PLAN.md — Wave 1 backend: ChatService.stream(...) Flux<StreamingEvent> + IngestionStatusWriter afterCommit DocumentStatusChangedEvent
+- [ ] 07-03-PLAN.md — Wave 2 ChatView + ChatPanelFragment + MessageBubble/ToolCallCard/CitationDialog components (UI-01, UI-02)
+- [ ] 07-04-PLAN.md — Wave 2 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
+- [ ] 07-05-PLAN.md — Wave 2 ParametersListView + ParametersDetailView Form + YAML preview tab (UI-04)
+- [ ] 07-06-PLAN.md — Wave 2 KnowledgeBaseView + ToolCallAuditListView + detail dialog + gridexport actions (UI-05, UI-06)
+- [ ] 07-07-PLAN.md — Wave 3 test suite: LocaleParity, AdminViewAccess, MarkdownRendererXss, PushAutoConfig, ChatStream/Stop, Upload, DocumentStatusPush, YamlPreview, AuditExport, RoleFilter (UI-08, UI-09, UI-10)
+
 ---
 
 ### Phase 8 — Integration Hardening & Release Readiness
@@ -344,4 +355,4 @@ P7 depends on P3, P4, P5, P6. P8 depends on all.
 
 ---
 
-*Last updated: 2026-04-18 after Phase 02 planning — D-10 applied*
+*Last updated: 2026-04-21 after Phase 07 planning*
