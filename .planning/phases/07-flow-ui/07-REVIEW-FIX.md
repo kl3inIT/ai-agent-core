@@ -2,10 +2,10 @@
 phase: 07-flow-ui
 fixed_at: 2026-04-21T00:00:00Z
 review_path: .planning/phases/07-flow-ui/07-REVIEW.md
-iteration: 1
+iteration: 2
 findings_in_scope: 15
-fixed: 9
-skipped: 6
+fixed: 12
+skipped: 3
 status: partial
 ---
 
@@ -121,6 +121,93 @@ status: partial
 **File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/push/AiAgentAppShell.java`.
 **Reason:** skipped: architectural decision (Assumption A2 per the class Javadoc). Options discussed (move `@Push` to a snippet consumers copy, or gate via optional Maven classifier) require build/packaging changes outside this phase. Should be resolved before 1.0 with a deploy-time bootRun test but is not fixable in-source alone.
 **Original issue:** Vaadin scans the classpath for `AppShellConfigurator` independently of Spring conditionals; deploy conflicts cannot be suppressed by `@ConditionalOnProperty` alone.
+
+---
+
+## Iteration 2 (2026-04-21)
+
+**Scope:** Revisit three findings previously skipped in iteration 1 — WR-02, WR-03,
+WR-04. All three are fixed in this iteration; WR-03 is a partial / "at minimum"
+fix per the review's fallback guidance.
+
+**Updated summary:**
+- Findings in scope: 15
+- Fixed: 12 (9 from iteration 1 + 3 in iteration 2)
+- Skipped: 3 (WR-05, WR-08, WR-10 remain deferred)
+
+### Iteration 2 Fixed Issues
+
+#### WR-02: Raw `addClickListener` / `addValueChangeListener` instead of `@Subscribe`
+
+**Files modified:**
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationDetailView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationListView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/knowledge/KnowledgeBaseView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/parameters/ParametersDetailView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/parameters/ParametersListView.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/audit/ToolCallAuditListView.java`
+
+**Commit:** 3379772
+**Applied fix:** Replaced static button-click and filter value-change
+`addClickListener` / `addValueChangeListener` registrations with declarative
+`@Subscribe("componentId")` handlers across all eight views/fragments. Raw
+listeners intentionally retained where the handler needs per-event context that
+is awkward to re-derive from an id: grid selection listeners that drive button
+enabled state, per-row `ItemDoubleClickEvent` / `ItemClickEvent` navigation,
+upload receivers, per-row renderer callbacks, and the native DOM keydown
+listener on `messageInput` (needs JS-side `event.preventDefault()` and key
+filter that `@Subscribe` cannot express). Those carve-outs match the review's
+own guidance for "dynamic grid wiring". Compilation verified via
+`./gradlew :ai-agent:compileJava`.
+
+#### WR-04: `MessageBubbleComponent` / `ToolCallCardComponent` fully programmatic
+
+**Files modified:**
+- `ai-agent/ai-agent/src/main/resources/META-INF/resources/frontend/styles/ai-agent-chat.css` (new)
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/MessageBubbleComponent.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ToolCallCardComponent.java`
+
+**Commit:** 4301468
+**Applied fix:** Created `META-INF/resources/frontend/styles/ai-agent-chat.css`
+on the ai-agent library classpath (standard Vaadin packaging for library
+modules that do not own a `frontend/` dir) with BEM-style classes for
+`ai-agent-bubble`, `ai-agent-bubble--user/assistant/system`,
+`ai-agent-tool-card__heading`, and `ai-agent-tool-card__pre`. Both components
+now declare `@CssImport("./styles/ai-agent-chat.css")` and use
+`addClassName(...)` instead of programmatic `getStyle().set(...)` calls. The
+Java side retains only buffer / streaming / outcome-theme logic — no inline
+Lumo strings remain in either component.
+
+#### WR-03: Programmatic dialogs should be XML fragment / dialog views — fixed: partial
+
+**Files modified:**
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/audit/ToolCallAuditDetailDialog.java`
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/CitationDialog.java`
+- `ai-agent/ai-agent/src/main/resources/META-INF/resources/frontend/styles/ai-agent-chat.css`
+
+**Commit:** b5e6471
+**Applied fix ("at minimum" scope per review):** Added shared CSS classes
+`ai-agent-scroll-pre` (14em default, for the audit dialog's args/result panes)
+and `ai-agent-scroll-pre--tall` (30em modifier, for the citation dialog's
+longer snippet payload) in `ai-agent-chat.css`. Replaced repeated inline
+`getStyle().set("white-space", "pre-wrap") / .setMaxHeight(...) / .set("overflow", "auto")`
+calls in both dialogs with `addClassName(...)` plus `@CssImport`. This also
+consolidates the IN-05 repeated-inline-style smell called out in the review.
+
+**Partial scope:** Full Jmix XML view-descriptor conversion + `DialogWindows`
+navigator rewiring for both dialogs is deferred as a tracked follow-up. The
+XML conversion touches two call sites, needs message-bundle re-wiring, and
+removes the programmatic `MessageFormat`-driven header title on the citation
+dialog — an amount of structural rewrite that is larger than a review-fix
+pass. This matches the review's own fallback wording:
+*"At minimum, hoist the styling ... into Lumo utility classes / a CSS file so
+the Java controller is layout-free."* Compilation verified.
+
+_Fixed: 2026-04-21_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 2_
 
 ---
 
