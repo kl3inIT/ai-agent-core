@@ -8,7 +8,8 @@ public enum AiToolCallOutcome implements EnumClass<String> {
 
     SUCCESS("SUCCESS"),
     BLOCKED("BLOCKED"),
-    ERROR("ERROR");
+    ERROR("ERROR"),
+    FLAGGED("FLAGGED");
 
     private final String id;
 

@@ -132,7 +132,7 @@ public class DefaultChatServiceImpl implements ChatService {
             content = "";
         }
         log.debug("ChatService.ask convId={} runId={} model={} latencyMs={}", convId, runId, model, latencyMs);
-        return new ChatResponseDto(convId, runId, content, model, latencyMs);
+        return ChatResponseDto.ok(convId, runId, content, model, latencyMs);
     }
 
     /**
