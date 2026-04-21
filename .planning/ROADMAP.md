@@ -277,7 +277,7 @@ Plans:
 - [ ] 07-04-PLAN.md — Wave 4 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
 - [ ] 07-05-PLAN.md — Wave 2 ParametersListView + ParametersDetailView Form + YAML preview tab (UI-04)
 - [ ] 07-06-PLAN.md — Wave 2 KnowledgeBaseView + ToolCallAuditListView + detail dialog + gridexport actions (UI-05, UI-06)
-- [ ] 07-07a-PLAN.md — Wave 0 test skeletons: 11 failing/disabled JUnit stubs so plans 07-01..07-06 have real test files to target (Nyquist RED)
+- [x] 07-07a-PLAN.md — Wave 0 test skeletons: 11 failing/disabled JUnit stubs so plans 07-01..07-06 have real test files to target (Nyquist RED)
 - [ ] 07-07b-PLAN.md — Wave 5 green fill: un-disable + implement the 11 test bodies scaffolded by 07-07a (UI-08, UI-09, UI-10)
 
 ---

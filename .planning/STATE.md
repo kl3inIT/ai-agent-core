@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-last_updated: "2026-04-21T06:30:29.200Z"
+status: Executing Phase 07
+last_updated: "2026-04-21T08:08:00.000Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 35
-  completed_plans: 35
-  percent: 100
+  total_plans: 43
+  completed_plans: 36
+  percent: 84
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 06 — parameters-structured-output-guardrails
+**Current focus:** Phase 07 — flow-ui
 
 ## Phase Status
 
@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
-| 7 | Flow UI | Not started |
+| 7 | Flow UI | In progress (1/8 plans — 07-07a Wave 0 RED skeletons) |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
 ## Active Milestone
@@ -132,6 +132,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-21 +07:00 — Plan 06-01 complete (Phase 6 foundation types: 4 guard exceptions + Overrides + ParametersValidationException + AiParametersBody Jakarta-validated record + AiAgentGuardProperties @ConfigurationProperties with 4 nested records and resolved* defaults (D-13/D-14/D-16/D-18) + AiToolCallOutcome.FLAGGED + ChatResponseDto extended to 8 components with GuardDenialInfo + denied() factory + ok() bridge; 12 new i18n keys in both locales with parity; one-site DefaultChatServiceImpl bridge edit to ChatResponseDto.ok(); compileJava green). Commits 28d58eb, 6767cf6. No deviations — plan executed exactly as written. Next: 06-02 (Parameters layer — ParametersService, YamlMapper, DefaultParamsSeeder, Resolver overloads).
 - 2026-04-21 +07:00 — Plan 06-02 complete (Parameters layer: AiParametersBodyYamlMapper with FAIL_ON_UNKNOWN_PROPERTIES + explicit UnrecognizedPropertyException catch + Jakarta Validator on every readValue/writeAsYaml; ParametersService CRUD + setActive exactly-one-active invariant via single REQUIRED tx flip-all-then-set-one (D-06); DefaultParamsSeeder @EventListener(ApplicationReadyEvent.class) + SystemAuthenticator.runWithSystem + dataManager.loadValue count-probe idempotency; AiParametersResolver gains effectiveModel(AiParameters, Overrides) + effectiveSystemPrompt(AiParameters, userId, conversationId, runId) — constructor grew to 4 args with sorted immutable List.copyOf of PromptContextContributor; bundled default-params.yaml on starter classpath; jackson-dataformat-yaml + jakarta.validation-api declared in a dedicated "Plan 06-02" labeled block in ai-agent.gradle for 06-03 alongside-edit safety; compileJava + compileTestJava + AiParametersResolverTest all green). Commits 146de14, f5bac19, b7e2696. Deviations: (Rule 3) SystemAuthenticator.runWithSystem accepts Runnable not Supplier — seed body moved into private method invoked via method reference. Plan-interpretation: PromptContextContributor.fragment() is zero-arg in Phase 2 SPI; per plan guidance "match existing signature EXACTLY", no SPI RunContext record added — resolver signature carries userId/conversationId/runId for Plan 04's call site but does not forward today. Next: 06-03 (guardrails — rate limit / token breaker / iteration cap / output scanner).
 - 2026-04-21 +07:00 — Plan 06-04 complete (runtime chat path wiring: ChatService gains ask(+Overrides), askTyped, askTyped(+Overrides) — original ask preserved; DefaultChatServiceImpl constructor 7→11 deps (+RateLimitGuard/TokenBudgetGuard/AuditWriter/jakarta.validation.Validator); ask(Overrides) body runs RunContext.set(runId) → IterationCounter.start() → rateLimitGuard.check(userId) → tokenBudgetGuard.check(conversationId) → AiParametersResolver overloads (effectiveModel(active,overrides), effectiveSystemPrompt(active,userId,conversationId,runId)) → chatClient.prompt()…call().chatClientResponse() → tokenBudgetGuard.accumulate(usage.totalTokens) → reads CONTEXT_KEY_FLAGGED_PATTERN off ChatClientResponse.context() and promotes into ChatResponseDto.flagged/flaggedPatternKey (pattern KEY only — D-17/D-18); IterationCapExceeded/ToolVetoed caught and mapped to ChatResponseDto.denied with stable i18n keys; RunContext.clear() + IterationCounter.reset() in finally; askTyped implements BeanOutputConverter + 2-attempt retry (initial + 1 retry), narrow catch on RuntimeException whose cause is JsonProcessingException (D-21: Spring AI 1.1.4 has NO BeanOutputParseException — plain RuntimeException wrapping JsonProcessingException); jakarta.validation violations trigger retry; mapDenialToTypedException switches on GuardDenialInfo.messageKey to rethrow typed guard exceptions so callers can react in code; StructuredOutputException surfaces on 2-failure exhaustion; ChatClientFactory injects @Qualifier("outputScannerAdvisor") CallAdvisor and appends as LAST entry of defaultAdvisors (HP+400 — inner to ToolCallAdvisor HP+300); GuardedToolCallingManager auto-picked via @Primary with no explicit ChatClient.Builder setter (Spring AI 1.1.4 has no such setter — documented as decision); :ai-agent:compileJava green; ChatServiceFilterParamContractTest 2/2 green covering both filter-set and admin-bypass paths). Commits 2cb5035, 498103b, 0c4a9b0, 6716b55. Deviations: (Rule 3) AiAgentGuardAutoConfiguration.guardedToolCallingManager gained @ConditionalOnBean(name="toolCallingManager") so test contexts without Spring AI's default manager do not explode at autoconfig startup; (Rule 3) ChatServiceFilterParamContractTest constructor extended to 11 deps + ChatClientResponse fluent stub updated. Deferred: 28 pre-existing @SpringBootTest failures rooted in eclipselink StandardQueryCache init — NOT caused by 06-04 (predate wave-2 ship) — documented in SUMMARY under Deferred Issues; recommend a follow-up infrastructure plan for that root cause. Next: 06-05 (verification tests + Phase 6 verification gate) — final phase plan.
+- 2026-04-21 08:08 +07:00 — Plan 07-07a complete (Phase 7 Wave 0 RED skeletons: 11 JUnit 5 test files across i18n/view.chat/view.parameters/view.audit/view.conversation/view.knowledge/push/security packages; 28 total `fail("not yet implemented — filled in by 07-07b")` stubs; LocaleParityTest + MarkdownRendererXssTest are plain JUnit and run FAILED; 9 files (and both @Nested classes inside PushAutoConfigTest) carry class-level `@Disabled("07-07b …")` because their target Phase-7 beans don't exist yet; `./gradlew :ai-agent:ai-agent:compileTestJava` green after every task). Commits 4d32b86, 6ecd342, 87309bf. No deviations — plan's Rule 1 `@Disabled` tolerance applied verbatim and extended consistently to Task 3. Next: 07-01 (Wave 1 foundations: deps, @Push AppShell, MarkdownRenderer, StreamingEvent DTOs, menu.xml, bilingual bundles) — the 11 skeletons now make every downstream `<verify><automated>` gradle --tests pattern resolve.
 - 2026-04-21 +07:00 — Plan 06-03 complete (runtime guardrails: RateLimitGuard sliding-window deque per username in Spring cache 'ai-agent.rateLimit' with synchronized read-modify-write and denied-attempt NOT recorded to prevent cooldown starvation; TokenBudgetGuard per-conversation Long accumulator in cache 'ai-agent.tokenBreaker' with check/accumulate/reset all synchronized; IterationCounter ThreadLocal<Integer> with start/current/increment/reset owned by decorator-lifecycle-by-orchestrator; CompiledOutputScannerPattern record compile-at-construction; GuardedToolCallingManager implements Spring AI 1.1.4 ToolCallingManager interface (resolveToolDefinitions + executeToolCalls returning ToolExecutionResult — signatures verified by javap against the 1.1.4 jar) with strict next>cap iteration check, request-level audit using sentinel '__chat__'/phase='REQUEST', pre-tool ToolGuard fan-out, veto audit with REAL tool name/denialReason='tool-vetoed:<msg>'/phase='PRE', Jackson JSON→Map adapter since ToolGuard.check signature is Map not String; OutputScannerAdvisor at HIGHEST_PRECEDENCE+400, flag-and-pass-through with pattern KEY only, 8 KiB input cap against ReDoS, malformed regex skipped-with-WARN at startup; AiAgentGuardAutoConfiguration @AutoConfigureAfter(AIAutoConfiguration) with default ConcurrentMapCacheManager seeding both D-12 caches, scanner advisor as CallAdvisor bean, @Primary guardedToolCallingManager resolving delegate via BeanFactory.getBean('toolCallingManager') to dodge @Primary-on-self cycle, optional reflective StructuredOutputValidationAdvisor (@ConditionalOnClass — absent in 1.1.4 so bean skipped today); AutoConfiguration.imports appended; spring-boot-starter-cache added in labeled Plan 06-03 gradle block beside the existing 06-02 block; compileJava + starter compileJava both green). Commits 9a1c62f, 906e289, a1e73e6. Deviations: (Rule 1) ToolGuard.check takes Map<String,Object> not String argumentsJson — plan pseudocode was wrong about the SPI shape; Jackson ObjectMapper bridges the JSON→Map gap. (Rule 3) Swapped plan's `ToolCallingManager delegate` param for BeanFactory + getBean('toolCallingManager') to avoid classic @Primary-on-self cycle. Next: 06-04 (wire guardrails into DefaultChatServiceImpl + ChatClientFactory + GuardDenialInfo mapper) or 06-05 (verification tests).
 
 ### Quick Tasks Completed
@@ -141,4 +142,8 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 | 260420-se6 | fix JetBrains file problems project-wide (diamond, @NonNull on @NonNullApi overrides, javadoc, getLast, Objects::nonNull, boolean XOR) | 2026-04-20 | pending | Verified — `:ai-agent:ai-agent:test` green | [260420-se6-fix-jetbrains-file-problems-project-wide](./quick/260420-se6-fix-jetbrains-file-problems-project-wide/) |
 
-**Last activity:** 2026-04-21
+**Last activity:** 2026-04-21 (plan 07-07a)
+
+## Phase 07 Progress
+
+- 07-07a: ✅ Wave 0 RED test skeletons — 11 JUnit 5 classes (28 @Test stubs) across 8 packages; pure-unit LocaleParityTest + MarkdownRendererXssTest (run FAILED); 9 class-level `@Disabled("07-07b …")` Spring-context skeletons (AdminViewAccessTest, PushAutoConfigTest with both @Nested classes, DocumentStatusPushTest, KnowledgeBaseUploadTest, ChatViewStreamTest, ChatViewStopTest, ParametersDetailYamlPreviewTest, ToolCallAuditListViewTest, ConversationListRoleFilterTest) that 07-07b Task 0 will re-enable + fill. compileTestJava green. Commits 4d32b86, 6ecd342, 87309bf. Nyquist Wave 0 contract satisfied: every `<verify><automated>` command in 07-01..07-06 now resolves to a real test file.
