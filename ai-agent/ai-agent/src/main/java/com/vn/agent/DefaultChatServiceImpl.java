@@ -146,18 +146,23 @@ public class DefaultChatServiceImpl implements ChatService {
         final long startNanos = System.nanoTime();
         AiConversation conversation = null;
         try {
+            // WR-01: rate-limit BEFORE touching the conversation gateway so a denied first turn
+            // does not persist an AiConversation row (loadOrCreate saves when conversationId==null).
+            try {
+                rateLimitGuard.check(userId);
+            } catch (RateLimitExceededException rate) {
+                auditDenial(runId, userId, conversationId, "rate-limit-exceeded");
+                return ChatResponseDto.denied(conversationId, runId,
+                        "ai-agent.guard.rate-limit-exceeded", Map.of("retryAfterSec", 60));
+            }
+
             // B4: pass `message` as firstMessage so auto-created conversation gets a title.
             conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
             final UUID convId = conversation.getId();
 
-            // Guard preamble — rate limit first (cheaper), then token budget.
+            // Token-budget gate runs AFTER loadOrCreate because it is strictly per-conversation.
             try {
-                rateLimitGuard.check(userId);
                 tokenBudgetGuard.check(convId);
-            } catch (RateLimitExceededException rate) {
-                auditDenial(runId, userId, convId, "rate-limit-exceeded");
-                return ChatResponseDto.denied(convId, runId,
-                        "ai-agent.guard.rate-limit-exceeded", Map.of("retryAfterSec", 60));
             } catch (TokenBudgetExhaustedException budget) {
                 auditDenial(runId, userId, convId, "token-budget-exhausted");
                 return ChatResponseDto.denied(convId, runId,
@@ -266,8 +271,13 @@ public class DefaultChatServiceImpl implements ChatService {
         final int maxAttempts = 2; // D-19 / ROADMAP §06 success criterion #4: initial + 1 retry.
         String lastRaw = null;
         String enrichedUserMessage = message + "\n\n" + formatHint;
+        // WR-01: thread the conversation id produced by the first attempt forward into retries
+        // so a parse failure does not spawn a second conversation (which would lose memory
+        // continuity and reset conversation-scoped token budgeting).
+        UUID currentConversationId = conversationId;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            ChatResponseDto resp = ask(userId, conversationId, enrichedUserMessage, overrides);
+            ChatResponseDto resp = ask(userId, currentConversationId, enrichedUserMessage, overrides);
+            currentConversationId = resp.conversationId();
             if (resp.guardDenial() != null) {
                 // Guard denial short-circuits typed calls — surface as a typed exception
                 // keyed off the denial message key (D-10 / AI-SPEC §4.4).
