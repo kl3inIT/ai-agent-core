@@ -5,10 +5,10 @@ import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiConversation;
-import com.vn.agent.security.AiAgentAdminRole;
+import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
-import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.ViewNavigators;
+import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
@@ -20,7 +20,6 @@ import io.jmix.flowui.view.ViewDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -61,7 +60,7 @@ public class ConversationListView extends StandardListView<AiConversation> {
     private TextField userFilter;
 
     @Autowired
-    private CurrentAuthentication currentAuthentication;
+    private AccessManager accessManager;
     @Autowired
     private ViewNavigators viewNavigators;
     @Autowired
@@ -103,14 +102,19 @@ public class ConversationListView extends StandardListView<AiConversation> {
     /**
      * Admin probe helper — extracted so the 07-07 {@code ConversationListRoleFilterTest}
      * can stub via reflection or a Spring slice. Package-private to permit test overrides.
+     *
+     * <p>Uses Jmix {@link AccessManager} + {@link UiShowViewContext} to probe an
+     * admin-only view id (AI Agent ToolCallAudit list). This is the same plumbing
+     * Vaadin navigation walks at runtime, so role drift or renamed roles cannot
+     * produce a false positive — unlike string-matching authority codes.</p>
      */
     boolean currentUserIsAdmin() {
         try {
-            return currentAuthentication.getUser().getAuthorities().stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .anyMatch(AiAgentAdminRole.CODE::equals);
+            UiShowViewContext ctx = new UiShowViewContext("AiAgent_ToolCallAudit.list");
+            accessManager.applyRegisteredConstraints(ctx);
+            return ctx.isPermitted();
         } catch (Exception ex) {
-            log.debug("Admin probe failed, defaulting to non-admin: {}", ex.getMessage());
+            log.warn("Admin probe failed, defaulting to non-admin: {}", ex.getMessage());
             return false;
         }
     }
