@@ -2,6 +2,7 @@ package com.vn.agent;
 
 import com.vn.agent.orchestration.ChatResponseDto;
 import com.vn.agent.orchestration.ConversationNotFoundException;
+import com.vn.agent.parameters.Overrides;
 
 import java.util.UUID;
 
@@ -13,6 +14,10 @@ import java.util.UUID;
  * dual-layer persistence (Spring AI's {@code SPRING_AI_CHAT_MEMORY} + projected {@code AiMessage}
  * rows in the same REQUIRED transaction — D-08), and emits per-run audit rows correlated by a
  * pre-allocated {@code runId} (B8).</p>
+ *
+ * <p>Phase 6 extensions (ORCH-01 carry-over + PARAM-01 + GUARD-06): per-conversation
+ * {@link Overrides} support plus a structured-output {@code askTyped} contract. All additions
+ * are additive — the original 3-arg {@link #ask(String, UUID, String)} signature remains.</p>
  *
  * @since 0.0.1
  */
@@ -31,4 +36,44 @@ public interface ChatService {
      *         missing OR owned by a different user (D-09 opacity)
      */
     ChatResponseDto ask(String userId, UUID conversationId, String message);
+
+    /**
+     * Variant of {@link #ask(String, UUID, String)} that applies per-conversation parameter
+     * overrides (PARAM-01, D-01). A {@code null} value or {@link Overrides#NONE} is equivalent
+     * to calling the three-arg overload.
+     *
+     * <p>Phase 6 guards are applied before the LLM call: rate limit → token budget →
+     * iteration counter start. Denials short-circuit with a {@link ChatResponseDto} whose
+     * {@code guardDenial} field carries a stable i18n message key (never the raw exception
+     * text — D-10 opacity).</p>
+     */
+    ChatResponseDto ask(String userId, UUID conversationId, String message, Overrides overrides);
+
+    /**
+     * Structured-output variant. Requests the LLM produce JSON matching the shape of
+     * {@code targetType} (GUARD-06). The response is parsed via Spring AI's
+     * {@code BeanOutputConverter} and validated via Jakarta Bean Validation.
+     *
+     * <p>On repeated parse/validation failure across the bounded retry window (D-19 — 2
+     * attempts = initial + 1 retry) the add-on throws
+     * {@link com.vn.agent.guard.StructuredOutputException} carrying the last raw text and the
+     * target type. Guard-level denials during {@code askTyped} propagate as their own typed
+     * exceptions (rate-limit / token-budget / iteration-cap / tool-vetoed) so the caller's
+     * {@code try/catch} can map each precisely — typed callers that need the richer
+     * {@link ChatResponseDto} denial metadata can call {@link #ask} instead.</p>
+     *
+     * @throws com.vn.agent.guard.StructuredOutputException         when parse + validation fails on every retry
+     * @throws com.vn.agent.guard.RateLimitExceededException        when the per-user rate limit denies the request
+     * @throws com.vn.agent.guard.TokenBudgetExhaustedException     when the per-conversation token breaker denies
+     * @throws com.vn.agent.guard.IterationCapExceededException     when the tool-calling iteration cap is breached
+     * @throws com.vn.agent.spi.ToolVetoedException                 when a {@code ToolGuard} vetoes the invocation
+     */
+    <T> T askTyped(String userId, UUID conversationId, String message, Class<T> targetType);
+
+    /**
+     * askTyped with per-conversation {@link Overrides} (GUARD-06 + D-01). A {@code null}
+     * {@code overrides} or {@link Overrides#NONE} is equivalent to
+     * {@link #askTyped(String, UUID, String, Class)}.
+     */
+    <T> T askTyped(String userId, UUID conversationId, String message, Overrides overrides, Class<T> targetType);
 }
