@@ -5,10 +5,12 @@ import com.vn.agent.entity.AiParameters;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -34,6 +36,13 @@ import org.springframework.core.Ordered;
  *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300} with internal memory disabled
  *       via {@code .disableMemory()}; order setter on this builder is named
  *       {@code .advisorOrder(int)} (different from MessageChatMemoryAdvisor).</li>
+ *   <li>{@code OutputScannerAdvisor} at {@code HIGHEST_PRECEDENCE + 400} (Plan 06-04) —
+ *       innermost CallAdvisor; inspects assistant content for configured patterns and
+ *       promotes a stable pattern-key flag into the advisor context (never the matched
+ *       text, per D-17/D-18). Injected by qualified bean name so hosts can override the
+ *       scanner without shadowing the entire advisor chain. The {@link ToolCallingManager}
+ *       is auto-picked via {@code @Primary} when the starter's guard autoconfig registers
+ *       {@code GuardedToolCallingManager} — no explicit setter needed here.</li>
  * </ol>
  */
 @Configuration
@@ -45,7 +54,8 @@ public class ChatClientFactory {
                                         AuditAdvisor auditAdvisor,
                                         AiParametersResolver parametersResolver,
                                         ToolCallingManager toolCallingManager,
-                                        RetrievalAugmentationAdvisor ragAdvisor) {
+                                        RetrievalAugmentationAdvisor ragAdvisor,
+                                        @Qualifier("outputScannerAdvisor") CallAdvisor outputScannerAdvisor) {
         AiParameters active = parametersResolver.resolveActive();
         String systemPrompt = parametersResolver.effectiveSystemPrompt(active);
 
@@ -61,7 +71,7 @@ public class ChatClientFactory {
 
         return ChatClient.builder(chatModel)
                 .defaultSystem(systemPrompt != null ? systemPrompt : AiAgentDefaultsProperties.FALLBACK_SYSTEM_PROMPT)
-                .defaultAdvisors(auditAdvisor, memoryAdvisor, ragAdvisor, toolCallAdvisor)
+                .defaultAdvisors(auditAdvisor, memoryAdvisor, ragAdvisor, toolCallAdvisor, outputScannerAdvisor)
                 .build();
     }
 }
