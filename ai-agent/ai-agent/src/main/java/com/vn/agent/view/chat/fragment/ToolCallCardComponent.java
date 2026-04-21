@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.Pre;
 import com.vaadin.flow.component.html.Span;
@@ -24,11 +25,21 @@ import java.util.UUID;
  *
  * <p>Summary row: tool icon + tool name + short args summary.
  * Expanded body: pretty-printed args JSON + result summary + outcome badge.</p>
+ *
+ * <p><b>Styling (WR-04):</b> all styling lives in
+ * {@code META-INF/resources/frontend/styles/ai-agent-chat.css} under the
+ * {@code ai-agent-tool-card__*} class names. The Java side only manages content
+ * (text, icon, JSON pretty-print, outcome theme) — do NOT add {@code getStyle()} calls
+ * here.</p>
  */
+@CssImport("./styles/ai-agent-chat.css")
 public class ToolCallCardComponent extends Composite<Details> {
 
     private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper();
     private static final int SHORT_SUMMARY_MAX = 40;
+
+    private static final String CSS_HEADING = "ai-agent-tool-card__heading";
+    private static final String CSS_PRE = "ai-agent-tool-card__pre";
 
     private final UUID toolCallId;
     private final String toolName;
@@ -60,18 +71,14 @@ public class ToolCallCardComponent extends Composite<Details> {
         body.setPadding(false);
 
         Span argsHeading = new Span(msg("chatView.toolCard.argsHeading"));
-        argsHeading.getStyle().setFontWeight("600");
+        argsHeading.addClassName(CSS_HEADING);
         Pre argsPre = new Pre(prettyJson(argsJson));
-        argsPre.getStyle().set("white-space", "pre-wrap");
-        argsPre.getStyle().setMaxHeight("20em");
-        argsPre.getStyle().set("overflow", "auto");
+        argsPre.addClassName(CSS_PRE);
 
         Span resultHeading = new Span(msg("chatView.toolCard.resultHeading"));
-        resultHeading.getStyle().setFontWeight("600");
+        resultHeading.addClassName(CSS_HEADING);
         this.resultPre = new Pre("");
-        resultPre.getStyle().set("white-space", "pre-wrap");
-        resultPre.getStyle().setMaxHeight("20em");
-        resultPre.getStyle().set("overflow", "auto");
+        resultPre.addClassName(CSS_PRE);
 
         this.outcomeBadge = new Span();
         outcomeBadge.getElement().getThemeList().add("badge");

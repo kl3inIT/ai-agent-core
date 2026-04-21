@@ -2,6 +2,7 @@ package com.vn.agent.view.chat.fragment;
 
 import com.vaadin.flow.component.Composite;
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vn.agent.view.chat.MarkdownRenderer;
 
@@ -13,7 +14,14 @@ import com.vn.agent.view.chat.MarkdownRenderer;
  *
  * <p>XSS mitigation (T-07-08): all markdown flows through {@code MarkdownRenderer.toSafeHtml},
  * which runs Flexmark → OWASP-HTML-Sanitizer. No {@code innerHTML} assignments without that pipe.</p>
+ *
+ * <p><b>Styling (WR-04):</b> all Lumo styling lives in
+ * {@code META-INF/resources/frontend/styles/ai-agent-chat.css}, keyed on the
+ * {@code ai-agent-bubble} + {@code ai-agent-bubble--<role>} class names. The Java side
+ * only manages the buffer and the sanitized HTML content — do NOT add {@code getStyle()}
+ * calls here.</p>
  */
+@CssImport("./styles/ai-agent-chat.css")
 public class MessageBubbleComponent extends Composite<Div> {
 
     public enum Role {USER, ASSISTANT, SYSTEM}
@@ -28,18 +36,8 @@ public class MessageBubbleComponent extends Composite<Div> {
         this.role = role;
         this.markdownRenderer = markdownRenderer;
         Div root = getContent();
-        root.getStyle().setPadding("var(--lumo-space-m)");
-        root.getStyle().setBorderRadius("var(--lumo-border-radius-m)");
-        root.getStyle().setBackground("var(--lumo-contrast-5pct)");
-        root.getStyle().setMaxWidth("80%");
-        switch (role) {
-            case ASSISTANT -> root.getStyle().setBorderLeft("2px solid var(--lumo-primary-color)");
-            case USER -> {
-                root.getStyle().setMarginLeft("auto");
-                root.getStyle().setBackground("var(--lumo-primary-color-10pct)");
-            }
-            case SYSTEM -> root.getStyle().setBorderLeft("2px solid var(--lumo-contrast-30pct)");
-        }
+        root.addClassName("ai-agent-bubble");
+        root.addClassName("ai-agent-bubble--" + role.name().toLowerCase());
         this.htmlContent = new Html("<div></div>");
         root.add(htmlContent);
     }
