@@ -236,7 +236,7 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md — Foundation types: exceptions, Overrides, AiParametersBody, AiAgentGuardProperties, FLAGGED enum, i18n keys (PARAM-01/02, GUARD-01..06)
-- [ ] 06-02-PLAN.md — Parameters layer: AiParametersBodyYamlMapper, ParametersService (setActive D-06), DefaultParamsSeeder, AiParametersResolver Overrides + contributor-chain overloads, default-params.yaml (PARAM-01..05, SPI-05)
+- [x] 06-02-PLAN.md — Parameters layer: AiParametersBodyYamlMapper, ParametersService (setActive D-06), DefaultParamsSeeder, AiParametersResolver Overrides + contributor-chain overloads, default-params.yaml (PARAM-01..05, SPI-05)
 - [ ] 06-03-PLAN.md — Guard components: RateLimitGuard, TokenBudgetGuard, IterationCounter, GuardedToolCallingManager, OutputScannerAdvisor, AiAgentGuardAutoConfiguration (GUARD-01..06, D-12/21)
 - [ ] 06-04-PLAN.md — Orchestration wiring: ChatService overloads, DefaultChatServiceImpl guard preamble + scanner promotion + askTyped retry + typed-exception mapper, ChatClientFactory advisor chain (PARAM-01/05, GUARD-01/02/03/05, STRUCT-01/02, SPI-05)
 - [ ] 06-05-PLAN.md — Tests: 12 eval rubrics (E-01..E-12) + 4 YAML fixtures + I18nParityTest + autoconfig boot test + evalTest gradle task
