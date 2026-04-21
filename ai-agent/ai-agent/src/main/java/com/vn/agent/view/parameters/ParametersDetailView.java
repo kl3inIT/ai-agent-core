@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.MessageSource;
 
 import java.util.ArrayList;
@@ -100,8 +99,6 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     private MessageSource messageSource;
     @Autowired
     private AgentToolCallbacks agentToolCallbacks;
-    @Autowired
-    private ApplicationContext applicationContext;
     @Autowired
     private EntityStates entityStates;
 
@@ -221,55 +218,16 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
      */
     private List<String> discoverToolNames() {
         Set<String> names = new LinkedHashSet<>();
-        try {
-            ToolCallback[] callbacks = agentToolCallbacks.forCurrentUser();
-            if (callbacks != null) {
-                for (ToolCallback cb : callbacks) {
-                    if (cb != null && cb.getToolDefinition() != null
-                            && cb.getToolDefinition().name() != null) {
-                        names.add(cb.getToolDefinition().name());
-                    }
+        ToolCallback[] callbacks = agentToolCallbacks.forCurrentUser();
+        if (callbacks != null) {
+            for (ToolCallback cb : callbacks) {
+                if (cb != null && cb.getToolDefinition() != null
+                        && cb.getToolDefinition().name() != null) {
+                    names.add(cb.getToolDefinition().name());
                 }
             }
-        } catch (Exception ex) {
-            // AgentToolCallbacks.forCurrentUser relies on CurrentAuthentication; during
-            // autoconfig-loaded views we have a request context, so this shouldn't normally
-            // fail. If it does, fall through to ApplicationContext scan below.
-            log.warn("AgentToolCallbacks.forCurrentUser() threw during tool discovery; falling "
-                    + "back to ApplicationContext scan", ex);
-        }
-        if (names.isEmpty()) {
-            // Fallback #2: reflectively scan ApplicationContext for @Tool methods.
-            names.addAll(scanApplicationContextForToolMethods());
         }
         return new ArrayList<>(names);
-    }
-
-    private Set<String> scanApplicationContextForToolMethods() {
-        Set<String> names = new LinkedHashSet<>();
-        for (String beanName : applicationContext.getBeanDefinitionNames()) {
-            Object bean;
-            try {
-                bean = applicationContext.getBean(beanName);
-            } catch (Exception skip) {
-                continue;
-            }
-            Class<?> clazz = bean.getClass();
-            // Unwrap Spring proxies.
-            while (clazz != null && clazz.getName().contains("$$")) {
-                clazz = clazz.getSuperclass();
-            }
-            if (clazz == null) continue;
-            for (var method : clazz.getDeclaredMethods()) {
-                var tool = method.getAnnotation(org.springframework.ai.tool.annotation.Tool.class);
-                if (tool != null) {
-                    String name = tool.name() == null || tool.name().isEmpty()
-                            ? method.getName() : tool.name();
-                    names.add(name);
-                }
-            }
-        }
-        return names;
     }
 
     // ---- Form <-> AiParametersBody bridging ----
