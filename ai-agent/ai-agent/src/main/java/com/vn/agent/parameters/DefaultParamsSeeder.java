@@ -6,6 +6,7 @@ import io.jmix.core.Metadata;
 import io.jmix.core.security.SystemAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
@@ -28,6 +29,10 @@ import java.io.InputStream;
  * AuditListenerDispatcherTest, etc.) all use {@code runWithSystem}.</p>
  */
 @Component
+@ConditionalOnProperty(
+        name = "jmix.ai-agent.parameters.seed-default",
+        havingValue = "true",
+        matchIfMissing = true)
 public class DefaultParamsSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultParamsSeeder.class);
