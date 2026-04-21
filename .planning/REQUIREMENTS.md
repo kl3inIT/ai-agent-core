@@ -98,7 +98,7 @@
 - [ ] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
 - [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
 - [x] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
-- [ ] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
+- [x] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
 
 > Note: UI-07 (`ExposureRuleListView`) dropped per D-10 (`AiExposureRule` entity removed). UI-08..UI-10 numbering preserved for cross-doc reference stability.
 
