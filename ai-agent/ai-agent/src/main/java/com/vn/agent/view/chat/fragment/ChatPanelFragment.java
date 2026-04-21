@@ -5,28 +5,23 @@ import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.messages.MessageInput;
+import com.vaadin.flow.component.messages.MessageList;
+import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
-import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.dom.DomListenerRegistration;
 import com.vn.agent.ChatService;
-import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
-import com.vn.agent.view.chat.MarkdownRenderer;
+import com.vn.agent.rag.CancellationRegistry;
 import io.jmix.core.DataManager;
 import io.jmix.core.security.CurrentAuthentication;
-import io.jmix.flowui.DialogWindows;
 import io.jmix.flowui.Notifications;
-import io.jmix.flowui.component.UiComponentUtils;
-import io.jmix.flowui.component.textarea.JmixTextArea;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
 import io.jmix.flowui.kit.component.button.JmixButton;
-import io.jmix.flowui.view.DialogWindow;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
@@ -36,7 +31,8 @@ import org.springframework.context.MessageSource;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
-import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,97 +40,54 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * D-29 substrate. Composed by {@code ChatView} (full route) in v1; the v2 floating launcher
- * will embed this SAME fragment unchanged.
- *
- * <p><b>Streaming pipeline (Pitfall #7 fix):</b> {@link StreamingEvent.Content} events are
- * coalesced at 50 ms via {@link Flux#bufferTimeout(int, Duration)} so DOM mutations stay
- * {@code ≤ 20 Hz} regardless of upstream token rate. A single {@code UI.access} per batch
- * concatenates the buffered markdown chunks and calls
- * {@link MessageBubbleComponent#appendMarkdown(String)} once.</p>
- *
- * <p><b>Dispose-on-detach (Pitfall #8):</b> {@link #onDetach(DetachEvent)} disposes any active
- * stream so navigating away tears down the Flux subscription.</p>
- *
- * <p>All UI mutations hop onto the per-UI event loop via {@code getUI().ifPresent(ui -> ui.access(...))}
- * because Push callbacks arrive off the {@code ai-agent-stream} scheduler thread.</p>
- */
+/** D-29 substrate on Vaadin MessageList + MessageInput. D-03 per-event ui.access; D-04 Stop
+ *  via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach. Public API for ChatView:
+ *  setConversationId / hasMessages / isStreaming / startNewChat. */
 @FragmentDescriptor("chat-panel-fragment.xml")
 public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private static final Logger log = LoggerFactory.getLogger(ChatPanelFragment.class);
+    private static final int USER_COLOR = 0;
+    private static final int AI_COLOR = 2;
 
-    /**
-     * Maximum number of Content events coalesced into a single UI.access tick. Acts as an
-     * upper bound when the provider is extremely fast; the 50 ms time trigger is the primary
-     * rate limiter.
-     */
-    private static final int CONTENT_BATCH_MAX = 64;
+    @ViewComponent private JmixButton stopButton;
+    @ViewComponent private VerticalLayout messageListSlot;
+    @ViewComponent private VerticalLayout messageInputSlot;
 
-    /** Time window for Content-event coalescing — yields ≤20 UI DOM updates per second. */
-    private static final Duration CONTENT_BATCH_WINDOW = Duration.ofMillis(50);
+    @Autowired private ChatService chatService;
+    @Autowired private ConversationGateway conversationGateway;
+    @Autowired private CancellationRegistry cancellationRegistry;
+    @Autowired private CurrentAuthentication currentAuthentication;
+    @Autowired private MessageSource messages;
+    @Autowired private DataManager dataManager;
+    @Autowired private Notifications notifications;
 
-    @ViewComponent
-    private VerticalLayout messageList;
-    @ViewComponent
-    private Scroller messageScroller;
-    @ViewComponent
-    private Div emptyStatePanel;
-    @ViewComponent
-    private JmixTextArea messageInput;
-    @ViewComponent
-    private JmixButton sendButton;
-    @ViewComponent
-    private JmixButton stopButton;
-
-    @Autowired
-    private ChatService chatService;
-    @Autowired
-    private CurrentAuthentication currentAuthentication;
-    @Autowired
-    private MarkdownRenderer markdownRenderer;
-    @Autowired
-    private MessageSource messages;
-    @Autowired
-    private ConversationGateway conversationGateway;
-    @Autowired
-    private DataManager dataManager;
-    @Autowired
-    private Notifications notifications;
-    @Autowired
-    private DialogWindows dialogWindows;
+    private MessageList messageList;
+    private MessageInput messageInput;
+    private final List<MessageListItem> items = new ArrayList<>();
+    private final Map<String, String> labels = new HashMap<>();
 
     private UUID conversationId;
+    private UUID activeRunId;
     private volatile Disposable activeStream;
-    private MessageBubbleComponent activeAssistantBubble;
-    private final Map<UUID, ToolCallCardComponent> toolCardsByCallId = new HashMap<>();
+    private MessageListItem botMsg;
     private volatile UI ownerUi;
-    private DomListenerRegistration sendOnEnterRegistration;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
-        if (sendOnEnterRegistration == null) {
-            // Enter → send; Shift+Enter → newline (chat UX convention). The text area's
-            // default Enter behaviour inserts a newline, so we must preventDefault when
-            // firing the send to stop the newline from being appended first. This remains
-            // a raw DOM listener because it wires JS-side keyboard shortcut semantics
-            // that @Subscribe does not model.
-            sendOnEnterRegistration = messageInput.getElement()
-                    .addEventListener("keydown", ev -> onSendClick())
-                    .setFilter("event.key === 'Enter' && !event.shiftKey && !event.isComposing")
-                    .preventDefault();
-        }
-    }
+        messageList = new MessageList();
+        messageList.setMarkdown(true);
+        messageList.setWidthFull();
+        messageList.getStyle().set("flex-grow", "1");
+        messageListSlot.add(messageList);
 
-    @Subscribe("sendButton")
-    public void onSendButtonClick(final ClickEvent<Button> event) {
-        onSendClick();
-    }
+        messageInput = new MessageInput();
+        messageInput.setWidthFull();
+        messageInput.addSubmitListener(this::onSubmit);
+        messageInputSlot.add(messageInput);
 
-    @Subscribe("stopButton")
-    public void onStopButtonClick(final ClickEvent<Button> event) {
-        onStopClick();
+        resolveLabels();
+        messageList.setItems(items);
     }
 
     @Override
@@ -145,269 +98,185 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     @Override
     protected void onDetach(DetachEvent detachEvent) {
-        try {
-            Disposable d = this.activeStream;
-            if (d != null && !d.isDisposed()) {
-                d.dispose();
+        // Pitfall #8 — dispose-on-detach. Route through registry when runId is known so
+        // the CANCELLED audit row is written; bare dispose is only the last-resort fallback.
+        Disposable d = this.activeStream;
+        if (d != null && !d.isDisposed()) {
+            try {
+                if (activeRunId != null) {
+                    cancellationRegistry.cancel(activeRunId);
+                } else {
+                    activeStream.dispose();
+                }
+            } catch (RuntimeException ignored) {
+                // Teardown must not throw.
             }
-        } catch (RuntimeException ignored) {
-            // Fragment teardown must not throw.
         }
         this.activeStream = null;
         this.ownerUi = null;
-        if (sendOnEnterRegistration != null) {
-            sendOnEnterRegistration.remove();
-            sendOnEnterRegistration = null;
-        }
         super.onDetach(detachEvent);
     }
 
-    // --- Public lifecycle --------------------------------------------------------
-
-    /**
-     * Set or clear the conversation bound to this fragment. A non-null id triggers
-     * transcript load; a null id resets to the empty-state panel.
-     */
-    public void setConversationId(UUID conversationId) {
-        // Dispose any in-flight stream so a mid-stream reset does not continue writing
-        // events into the cleared fragment state (the bubble reference is nulled below
-        // but the Flux would keep pushing until natural completion otherwise).
-        Disposable d = this.activeStream;
-        if (d != null && !d.isDisposed()) {
-            d.dispose();
-        }
-        this.activeStream = null;
-        this.conversationId = conversationId;
-        messageList.removeAll();
-        toolCardsByCallId.clear();
-        activeAssistantBubble = null;
-        if (conversationId != null) {
-            loadTranscript();
-        } else {
-            emptyStatePanel.setVisible(true);
+    @Subscribe("stopButton")
+    public void onStopButtonClick(final ClickEvent<Button> event) {
+        // D-04 — MUST route through the registry so the audit row records CANCELLED.
+        if (activeRunId != null) {
+            cancellationRegistry.cancel(activeRunId);
         }
     }
 
-    public UUID getConversationId() {
-        return conversationId;
-    }
+    // ---- Public API --------------------------------------------------------
 
-    /** True if this fragment has rendered at least one message bubble. */
-    public boolean hasMessages() {
-        return messageList.getComponentCount() > 0;
-    }
-
-    /**
-     * Read-only load of the transcript for {@link #conversationId}. Skips the
-     * {@code loadOrCreate}'s auto-create branch by issuing a direct ownership-checked JPQL
-     * query so no side-effect happens when the view is merely displaying history.
-     */
-    private void loadTranscript() {
-        String userId = currentAuthentication.getUser().getUsername();
-        // Ownership check (D-09 opacity) via gateway — throws ConversationNotFoundException
-        // if the id is missing or owned by another user.
-        AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, null);
+    public void setConversationId(UUID cid) {
+        if (isStreaming() && activeRunId != null) {
+            cancellationRegistry.cancel(activeRunId);
+        }
+        this.conversationId = cid;
+        items.clear();
+        if (cid == null) {
+            if (messageList != null) messageList.setItems(items);
+            return;
+        }
+        // Ownership check (D-09) — foreign / missing ids throw ConversationNotFoundException.
+        conversationGateway.loadOrCreate(currentAuthentication.getUser().getUsername(), cid, null);
 
         List<AiMessage> history = dataManager.load(AiMessage.class)
-                .query("select m from ai_AiMessage m where m.conversation = :conv order by m.seq asc, m.createdDate asc")
-                .parameter("conv", conversation)
+                .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
+                       "order by m.createdDate asc, m.seq asc")
+                .parameter("cid", cid)
                 .list();
 
-        if (history.isEmpty()) {
-            emptyStatePanel.setVisible(true);
-            return;
+        String userName = resolveLabel("chatView.message.userName", "You");
+        String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+        for (AiMessage m : history) {
+            AiMessageRole role = m.getRole();
+            // SYSTEM / TOOL roles skipped — replay shows user-visible turns only.
+            if (role == AiMessageRole.USER) {
+                items.add(buildItem(m, userName, USER_COLOR));
+            } else if (role == AiMessageRole.ASSISTANT) {
+                items.add(buildItem(m, aiName, AI_COLOR));
+            }
         }
-
-        emptyStatePanel.setVisible(false);
-        for (AiMessage message : history) {
-            MessageBubbleComponent.Role role = roleOf(message.getRole());
-            MessageBubbleComponent bubble = new MessageBubbleComponent(role, markdownRenderer);
-            bubble.setMarkdown(message.getContent());
-            messageList.add(bubble);
-        }
-        scrollToEnd();
+        if (messageList != null) messageList.setItems(items);
     }
 
-    private static MessageBubbleComponent.Role roleOf(AiMessageRole role) {
-        if (role == null) {
-            return MessageBubbleComponent.Role.SYSTEM;
-        }
-        return switch (role) {
-            case USER -> MessageBubbleComponent.Role.USER;
-            case ASSISTANT -> MessageBubbleComponent.Role.ASSISTANT;
-            default -> MessageBubbleComponent.Role.SYSTEM;
-        };
+    public UUID getConversationId() { return conversationId; }
+
+    public boolean hasMessages() { return !items.isEmpty(); }
+
+    public boolean isStreaming() {
+        Disposable d = activeStream;
+        return d != null && !d.isDisposed();
     }
 
-    // --- Send / Stop -------------------------------------------------------------
-
-    private void onSendClick() {
-        String text = messageInput.getValue();
-        if (text == null || text.isBlank()) {
-            return;
+    public void startNewChat() {
+        if (isStreaming() && activeRunId != null) {
+            cancellationRegistry.cancel(activeRunId);
         }
-        messageInput.clear();
+        items.clear();
+        if (messageList != null) messageList.setItems(items);
+        conversationId = null;
+    }
+
+    // ---- Streaming ---------------------------------------------------------
+
+    private void onSubmit(MessageInput.SubmitEvent event) {
+        String text = event.getValue();
+        if (text == null || text.isBlank()) return;
+
+        String userName = resolveLabel("chatView.message.userName", "You");
+        String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+        MessageListItem userItem = new MessageListItem(text, Instant.now(), userName);
+        userItem.setUserColorIndex(USER_COLOR);
+        items.add(userItem);
+
+        botMsg = new MessageListItem("", Instant.now(), aiName);
+        botMsg.setUserColorIndex(AI_COLOR);
+        items.add(botMsg);
+        // Last setItems of the turn — mid-stream mutations use appendText only (Pitfall #5).
+        messageList.setItems(new ArrayList<>(items));
+
         messageInput.setEnabled(false);
-        sendButton.setVisible(false);
         stopButton.setVisible(true);
-        emptyStatePanel.setVisible(false);
 
-        // Append USER bubble.
-        MessageBubbleComponent userBubble = new MessageBubbleComponent(
-                MessageBubbleComponent.Role.USER, markdownRenderer);
-        userBubble.setMarkdown(text);
-        messageList.add(userBubble);
-
-        // Append streaming ASSISTANT bubble.
-        this.activeAssistantBubble = new MessageBubbleComponent(
-                MessageBubbleComponent.Role.ASSISTANT, markdownRenderer);
-        messageList.add(activeAssistantBubble);
-        scrollToEnd();
-
-        String userId = currentAuthentication.getUser().getUsername();
+        final String userId = currentAuthentication.getUser().getUsername();
+        final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
 
         Flux<StreamingEvent> source = chatService.stream(userId, conversationId, text, null);
-
-        // 50 ms Content-event coalescing (Pitfall #7). Using the simple-shape bufferTimeout
-        // over the FULL event stream: handleBatch iterates and dispatches per type under a
-        // single UI.access per 50 ms window — keeps DOM updates ≤ 20 Hz regardless of the
-        // provider's token rate, at the cost of also bunching structural events by 50 ms
-        // (acceptable for the UI contract; tool cards / citations are not real-time critical).
-        this.activeStream = source
-                .bufferTimeout(CONTENT_BATCH_MAX, CONTENT_BATCH_WINDOW)
-                .filter(batch -> !batch.isEmpty())
-                .subscribe(
-                        this::handleBatch,
-                        this::handleError,
-                        this::finishStream);
-    }
-
-    private void onStopClick() {
-        Disposable d = this.activeStream;
-        if (d != null && !d.isDisposed()) {
-            d.dispose();
-        }
-        if (activeAssistantBubble != null) {
-            Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
-            String stoppedLabel = messages.getMessage(
-                    "chatView.message.stopped", null, "chatView.message.stopped", locale);
-            activeAssistantBubble.markStopped(stoppedLabel);
-        }
-        finishStream();
-    }
-
-    // --- Batch dispatch ----------------------------------------------------------
-
-    private void handleBatch(List<StreamingEvent> batch) {
-        accessUi(() -> {
-            StringBuilder contentBuffer = new StringBuilder();
-            List<StreamingEvent> structural = new ArrayList<>();
-            for (StreamingEvent event : batch) {
-                if (event instanceof StreamingEvent.Content c) {
-                    if (c.markdownChunk() != null) {
-                        contentBuffer.append(c.markdownChunk());
+        activeStream = source
+                .doOnSubscribe(sub -> {
+                    if (sub instanceof Disposable disposable && activeRunId != null) {
+                        cancellationRegistry.register(activeRunId, disposable);
                     }
-                } else {
-                    structural.add(event);
-                }
-            }
-            // Single DOM mutation per 50 ms window for content.
-            if (contentBuffer.length() > 0 && activeAssistantBubble != null) {
-                activeAssistantBubble.appendMarkdown(contentBuffer.toString());
-            }
-            for (StreamingEvent event : structural) {
-                dispatchStructural(event);
-            }
-            if (!batch.isEmpty()) {
-                scrollToEnd();
-            }
-        });
-    }
-
-    private void dispatchStructural(StreamingEvent event) {
-        if (event instanceof StreamingEvent.ToolCall tc) {
-            ToolCallCardComponent card = new ToolCallCardComponent(
-                    tc.toolCallId(), tc.toolName(), tc.argsJson(), messages);
-            toolCardsByCallId.put(tc.toolCallId(), card);
-            messageList.add(card);
-        } else if (event instanceof StreamingEvent.ToolResult tr) {
-            ToolCallCardComponent card = toolCardsByCallId.get(tr.toolCallId());
-            if (card != null) {
-                card.setResult(tr.summary(), tr.outcome());
-            }
-        } else if (event instanceof StreamingEvent.Citation c) {
-            // Append inline [n] marker; clicking would normally open the dialog. For v1 we
-            // render the marker as part of the bubble and surface a single click through a
-            // helper span so the dialog is wired here without taking a hard dependency on
-            // the bubble's internal HTML structure.
-            if (activeAssistantBubble != null) {
-                activeAssistantBubble.appendMarkdown(" [" + c.index() + "]");
-            }
-            openCitationDialog(c);
-        } else if (event instanceof StreamingEvent.Error err) {
-            showErrorNotification(err.messageKey());
-        } else if (event instanceof StreamingEvent.Final) {
-            // Final is the stream terminator — onComplete handles finishStream().
-        }
-    }
-
-    private void openCitationDialog(StreamingEvent.Citation c) {
-        DialogWindow<CitationDialog> dialogWindow =
-                dialogWindows.view(UiComponentUtils.getView(getContent()), CitationDialog.class).build();
-        dialogWindow.getView().setCitation(
-                c.documentId(),
-                c.documentId() == null ? null : c.documentId().toString(),
-                c.snippet());
-        dialogWindow.open();
-    }
-
-    private void handleError(Throwable t) {
-        log.warn("Chat stream failed", t);
-        accessUi(() -> {
-            showErrorNotification("chatView.error.generic");
-            finishStreamInternal();
-        });
-    }
-
-    private void finishStream() {
-        accessUi(this::finishStreamInternal);
+                })
+                .doOnNext(evt -> {
+                    if (evt instanceof StreamingEvent.Final f && activeRunId == null) {
+                        activeRunId = f.runId();
+                    }
+                    String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
+                    if (md.isEmpty()) return;
+                    accessUi(() -> {
+                        if (botMsg != null) botMsg.appendText(md);
+                        scrollToBottom();
+                    });
+                })
+                .doOnError(err -> {
+                    log.warn("Chat stream failed", err);
+                    accessUi(() -> { showErrorNotification("chatView.error.generic"); finishStreamInternal(); });
+                })
+                .doOnComplete(() -> accessUi(this::finishStreamInternal))
+                .subscribe();
     }
 
     private void finishStreamInternal() {
-        sendButton.setVisible(true);
-        stopButton.setVisible(false);
         messageInput.setEnabled(true);
-        activeAssistantBubble = null;
+        stopButton.setVisible(false);
+        if (activeRunId != null) cancellationRegistry.clearDisposable(activeRunId);
+        activeRunId = null;
         activeStream = null;
+        botMsg = null;
     }
 
-    private void showErrorNotification(String messageKey) {
+    // ---- Helpers -----------------------------------------------------------
+
+    private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
+        String content = m.getContent() == null ? "" : m.getContent();
+        OffsetDateTime created = m.getCreatedDate();
+        Instant time = created == null ? Instant.now() : created.toInstant();
+        MessageListItem item = new MessageListItem(content, time, name);
+        item.setUserColorIndex(colorIndex);
+        return item;
+    }
+
+    private void resolveLabels() {
+        labels.clear();
+        labels.put("chatView.stream.sources", resolveLabel("chatView.stream.sources", "Sources"));
+        labels.put("chatView.stream.outcome.SUCCESS", resolveLabel("chatView.stream.outcome.SUCCESS", "done"));
+        labels.put("chatView.stream.outcome.BLOCKED", resolveLabel("chatView.stream.outcome.BLOCKED", "blocked"));
+        labels.put("chatView.stream.outcome.ERROR", resolveLabel("chatView.stream.outcome.ERROR", "error"));
+        labels.put("chatView.stream.outcome.FLAGGED", resolveLabel("chatView.stream.outcome.FLAGGED", "flagged"));
+        labels.put("chatView.stream.error", resolveLabel("chatView.stream.error", "error"));
+    }
+
+    private String resolveLabel(String key, String fallback) {
         Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
-        String text = messages.getMessage(messageKey, null, messageKey, locale);
-        notifications.create(text)
-                .withThemeVariant(NotificationVariant.LUMO_ERROR)
-                .show();
+        return messages.getMessage(key, null, fallback, locale);
     }
 
-    private void scrollToEnd() {
-        // Scroller snaps to the bottom via JS-free position update — the scroller's content
-        // grows downward so simply scrolling its host to maxScroll is enough.
-        messageScroller.getElement().executeJs("this.scrollTop = this.scrollHeight;");
+    private void showErrorNotification(String key) {
+        Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
+        String text = messages.getMessage(key, null, key, locale);
+        notifications.create(text).withThemeVariant(NotificationVariant.LUMO_ERROR).show();
     }
 
-    /**
-     * Hop onto the owning UI's lock before mutating the DOM. Falls back to
-     * {@link #getUI()} when the ownerUi was not captured (pre-attach path).
-     */
+    private void scrollToBottom() {
+        messageList.getElement().executeJs("setTimeout(() => { this.scrollTop = this.scrollHeight; }, 50);");
+    }
+
     private void accessUi(Runnable action) {
         UI ui = this.ownerUi;
-        if (ui == null) {
-            ui = getUI().orElse(null);
-        }
-        if (ui == null) {
-            // Fragment is detached — drop the update (navigate-away race).
-            return;
-        }
-        ui.access(() -> action.run());
+        if (ui == null) ui = getUI().orElse(null);
+        if (ui == null) return; // detached — drop update
+        ui.access(action::run);
     }
 }
