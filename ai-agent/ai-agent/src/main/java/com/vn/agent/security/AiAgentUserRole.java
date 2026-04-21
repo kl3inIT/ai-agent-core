@@ -5,6 +5,8 @@ import com.vn.agent.entity.AiMessage;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
+import io.jmix.securityflowui.role.annotation.MenuPolicy;
+import io.jmix.securityflowui.role.annotation.ViewPolicy;
 
 /**
  * Resource role granting end users narrow CRUD on their own conversations and messages.
@@ -26,4 +28,24 @@ public interface AiAgentUserRole {
     @EntityPolicy(entityClass = AiMessage.class,
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE})
     void userAccess();
+
+    /**
+     * View + menu access for the two user-facing Phase 7 views — Chat and Conversation
+     * list (plus the conversation detail route reached from that list). Admin-only views
+     * (Parameters, KnowledgeBase, ToolCallAudit) are intentionally absent so non-admins
+     * are denied per UI-10 / D-10.
+     *
+     * <p>Added in plan 07-07b Task 1 as a Rule-2 deviation: {@link AiAgentAdminRole}
+     * declared view-level policies for admin views but this user role was not granted
+     * symmetric view access to Chat / Conversation, leaving non-admins unable to reach
+     * any Phase 7 UI. AdminViewAccessTest ({@code allowsChatForUser}) surfaced the gap.
+     */
+    @MenuPolicy(menuIds = {
+            "aiAgent.chat",
+            "aiAgent.conversations"})
+    @ViewPolicy(viewIds = {
+            "AiAgent_Chat",
+            "AiAgent_Conversation.list",
+            "AiAgent_Conversation.detail"})
+    void userViews();
 }
