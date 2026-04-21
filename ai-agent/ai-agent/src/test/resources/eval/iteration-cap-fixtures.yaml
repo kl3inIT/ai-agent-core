@@ -1,0 +1,13 @@
+# Eval corpus for GuardedToolCallingManager iteration cap (E-03).
+# Default cap = 6 per AiAgentGuardProperties.resolvedMaxIterations().
+# `rounds` = number of executeToolCalls invocations; `expectedException` = null on pass,
+# or `IterationCapExceededException` when the cap is breached.
+cases:
+  - rounds: 1
+    expectedException: null
+  - rounds: 6
+    expectedException: null
+  - rounds: 7
+    expectedException: IterationCapExceededException
+  - rounds: 20
+    expectedException: IterationCapExceededException

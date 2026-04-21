@@ -92,10 +92,28 @@ tasks.named('test') {
         // Default test task excludes:
         //  - @Tag("live")   — requires OPENROUTER_API_KEY (see liveTest task)
         //  - @Tag("rag-it") — requires Docker for Testcontainers pgvector (see integrationTest)
+        //  - @Tag("eval")   — Phase 6 evaluation rubric tests (see evalTest task, Plan 06-05)
         // Integration tests are additionally gated at class level by an isDockerAvailable()
         // condition so sandboxed / forensic runs skip them cleanly without stack traces.
-        excludeTags 'live', 'rag-it'
+        excludeTags 'live', 'rag-it', 'eval'
     }
+}
+
+// --- Plan 06-05: evaluation rubric suite --------------------------------------------------
+// Phase 6 ships 12 evaluation rubrics (E-01..E-12) whose contract lives in
+// `.planning/phases/06-parameters-structured-output-guardrails/06-AI-SPEC.md`. Tests are
+// tagged `@Tag("eval")` so `./gradlew test` stays fast and the eval suite is opted into
+// explicitly via `./gradlew evalTest`. Corpus fixtures (src/test/resources/eval/*.yaml)
+// drive the parameterised tests so rubric drift surfaces as a test-count change in CI log.
+tasks.register('evalTest', Test) {
+    description = 'Runs Phase 6 evaluation rubric tests (@Tag("eval")).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
 }
 
 tasks.register('liveTest', Test) {
