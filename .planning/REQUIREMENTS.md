@@ -93,11 +93,11 @@
 
 ### Built-in Flow UI
 
-- [ ] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
-- [ ] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
+- [x] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
+- [x] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
 - [ ] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
 - [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
-- [ ] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
+- [x] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
 - [ ] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
 
 > Note: UI-07 (`ExposureRuleListView`) dropped per D-10 (`AiExposureRule` entity removed). UI-08..UI-10 numbering preserved for cross-doc reference stability.

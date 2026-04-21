@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 07
-last_updated: "2026-04-21T08:08:00.000Z"
-last_activity: 2026-04-21
+last_updated: "2026-04-21T08:47:14Z"
+last_activity: 2026-04-21 (plan 07-02)
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 43
-  completed_plans: 36
-  percent: 84
+  completed_plans: 40
+  percent: 93
 ---
 
 # Project State
@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
-| 7 | Flow UI | In progress (1/8 plans — 07-07a Wave 0 RED skeletons) |
+| 7 | Flow UI | In progress (3/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone) |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
 ## Active Milestone
@@ -142,8 +142,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 | 260420-se6 | fix JetBrains file problems project-wide (diamond, @NonNull on @NonNullApi overrides, javadoc, getLast, Objects::nonNull, boolean XOR) | 2026-04-20 | pending | Verified — `:ai-agent:ai-agent:test` green | [260420-se6-fix-jetbrains-file-problems-project-wide](./quick/260420-se6-fix-jetbrains-file-problems-project-wide/) |
 
-**Last activity:** 2026-04-21 (plan 07-07a)
+**Last activity:** 2026-04-21 (plan 07-02)
 
 ## Phase 07 Progress
 
 - 07-07a: ✅ Wave 0 RED test skeletons — 11 JUnit 5 classes (28 @Test stubs) across 8 packages; pure-unit LocaleParityTest + MarkdownRendererXssTest (run FAILED); 9 class-level `@Disabled("07-07b …")` Spring-context skeletons (AdminViewAccessTest, PushAutoConfigTest with both @Nested classes, DocumentStatusPushTest, KnowledgeBaseUploadTest, ChatViewStreamTest, ChatViewStopTest, ParametersDetailYamlPreviewTest, ToolCallAuditListViewTest, ConversationListRoleFilterTest) that 07-07b Task 0 will re-enable + fill. compileTestJava green. Commits 4d32b86, 6ecd342, 87309bf. Nyquist Wave 0 contract satisfied: every `<verify><automated>` command in 07-01..07-06 now resolves to a real test file.
+- 07-01: ✅ Wave 1 UI foundation — phase-7 deps (vaadin-flow, jmix-flowui-data, markdown-renderer) + @Push AppShell + MarkdownRenderer + StreamingEvent sealed interface (6 records) + DocumentStatusChangedEvent + menu.xml entries + bilingual i18n. Commits 500edb5, 7823d1f, 5313b9a, 2b2d0f1, dfdc9d6.
+- 07-02: ✅ Streaming backend backbone — ChatService.stream(userId, convId, msg, overrides) → Flux<StreamingEvent>; ChatStreamingSchedulerConfig (boundedElastic 20/1000 "ai-agent-stream"); StreamingSinkHolder (ConcurrentHashMap UUID→Sinks.Many, RunContext lookup); DefaultChatServiceImpl.stream full implementation (subscribeOn scheduler, doOnSubscribe cancellation-wire via Disposable cast, onErrorResume→StreamingEvent.Error with stable i18n keys, doFinally cleanup); CancellationRegistry.register(UUID, Disposable) overload + cancel disposes subscription; ToolCallbackAuditDecorator streaming overload (StreamingEvent.ToolCall entry + StreamingEvent.ToolResult exit, opt-in via StreamingSinkHolder.current().ifPresent); IngestionStatusWriter publishes DocumentStatusChangedEvent via TransactionSynchronization.afterCommit on all 5 mutation methods. Requirements UI-01, UI-02, UI-05 complete. Commits d2950d2, ec23da9, 6747ac7. Decisions: Pattern A (doOnSubscribe + subscription::cancel lambda cast to Disposable) over 7th StreamingEvent variant; ChatStreamingScheduler renamed to ChatStreamingSchedulerConfig to avoid @Configuration-class-name vs @Bean-name clash; runId pre-allocated outside Flux.defer for subscription-retry stability; centralized registerAfterCommit helper preserves one afterCommit publish per mutation.

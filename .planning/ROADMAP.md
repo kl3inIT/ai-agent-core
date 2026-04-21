@@ -272,7 +272,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Wave 1 foundations: deps, @Push AppShell, MarkdownRenderer, StreamingEvent sealed DTOs, menu.xml, AiAgentAdminRole @ViewPolicy, bilingual messages bundles
-- [ ] 07-02-PLAN.md — Wave 1 backend: ChatService.stream(...) Flux<StreamingEvent> + IngestionStatusWriter afterCommit DocumentStatusChangedEvent
+- [x] 07-02-PLAN.md — Wave 1 backend: ChatService.stream(...) Flux<StreamingEvent> + IngestionStatusWriter afterCommit DocumentStatusChangedEvent
 - [ ] 07-03-PLAN.md — Wave 3 ChatView + ChatPanelFragment + MessageBubble/ToolCallCard/CitationDialog components (UI-01, UI-02)
 - [ ] 07-04-PLAN.md — Wave 4 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
 - [ ] 07-05-PLAN.md — Wave 2 ParametersListView + ParametersDetailView Form + YAML preview tab (UI-04)
