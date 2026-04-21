@@ -65,27 +65,27 @@
 
 ### Parameters & Configuration
 
-- [ ] **PARAM-01**: `AiParameters` entity stores multiple profiles (YAML blob) with exactly one marked active
+- [x] **PARAM-01**: `AiParameters` entity stores multiple profiles (YAML blob) with exactly one marked active
 - [ ] **PARAM-02**: Profile fields: model id, temperature, max tokens, system prompt, enabled tool names, RAG top-k, RAG similarity threshold
 - [ ] **PARAM-03**: Per-conversation parameter override supported by `ChatService` API
 - [ ] **PARAM-04**: `default-params.yaml` bundled with starter; seeded on first startup if table empty
-- [ ] **PARAM-05**: Host can contribute additional system-prompt fragments via `PromptContextContributor` SPI
+- [x] **PARAM-05**: Host can contribute additional system-prompt fragments via `PromptContextContributor` SPI
 
 ### Guardrails
 
-- [ ] **GUARD-01**: `ToolGuard` SPI invoked before each tool execution; veto raises a denial captured in audit
-- [ ] **GUARD-02**: `ToolCallingManager` max-iteration cap (default 6, configurable)
-- [ ] **GUARD-03**: Per-session token circuit breaker (configurable ceiling); breach returns a user-friendly error and audits the truncation
-- [ ] **GUARD-04**: Per-user rate limit on chat submissions (configurable; default 10 req/min)
-- [ ] **GUARD-05**: Output-side advisor scans model response for likely injection patterns echoed back; redacts or flags
-- [ ] **GUARD-06**: Structured output via `.entity(Class)` + `BeanOutputConverter` + bounded retry (max 2). Do not assume native structured-output support
+- [x] **GUARD-01**: `ToolGuard` SPI invoked before each tool execution; veto raises a denial captured in audit
+- [x] **GUARD-02**: `ToolCallingManager` max-iteration cap (default 6, configurable)
+- [x] **GUARD-03**: Per-session token circuit breaker (configurable ceiling); breach returns a user-friendly error and audits the truncation
+- [x] **GUARD-04**: Per-user rate limit on chat submissions (configurable; default 10 req/min)
+- [x] **GUARD-05**: Output-side advisor scans model response for likely injection patterns echoed back; redacts or flags
+- [x] **GUARD-06**: Structured output via `.entity(Class)` + `BeanOutputConverter` + bounded retry (max 2). Do not assume native structured-output support
 
 ### SPI Extension Points (functional module)
 
 - [ ] **SPI-01**: `ToolContributor` — hosts register additional `@Tool`-annotated beans
 - [ ] **SPI-02**: `ContextContributor` — inject per-request context (user, tenant, env) into prompt
 - [ ] **SPI-03**: `PromptContextContributor` — augment system prompt with host-specific instructions
-- [ ] **SPI-05**: `ToolGuard` — veto tool calls
+- [x] **SPI-05**: `ToolGuard` — veto tool calls
 - [ ] **SPI-06**: `AuditListener` — observe audit writes for side-channels
 - [x] **SPI-07**: `CustomIngester` — plug in additional KB sources
 
