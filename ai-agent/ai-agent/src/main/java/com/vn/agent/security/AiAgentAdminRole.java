@@ -8,6 +8,8 @@ import com.vn.agent.entity.AiToolCallAudit;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
+import io.jmix.securityflowui.role.annotation.MenuPolicy;
+import io.jmix.securityflowui.role.annotation.ViewPolicy;
 
 /**
  * Resource role granting administrators full CRUD on all AI Agent entities.
@@ -26,4 +28,14 @@ public interface AiAgentAdminRole {
     @EntityPolicy(entityClass = AiParameters.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiKnowledgeDocument.class, actions = EntityPolicyAction.ALL)
     void adminAccess();
+
+    @MenuPolicy(menuIds = {
+            "aiAgent.parameters.list",
+            "aiAgent.knowledge.list",
+            "aiAgent.audit.list"})
+    @ViewPolicy(viewIds = {
+            "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
+            "AiAgent_KnowledgeBase.list",
+            "AiAgent_ToolCallAudit.list"})
+    void adminViews();
 }

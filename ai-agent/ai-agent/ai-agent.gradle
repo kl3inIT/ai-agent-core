@@ -4,6 +4,9 @@ dependencies {
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
     implementation 'io.jmix.security:jmix-security-starter'
+    // Plan 07-01: @MenuPolicy + @ViewPolicy annotations live in jmix-security-flowui
+    // (package io.jmix.securityflowui.role.annotation). Required by AiAgentAdminRole.adminViews().
+    implementation 'io.jmix.security:jmix-security-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
