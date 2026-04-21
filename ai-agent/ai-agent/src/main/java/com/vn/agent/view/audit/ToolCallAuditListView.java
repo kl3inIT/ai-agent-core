@@ -171,18 +171,28 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         auditsDl.setQuery(jpql.toString());
         if (user != null && !user.isBlank()) {
             auditsDl.setParameter("user", "%" + user.toLowerCase(Locale.ROOT) + "%");
+        } else {
+            auditsDl.removeParameter("user");
         }
         if (tool != null && !tool.isBlank()) {
             auditsDl.setParameter("tool", tool);
+        } else {
+            auditsDl.removeParameter("tool");
         }
         if (outcome != null) {
             auditsDl.setParameter("outcome", outcome.getId());
+        } else {
+            auditsDl.removeParameter("outcome");
         }
         if (from != null) {
             auditsDl.setParameter("fromDate", from.atOffset(ZoneOffset.UTC));
+        } else {
+            auditsDl.removeParameter("fromDate");
         }
         if (to != null) {
             auditsDl.setParameter("toDate", to.atOffset(ZoneOffset.UTC));
+        } else {
+            auditsDl.removeParameter("toDate");
         }
         auditsDl.load();
     }
