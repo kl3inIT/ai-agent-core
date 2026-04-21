@@ -135,6 +135,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      * transcript load; a null id resets to the empty-state panel.
      */
     public void setConversationId(UUID conversationId) {
+        // Dispose any in-flight stream so a mid-stream reset does not continue writing
+        // events into the cleared fragment state (the bubble reference is nulled below
+        // but the Flux would keep pushing until natural completion otherwise).
+        Disposable d = this.activeStream;
+        if (d != null && !d.isDisposed()) {
+            d.dispose();
+        }
+        this.activeStream = null;
         this.conversationId = conversationId;
         messageList.removeAll();
         toolCardsByCallId.clear();
