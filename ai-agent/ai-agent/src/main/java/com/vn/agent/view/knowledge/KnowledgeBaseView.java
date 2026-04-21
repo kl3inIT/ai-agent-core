@@ -178,15 +178,21 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         QueryParameters qp = event.getLocation().getQueryParameters();
         Map<String, List<String>> params = qp.getParameters();
         List<String> docIds = params.get("documentId");
-        if (docIds != null && !docIds.isEmpty()) {
-            try {
-                UUID docId = UUID.fromString(docIds.get(0));
-                documentsDl.setQuery(
-                        "select e from ai_AiKnowledgeDocument e where e.id = :docId");
-                documentsDl.setParameter("docId", docId);
-            } catch (IllegalArgumentException ex) {
-                log.debug("Ignoring malformed documentId query param: {}", docIds.get(0));
-            }
+        if (docIds == null || docIds.isEmpty()) {
+            return;
+        }
+        try {
+            UUID docId = UUID.fromString(docIds.get(0));
+            // Do NOT mutate the loader query (that would permanently scope the grid to
+            // a single row across subsequent push refreshes / reloads). Instead, after
+            // the full list loads, pre-select the matching row so the admin lands on
+            // the cited document with full navigation still available.
+            documentsDl.addPostLoadListener(e -> documentsDc.getItems().stream()
+                    .filter(d -> docId.equals(d.getId()))
+                    .findFirst()
+                    .ifPresent(documentsDataGrid::select));
+        } catch (IllegalArgumentException ex) {
+            log.debug("Ignoring malformed documentId query param: {}", docIds.get(0));
         }
     }
 
