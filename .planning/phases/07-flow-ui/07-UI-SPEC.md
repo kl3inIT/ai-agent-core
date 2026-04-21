@@ -1,10 +1,11 @@
 ---
 phase: 7
 slug: flow-ui
-status: draft
+status: approved
 shadcn_initialized: false
 preset: not applicable (Vaadin Lumo / Jmix Flow UI)
 created: 2026-04-21
+reviewed_at: 2026-04-21
 ---
 
 # Phase 7 — UI Design Contract

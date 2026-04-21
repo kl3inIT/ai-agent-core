@@ -1,5 +1,5 @@
 ---
-status: partial
+status: complete
 phase: 06-parameters-structured-output-guardrails
 source:
   - 06-01-SUMMARY.md
@@ -8,7 +8,7 @@ source:
   - 06-04-SUMMARY.md
   - 06-05-SUMMARY.md
 started: 2026-04-21T12:53:12.9094689+07:00
-updated: 2026-04-21T13:08:00+07:00
+updated: 2026-04-21T13:29:00+07:00
 ---
 
 ## Current Test
@@ -19,9 +19,7 @@ updated: 2026-04-21T13:08:00+07:00
 
 ### 1. Default Profile Seeds on First Boot
 expected: Boot a host app with `ai-agent-starter` and an empty `AiParameters` table; the bundled `default-params.yaml` seeds exactly one active `default` profile and the first `ChatService.ask(...)` works without manual parameter setup.
-result: blocked
-blocked_by: prior-phase
-reason: "Automated tests confirmed seeding and starter autoconfiguration (`:ai-agent:ai-agent:evalTest`, `:ai-agent:ai-agent-starter:evalTest`), but the real live smoke `ChatServiceLiveSemanticTest` could not reach OpenRouter because the Spring test context failed early with `java.lang.IllegalStateException at StandardQueryCache.java:52`."
+result: pass
 
 ### 2. Active Profile Switch and Per-Conversation Override
 expected: After creating another profile and marking it active, the next `ChatService.ask(...)` uses that profile on the next request, while `ChatService.ask(..., Overrides)` changes only the single conversation call instead of replacing the active profile globally.
@@ -50,10 +48,10 @@ result: pass
 ## Summary
 
 total: 7
-passed: 6
+passed: 7
 issues: 0
 pending: 0
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps
