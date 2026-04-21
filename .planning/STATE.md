@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-04-20T17:04:07.909Z"
-last_activity: 2026-04-20
+status: Executing Phase 06
+last_updated: "2026-04-21T08:30:00.000Z"
+last_activity: 2026-04-21
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 30
-  completed_plans: 30
-  percent: 100
+  total_plans: 35
+  completed_plans: 31
+  percent: 89
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 04 — orchestration-core
+**Current focus:** Phase 06 — parameters-structured-output-guardrails
 
 ## Phase Status
 
@@ -34,7 +34,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
-| 6 | Parameters, Structured Output & Guardrails | Not started |
+| 6 | Parameters, Structured Output & Guardrails | In progress (1/5 plans — 06-01 foundation types shipped) |
 | 7 | Flow UI | Not started |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
@@ -129,6 +129,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-20 12:50 +07:00 — Plan 04-05 complete (Phase 4 verification suite: StubChatModelConfiguration + 8 test classes covering advisor order, D-08 parity, D-09 opacity, AUD-02 durability, SPI-06/D-13 fan-out, W14/B1 field mapping, TEST-05 live wire). Rule 1 fix to ProjectingChatMemoryRepository (delete-then-insert) + test-isolation fix to AuditListenerFanOutTest. ./gradlew :ai-agent:ai-agent:test PASS (18 suites, 0 failures). Commits 2edbc34, a7810a4, 866f62e, bcfc3c7. **Phase 4 complete (5/5 plans).** Next: Phase 4 merge + Phase 5 (RAG layer).
 - 2026-04-20 14:30 +07:00 — Plan 05-03 complete (async ingestion pipeline: IngestionStatusWriter REQUIRES_NEW + CancellationRegistry + MdcPropagatingTaskDecorator + aiAgentIngestExecutor bean + AsyncIngestionWorker Tika→TokenTextSplitter→metadata-enriched VectorStore.add; CANCELLED enum added; Option A flattened role_<code>=true flags; spring.ai.retry.* defaults wired). 18 unit tests green. Commits f316f77, b75b443, 97d60f3. Decisions: REQUIRES_NEW writer isolates status commits from @Async (D-14); built-in spring.ai.retry.* replaces spring-retry (D-17); flattened role flags portable across vector stores; CANCELLED enum value for D-20 terminal state. Next: 05-04 (knowledge-document upload service) or 05-05 (integration tests).
 - 2026-04-20 19:23 +07:00 — Plan 05-04 complete (document service + SPI fan-out: KnowledgeDocumentUploadService with ResourceRoleRepository.findRoleByCode validation + afterCommit worker dispatch; KnowledgeDocumentService atomic delete + reingest; IngesterManager List<CustomIngester> fan-out; opt-in ClasspathMarkdownIngester; UnknownRoleCode + DocumentNotFound exceptions; 6 new RAG i18n keys EN + VI). 20 Mockito tests green (6+7+7); full :ai-agent:ai-agent:test passes. Commits 07776bb, 5f04405, 0f491d7, ab30cdd. Decisions: sourceUri→fileName + sourceKind→mimeType (no Liquibase churn); IngesterManager forwards classpath:/file: URIs verbatim; reingest skips role re-validation; D-19 UUIDv5 upsert still deferred. Next: 05-05 (integration tests + Phase 5 verification gate).
+- 2026-04-21 +07:00 — Plan 06-01 complete (Phase 6 foundation types: 4 guard exceptions + Overrides + ParametersValidationException + AiParametersBody Jakarta-validated record + AiAgentGuardProperties @ConfigurationProperties with 4 nested records and resolved* defaults (D-13/D-14/D-16/D-18) + AiToolCallOutcome.FLAGGED + ChatResponseDto extended to 8 components with GuardDenialInfo + denied() factory + ok() bridge; 12 new i18n keys in both locales with parity; one-site DefaultChatServiceImpl bridge edit to ChatResponseDto.ok(); compileJava green). Commits 28d58eb, 6767cf6. No deviations — plan executed exactly as written. Next: 06-02 (Parameters layer — ParametersService, YamlMapper, DefaultParamsSeeder, Resolver overloads).
 
 ### Quick Tasks Completed
 
@@ -137,4 +138,4 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 | 260420-se6 | fix JetBrains file problems project-wide (diamond, @NonNull on @NonNullApi overrides, javadoc, getLast, Objects::nonNull, boolean XOR) | 2026-04-20 | pending | Verified — `:ai-agent:ai-agent:test` green | [260420-se6-fix-jetbrains-file-problems-project-wide](./quick/260420-se6-fix-jetbrains-file-problems-project-wide/) |
 
-**Last activity:** 2026-04-20
+**Last activity:** 2026-04-21
