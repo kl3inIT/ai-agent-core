@@ -43,3 +43,21 @@
     max-height: 20em;
     overflow: auto;
 }
+
+/* --- Shared dialog styles (ToolCallAuditDetailDialog, CitationDialog) ------- */
+/*
+ * Shared between the audit-detail and citation dialogs (plus the tool-card `__pre`
+ * above). The 14em variant is for the audit dialog's args/result panes, 30em for
+ * the citation snippet (longer text payload). Consolidates the IN-05 repeated
+ * inline styles flagged in the review.
+ */
+
+.ai-agent-scroll-pre {
+    white-space: pre-wrap;
+    max-height: 14em;
+    overflow: auto;
+}
+
+.ai-agent-scroll-pre--tall {
+    max-height: 30em;
+}

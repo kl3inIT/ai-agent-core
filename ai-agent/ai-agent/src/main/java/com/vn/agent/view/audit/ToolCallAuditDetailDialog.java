@@ -1,5 +1,6 @@
 package com.vn.agent.view.audit;
 
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Pre;
@@ -24,8 +25,16 @@ import java.util.UUID;
  *
  * <p>All labels come through {@link MessageSource} with msg:// keys under
  * {@code auditList.detail.*}; no hardcoded strings.</p>
+ *
+ * <p><b>Styling (WR-03 partial):</b> scroll-pre visuals live in the shared
+ * {@code META-INF/resources/frontend/styles/ai-agent-chat.css} under
+ * {@code ai-agent-scroll-pre}. Conversion of this dialog to a full Jmix XML view
+ * descriptor is tracked as a follow-up (see 07-REVIEW-FIX.md iteration 2 notes).</p>
  */
+@CssImport("./styles/ai-agent-chat.css")
 public class ToolCallAuditDetailDialog extends Dialog {
+
+    private static final String CSS_SCROLL_PRE = "ai-agent-scroll-pre";
 
     public ToolCallAuditDetailDialog(AiToolCallAudit audit, MessageSource messageSource, Locale locale) {
         Objects.requireNonNull(audit, "audit must not be null");
@@ -62,20 +71,16 @@ public class ToolCallAuditDetailDialog extends Dialog {
                 m(messageSource, locale, "auditList.detail.outcome", "Outcome"));
         form.setColspan(outcomeItem, 2);
 
-        // Arguments JSON — Pre for monospace.
+        // Arguments JSON — Pre for monospace. Styling from CSS class.
         Pre args = new Pre(Objects.toString(audit.getArgumentsJson(), ""));
-        args.getStyle().set("white-space", "pre-wrap");
-        args.getStyle().set("max-height", "14em");
-        args.getStyle().set("overflow", "auto");
+        args.addClassName(CSS_SCROLL_PRE);
         FormLayout.FormItem argsItem = form.addFormItem(args,
                 m(messageSource, locale, "auditList.detail.argsJson", "Arguments"));
         form.setColspan(argsItem, 2);
 
         // Result summary.
         Pre result = new Pre(Objects.toString(audit.getResultSummary(), ""));
-        result.getStyle().set("white-space", "pre-wrap");
-        result.getStyle().set("max-height", "14em");
-        result.getStyle().set("overflow", "auto");
+        result.addClassName(CSS_SCROLL_PRE);
         FormLayout.FormItem resultItem = form.addFormItem(result,
                 m(messageSource, locale, "auditList.detail.resultSummary", "Result"));
         form.setColspan(resultItem, 2);
