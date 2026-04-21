@@ -1,19 +1,20 @@
 package com.vn.agent.view.audit;
 
 import com.vaadin.flow.component.AbstractField;
-import com.vaadin.flow.component.HasValue;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
 import io.jmix.core.DataManager;
+import io.jmix.flowui.DialogWindows;
+import io.jmix.flowui.component.combobox.JmixComboBox;
+import io.jmix.flowui.component.datetimepicker.TypedDateTimePicker;
 import io.jmix.flowui.component.grid.DataGrid;
+import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.model.CollectionLoader;
+import io.jmix.flowui.view.DialogWindow;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
@@ -73,20 +74,22 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     @ViewComponent
     private CollectionLoader<AiToolCallAudit> auditsDl;
     @ViewComponent
-    private TextField userFilter;
+    private TypedTextField<String> userFilter;
     @ViewComponent
-    private ComboBox<String> toolFilter;
+    private JmixComboBox<String> toolFilter;
     @ViewComponent
-    private ComboBox<AiToolCallOutcome> outcomeFilter;
+    private JmixComboBox<AiToolCallOutcome> outcomeFilter;
     @ViewComponent
-    private DateTimePicker dateFromFilter;
+    private TypedDateTimePicker<LocalDateTime> dateFromFilter;
     @ViewComponent
-    private DateTimePicker dateToFilter;
+    private TypedDateTimePicker<LocalDateTime> dateToFilter;
 
     @Autowired
     private DataManager dataManager;
     @Autowired
     private MessageSource messageSource;
+    @Autowired
+    private DialogWindows dialogWindows;
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -108,34 +111,41 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         auditsDataGrid.addItemClickListener(e -> {
             AiToolCallAudit row = e.getItem();
             if (row != null) {
-                new ToolCallAuditDetailDialog(row, messageSource, UI.getCurrent().getLocale()).open();
+                DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
+                        dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
+                dialogWindow.getView().setAudit(row);
+                dialogWindow.open();
             }
         });
     }
 
     @Subscribe("userFilter")
     public void onUserFilterChange(
-            final AbstractField.ComponentValueChangeEvent<TextField, String> event) {
+            final AbstractField.ComponentValueChangeEvent<TypedTextField<String>, String> event) {
         rebuildQuery();
     }
 
     @Subscribe("toolFilter")
-    public void onToolFilterChange(final HasValue.ValueChangeEvent<?> event) {
+    public void onToolFilterChange(
+            final AbstractField.ComponentValueChangeEvent<JmixComboBox<String>, String> event) {
         rebuildQuery();
     }
 
     @Subscribe("outcomeFilter")
-    public void onOutcomeFilterChange(final HasValue.ValueChangeEvent<?> event) {
+    public void onOutcomeFilterChange(
+            final AbstractField.ComponentValueChangeEvent<JmixComboBox<AiToolCallOutcome>, AiToolCallOutcome> event) {
         rebuildQuery();
     }
 
     @Subscribe("dateFromFilter")
-    public void onDateFromFilterChange(final HasValue.ValueChangeEvent<?> event) {
+    public void onDateFromFilterChange(
+            final AbstractField.ComponentValueChangeEvent<TypedDateTimePicker<LocalDateTime>, LocalDateTime> event) {
         rebuildQuery();
     }
 
     @Subscribe("dateToFilter")
-    public void onDateToFilterChange(final HasValue.ValueChangeEvent<?> event) {
+    public void onDateToFilterChange(
+            final AbstractField.ComponentValueChangeEvent<TypedDateTimePicker<LocalDateTime>, LocalDateTime> event) {
         rebuildQuery();
     }
 

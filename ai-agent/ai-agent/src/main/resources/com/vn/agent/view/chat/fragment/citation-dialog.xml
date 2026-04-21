@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg://chatView.citation.dialogTitle">
+    <layout padding="true" spacing="true">
+        <textArea id="snippetField"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="30em"/>
+        <hbox width="100%" justifyContent="END" spacing="true">
+            <button id="closeBtn"
+                    text="msg://chatView.citation.close"/>
+            <button id="openInKbBtn"
+                    text="msg://chatView.citation.openInKb"
+                    themeNames="primary"/>
+        </hbox>
+    </layout>
+</view>

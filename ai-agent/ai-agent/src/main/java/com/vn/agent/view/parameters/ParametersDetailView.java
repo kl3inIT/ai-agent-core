@@ -187,7 +187,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             } catch (Exception ex) {
                 log.warn("Unable to parse existing bodyYaml for profile {}: {}",
                         edited.getId(), ex.getMessage());
-                notifications.create(ex.getMessage() == null ? "YAML parse error" : ex.getMessage())
+                notifications.create(buildErrorMessage("parametersDetail.error.yamlParse", ex))
                         .withThemeVariant(NotificationVariant.LUMO_WARNING)
                         .show();
             }
@@ -206,7 +206,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             body = buildBodyFromForm();
         } catch (Exception ex) {
             event.preventSave();
-            notifications.create(ex.getMessage() == null ? "Invalid form" : ex.getMessage())
+            notifications.create(buildErrorMessage("parametersDetail.error.invalidForm", ex))
                     .withThemeVariant(NotificationVariant.LUMO_ERROR)
                     .show();
             return;
@@ -216,7 +216,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             edited.setBodyYaml(yamlMapper.writeAsYaml(body));
         } catch (Exception ex) {
             event.preventSave();
-            notifications.create(ex.getMessage() == null ? "YAML write error" : ex.getMessage())
+            notifications.create(buildErrorMessage("parametersDetail.error.yamlWrite", ex))
                     .withThemeVariant(NotificationVariant.LUMO_ERROR)
                     .show();
         }
@@ -239,7 +239,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
                     .show();
         } catch (Exception ex) {
             log.warn("setActive failed for profile {}", edited.getId(), ex);
-            notifications.create(ex.getMessage() == null ? "Error" : ex.getMessage())
+            notifications.create(buildErrorMessage("parametersDetail.error.setActive", ex))
                     .withThemeVariant(NotificationVariant.LUMO_ERROR)
                     .show();
         }
@@ -343,6 +343,15 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     private Locale currentLocale() {
         UI ui = UI.getCurrent();
         return ui == null ? Locale.getDefault() : ui.getLocale();
+    }
+
+    private String buildErrorMessage(String key, Exception ex) {
+        String message = messageSource.getMessage(key, null, key, currentLocale());
+        String detail = ex.getMessage();
+        if (detail == null || detail.isBlank()) {
+            return message;
+        }
+        return message + " " + detail;
     }
 
 }

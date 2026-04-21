@@ -1,7 +1,6 @@
 package com.vn.agent.view.conversation;
 
 import com.vaadin.flow.component.AbstractField;
-import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.Route;
@@ -9,6 +8,7 @@ import com.vn.agent.entity.AiConversation;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
 import io.jmix.flowui.ViewNavigators;
+import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.model.CollectionLoader;
@@ -56,9 +56,9 @@ public class ConversationListView extends StandardListView<AiConversation> {
     @ViewComponent
     private CollectionLoader<AiConversation> conversationsDl;
     @ViewComponent
-    private TextField titleFilter;
+    private TypedTextField<String> titleFilter;
     @ViewComponent
-    private TextField userFilter;
+    private TypedTextField<String> userFilter;
 
     @Autowired
     private AccessManager accessManager;
@@ -104,13 +104,13 @@ public class ConversationListView extends StandardListView<AiConversation> {
 
     @Subscribe("titleFilter")
     public void onTitleFilterChange(
-            final AbstractField.ComponentValueChangeEvent<TextField, String> event) {
+            final AbstractField.ComponentValueChangeEvent<TypedTextField<String>, String> event) {
         rebuildQuery();
     }
 
     @Subscribe("userFilter")
     public void onUserFilterChange(
-            final AbstractField.ComponentValueChangeEvent<TextField, String> event) {
+            final AbstractField.ComponentValueChangeEvent<TypedTextField<String>, String> event) {
         rebuildQuery();
     }
 

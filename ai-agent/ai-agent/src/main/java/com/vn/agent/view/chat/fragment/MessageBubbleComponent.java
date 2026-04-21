@@ -5,6 +5,7 @@ import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vn.agent.view.chat.MarkdownRenderer;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * D-06 role-styled bubble. Server-side markdown rendering via {@link MarkdownRenderer}
@@ -31,6 +32,7 @@ public class MessageBubbleComponent extends Composite<Div> {
     private final StringBuilder buffer = new StringBuilder();
     private final Html htmlContent;
     private boolean stopped;
+    private String stoppedLabel = "";
 
     public MessageBubbleComponent(Role role, MarkdownRenderer markdownRenderer) {
         this.role = role;
@@ -65,17 +67,20 @@ public class MessageBubbleComponent extends Composite<Div> {
     }
 
     /** Append a muted "— stopped" suffix. Idempotent. */
-    public void markStopped() {
+    public void markStopped(String stoppedLabel) {
         if (stopped) {
             return;
         }
         stopped = true;
+        this.stoppedLabel = stoppedLabel == null ? "" : stoppedLabel;
         renderBuffer();
     }
 
     private void renderBuffer() {
         String safe = markdownRenderer.toSafeHtml(buffer.toString());
-        String suffix = stopped ? "<span class=\"ai-agent-stopped\">&nbsp;— stopped</span>" : "";
+        String suffix = stopped
+                ? "<span class=\"ai-agent-stopped\">&nbsp;— " + HtmlUtils.htmlEscape(stoppedLabel) + "</span>"
+                : "";
         // Wrap in a single div so Html always has exactly one root (Vaadin Html requirement).
         htmlContent.setHtmlContent("<div>" + safe + suffix + "</div>");
     }

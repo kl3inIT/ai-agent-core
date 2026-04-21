@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -110,6 +111,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
 
     /** Captured onAttach so the push listener can UI.access() the correct UI per-browser-tab. */
     private volatile UI ownerUi;
+    private UUID pendingSelectionDocumentId;
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -130,6 +132,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         // Upload wiring — D-15 / RESEARCH Pitfall #3 multi-file receiver. Upload
         // succeed/fail/reject events are component-specific (not ClickEvent), so
         // they continue to be wired via explicit listener calls.
+        documentsDl.addPostLoadListener(e -> selectPendingDocumentIfNeeded());
         configureUploadListeners();
     }
 
@@ -193,15 +196,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
             return;
         }
         try {
-            UUID docId = UUID.fromString(docIds.get(0));
-            // Do NOT mutate the loader query (that would permanently scope the grid to
-            // a single row across subsequent push refreshes / reloads). Instead, after
-            // the full list loads, pre-select the matching row so the admin lands on
-            // the cited document with full navigation still available.
-            documentsDl.addPostLoadListener(e -> documentsDc.getItems().stream()
-                    .filter(d -> docId.equals(d.getId()))
-                    .findFirst()
-                    .ifPresent(documentsDataGrid::select));
+            pendingSelectionDocumentId = UUID.fromString(docIds.get(0));
         } catch (IllegalArgumentException ex) {
             log.debug("Ignoring malformed documentId query param: {}", docIds.get(0));
         }
@@ -222,6 +217,18 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
             badge.getElement().setAttribute("title", doc.getErrorMessage());
         }
         return badge;
+    }
+
+    private void selectPendingDocumentIfNeeded() {
+        UUID documentId = pendingSelectionDocumentId;
+        if (documentId == null) {
+            return;
+        }
+        pendingSelectionDocumentId = null;
+        documentsDc.getItems().stream()
+                .filter(d -> documentId.equals(d.getId()))
+                .findFirst()
+                .ifPresent(documentsDataGrid::select);
     }
 
     private static String statusTheme(AiKnowledgeDocumentStatus status) {
@@ -316,7 +323,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("reingest failed for {}", doc.getId(), ex);
-                                        notifyError("knowledgeBase.upload.rejected", ex.getMessage());
+                                        notifyDetailedError("knowledgeBase.reingest.failed", ex.getMessage());
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -346,7 +353,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("delete failed for {}", doc.getId(), ex);
-                                        notifyError("knowledgeBase.upload.rejected", ex.getMessage());
+                                        notifyDetailedError("knowledgeBase.delete.failed", ex.getMessage());
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -362,6 +369,17 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
     private void notifyError(String key, Object... args) {
         Locale locale = UI.getCurrent().getLocale();
         String msg = messageSource.getMessage(key, args, key, locale);
+        notifications.create(msg)
+                .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                .show();
+    }
+
+    private void notifyDetailedError(String key, String detail) {
+        Locale locale = UI.getCurrent().getLocale();
+        String msg = messageSource.getMessage(key, null, key, locale);
+        if (detail != null && !detail.isBlank()) {
+            msg = msg + " " + Objects.toString(detail, "");
+        }
         notifications.create(msg)
                 .withThemeVariant(NotificationVariant.LUMO_ERROR)
                 .show();

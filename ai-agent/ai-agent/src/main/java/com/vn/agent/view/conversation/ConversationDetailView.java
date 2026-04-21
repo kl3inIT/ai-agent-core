@@ -1,7 +1,6 @@
 package com.vn.agent.view.conversation;
 
 import com.vaadin.flow.component.ClickEvent;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.QueryParameters;
@@ -12,6 +11,7 @@ import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.view.chat.ChatView;
 import com.vn.agent.view.chat.MarkdownRenderer;
 import com.vn.agent.view.chat.fragment.MessageBubbleComponent;
+import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
@@ -59,6 +59,8 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
 
     @Autowired
     private MarkdownRenderer markdownRenderer;
+    @Autowired
+    private ViewNavigators viewNavigators;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
@@ -75,11 +77,9 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
             return;
         }
         UUID convId = conv.getId();
-        UI ui = UI.getCurrent();
-        if (ui != null) {
-            ui.navigate(ChatView.class,
-                    QueryParameters.simple(Map.of("conversationId", convId.toString())));
-        }
+        viewNavigators.view(this, ChatView.class)
+                .withQueryParameters(QueryParameters.simple(Map.of("conversationId", convId.toString())))
+                .navigate();
     }
 
     /**

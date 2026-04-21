@@ -1,13 +1,20 @@
 package com.vn.agent.view.audit;
 
-import com.vaadin.flow.component.dependency.CssImport;
-import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.formlayout.FormLayout;
-import com.vaadin.flow.component.html.Pre;
+import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
-import org.springframework.context.MessageSource;
+import io.jmix.flowui.component.textarea.JmixTextArea;
+import io.jmix.flowui.component.textfield.TypedTextField;
+import io.jmix.flowui.view.DialogMode;
+import io.jmix.flowui.view.MessageBundle;
+import io.jmix.flowui.view.StandardOutcome;
+import io.jmix.flowui.view.StandardView;
+import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.ViewComponent;
+import io.jmix.flowui.view.ViewController;
+import io.jmix.flowui.view.ViewDescriptor;
 
 import java.time.OffsetDateTime;
 import java.util.Locale;
@@ -19,89 +26,66 @@ import java.util.UUID;
  * {@link AiToolCallAudit} row. Opened by a row-click listener in
  * {@link ToolCallAuditListView}.
  *
- * <p>Layout is Vaadin {@link FormLayout} with one row per audit field; large-text
- * fields (arguments JSON, result summary) render inside {@link Pre} for monospace
- * word-wrap. Outcome renders as a themed Badge per UI-SPEC.</p>
- *
- * <p>All labels come through {@link MessageSource} with msg:// keys under
- * {@code auditList.detail.*}; no hardcoded strings.</p>
- *
- * <p><b>Styling (WR-03 partial):</b> scroll-pre visuals live in the shared
- * {@code META-INF/resources/frontend/styles/ai-agent-chat.css} under
- * {@code ai-agent-scroll-pre}. Conversion of this dialog to a full Jmix XML view
- * descriptor is tracked as a follow-up (see 07-REVIEW-FIX.md iteration 2 notes).</p>
+ * <p>All structure now lives in a Jmix view descriptor opened through
+ * {@code DialogWindows.view(...)}. The controller only binds current row values and
+ * outcome badge state.</p>
  */
-@CssImport("./styles/ai-agent-chat.css")
-public class ToolCallAuditDetailDialog extends Dialog {
+@ViewController("AiAgent_ToolCallAudit.detailDialog")
+@ViewDescriptor("tool-call-audit-detail-dialog.xml")
+@DialogMode(width = "var(--lumo-size-xl-plus, 960px)", draggable = true, resizable = true, closeOnEsc = true)
+public class ToolCallAuditDetailDialog extends StandardView {
 
-    private static final String CSS_SCROLL_PRE = "ai-agent-scroll-pre";
+    @ViewComponent
+    private MessageBundle messageBundle;
+    @ViewComponent
+    private TypedTextField<String> startedAtField;
+    @ViewComponent
+    private TypedTextField<String> userField;
+    @ViewComponent
+    private TypedTextField<String> toolField;
+    @ViewComponent
+    private TypedTextField<String> phaseField;
+    @ViewComponent
+    private TypedTextField<String> runIdField;
+    @ViewComponent
+    private TypedTextField<String> latencyMsField;
+    @ViewComponent
+    private TypedTextField<String> errorClassField;
+    @ViewComponent
+    private TypedTextField<String> denialReasonField;
+    @ViewComponent
+    private Span outcomeBadge;
+    @ViewComponent
+    private JmixTextArea argumentsField;
+    @ViewComponent
+    private JmixTextArea resultField;
 
-    public ToolCallAuditDetailDialog(AiToolCallAudit audit, MessageSource messageSource, Locale locale) {
+    public void setAudit(AiToolCallAudit audit) {
         Objects.requireNonNull(audit, "audit must not be null");
-        setHeaderTitle(m(messageSource, locale, "auditList.detail.title", "Tool call details"));
-        setWidth("var(--lumo-size-xl-plus, 960px)");
-        setResizable(true);
-        setDraggable(true);
-
-        FormLayout form = new FormLayout();
-        form.setResponsiveSteps(
-                new FormLayout.ResponsiveStep("0", 1),
-                new FormLayout.ResponsiveStep("40em", 2));
-
-        addField(form, messageSource, locale, "auditList.detail.startedAt",
-                fmt(audit.getStartedAt()));
-        addField(form, messageSource, locale, "auditList.detail.user",
-                Objects.toString(audit.getUserUsername(), ""));
-        addField(form, messageSource, locale, "auditList.detail.tool",
-                Objects.toString(audit.getToolName(), ""));
-        addField(form, messageSource, locale, "auditList.detail.phase",
-                Objects.toString(audit.getPhase(), ""));
-        addField(form, messageSource, locale, "auditList.detail.runId",
-                uuidStr(audit.getRunId()));
-        addField(form, messageSource, locale, "auditList.detail.latencyMs",
-                audit.getLatencyMs() == null ? "" : audit.getLatencyMs().toString());
-        addField(form, messageSource, locale, "auditList.detail.errorClass",
-                Objects.toString(audit.getErrorClass(), ""));
-        addField(form, messageSource, locale, "auditList.detail.denialReason",
-                Objects.toString(audit.getDenialReason(), ""));
-
-        // Outcome badge on its own row.
-        FormLayout.FormItem outcomeItem = form.addFormItem(
-                renderOutcomeBadge(audit, messageSource, locale),
-                m(messageSource, locale, "auditList.detail.outcome", "Outcome"));
-        form.setColspan(outcomeItem, 2);
-
-        // Arguments JSON — Pre for monospace. Styling from CSS class.
-        Pre args = new Pre(Objects.toString(audit.getArgumentsJson(), ""));
-        args.addClassName(CSS_SCROLL_PRE);
-        FormLayout.FormItem argsItem = form.addFormItem(args,
-                m(messageSource, locale, "auditList.detail.argsJson", "Arguments"));
-        form.setColspan(argsItem, 2);
-
-        // Result summary.
-        Pre result = new Pre(Objects.toString(audit.getResultSummary(), ""));
-        result.addClassName(CSS_SCROLL_PRE);
-        FormLayout.FormItem resultItem = form.addFormItem(result,
-                m(messageSource, locale, "auditList.detail.resultSummary", "Result"));
-        form.setColspan(resultItem, 2);
-
-        add(form);
+        startedAtField.setValue(fmt(audit.getStartedAt()));
+        userField.setValue(Objects.toString(audit.getUserUsername(), ""));
+        toolField.setValue(Objects.toString(audit.getToolName(), ""));
+        phaseField.setValue(Objects.toString(audit.getPhase(), ""));
+        runIdField.setValue(uuidStr(audit.getRunId()));
+        latencyMsField.setValue(audit.getLatencyMs() == null ? "" : audit.getLatencyMs().toString());
+        errorClassField.setValue(Objects.toString(audit.getErrorClass(), ""));
+        denialReasonField.setValue(Objects.toString(audit.getDenialReason(), ""));
+        argumentsField.setValue(Objects.toString(audit.getArgumentsJson(), ""));
+        resultField.setValue(Objects.toString(audit.getResultSummary(), ""));
+        applyOutcomeBadge(audit.getOutcome());
     }
 
-    private static void addField(FormLayout form, MessageSource ms, Locale locale,
-                                 String key, String value) {
-        Span span = new Span(value == null ? "" : value);
-        form.addFormItem(span, m(ms, locale, key, key));
+    @Subscribe("closeBtn")
+    public void onCloseBtnClick(final ClickEvent<Button> event) {
+        close(StandardOutcome.CLOSE);
     }
 
-    private static Span renderOutcomeBadge(AiToolCallAudit audit, MessageSource ms, Locale locale) {
-        AiToolCallOutcome outcome = audit.getOutcome();
+    private void applyOutcomeBadge(AiToolCallOutcome outcome) {
         String key = "auditList.outcome." + (outcome == null ? "success" : outcome.name().toLowerCase(Locale.ROOT));
-        String label = ms.getMessage(key, null, outcome == null ? "" : outcome.name(), locale);
-        Span badge = new Span(label);
-        badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add(outcomeTheme(outcome));
-        return badge;
+        outcomeBadge.setText(messageBundle.getMessage(key));
+        outcomeBadge.getElement().getThemeList().clear();
+        outcomeBadge.getElement().getThemeList().add("badge");
+        outcomeBadge.getElement().getThemeList().add(outcomeTheme(outcome));
     }
 
     static String outcomeTheme(AiToolCallOutcome outcome) {
@@ -114,10 +98,6 @@ public class ToolCallAuditDetailDialog extends Dialog {
             case BLOCKED -> "warning";
             case FLAGGED -> "contrast";
         };
-    }
-
-    private static String m(MessageSource ms, Locale locale, String key, String fallback) {
-        return ms.getMessage(key, null, fallback, locale);
     }
 
     private static String uuidStr(UUID id) {

@@ -6,10 +6,10 @@ import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.dom.DomListenerRegistration;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
@@ -19,10 +19,14 @@ import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.view.chat.MarkdownRenderer;
 import io.jmix.core.DataManager;
 import io.jmix.core.security.CurrentAuthentication;
+import io.jmix.flowui.DialogWindows;
+import io.jmix.flowui.Notifications;
+import io.jmix.flowui.component.UiComponentUtils;
 import io.jmix.flowui.component.textarea.JmixTextArea;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
 import io.jmix.flowui.kit.component.button.JmixButton;
+import io.jmix.flowui.view.DialogWindow;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
@@ -96,23 +100,31 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private ConversationGateway conversationGateway;
     @Autowired
     private DataManager dataManager;
+    @Autowired
+    private Notifications notifications;
+    @Autowired
+    private DialogWindows dialogWindows;
 
     private UUID conversationId;
     private volatile Disposable activeStream;
     private MessageBubbleComponent activeAssistantBubble;
     private final Map<UUID, ToolCallCardComponent> toolCardsByCallId = new HashMap<>();
     private volatile UI ownerUi;
+    private DomListenerRegistration sendOnEnterRegistration;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
-        // Enter → send; Shift+Enter → newline (chat UX convention). The text area's
-        // default Enter behaviour inserts a newline, so we must preventDefault when
-        // firing the send to stop the newline from being appended first. This remains
-        // a raw DOM listener because it wires a JS-side filter (preventDefault +
-        // keyboard-shortcut semantics) that @Subscribe does not model.
-        messageInput.getElement().addEventListener("keydown", ev -> onSendClick())
-                .setFilter("event.key === 'Enter' && !event.shiftKey && !event.isComposing")
-                .addEventData("event.preventDefault()");
+        if (sendOnEnterRegistration == null) {
+            // Enter → send; Shift+Enter → newline (chat UX convention). The text area's
+            // default Enter behaviour inserts a newline, so we must preventDefault when
+            // firing the send to stop the newline from being appended first. This remains
+            // a raw DOM listener because it wires JS-side keyboard shortcut semantics
+            // that @Subscribe does not model.
+            sendOnEnterRegistration = messageInput.getElement()
+                    .addEventListener("keydown", ev -> onSendClick())
+                    .setFilter("event.key === 'Enter' && !event.shiftKey && !event.isComposing")
+                    .preventDefault();
+        }
     }
 
     @Subscribe("sendButton")
@@ -143,6 +155,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         }
         this.activeStream = null;
         this.ownerUi = null;
+        if (sendOnEnterRegistration != null) {
+            sendOnEnterRegistration.remove();
+            sendOnEnterRegistration = null;
+        }
         super.onDetach(detachEvent);
     }
 
@@ -272,7 +288,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             d.dispose();
         }
         if (activeAssistantBubble != null) {
-            activeAssistantBubble.markStopped();
+            Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
+            String stoppedLabel = messages.getMessage(
+                    "chatView.message.stopped", null, "chatView.message.stopped", locale);
+            activeAssistantBubble.markStopped(stoppedLabel);
         }
         finishStream();
     }
@@ -333,15 +352,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void openCitationDialog(StreamingEvent.Citation c) {
-        // Document name is not carried on the Citation event yet — use the id as fallback
-        // header. A follow-up can resolve the AiKnowledgeDocument title in a later plan.
-        CitationDialog dialog = new CitationDialog(
-                c.index(),
+        DialogWindow<CitationDialog> dialogWindow =
+                dialogWindows.view(UiComponentUtils.getView(getContent()), CitationDialog.class).build();
+        dialogWindow.getView().setCitation(
                 c.documentId(),
                 c.documentId() == null ? null : c.documentId().toString(),
-                c.snippet(),
-                messages);
-        dialog.open();
+                c.snippet());
+        dialogWindow.open();
     }
 
     private void handleError(Throwable t) {
@@ -367,8 +384,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void showErrorNotification(String messageKey) {
         Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
         String text = messages.getMessage(messageKey, null, messageKey, locale);
-        Notification notification = Notification.show(text);
-        notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+        notifications.create(text)
+                .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                .show();
     }
 
     private void scrollToEnd() {

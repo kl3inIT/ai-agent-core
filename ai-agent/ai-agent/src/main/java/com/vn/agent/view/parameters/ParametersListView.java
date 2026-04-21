@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Locale;
 
 /**
  * UI-04 Parameters list (admin-only via {@code AiAgentAdminRole @ViewPolicy} in 07-01).
@@ -129,7 +130,7 @@ public class ParametersListView extends StandardListView<AiParameters> {
                     .show();
         } catch (Exception ex) {
             log.warn("setActive failed for profile {}", row.getId(), ex);
-            notifications.create(ex.getMessage() == null ? "Error" : ex.getMessage())
+            notifications.create(buildErrorMessage("parametersList.error.setActive", ex))
                     .withThemeVariant(NotificationVariant.LUMO_ERROR)
                     .show();
         }
@@ -149,6 +150,20 @@ public class ParametersListView extends StandardListView<AiParameters> {
                 return null;
             }
         });
+    }
+
+    private String buildErrorMessage(String key, Exception ex) {
+        String message = messageSource.getMessage(key, null, key, currentLocale());
+        String detail = ex.getMessage();
+        if (detail == null || detail.isBlank()) {
+            return message;
+        }
+        return message + " " + detail;
+    }
+
+    private Locale currentLocale() {
+        UI ui = UI.getCurrent();
+        return ui == null ? Locale.getDefault() : ui.getLocale();
     }
 
 }
