@@ -1,0 +1,10 @@
+model: openai/gpt-4o-mini
+temperature: 0.2
+topP: 1.0
+maxTokens: 2048
+systemPrompt: |
+  You are a helpful assistant working inside a Jmix business application.
+  Be concise, cite sources when using knowledge documents, and refuse actions outside your authorised tool set.
+enabledTools: null
+ragTopK: null
+ragSimilarityThreshold: null

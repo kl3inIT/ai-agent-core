@@ -33,6 +33,13 @@ dependencies {
     // it as a parameter — both are visible to the ai-agent-starter module.
     api 'org.springframework.ai:spring-ai-rag'
 
+    // Plan 06-02 (PARAM-02/D-05): YAML ser/de for AiParametersBody (strict-on-write) +
+    // Jakarta Bean Validation API for @NotBlank/@DecimalMin/etc. constraints on that record.
+    // Hibernate Validator is already transitively pulled by Jmix/Spring Boot; no explicit
+    // declaration needed here. Versions are resolved via Spring Boot BOM.
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'jakarta.validation:jakarta.validation-api'
+
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
