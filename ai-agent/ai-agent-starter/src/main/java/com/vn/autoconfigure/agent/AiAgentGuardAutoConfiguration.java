@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.model.tool.ToolCallingManager;
-import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -38,9 +38,10 @@ import org.springframework.context.annotation.Primary;
  *   <li>{@link OutputScannerAdvisor} — exposed as a {@link CallAdvisor} bean so Plan 04's
  *       {@code ChatClientFactory} can pick it up alongside the existing advisor chain.</li>
  *   <li>{@link GuardedToolCallingManager} — {@code @Primary} ToolCallingManager decorating
- *       whatever default Spring AI registered. The delegate lookup happens lazily via the
- *       {@link BeanFactory} so we can resolve the non-self bean by name and avoid the
- *       {@code @Primary}-on-self injection cycle.</li>
+ *       whatever default Spring AI registered. The delegate lookup happens lazily via an
+ *       {@link ObjectProvider} that filters out any {@link GuardedToolCallingManager} instances,
+ *       so we can resolve the non-self bean by type and avoid the {@code @Primary}-on-self
+ *       injection cycle.</li>
  *   <li>{@code StructuredOutputValidationAdvisor} — optional, reflective, {@code @ConditionalOnClass}.
  *       The class does NOT exist in Spring AI 1.1.4 (RESEARCH D-21); this bean ships for forward
  *       compatibility only. Plan 04's inline retry is the authoritative path today.</li>
@@ -84,12 +85,12 @@ public class AiAgentGuardAutoConfiguration {
     /**
      * Guarded tool-calling manager — decorates whatever {@link ToolCallingManager} Spring AI
      * registered by default. Uses {@code @Primary} so consumers (notably
-     * {@code ChatClientFactory}) receive THIS manager. The delegate is resolved from the
-     * {@link BeanFactory} at bean-creation time via
-     * {@link BeanFactory#getBean(String, Class)} looking for the well-known Spring AI bean name
-     * {@code "toolCallingManager"} — this avoids the
-     * {@code @Primary}-on-self injection cycle that a direct {@code ToolCallingManager delegate}
-     * parameter would cause (we would become the primary and get asked to inject ourselves).
+     * {@code ChatClientFactory}) receive THIS manager. The delegate is resolved by TYPE via an
+     * {@link ObjectProvider} (WR-03): any upstream {@code ToolCallingManager} that is not itself
+     * a {@link GuardedToolCallingManager} is picked as the delegate. Type-based resolution lets
+     * hosts that replaced Spring AI's default under a different bean name still benefit from
+     * iteration-cap and {@code ToolGuard} veto enforcement, which the previous bean-name-based
+     * lookup silently skipped.
      *
      * <p>Hosts that truly want the raw manager can declare a bean named
      * {@value #GUARDED_TOOL_CALLING_MANAGER_BEAN} themselves — this conditional-on-missing-bean
@@ -97,38 +98,49 @@ public class AiAgentGuardAutoConfiguration {
      */
     @Bean(name = GUARDED_TOOL_CALLING_MANAGER_BEAN)
     @Primary
-    @ConditionalOnBean(name = "toolCallingManager")
+    @ConditionalOnBean(ToolCallingManager.class)
     @ConditionalOnMissingBean(name = GUARDED_TOOL_CALLING_MANAGER_BEAN)
     public ToolCallingManager guardedToolCallingManager(
-            BeanFactory beanFactory,
+            ObjectProvider<ToolCallingManager> upstreamManagers,
             AiAgentGuardProperties props,
             ToolGuard toolGuard,
             AuditWriter auditWriter,
             CurrentAuthentication currentAuthentication) {
-        ToolCallingManager delegate = resolveDelegate(beanFactory);
+        ToolCallingManager delegate = resolveDelegate(upstreamManagers);
         return new GuardedToolCallingManager(delegate, props, toolGuard, auditWriter, currentAuthentication);
     }
 
     /**
-     * Locates the upstream Spring AI default {@link ToolCallingManager}. Spring AI's own
-     * autoconfig registers the bean under the canonical method name {@code toolCallingManager};
-     * any host that replaced it with a non-primary named bean can register its own
-     * {@value #GUARDED_TOOL_CALLING_MANAGER_BEAN} to bypass this wiring entirely.
+     * Locates the upstream {@link ToolCallingManager} to decorate (WR-03). Resolving by type via
+     * {@link ObjectProvider} instead of the canonical Spring AI bean name {@code toolCallingManager}
+     * lets hosts that replaced the default with a differently-named bean still have iteration-cap
+     * and {@code ToolGuard} veto enforcement applied. Excludes any {@link GuardedToolCallingManager}
+     * instances to avoid the {@code @Primary}-on-self cycle.
+     *
+     * <p>If zero upstream managers remain, surface the failure here (rather than letting
+     * {@code ChatClientFactory} inject a raw manager) with actionable remediation guidance. If
+     * more than one candidate is present, require the host to opt out by registering their own
+     * {@value #GUARDED_TOOL_CALLING_MANAGER_BEAN} so we never silently pick an arbitrary bean.</p>
      */
-    private static ToolCallingManager resolveDelegate(BeanFactory beanFactory) {
-        try {
-            return beanFactory.getBean("toolCallingManager", ToolCallingManager.class);
-        } catch (RuntimeException e) {
-            // Defensive fallback — if the canonical name is not in use for any reason, Spring
-            // will have failed earlier anyway (ChatClientFactory requires a ToolCallingManager).
-            // Surface the failure at autoconfig construction so it is diagnosable.
+    private static ToolCallingManager resolveDelegate(ObjectProvider<ToolCallingManager> upstreamManagers) {
+        java.util.List<ToolCallingManager> candidates = upstreamManagers.orderedStream()
+                .filter(manager -> !(manager instanceof GuardedToolCallingManager))
+                .toList();
+        if (candidates.isEmpty()) {
             throw new IllegalStateException(
-                    "GuardedToolCallingManager could not locate the default Spring AI 'toolCallingManager' "
-                            + "bean to decorate. Register a bean named '"
-                            + GUARDED_TOOL_CALLING_MANAGER_BEAN
-                            + "' to opt out of this autoconfig, or ensure Spring AI's default "
-                            + "ToolCallingManager autoconfig is active.", e);
+                    "GuardedToolCallingManager could not locate an upstream ToolCallingManager "
+                            + "to decorate. Ensure Spring AI's default ToolCallingManager autoconfig "
+                            + "is active, or register a bean named '"
+                            + GUARDED_TOOL_CALLING_MANAGER_BEAN + "' to opt out of this autoconfig.");
         }
+        if (candidates.size() > 1) {
+            throw new IllegalStateException(
+                    "GuardedToolCallingManager found multiple upstream ToolCallingManager beans "
+                            + "(" + candidates.size() + "). Register a bean named '"
+                            + GUARDED_TOOL_CALLING_MANAGER_BEAN + "' to opt out of this autoconfig "
+                            + "and handle decoration explicitly.");
+        }
+        return candidates.get(0);
     }
 
     /**
