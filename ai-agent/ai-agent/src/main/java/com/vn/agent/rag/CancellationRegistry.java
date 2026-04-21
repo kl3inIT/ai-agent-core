@@ -1,6 +1,7 @@
 package com.vn.agent.rag;
 
 import org.springframework.stereotype.Component;
+import reactor.core.Disposable;
 
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,12 @@ public class CancellationRegistry {
     private final Map<UUID, Long> cancelledAtOrBelow = new ConcurrentHashMap<>();
     /** Legacy single-flag support for callers that have not migrated to generations yet. */
     private final Set<UUID> cancelled = ConcurrentHashMap.newKeySet();
+    /**
+     * Plan 07-02 (D-03): Phase 7 chat-stream support. Maps a chat {@code runId} to the active
+     * reactor {@link Disposable}; {@link #cancel(UUID)} disposes it so the subscription tears
+     * down, {@code doFinally} clears the entry via {@link #clearDisposable(UUID)}.
+     */
+    private final Map<UUID, Disposable> disposables = new ConcurrentHashMap<>();
 
     /**
      * Reserved for future metrics (e.g., counting in-flight ingestions). Currently a
@@ -74,12 +81,50 @@ public class CancellationRegistry {
      * Idempotent — calling twice on the same id does not throw. Cancels any worker
      * whose captured generation is less than or equal to the generation at call time
      * AND sets the legacy boolean flag for backward-compatible callers.
+     *
+     * <p>Plan 07-02 (D-03): if a chat-stream {@link Disposable} was registered against
+     * this id via {@link #register(UUID, Disposable)}, it is disposed here so the Flux
+     * subscription tears down synchronously — the Stop button in ChatView wires to this.</p>
      */
     public void cancel(UUID id) {
         if (id == null) return;
         long gen = generations.computeIfAbsent(id, k -> new AtomicLong()).get();
         cancelledAtOrBelow.merge(id, gen, Math::max);
         cancelled.add(id);
+        Disposable d = disposables.remove(id);
+        if (d != null && !d.isDisposed()) {
+            try {
+                d.dispose();
+            } catch (RuntimeException ignored) {
+                // Dispose must not throw — worst case the subscription self-terminates shortly.
+            }
+        }
+    }
+
+    /**
+     * Plan 07-02 (D-03): register the active chat-stream {@link Disposable} against its
+     * pre-allocated {@code runId}. Overload is additive to the ingestion-worker
+     * {@link #register(UUID)} no-op so callers pick the variant matching their lifecycle.
+     *
+     * <p>If the same {@code runId} already has a Disposable registered, the prior entry is
+     * replaced (not disposed) — this is an idempotency guarantee for retry paths; the Flux
+     * cleanup pipeline owns disposal of orphaned subscriptions via {@code doFinally}.</p>
+     */
+    public void register(UUID runId, Disposable disposable) {
+        if (runId == null || disposable == null) {
+            return;
+        }
+        disposables.put(runId, disposable);
+    }
+
+    /**
+     * Plan 07-02 (D-03): remove the stream {@link Disposable} entry (called from
+     * {@code doFinally}) without disposing it — the Flux is already terminating on its own
+     * path. No-op if no entry exists.
+     */
+    public void clearDisposable(UUID runId) {
+        if (runId == null) return;
+        disposables.remove(runId);
     }
 
     /** Legacy single-flag check — kept for callers that have not captured a generation. */

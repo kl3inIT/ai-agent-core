@@ -2,6 +2,8 @@ package com.vn.agent.audit;
 
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.orchestration.RunContext;
+import com.vn.agent.orchestration.StreamingEvent;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import io.jmix.core.security.CurrentAuthentication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,14 @@ import java.util.UUID;
  * <p><b>Not a Spring @Component.</b> Instantiated per-callback by {@code AgentToolCallbacks}
  * (Plan 04-04). No {@code @Transactional} annotation on this class — the durability guarantee
  * comes from the injected {@link AuditWriter} proxy, not from the decorator.
+ *
+ * <p><b>Plan 07-02 streaming extension (RESEARCH Open Q#2 RESOLVED).</b> When a streaming run
+ * is active ({@code ChatService.stream(...)} path registered a {@link StreamingSinkHolder}
+ * entry for the current {@link RunContext#get()} runId), each tool invocation also emits
+ * {@link StreamingEvent.ToolCall} on entry and {@link StreamingEvent.ToolResult} on exit to
+ * the active sink — interleaved with Content chunks in the ChatView Flux so the UI can render
+ * live tool-call cards (D-08). Blocking {@code ask(...)} path is unchanged: the sink lookup
+ * returns empty and {@code ifPresent(...)} is a no-op, preserving Phase-4 semantics.</p>
  */
 public class ToolCallbackAuditDecorator implements ToolCallback {
 
@@ -46,13 +56,31 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     private final ToolCallback delegate;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
+    private final StreamingSinkHolder streamingSinkHolder;
 
+    /**
+     * Phase-4 constructor preserved for non-streaming callers; delegates to the Plan-07-02
+     * overload with a {@code null} sink holder (blocking path only).
+     */
     public ToolCallbackAuditDecorator(ToolCallback delegate,
                                       AuditWriter auditWriter,
                                       CurrentAuthentication currentAuthentication) {
+        this(delegate, auditWriter, currentAuthentication, null);
+    }
+
+    /**
+     * Plan 07-02 streaming-aware constructor. When {@code streamingSinkHolder} is non-null and
+     * a run is registered for the current thread's runId, tool-call lifecycle events are
+     * emitted into the active Flux.
+     */
+    public ToolCallbackAuditDecorator(ToolCallback delegate,
+                                      AuditWriter auditWriter,
+                                      CurrentAuthentication currentAuthentication,
+                                      StreamingSinkHolder streamingSinkHolder) {
         this.delegate = delegate;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.streamingSinkHolder = streamingSinkHolder;
     }
 
     @Override
@@ -92,6 +120,12 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             log.warn("Tool PRE audit failed runId={} tool={}", runId, toolName, t);
         }
 
+        // Plan 07-02: correlate ToolCall / ToolResult pair via a single id (ChatView's
+        // ToolCallCardComponent.setResult matches by id). Emission is a no-op when no
+        // streaming run is active (blocking ask() path or non-chat invocation).
+        final UUID toolCallId = UUID.randomUUID();
+        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
+
         boolean success = false;
         String output = null;
         String errorMessage = null;
@@ -106,17 +140,37 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             throw t;
         } finally {
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            AiToolCallOutcome outcome = success ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
+            String resultSummary = output == null
+                    ? cap(errorMessage, RESULT_SUMMARY_MAX_CHARS)
+                    : cap(output, RESULT_SUMMARY_MAX_CHARS);
             try {
-                AiToolCallOutcome outcome = success ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
-                String resultSummary = output == null
-                        ? cap(errorMessage, RESULT_SUMMARY_MAX_CHARS)
-                        : cap(output, RESULT_SUMMARY_MAX_CHARS);
                 auditWriter.writeToolCall(runId, userUsername, conversationId, toolName,
                         cappedInput, resultSummary, latencyMs, outcome,
                         /*denialReason*/ null, errorClass, "POST");
             } catch (Throwable t2) {
                 log.warn("Tool POST audit failed runId={} tool={}", runId, toolName, t2);
             }
+            // Plan 07-02: emit post-exit ToolResult to the streaming sink (both success + error paths).
+            final String emittedSummary = resultSummary;
+            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
+        }
+    }
+
+    /**
+     * Plan 07-02 bridge: emit a lifecycle event into the request-scoped
+     * {@link StreamingSinkHolder} sink if one exists for the current thread's runId.
+     * Non-streaming callers (and callers outside {@code ChatService.stream(...)}) see a no-op
+     * — zero behavior change for the Phase-4 blocking path.
+     */
+    private void emitToolEvent(java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
+        if (streamingSinkHolder == null) {
+            return;
+        }
+        try {
+            streamingSinkHolder.current().ifPresent(emitter);
+        } catch (RuntimeException ex) {
+            log.debug("Streaming tool-event emission failed; continuing with audit-only path", ex);
         }
     }
 

@@ -122,7 +122,10 @@ class AskTypedRetryTest {
 
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder,
-                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator);
+                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
+                /* chatStreamingScheduler */ null,
+                /* cancellationRegistry */ null,
+                /* streamingSinkHolder */ null);
     }
 
     /**
