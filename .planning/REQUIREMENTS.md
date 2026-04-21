@@ -95,7 +95,7 @@
 
 - [x] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
 - [x] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
-- [ ] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
+- [x] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
 - [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
 - [x] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
 - [x] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
