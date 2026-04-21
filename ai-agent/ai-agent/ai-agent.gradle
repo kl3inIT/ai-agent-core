@@ -40,6 +40,13 @@ dependencies {
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'jakarta.validation:jakarta.validation-api'
 
+    // Plan 06-03 (GUARD-01/GUARD-02, D-12): Spring Cache starter powers the per-user
+    // RateLimitGuard (cache "ai-agent.rateLimit") and the per-conversation TokenBudgetGuard
+    // (cache "ai-agent.tokenBreaker"). AiAgentGuardAutoConfiguration registers a default
+    // ConcurrentMapCacheManager when the host has not declared its own CacheManager.
+    // BOM-versioned — no explicit version.
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
