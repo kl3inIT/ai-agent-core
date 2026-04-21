@@ -666,7 +666,7 @@ void noHardcodedStringsInViewXml() throws IOException {
 | A5 | `ApplicationEventPublisher` events fired inside `afterCommit` reach `@EventListener` methods synchronously on the committing thread | Pattern 3 | If async (requires `@Async`), ordering may not hold — ref impl AuditWriter Phase 4 D-14 already uses this pattern and works, so risk is low |
 | A6 | Jmix Fragment's public instance methods are invokable by including view after fragment `ReadyEvent` fires | Pattern 5 | Timing issue — confirm with Jmix skill `jmix-fragments` during plan |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Jmix gridexport CSV gap — RESOLVED 2026-04-21 (Option A).**
    - **Decision:** Align UI-06 / D-20 with the add-on's native formats. Ship Excel + JSON via the gridexport add-on; do **not** ship CSV. User-confirmed via /gsd-plan-phase 7: "follow addons export docs".
@@ -681,11 +681,13 @@ void noHardcodedStringsInViewXml() throws IOException {
    - **What we know:** ref impl (`ChatImpl.java`) uses `Sinks.Many<EventStreamValueHolder>` populated by a `ToolEventListener` that hooks Spring AI's blocking tool execution. Spring AI GH issues confirm tool-calls do not surface cleanly through `.stream().chatResponse()` alone.
    - **What's unclear:** Whether Spring AI 1.1.4 exposes a `ToolEventListener` equivalent or whether we need to implement it via a `ToolCallback` wrapper that also emits events. (Phase 3 already has `ToolCallbackAuditDecorator` which wraps every tool — that's the natural place to also emit streaming events.)
    - **Recommendation:** Planner extends `ToolCallbackAuditDecorator` (Phase 4) to optionally emit to a `Sinks.Many` sink when streaming is active, threaded via the `RunContext`. Verify via Context7 `/spring-projects/spring-ai/v1.1.4` that the decorator hook surface doesn't change in 1.1.4.
+   - **RESOLVED 2026-04-21:** Extend `ToolCallbackAuditDecorator` to optionally publish `StreamingEvent.ToolCall` (on invoke entry) and `StreamingEvent.ToolResult` (on invoke exit, with outcome) to a request-scoped `Sinks.Many<StreamingEvent>` threaded via `RunContext`. Plan 07-02 Task 2 MUST wire this emission path (not deferred). Fallback for Spring AI provider without streaming tool-call support: D-04 graceful fallback to blocking `ask(...)` single-chunk path.
 
 3. **Vaadin `AppShellConfigurator` + Spring `@ConditionalOnXxx`.**
    - **What we know:** Vaadin scans classpath for `AppShellConfigurator` implementers at startup, not Spring beans.
    - **What's unclear:** Whether a Spring-conditional `AppShellConfigurator` bean is actually excluded from Vaadin's scan when the condition fails, or whether the class loading itself triggers Vaadin registration.
    - **Recommendation:** Test at plan time with a two-configuration experiment. If conditionals don't work, fall back to documented snippet + no shipped class.
+   - **RESOLVED 2026-04-21:** Ship `AiAgentAppShell` with `@ConditionalOnProperty(jmix.ai-agent.flowui.push-autoconfigure, matchIfMissing=true)` per Plan 07-01 Task 2. Plan 07-07 `PushAutoConfigTest` empirically validates both states; if the test fails on the disabled branch (Vaadin classpath scanner ignores Spring conditional), Plan 07-01 SUMMARY must record the pivot to documentation-only distribution (delete class, document snippet).
 
 ## Environment Availability
 

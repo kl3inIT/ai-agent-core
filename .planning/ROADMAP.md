@@ -268,16 +268,17 @@ Plans:
 
 **Needs research phase:** Partial — reuses P4 streaming validation; Vaadin upload patterns standard.
 
-**Plans:** 7 plans
+**Plans:** 8 plans
 
 Plans:
 - [ ] 07-01-PLAN.md — Wave 1 foundations: deps, @Push AppShell, MarkdownRenderer, StreamingEvent sealed DTOs, menu.xml, AiAgentAdminRole @ViewPolicy, bilingual messages bundles
 - [ ] 07-02-PLAN.md — Wave 1 backend: ChatService.stream(...) Flux<StreamingEvent> + IngestionStatusWriter afterCommit DocumentStatusChangedEvent
-- [ ] 07-03-PLAN.md — Wave 2 ChatView + ChatPanelFragment + MessageBubble/ToolCallCard/CitationDialog components (UI-01, UI-02)
-- [ ] 07-04-PLAN.md — Wave 2 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
+- [ ] 07-03-PLAN.md — Wave 3 ChatView + ChatPanelFragment + MessageBubble/ToolCallCard/CitationDialog components (UI-01, UI-02)
+- [ ] 07-04-PLAN.md — Wave 4 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
 - [ ] 07-05-PLAN.md — Wave 2 ParametersListView + ParametersDetailView Form + YAML preview tab (UI-04)
 - [ ] 07-06-PLAN.md — Wave 2 KnowledgeBaseView + ToolCallAuditListView + detail dialog + gridexport actions (UI-05, UI-06)
-- [ ] 07-07-PLAN.md — Wave 3 test suite: LocaleParity, AdminViewAccess, MarkdownRendererXss, PushAutoConfig, ChatStream/Stop, Upload, DocumentStatusPush, YamlPreview, AuditExport, RoleFilter (UI-08, UI-09, UI-10)
+- [ ] 07-07a-PLAN.md — Wave 0 test skeletons: 11 failing/disabled JUnit stubs so plans 07-01..07-06 have real test files to target (Nyquist RED)
+- [ ] 07-07b-PLAN.md — Wave 5 green fill: un-disable + implement the 11 test bodies scaffolded by 07-07a (UI-08, UI-09, UI-10)
 
 ---
 

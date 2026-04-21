@@ -1,9 +1,9 @@
 ---
 phase: 07-flow-ui
-plan: 07
+plan: 07b
 type: execute
-wave: 3
-depends_on: [07-01, 07-02, 07-03, 07-04, 07-05, 07-06]
+wave: 5
+depends_on: [07-07a, 07-01, 07-02, 07-03, 07-04, 07-05, 07-06]
 files_modified:
   - ai-agent/ai-agent/src/test/java/com/vn/agent/i18n/LocaleParityTest.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/security/AdminViewAccessTest.java
@@ -54,7 +54,7 @@ must_haves:
 ---
 
 <objective>
-Wave 3 plan. Lands the complete Phase 7 test suite — 11 tests that together certify UI-01..10 success criteria: locale parity (UI-08/09), admin gating (UI-10), XSS defense (D-07), streaming (UI-01), Stop (UI-02/D-03), upload (UI-05), push refresh (D-16), YAML preview live regen (D-12), gridexport actions (D-20), role-aware filter (D-24), and AppShell conditional (D-02). Depends on all prior Phase 7 plans. All tests are @SpringBootTest or @UiTest where views are involved; pure unit tests where classes are standalone.
+Wave 5 plan. GREEN-fills the Phase 7 test suite scaffolded by 07-07a (Wave 0). Removes every @Disabled("07-07b…") annotation, deletes every fail("not yet implemented — 07-07b") stub, and replaces each @Test body with the real assertion logic. Together with 07-07a this suite — 11 tests that together certify UI-01..10 success criteria: locale parity (UI-08/09), admin gating (UI-10), XSS defense (D-07), streaming (UI-01), Stop (UI-02/D-03), upload (UI-05), push refresh (D-16), YAML preview live regen (D-12), gridexport actions (D-20), role-aware filter (D-24), and AppShell conditional (D-02). Depends on all prior Phase 7 plans. All tests are @SpringBootTest or @UiTest where views are involved; pure unit tests where classes are standalone.
 </objective>
 
 <execution_context>
@@ -87,6 +87,61 @@ Reactor test utility: `reactor.test.StepVerifier` for Flux-based tests.
 </context>
 
 <tasks>
+
+<task type="auto">
+  <name>Task 0: Un-disable skeletons — strip @Disabled + fail() placeholders from 07-07a</name>
+  <read_first>
+    - .planning/phases/07-flow-ui/07-07a-PLAN.md
+    - All 11 test files listed in files_modified
+  </read_first>
+  <files>
+    (same 11 test files as files_modified)
+  </files>
+  <action>
+    Before writing real assertions, the executor MUST:
+    1. Delete every class-level  annotation added by 07-07a. Grep target: .
+    2. Remove every  line. Each will be replaced by the real assertion body in Tasks 1–3 below.
+    3. Remove the  line from any class that no longer calls .
+
+    Verification after Task 0 (before Task 1 writes real code):
+    -  prints NOTHING.
+    - > Task :ai-agent:ai-agent:compileJava
+> Task :ai-agent:ai-agent:processResources UP-TO-DATE
+
+> Task :ai-agent:ai-agent:enhanceJmixMain
+Enhancing entities in project ':ai-agent:ai-agent' for source set 'main'
+Project entities:
+    JPA: [com.vn.agent.entity.AiParameters, com.vn.agent.entity.AiMessage, com.vn.agent.entity.AiToolCallAudit, com.vn.agent.entity.AiKnowledgeDocument, com.vn.agent.entity.AiConversation];
+    DTO: [];
+Project converters: [].
+Running EclipseLink enhancer in project ':ai-agent:ai-agent' for source set 'main'
+Running Jmix enhancer in project ':ai-agent:ai-agent' for source set 'main'
+
+> Task :ai-agent:ai-agent:copyJmixEnhancingResourcesMain
+> Task :ai-agent:ai-agent:classes
+> Task :ai-agent:ai-agent-starter:compileJava UP-TO-DATE
+> Task :ai-agent:ai-agent:compileTestJava UP-TO-DATE
+
+[Incubating] Problems report is available at: file:///D:/DTH/ai-agent-core/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.4/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 22s
+6 actionable tasks: 3 executed, 3 up-to-date still succeeds (files temporarily have empty @Test bodies — tasks 1–3 fill them).
+  </action>
+  <verify>
+    <automated>./gradlew :ai-agent:ai-agent:compileTestJava</automated>
+  </verify>
+  <done>
+    - zero remaining  markers
+    - zero remaining  markers
+    - compileTestJava green
+  </done>
+</task>
 
 <task type="auto">
   <name>Task 1: Infrastructure tests (LocaleParity, AdminViewAccess, MarkdownRendererXss, PushAutoConfig)</name>
