@@ -63,14 +63,27 @@ public class DefaultParamsSeeder {
     }
 
     private void doSeedIfEmpty() {
-        // Idempotency guard — probe for any existing row via select count(e).
-        long count = dataManager.loadValue(
-                        "select count(e) from ai_AiParameters e", Long.class)
-                .one();
-        if (count > 0) {
-            log.debug("AiParameters already populated ({} rows) — skipping default seed", count);
+        // Idempotency guard — probe for any existing row with a typed fluent query.
+        // Some environments can reject JPQL entity-name strings during startup even though
+        // the class itself is available. Keep startup resilient: log and skip seeding on
+        // probe/save failures instead of aborting the application.
+        try {
+            boolean hasExistingRows = !dataManager.load(AiParameters.class)
+                    .all()
+                    .maxResults(1)
+                    .list()
+                    .isEmpty();
+            if (hasExistingRows) {
+                log.debug("AiParameters already populated — skipping default seed");
+                return;
+            }
+        } catch (RuntimeException probeFailure) {
+            log.warn("Unable to probe AiParameters rows; skipping default seed to keep startup alive: {}",
+                    probeFailure.getMessage());
+            log.debug("AiParameters probe failure details", probeFailure);
             return;
         }
+
         Resource resource = resourceLoader.getResource(RESOURCE_PATH);
         if (!resource.exists()) {
             log.warn("Default params resource {} not found on classpath — skipping seed",
@@ -84,7 +97,14 @@ public class DefaultParamsSeeder {
             row.setProfileName(DEFAULT_PROFILE_NAME);
             row.setBodyYaml(canonical);
             row.setActive(Boolean.TRUE);
-            dataManager.save(row);
+            try {
+                dataManager.save(row);
+            } catch (RuntimeException saveFailure) {
+                log.warn("Unable to persist default AiParameters profile; skipping seed: {}",
+                        saveFailure.getMessage());
+                log.debug("AiParameters default-seed save failure details", saveFailure);
+                return;
+            }
             log.info("Seeded default AiParameters profile from {}", RESOURCE_PATH);
         } catch (IOException e) {
             throw new IllegalStateException(

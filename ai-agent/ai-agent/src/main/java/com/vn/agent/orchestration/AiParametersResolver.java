@@ -69,10 +69,17 @@ public class AiParametersResolver {
     }
 
     public AiParameters resolveActive() {
-        return dataManager.load(AiParameters.class)
-                .query("select e from ai_AiParameters e where e.active = true")
-                .optional()
-                .orElseGet(this::buildFallback);
+        try {
+            return dataManager.load(AiParameters.class)
+                    .query("select e from ai_AiParameters e where e.active = true")
+                    .optional()
+                    .orElseGet(this::buildFallback);
+        } catch (RuntimeException persistenceFailure) {
+            log.warn("Unable to resolve active AiParameters from persistence; using defaults fallback: {}",
+                    persistenceFailure.getMessage());
+            log.debug("AiParameters resolveActive persistence failure details", persistenceFailure);
+            return buildFallback();
+        }
     }
 
     private AiParameters buildFallback() {

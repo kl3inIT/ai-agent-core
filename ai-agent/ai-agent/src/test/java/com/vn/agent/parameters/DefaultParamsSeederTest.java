@@ -2,7 +2,7 @@ package com.vn.agent.parameters;
 
 import com.vn.agent.entity.AiParameters;
 import io.jmix.core.DataManager;
-import io.jmix.core.FluentValueLoader;
+import io.jmix.core.FluentLoader;
 import io.jmix.core.Metadata;
 import io.jmix.core.security.SystemAuthenticator;
 import jakarta.validation.Validation;
@@ -16,16 +16,14 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 /**
  * E-12 rubric: {@link DefaultParamsSeeder} idempotence (PARAM-04, D-04).
@@ -54,7 +52,6 @@ class DefaultParamsSeederTest {
                     "systemPrompt: \"You are an assistant.\"\n";
 
     @BeforeEach
-    @SuppressWarnings({"unchecked", "rawtypes"})
     void setUp() {
         dataManager = mock(DataManager.class);
         metadata = mock(Metadata.class);
@@ -78,9 +75,13 @@ class DefaultParamsSeederTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void stubCount(long count) {
-        FluentValueLoader loader = mock(FluentValueLoader.class);
-        when(dataManager.loadValue(anyString(), eq(Long.class))).thenReturn(loader);
-        when(loader.one()).thenReturn(count);
+        FluentLoader<AiParameters> loader = mock(FluentLoader.class);
+        @SuppressWarnings("rawtypes")
+        FluentLoader.ByCondition byCondition = mock(FluentLoader.ByCondition.class);
+        when(dataManager.load(AiParameters.class)).thenReturn(loader);
+        when(loader.all()).thenReturn(byCondition);
+        when(byCondition.maxResults(1)).thenReturn(byCondition);
+        when(byCondition.list()).thenReturn(count > 0 ? java.util.List.of(new AiParameters()) : java.util.List.of());
     }
 
     private void stubResource(boolean exists, String content) {
@@ -141,5 +142,21 @@ class DefaultParamsSeederTest {
         seeder.seedIfEmpty();
 
         verify(dataManager, never()).save(any(AiParameters.class));
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void skipsSilentlyWhenProbeFails() {
+        FluentLoader<AiParameters> loader = mock(FluentLoader.class);
+        FluentLoader.ByCondition byCondition = mock(FluentLoader.ByCondition.class, withSettings().stubOnly());
+        when(dataManager.load(AiParameters.class)).thenReturn(loader);
+        when(loader.all()).thenReturn(byCondition);
+        when(byCondition.maxResults(1)).thenReturn(byCondition);
+        when(byCondition.list()).thenThrow(new IllegalArgumentException("entity unknown"));
+
+        seeder.seedIfEmpty();
+
+        verify(dataManager, never()).save(any(AiParameters.class));
+        verify(resourceLoader, never()).getResource(anyString());
     }
 }
