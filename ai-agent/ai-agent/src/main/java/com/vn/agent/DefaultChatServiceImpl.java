@@ -349,7 +349,8 @@ public class DefaultChatServiceImpl implements ChatService {
                     return merged
                     .concatWith(Flux.defer(() -> {
                         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
-                        return Flux.<StreamingEvent>just(new StreamingEvent.Final(runId, latencyMs, 0, 0));
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0));
                     }));
                 })
         .subscribeOn(chatStreamingScheduler)

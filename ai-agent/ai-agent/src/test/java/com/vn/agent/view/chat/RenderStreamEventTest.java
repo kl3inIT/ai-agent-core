@@ -130,7 +130,7 @@ class RenderStreamEventTest {
     void final_emitsEmptyString_v1() {
         StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
         String out = StreamEventRenderer.renderStreamEvent(
-                new StreamingEvent.Final(RUN_ID, 1234L, 50, 200), labels(), state);
+                new StreamingEvent.Final(RUN_ID, UUID.randomUUID(), 1234L, 50, 200), labels(), state);
         assertThat(out).isEqualTo("");
     }
 

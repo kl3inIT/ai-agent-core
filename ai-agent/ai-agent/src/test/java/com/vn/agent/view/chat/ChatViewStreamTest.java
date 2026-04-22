@@ -48,6 +48,7 @@ class ChatViewStreamTest {
     void stream_emitsEventsInOrder_renderedMarkdownConcatenates() {
         ChatService chatService = Mockito.mock(ChatService.class);
         UUID runId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
         Mockito.when(chatService.stream(
                         Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(Flux.just(
@@ -55,7 +56,7 @@ class ChatViewStreamTest {
                         new StreamingEvent.Content("world"),
                         new StreamingEvent.ToolCall(UUID.randomUUID(), "find_records", "{}"),
                         new StreamingEvent.ToolResult(UUID.randomUUID(), "3 rows", AiToolCallOutcome.SUCCESS),
-                        new StreamingEvent.Final(runId, 150L, 10, 20)
+                        new StreamingEvent.Final(runId, conversationId, 150L, 10, 20)
                 ));
 
         StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();

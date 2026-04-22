@@ -212,6 +212,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 .doOnNext(evt -> {
                     if (evt instanceof StreamingEvent.Final f && activeRunId == null) {
                         activeRunId = f.runId();
+                        if (conversationId == null && f.conversationId() != null) {
+                            conversationId = f.conversationId();
+                        }
                     }
                     String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
                     if (md.isEmpty()) return;

@@ -16,7 +16,7 @@ import java.util.UUID;
  *   <li>{@link ToolCall} — a tool invocation was started by the model.</li>
  *   <li>{@link ToolResult} — the matching tool completed (success, blocked, or error).</li>
  *   <li>{@link Citation} — a retrieval citation marker to render inline.</li>
- *   <li>{@link Final} — terminal event carrying run id + usage metrics.</li>
+ *   <li>{@link Final} — terminal event carrying run id, conversation id, and usage metrics.</li>
  *   <li>{@link Error} — terminal error event carrying an i18n message key.</li>
  * </ul>
  */
@@ -36,7 +36,8 @@ public sealed interface StreamingEvent
 
     record Citation(int index, UUID documentId, String snippet) implements StreamingEvent {}
 
-    record Final(UUID runId, long latencyMs, int promptTokens, int completionTokens) implements StreamingEvent {}
+    record Final(UUID runId, UUID conversationId, long latencyMs, int promptTokens, int completionTokens)
+            implements StreamingEvent {}
 
     record Error(String messageKey, Map<String, Object> params) implements StreamingEvent {}
 }
