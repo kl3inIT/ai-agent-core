@@ -44,9 +44,12 @@ import org.springframework.core.Ordered;
  *       {@code RetrievalAugmentationAdvisorFactory}; per-request role-scoped retrieval filter is
  *       supplied by {@code DefaultChatServiceImpl} via the
  *       {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param.</li>
- *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300} with internal memory disabled
- *       via {@code .disableMemory()}; order setter on this builder is named
- *       {@code .advisorOrder(int)} (different from MessageChatMemoryAdvisor).</li>
+ *   <li>{@link ToolCallAdvisor} at {@code HIGHEST_PRECEDENCE + 300} with
+ *       {@code conversationHistoryEnabled(true)} so recursive tool rounds keep the assistant
+ *       tool-call message paired with the tool response. OpenRouter/OpenAI-compatible APIs reject
+ *       orphan {@code role=tool} messages ({@code 400 messages.[1].role}) when that pairing is
+ *       missing. Order setter on this builder is named {@code .advisorOrder(int)} (different from
+ *       MessageChatMemoryAdvisor).</li>
  *   <li>{@code OutputScannerAdvisor} at {@code HIGHEST_PRECEDENCE + 400} (Plan 06-04) —
  *       innermost CallAdvisor; inspects assistant content for configured patterns and
  *       promotes a stable pattern-key flag into the advisor context (never the matched
@@ -72,7 +75,7 @@ public class ChatClientFactory {
 
         ToolCallAdvisor toolCallAdvisor = ToolCallAdvisor.builder()
                 .toolCallingManager(toolCallingManager)
-                .disableMemory()
+                .conversationHistoryEnabled(true)
                 .advisorOrder(Ordered.HIGHEST_PRECEDENCE + 300)
                 .build();
 

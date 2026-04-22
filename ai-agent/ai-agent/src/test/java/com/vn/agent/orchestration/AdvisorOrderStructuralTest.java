@@ -98,16 +98,16 @@ class AdvisorOrderStructuralTest {
                 .isInstanceOf(OutputScannerAdvisor.class);
         assertThat(outputScanner.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 400);
 
-        // Reflectively assert the disabled internal-memory flag on ToolCallAdvisor. Field name is
-        // captured in ToolCallAdvisorBuilderConstants (OQ-1 closure constants).
+        // Reflectively assert the internal conversation-history flag on ToolCallAdvisor. Field
+        // name is captured in ToolCallAdvisorBuilderConstants (OQ-1 closure constants).
         Field internalFlag = tool.getClass().getDeclaredField(
                 ToolCallAdvisorBuilderConstants.INTERNAL_FLAG_FIELD);
         internalFlag.setAccessible(true);
         Object value = internalFlag.get(tool);
         assertThat(value)
-                .as("ToolCallAdvisor.%s must be false after .disableMemory()",
+                .as("ToolCallAdvisor.%s must be true so tool recursion keeps assistant/tool pairing",
                         ToolCallAdvisorBuilderConstants.INTERNAL_FLAG_FIELD)
-                .isEqualTo(Boolean.FALSE);
+                .isEqualTo(Boolean.TRUE);
     }
 
     /**

@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.lang.NonNull;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
@@ -91,13 +92,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     @Override
-    protected void onAttach(AttachEvent attachEvent) {
+    protected void onAttach(@NonNull AttachEvent attachEvent) {
         super.onAttach(attachEvent);
         this.ownerUi = attachEvent.getUI();
     }
 
     @Override
-    protected void onDetach(DetachEvent detachEvent) {
+    protected void onDetach(@NonNull DetachEvent detachEvent) {
         // Pitfall #8 — dispose-on-detach. Route through registry when runId is known so
         // the CANCELLED audit row is written; bare dispose is only the last-resort fallback.
         Disposable d = this.activeStream;
@@ -200,9 +201,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         stopButton.setVisible(true);
 
         final String userId = currentAuthentication.getUser().getUsername();
+        final UUID targetConversationId = ensureConversationIdForSubmit(userId, text);
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
 
-        Flux<StreamingEvent> source = chatService.stream(userId, conversationId, text, null);
+        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, text, null);
         activeStream = source
                 .doOnSubscribe(sub -> {
                     if (sub instanceof Disposable disposable && activeRunId != null) {
@@ -225,7 +227,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnError(err -> {
                     log.warn("Chat stream failed", err);
-                    accessUi(() -> { showErrorNotification("chatView.error.generic"); finishStreamInternal(); });
+                    accessUi(() -> { showGenericErrorNotification(); finishStreamInternal(); });
                 })
                 .doOnComplete(() -> accessUi(this::finishStreamInternal))
                 .subscribe();
@@ -241,6 +243,22 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     // ---- Helpers -----------------------------------------------------------
+
+    /**
+     * Reserve a stable conversation id before streaming starts so follow-up turns always
+     * continue the same thread, even if the stream terminates before a Final event arrives.
+     */
+    UUID ensureConversationIdForSubmit(String userId, String firstMessage) {
+        if (conversationId != null) {
+            return conversationId;
+        }
+        UUID resolved = conversationGateway.loadOrCreate(userId, null, firstMessage).getId();
+        if (resolved == null) {
+            throw new IllegalStateException("Conversation id must not be null");
+        }
+        conversationId = resolved;
+        return resolved;
+    }
 
     private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
         String content = m.getContent() == null ? "" : m.getContent();
@@ -266,10 +284,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         return messages.getMessage(key, null, fallback, locale);
     }
 
-    private void showErrorNotification(String key) {
+    private void showGenericErrorNotification() {
         Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
+        String key = "chatView.error.generic";
         String text = messages.getMessage(key, null, key, locale);
-        notifications.create(text).withThemeVariant(NotificationVariant.LUMO_ERROR).show();
+        notifications.create(text != null ? text : key)
+                .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                .show();
     }
 
     private void scrollToBottom() {
