@@ -6,7 +6,7 @@
             <hbox id="toolbar" width="100%" alignItems="CENTER"
                   classNames="ai-agent-chat-panel__toolbar">
                 <button id="stopButton"
-                        text="msg://chatView.action.stop"
+                        text="msg:///chatView.action.stop"
                         themeNames="tertiary"
                         visible="false"/>
             </hbox>

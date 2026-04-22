@@ -1,1 +1,9 @@
 rootProject.name = 'jmix-app'
+
+// Allow jmix-app to be opened standalone in IntelliJ/Gradle without relying on
+// a previously published SNAPSHOT in mavenLocal. When this build is itself
+// included from the workspace root composite, `gradle.parent` is non-null, so
+// we skip re-including the sibling add-on build and avoid duplicate entries.
+if (gradle.parent == null && file('../ai-agent').exists()) {
+    includeBuild '../ai-agent'
+}

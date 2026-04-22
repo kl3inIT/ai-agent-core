@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://conversationDetail.title">
+      title="msg:///conversationDetail.title">
     <data>
         <instance id="conversationDc" class="com.vn.agent.entity.AiConversation">
             <fetchPlan extends="_base"/>
@@ -20,10 +20,10 @@
     </facets>
     <layout>
         <hbox id="headerBar" width="100%" alignItems="CENTER" justifyContentMode="BETWEEN">
-            <span id="readOnlyBanner" text="msg://conversationDetail.banner.readOnly"
+            <span id="readOnlyBanner" text="msg:///conversationDetail.banner.readOnly"
                   themeNames="badge contrast"/>
             <button id="continueInChatButton"
-                    text="msg://conversationDetail.action.continueInChat"
+                    text="msg:///conversationDetail.action.continueInChat"
                     themeNames="primary"/>
         </hbox>
         <scroller id="transcriptScroller" width="100%" minHeight="30em">

@@ -27,6 +27,7 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
+import io.jmix.core.security.SystemAuthenticator;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +115,7 @@ public class DefaultChatServiceImpl implements ChatService {
     private final BaselineContextProvider baselineContextProvider;
     private final RetrievalFilterBuilder retrievalFilterBuilder;
     private final CurrentAuthentication currentAuthentication;
+    private final SystemAuthenticator systemAuthenticator;
     private final RateLimitGuard rateLimitGuard;
     private final TokenBudgetGuard tokenBudgetGuard;
     private final AuditWriter auditWriter;
@@ -129,6 +131,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                   BaselineContextProvider baselineContextProvider,
                                   RetrievalFilterBuilder retrievalFilterBuilder,
                                   CurrentAuthentication currentAuthentication,
+                                  SystemAuthenticator systemAuthenticator,
                                   RateLimitGuard rateLimitGuard,
                                   TokenBudgetGuard tokenBudgetGuard,
                                   AuditWriter auditWriter,
@@ -143,6 +146,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.baselineContextProvider = baselineContextProvider;
         this.retrievalFilterBuilder = retrievalFilterBuilder;
         this.currentAuthentication = currentAuthentication;
+        this.systemAuthenticator = systemAuthenticator;
         this.rateLimitGuard = rateLimitGuard;
         this.tokenBudgetGuard = tokenBudgetGuard;
         this.auditWriter = auditWriter;
@@ -284,73 +288,81 @@ public class DefaultChatServiceImpl implements ChatService {
         final UUID runId = UUID.randomUUID();
         final long startNanos = System.nanoTime();
 
-        return Flux.defer(() -> {
-            RunContext.set(runId);
-            // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
-            Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
-            streamingSinkHolder.register(runId, toolSink);
+        return Flux.using(
+                () -> {
+                    // Jmix security is thread-bound; every streaming subscription runs on a
+                    // background worker and must establish the caller identity explicitly.
+                    systemAuthenticator.begin(userId);
+                    return (Runnable) systemAuthenticator::end;
+                },
+                ignoredAuthScope -> Flux.defer(() -> {
+                    RunContext.set(runId);
+                    // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
+                    Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
+                    streamingSinkHolder.register(runId, toolSink);
 
-            final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
-            final UUID convId = conversation.getId();
+                    final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
+                    final UUID convId = conversation.getId();
 
-            AiParameters active = parametersResolver.resolveActive();
-            String model = parametersResolver.effectiveModel(active, effectiveOverrides);
-            String profileSystemPrompt = parametersResolver.effectiveSystemPrompt(active, userId, convId, runId);
-            String baselineText = baselineContextProvider.renderAsText(convId);
-            String composedSystemPrompt = baselineText
-                    + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
-                            ? "\n\n" + profileSystemPrompt
-                            : "");
-            Authentication runtimeAuth = safeGetAuthentication();
-            Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
+                    AiParameters active = parametersResolver.resolveActive();
+                    String model = parametersResolver.effectiveModel(active, effectiveOverrides);
+                    String profileSystemPrompt = parametersResolver.effectiveSystemPrompt(active, userId, convId, runId);
+                    String baselineText = baselineContextProvider.renderAsText(convId);
+                    String composedSystemPrompt = baselineText
+                            + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
+                                    ? "\n\n" + profileSystemPrompt
+                                    : "");
+                    Authentication runtimeAuth = safeGetAuthentication();
+                    Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
-            Flux<StreamingEvent> content;
-            try {
-                content = chatClient.prompt()
-                        .system(composedSystemPrompt)
-                        .user(message)
-                        .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
-                        .advisors(advisorSpec -> {
-                            advisorSpec
-                                    .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                    .param("audit.runId", runId);
-                            if (ragFilter != null) {
-                                advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
-                            }
-                        })
-                        .options(ChatOptions.builder()
-                                .model(model)
-                                .temperature(parametersResolver.effectiveTemperature(active))
-                                .topP(parametersResolver.effectiveTopP(active))
-                                .maxTokens(parametersResolver.effectiveMaxTokens(active))
-                                .build())
-                        .stream()
-                        .chatResponse()
-                        .<StreamingEvent>concatMap(chunk -> {
-                            AssistantMessage am = chunk != null && chunk.getResult() != null
-                                    ? chunk.getResult().getOutput() : null;
-                            String text = am != null ? am.getText() : null;
-                            return (text != null && !text.isEmpty())
-                                    ? Flux.just(new StreamingEvent.Content(text))
-                                    : Flux.empty();
-                        })
-                        .doOnComplete(toolSink::tryEmitComplete)
-                        .doOnError(ex -> toolSink.tryEmitComplete());
-            } catch (UnsupportedOperationException nonStreaming) {
-                // D-04 graceful fallback: provider does not support streaming. Fall through to
-                // blocking ask(...) wrapped as a single Content chunk + Final.
-                ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
-                toolSink.tryEmitComplete();
-                content = Flux.just(
-                        new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
-            }
+                    Flux<StreamingEvent> content;
+                    try {
+                        content = chatClient.prompt()
+                                .system(composedSystemPrompt)
+                                .user(message)
+                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                                .advisors(advisorSpec -> {
+                                    advisorSpec
+                                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
+                                            .param("audit.runId", runId);
+                                    if (ragFilter != null) {
+                                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
+                                    }
+                                })
+                                .options(ChatOptions.builder()
+                                        .model(model)
+                                        .temperature(parametersResolver.effectiveTemperature(active))
+                                        .topP(parametersResolver.effectiveTopP(active))
+                                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
+                                        .build())
+                                .stream()
+                                .chatResponse()
+                                .<StreamingEvent>concatMap(chunk -> {
+                                    AssistantMessage am = chunk != null && chunk.getResult() != null
+                                            ? chunk.getResult().getOutput() : null;
+                                    String text = am != null ? am.getText() : null;
+                                    return (text != null && !text.isEmpty())
+                                            ? Flux.just(new StreamingEvent.Content(text))
+                                            : Flux.empty();
+                                })
+                                .doOnComplete(toolSink::tryEmitComplete)
+                                .doOnError(ex -> toolSink.tryEmitComplete());
+                    } catch (UnsupportedOperationException nonStreaming) {
+                        // D-04 graceful fallback: provider does not support streaming. Fall through to
+                        // blocking ask(...) wrapped as a single Content chunk + Final.
+                        ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
+                        toolSink.tryEmitComplete();
+                        content = Flux.just(
+                                new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
+                    }
 
-            Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
-            return merged.concatWith(Flux.defer(() -> {
-                long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
-                return Flux.<StreamingEvent>just(new StreamingEvent.Final(runId, latencyMs, 0, 0));
-            }));
-        })
+                    Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
+                    return merged.concatWith(Flux.defer(() -> {
+                        long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(new StreamingEvent.Final(runId, latencyMs, 0, 0));
+                    }));
+                }),
+                Runnable::run)
         .subscribeOn(chatStreamingScheduler)
         // D-03: register the subscription-cancel callback BEFORE tokens flow. Disposable is a
         // @FunctionalInterface, so a () -> subscription.cancel() lambda satisfies the registry

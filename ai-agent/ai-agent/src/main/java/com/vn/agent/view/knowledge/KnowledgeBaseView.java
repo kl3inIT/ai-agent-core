@@ -12,6 +12,7 @@ import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.streams.UploadHandler;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
@@ -22,12 +23,11 @@ import io.jmix.flowui.Notifications;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.component.upload.JmixUpload;
-import io.jmix.flowui.component.upload.receiver.MultiFileTemporaryStorageBuffer;
-import io.jmix.flowui.component.upload.receiver.TemporaryStorageFileData;
 import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
+import io.jmix.flowui.upload.TemporaryStorage;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
@@ -40,7 +40,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.context.event.EventListener;
 
-import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -53,13 +52,11 @@ import java.util.UUID;
  * UI-05 Knowledge Base admin view.
  *
  * <p>Admin-only per {@code AiAgentAdminRole.adminViews()} {@code @ViewPolicy} wired in 07-01.
- * Uses Jmix {@code <upload receiverType="MULTI_FILE_TEMPORARY_STORAGE_BUFFER">} — D-15 /
- * RESEARCH Pitfall #3: single-file {@code com.vaadin.flow.component.upload.receivers.Memory-Buffer}
- * would silently drop all but one file when
- * {@code maxFiles > 1}. The multi-file temporary-storage buffer writes each uploaded file
- * to {@code CoreProperties.tempDir} and we forward each file to
- * {@link KnowledgeDocumentUploadService#upload(String, String, java.util.Collection)} as a
- * {@code file:} URI after the Vaadin {@code AllFinishedEvent}.</p>
+ * Uploads are staged into Jmix {@link TemporaryStorage} via Vaadin's non-deprecated
+ * {@link UploadHandler#toFile(com.vaadin.flow.server.streams.FileUploadCallback, com.vaadin.flow.server.streams.FileFactory)}
+ * path so each file lands under the same temp root validated by
+ * {@link KnowledgeDocumentUploadService#upload(String, String, java.util.Collection)} before
+ * async ingestion begins.</p>
  *
  * <p><b>Size cap:</b> XML {@code maxFileSize=10485760} (10 MiB) clamps client-side uploads;
  * the server {@code KnowledgeDocumentUploadService} also enforces a character cap during
@@ -108,6 +105,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
     private Notifications notifications;
     @Autowired
     private MessageSource messageSource;
+    @Autowired
+    private TemporaryStorage temporaryStorage;
 
     /** Captured onAttach so the push listener can UI.access() the correct UI per-browser-tab. */
     private volatile UI ownerUi;
@@ -129,11 +128,10 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         documentsDataGrid.getColumnByKey("status")
                 .setRenderer(new ComponentRenderer<>(doc -> renderStatusBadge(doc)));
 
-        // Upload wiring — D-15 / RESEARCH Pitfall #3 multi-file receiver. Upload
-        // succeed/fail/reject events are component-specific (not ClickEvent), so
-        // they continue to be wired via explicit listener calls.
+        // Upload wiring keeps files inside Jmix temporary storage while using
+        // Vaadin's current UploadHandler API instead of deprecated receiver access.
         documentsDl.addPostLoadListener(e -> selectPendingDocumentIfNeeded());
-        configureUploadListeners();
+        configureUploadHandling();
     }
 
     @Subscribe("reingestBtn")
@@ -243,61 +241,29 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         };
     }
 
-    @SuppressWarnings("removal") // Vaadin 24 deprecates these on Upload in favour of AllFinishedEvent;
-    // Jmix 2.8 JmixUpload extends Upload directly so the deprecated listeners remain the idiomatic
-    // integration point for succeed/fail/reject signals.
-    private void configureUploadListeners() {
-        documentUpload.addSucceededListener(e -> {
+    private void configureUploadHandling() {
+        documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
             try {
-                String fileName = e.getFileName();
-                String mimeType = e.getMIMEType();
-                File staged = resolveStagedFile(fileName);
-                if (staged == null) {
-                    notifyError("knowledgeBase.upload.rejected", fileName);
-                    return;
-                }
-                String uri = staged.toURI().toString();
+                String fileName = metadata.fileName();
+                String mimeType = metadata.contentType();
+                String uri = stagedFile.toURI().toString();
                 uploadService.upload(uri, mimeType, Collections.emptyList());
                 notifyInfo("knowledgeBase.toast.uploadStarted", fileName);
                 documentsDl.load();
             } catch (IllegalArgumentException ex) {
                 // URI allowlist rejection — configuration issue; surface a clear toast.
                 log.warn("Upload rejected by staging-root allowlist: {}", ex.getMessage());
-                notifyError("knowledgeBase.upload.rejected", e.getFileName());
+                notifyError("knowledgeBase.upload.rejected", metadata.fileName());
+                throw ex;
             } catch (Exception ex) {
-                log.warn("Upload failed for {}", e.getFileName(), ex);
-                notifyError("knowledgeBase.upload.rejected", e.getFileName());
+                log.warn("Upload failed for {}", metadata.fileName(), ex);
+                notifyError("knowledgeBase.upload.rejected", metadata.fileName());
+                throw ex;
             }
-        });
+        }, metadata -> temporaryStorage.createFile().getFile()));
 
         documentUpload.addFileRejectedListener(e ->
                 notifyError("knowledgeBase.upload.rejected", e.getErrorMessage()));
-
-        documentUpload.addFailedListener(e -> {
-            log.warn("Upload transport failed for {}", e.getFileName(), e.getReason());
-            notifyError("knowledgeBase.upload.rejected", e.getFileName());
-        });
-    }
-
-    private File resolveStagedFile(String fileName) {
-        if (!(documentUpload.getReceiver() instanceof MultiFileTemporaryStorageBuffer buffer)) {
-            log.warn("Upload receiver is not MultiFileTemporaryStorageBuffer; cannot stage {}", fileName);
-            return null;
-        }
-        Map<UUID, TemporaryStorageFileData> files = buffer.getFiles();
-        // Scan matching entries — multi-file uploads may hold several entries; take the
-        // most-recently-registered one for this filename (Vaadin reuses the buffer).
-        File latest = null;
-        for (Map.Entry<UUID, TemporaryStorageFileData> entry : files.entrySet()) {
-            TemporaryStorageFileData data = entry.getValue();
-            if (data.getFileName().equals(fileName)) {
-                File f = data.getFileInfo().getFile();
-                if (f != null && f.exists()) {
-                    latest = f;
-                }
-            }
-        }
-        return latest;
     }
 
     private void onReingestClick() {

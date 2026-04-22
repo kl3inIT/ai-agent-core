@@ -31,6 +31,27 @@
         </sql>
     </changeSet>
 
+    <!--
+        Recreate guard: if the table was dropped out-of-band after 1-postgres ran,
+        Liquibase still records it as EXECUTED and will not retry. This changeset
+        re-applies the DDL idempotently (CREATE TABLE IF NOT EXISTS) so recovery
+        happens automatically on next boot.
+    -->
+    <changeSet id="2-postgres-recreate" author="ai-agent" dbms="postgresql" runAlways="true">
+        <sql>
+            CREATE TABLE IF NOT EXISTS SPRING_AI_CHAT_MEMORY (
+                conversation_id VARCHAR(36) NOT NULL,
+                content TEXT NOT NULL,
+                type VARCHAR(10) NOT NULL CHECK (type IN ('USER','ASSISTANT','SYSTEM','TOOL')),
+                "timestamp" TIMESTAMP NOT NULL
+            );
+        </sql>
+        <sql>
+            CREATE INDEX IF NOT EXISTS SPRING_AI_CHAT_MEMORY_CONVERSATION_ID_TIMESTAMP_IDX
+            ON SPRING_AI_CHAT_MEMORY(conversation_id, "timestamp");
+        </sql>
+    </changeSet>
+
     <!-- ====== HSQLDB variant (matches schema-hsqldb.sql in 1.1.4) ====== -->
     <changeSet id="1-hsqldb" author="ai-agent" dbms="hsqldb">
         <sql>

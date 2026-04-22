@@ -1,48 +1,48 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://auditList.detail.title">
+      title="msg:///auditList.detail.title">
     <layout padding="true" spacing="true">
         <textField id="startedAtField"
-                   label="msg://auditList.detail.startedAt"
+                   label="msg:///auditList.detail.startedAt"
                    readOnly="true"/>
         <textField id="userField"
-                   label="msg://auditList.detail.user"
+                   label="msg:///auditList.detail.user"
                    readOnly="true"/>
         <textField id="toolField"
-                   label="msg://auditList.detail.tool"
+                   label="msg:///auditList.detail.tool"
                    readOnly="true"/>
         <textField id="phaseField"
-                   label="msg://auditList.detail.phase"
+                   label="msg:///auditList.detail.phase"
                    readOnly="true"/>
         <textField id="runIdField"
-                   label="msg://auditList.detail.runId"
+                   label="msg:///auditList.detail.runId"
                    readOnly="true"/>
         <textField id="latencyMsField"
-                   label="msg://auditList.detail.latencyMs"
+                   label="msg:///auditList.detail.latencyMs"
                    readOnly="true"/>
         <textField id="errorClassField"
-                   label="msg://auditList.detail.errorClass"
+                   label="msg:///auditList.detail.errorClass"
                    readOnly="true"/>
         <textField id="denialReasonField"
-                   label="msg://auditList.detail.denialReason"
+                   label="msg:///auditList.detail.denialReason"
                    readOnly="true"/>
         <vbox id="outcomeBox" padding="false" spacing="false">
-            <span text="msg://auditList.detail.outcome"/>
+            <span text="msg:///auditList.detail.outcome"/>
             <span id="outcomeBadge"/>
         </vbox>
         <textArea id="argumentsField"
-                  label="msg://auditList.detail.argsJson"
+                  label="msg:///auditList.detail.argsJson"
                   readOnly="true"
                   width="100%"
                   minHeight="14em"/>
         <textArea id="resultField"
-                  label="msg://auditList.detail.resultSummary"
+                  label="msg:///auditList.detail.resultSummary"
                   readOnly="true"
                   width="100%"
                   minHeight="14em"/>
         <hbox width="100%" justifyContent="END" spacing="true">
             <button id="closeBtn"
-                    text="msg://auditList.detail.close"/>
+                    text="msg:///auditList.detail.close"/>
         </hbox>
     </layout>
 </view>

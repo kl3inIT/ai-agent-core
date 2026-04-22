@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://conversationList.title"
+      title="msg:///conversationList.title"
       focusComponent="conversationsDataGrid">
     <data>
         <collection id="conversationsDc" class="com.vn.agent.entity.AiConversation">
@@ -17,9 +17,9 @@
     </facets>
     <layout>
         <hbox id="filterBar" classNames="buttons-panel">
-            <textField id="titleFilter" placeholder="msg://conversationList.column.title"
+            <textField id="titleFilter" placeholder="msg:///conversationList.column.title"
                        clearButtonVisible="true"/>
-            <textField id="userFilter" placeholder="msg://conversationList.column.user"
+            <textField id="userFilter" placeholder="msg:///conversationList.column.user"
                        clearButtonVisible="true" visible="false"/>
         </hbox>
         <dataGrid id="conversationsDataGrid"
@@ -27,11 +27,11 @@
                   minHeight="20em"
                   dataContainer="conversationsDc">
             <columns resizable="true">
-                <column property="title" header="msg://conversationList.column.title"/>
-                <column property="createdDate" header="msg://conversationList.column.createdDate"/>
+                <column property="title" header="msg:///conversationList.column.title"/>
+                <column property="createdDate" header="msg:///conversationList.column.createdDate"/>
                 <!-- messageCount column renderer wired in ConversationListView.onInit via per-row DataManager count (plan path b). -->
-                <column key="messageCount" header="msg://conversationList.column.messageCount"/>
-                <column property="createdBy" header="msg://conversationList.column.user" visible="false"/>
+                <column key="messageCount" header="msg:///conversationList.column.messageCount"/>
+                <column property="createdBy" header="msg:///conversationList.column.user" visible="false"/>
             </columns>
         </dataGrid>
     </layout>

@@ -14,7 +14,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
@@ -46,10 +45,14 @@ import org.springframework.context.annotation.Primary;
  *       {@link ObjectProvider} that filters out any {@link GuardedToolCallingManager} instances,
  *       so we can resolve the non-self bean by type and avoid the {@code @Primary}-on-self
  *       injection cycle.</li>
- *   <li>{@code StructuredOutputValidationAdvisor} — optional, reflective, {@code @ConditionalOnClass}.
- *       The class does NOT exist in Spring AI 1.1.4 (RESEARCH D-21); this bean ships for forward
- *       compatibility only. Plan 04's inline retry is the authoritative path today.</li>
  * </ul>
+ *
+ * <p>Note on {@code StructuredOutputValidationAdvisor} (D-21): earlier forward-compat code
+ * attempted to reflectively wire this advisor as a {@link CallAdvisor} bean. Spring AI 1.1.4
+ * now ships the class, but it has only a private constructor taking a JSON schema + target
+ * {@code Type} + {@code ObjectMapper} (obtained via its {@code builder()}), so it cannot be
+ * registered as a generic autoconfigured bean — it is inherently per-call. Plan 04's inline
+ * {@code askTyped} retry is and remains the authoritative path.</p>
  */
 @AutoConfiguration
 @AutoConfigureAfter(AIAutoConfiguration.class)
@@ -169,32 +172,5 @@ public class AiAgentGuardAutoConfiguration {
                             + "and handle decoration explicitly.");
         }
         return candidates.get(0);
-    }
-
-    /**
-     * Optional Spring-AI {@code StructuredOutputValidationAdvisor} (D-21). The class does NOT
-     * exist in Spring AI 1.1.4 — this block is forward-compat: when a future Spring AI ships the
-     * class, {@link ConditionalOnClass} activates and reflective construction binds it. Plan 04's
-     * inline {@code askTyped} retry remains the authoritative path today.
-     *
-     * <p>T-06-20 trade-off: a malicious class with the same FQN on the classpath would be
-     * picked up here, but that scenario implies the host is already compromised — the FQN is
-     * scoped to Spring AI.</p>
-     */
-    @Bean
-    @ConditionalOnClass(name = "org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvisor")
-    @ConditionalOnMissingBean(name = "structuredOutputValidationAdvisor")
-    public CallAdvisor structuredOutputValidationAdvisor() {
-        try {
-            Class<?> cls = Class.forName(
-                    "org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvisor");
-            Object instance = cls.getDeclaredConstructor().newInstance();
-            log.info("Detected Spring AI StructuredOutputValidationAdvisor — wired as CallAdvisor bean");
-            return (CallAdvisor) instance;
-        } catch (ReflectiveOperationException | ClassCastException e) {
-            log.warn("StructuredOutputValidationAdvisor class present but could not be instantiated "
-                    + "reflectively; falling back to inline retry loop", e);
-            return null;
-        }
     }
 }

@@ -11,6 +11,7 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.test_support.EvalFixtures;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
+import io.jmix.core.security.SystemAuthenticator;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
@@ -67,6 +68,7 @@ class AskTypedRetryTest {
     private BaselineContextProvider baselineContextProvider;
     private RetrievalFilterBuilder retrievalFilterBuilder;
     private CurrentAuthentication currentAuthentication;
+    private SystemAuthenticator systemAuthenticator;
     private RateLimitGuard rateLimitGuard;
     private TokenBudgetGuard tokenBudgetGuard;
     private AuditWriter auditWriter;
@@ -88,6 +90,7 @@ class AskTypedRetryTest {
         baselineContextProvider = mock(BaselineContextProvider.class);
         retrievalFilterBuilder = mock(RetrievalFilterBuilder.class);
         currentAuthentication = mock(CurrentAuthentication.class);
+        systemAuthenticator = mock(SystemAuthenticator.class);
         rateLimitGuard = mock(RateLimitGuard.class);
         tokenBudgetGuard = mock(TokenBudgetGuard.class);
         auditWriter = mock(AuditWriter.class);
@@ -122,7 +125,7 @@ class AskTypedRetryTest {
 
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder,
-                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
+                currentAuthentication, systemAuthenticator, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
                 /* chatStreamingScheduler */ null,
                 /* cancellationRegistry */ null,
                 /* streamingSinkHolder */ null);

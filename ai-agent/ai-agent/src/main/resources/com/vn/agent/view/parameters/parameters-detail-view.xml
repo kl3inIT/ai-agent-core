@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://parametersDetail.title.edit"
+      title="msg:///parametersDetail.title.edit"
       focusComponent="modelField">
     <data>
         <instance id="parametersDc" class="com.vn.agent.entity.AiParameters">
@@ -20,34 +20,34 @@
             <textField id="profileNameField" property="profileName" required="true"/>
         </formLayout>
         <tabSheet id="editTabs" width="100%">
-            <tab id="formTab" label="msg://parametersDetail.tab.form">
+            <tab id="formTab" label="msg:///parametersDetail.tab.form">
                 <vbox id="formLayout" padding="true" spacing="true" width="100%">
                     <textField id="modelField"
-                               label="msg://parametersDetail.field.model"
+                               label="msg:///parametersDetail.field.model"
                                required="true"
-                               requiredMessage="msg://parametersDetail.validation.modelRequired"/>
+                               requiredMessage="msg:///parametersDetail.validation.modelRequired"/>
                     <bigDecimalField id="temperatureField"
-                                     label="msg://parametersDetail.field.temperature"/>
+                                     label="msg:///parametersDetail.field.temperature"/>
                     <bigDecimalField id="topPField"
-                                     label="msg://parametersDetail.field.topP"/>
+                                     label="msg:///parametersDetail.field.topP"/>
                     <integerField id="maxTokensField"
-                                  label="msg://parametersDetail.field.maxTokens"/>
+                                  label="msg:///parametersDetail.field.maxTokens"/>
                     <textArea id="systemPromptField"
-                              label="msg://parametersDetail.field.systemPrompt"
+                              label="msg:///parametersDetail.field.systemPrompt"
                               minHeight="8em"
                               width="100%"/>
                     <multiSelectComboBox id="enabledToolsField"
-                                         label="msg://parametersDetail.field.enabledTools"
+                                         label="msg:///parametersDetail.field.enabledTools"
                                          width="100%"/>
                     <integerField id="ragTopKField"
-                                  label="msg://parametersDetail.field.ragTopK"/>
+                                  label="msg:///parametersDetail.field.ragTopK"/>
                     <bigDecimalField id="ragSimilarityThresholdField"
-                                     label="msg://parametersDetail.field.ragSimilarityThreshold"/>
+                                     label="msg:///parametersDetail.field.ragSimilarityThreshold"/>
                 </vbox>
             </tab>
-            <tab id="yamlTab" label="msg://parametersDetail.tab.yaml">
+            <tab id="yamlTab" label="msg:///parametersDetail.tab.yaml">
                 <vbox id="yamlLayout" padding="true" spacing="true" width="100%">
-                    <span id="yamlBanner" text="msg://parametersDetail.yaml.banner"/>
+                    <span id="yamlBanner" text="msg:///parametersDetail.yaml.banner"/>
                     <codeEditor id="yamlPreviewField"
                                 readOnly="true"
                                 width="100%"
@@ -58,10 +58,10 @@
         <hbox id="actionBar" spacing="true">
             <button id="saveBtn"
                     action="saveAction"
-                    text="msg://parametersDetail.action.save"
+                    text="msg:///parametersDetail.action.save"
                     themeNames="primary"/>
             <button id="setActiveBtn"
-                    text="msg://parametersDetail.action.setActive"
+                    text="msg:///parametersDetail.action.setActive"
                     themeNames="primary success"/>
             <button id="closeBtn" action="closeAction"/>
         </hbox>

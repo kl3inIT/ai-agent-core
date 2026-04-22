@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://knowledgeBase.title"
+      title="msg:///knowledgeBase.title"
       focusComponent="documentsDataGrid">
     <data>
         <collection id="documentsDc" class="com.vn.agent.entity.AiKnowledgeDocument">
@@ -17,12 +17,11 @@
     </facets>
     <layout padding="true" spacing="true">
         <upload id="documentUpload"
-                receiverType="MULTI_FILE_TEMPORARY_STORAGE_BUFFER"
                 acceptedFileTypes="application/pdf,text/markdown,text/plain,text/html,.pdf,.md,.txt,.html"
                 maxFiles="10"
                 maxFileSize="10485760"
-                dropLabel="msg://knowledgeBase.upload.placeholder"
-                uploadText="msg://knowledgeBase.upload.button"
+                dropLabel="msg:///knowledgeBase.upload.placeholder"
+                uploadText="msg:///knowledgeBase.upload.button"
                 width="100%"/>
         <dataGrid id="documentsDataGrid"
                   dataContainer="documentsDc"
@@ -30,17 +29,17 @@
                   minHeight="20em"
                   themeNames="compact">
             <columns resizable="true">
-                <column property="fileName" header="msg://knowledgeBase.column.filename"/>
-                <column property="mimeType" header="msg://knowledgeBase.column.mimeType"/>
-                <column key="status" header="msg://knowledgeBase.column.status"/>
-                <column property="createdDate" header="msg://knowledgeBase.column.uploadedDate"/>
+                <column property="fileName" header="msg:///knowledgeBase.column.filename"/>
+                <column property="mimeType" header="msg:///knowledgeBase.column.mimeType"/>
+                <column key="status" header="msg:///knowledgeBase.column.status"/>
+                <column property="createdDate" header="msg:///knowledgeBase.column.uploadedDate"/>
             </columns>
         </dataGrid>
         <hbox id="rowActionsBar" spacing="true">
             <button id="reingestBtn"
-                    text="msg://knowledgeBase.action.reingest"/>
+                    text="msg:///knowledgeBase.action.reingest"/>
             <button id="deleteBtn"
-                    text="msg://knowledgeBase.action.delete"
+                    text="msg:///knowledgeBase.action.delete"
                     themeNames="error"/>
         </hbox>
     </layout>
