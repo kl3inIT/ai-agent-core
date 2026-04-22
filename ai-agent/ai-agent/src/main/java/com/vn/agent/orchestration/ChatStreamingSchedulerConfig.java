@@ -21,7 +21,7 @@ import reactor.core.scheduler.Schedulers;
  * {@code ChatStreamingSchedulerConfig} (not {@code ChatStreamingScheduler}) to avoid the
  * auto-generated class-bean id clashing with the factory-method bean id — the component-scan
  * registers the config class itself as a bean and its default name would collide with the
- * @Bean method's name.</p>
+ * {@code @Bean} method's name.</p>
  *
  * <p>Wired into {@code DefaultChatServiceImpl.stream(...)} via {@code subscribeOn(...)}; every
  * LLM stream runs on this pool rather than the Vaadin UI thread or the Tomcat handler thread,
@@ -31,11 +31,10 @@ import reactor.core.scheduler.Schedulers;
  * required so Jmix security context survives scheduler hops during streaming. Spring AI's
  * {@code ChatClient.stream()} pipeline executes the advisor chain (including
  * {@code MessageChatMemoryAdvisor}, which persists entities via Jmix {@code DataManager}) on
- * internal Reactor scheduler threads — different from the outer {@code chatStreamingScheduler}
- * thread where {@code systemAuthenticator.begin(userId)} populates the
- * {@code SecurityContextHolder}. Without automatic context propagation the advisor runs with an
- * empty {@code SecurityContext} and Jmix's {@code CurrentAuthenticationImpl.getAuthentication()}
- * throws {@code IllegalStateException: Authentication is not set}.</p>
+ * internal Reactor scheduler threads. Without automatic context propagation the advisor runs
+ * with an empty {@code SecurityContext} and Jmix's
+ * {@code CurrentAuthenticationImpl.getAuthentication()} throws
+ * {@code IllegalStateException: Authentication is not set}.</p>
  *
  * <p>The hook relies on {@code io.micrometer:context-propagation} (on the classpath
  * transitively via Reactor 3.5+) and Spring Security's
@@ -55,11 +54,11 @@ public class ChatStreamingSchedulerConfig {
      *
      * <p>After this hook is enabled, Reactor captures all registered {@code ThreadLocalAccessor}
      * values (including Spring Security's {@code SecurityContext}) at subscription time on the
-     * subscribing thread and restores them on every scheduler worker thread that runs a downstream
-     * operator. This carries Jmix's {@code SecurityContextHolder} authentication — established by
-     * {@code systemAuthenticator.begin(userId)} inside {@code DefaultChatServiceImpl.stream()}'s
-     * {@code Flux.using} resource factory — across the scheduler boundary into Spring AI's
-     * streaming HTTP client and advisor chain.</p>
+     * caller thread and restores them on every scheduler worker thread that runs a downstream
+     * operator. In {@code DefaultChatServiceImpl.stream()} this works with
+     * {@code .contextCapture()} placed after {@code subscribeOn(chatStreamingScheduler)} so the
+     * authenticated request context survives scheduler hops into Spring AI's streaming HTTP client
+     * and advisor chain.</p>
      */
     @PostConstruct
     public void enableReactorContextPropagation() {

@@ -27,7 +27,6 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
-import io.jmix.core.security.SystemAuthenticator;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,7 +114,6 @@ public class DefaultChatServiceImpl implements ChatService {
     private final BaselineContextProvider baselineContextProvider;
     private final RetrievalFilterBuilder retrievalFilterBuilder;
     private final CurrentAuthentication currentAuthentication;
-    private final SystemAuthenticator systemAuthenticator;
     private final RateLimitGuard rateLimitGuard;
     private final TokenBudgetGuard tokenBudgetGuard;
     private final AuditWriter auditWriter;
@@ -131,7 +129,6 @@ public class DefaultChatServiceImpl implements ChatService {
                                   BaselineContextProvider baselineContextProvider,
                                   RetrievalFilterBuilder retrievalFilterBuilder,
                                   CurrentAuthentication currentAuthentication,
-                                  SystemAuthenticator systemAuthenticator,
                                   RateLimitGuard rateLimitGuard,
                                   TokenBudgetGuard tokenBudgetGuard,
                                   AuditWriter auditWriter,
@@ -146,7 +143,6 @@ public class DefaultChatServiceImpl implements ChatService {
         this.baselineContextProvider = baselineContextProvider;
         this.retrievalFilterBuilder = retrievalFilterBuilder;
         this.currentAuthentication = currentAuthentication;
-        this.systemAuthenticator = systemAuthenticator;
         this.rateLimitGuard = rateLimitGuard;
         this.tokenBudgetGuard = tokenBudgetGuard;
         this.auditWriter = auditWriter;
@@ -288,14 +284,7 @@ public class DefaultChatServiceImpl implements ChatService {
         final UUID runId = UUID.randomUUID();
         final long startNanos = System.nanoTime();
 
-        return Flux.using(
-                () -> {
-                    // Jmix security is thread-bound; every streaming subscription runs on a
-                    // background worker and must establish the caller identity explicitly.
-                    systemAuthenticator.begin(userId);
-                    return (Runnable) systemAuthenticator::end;
-                },
-                ignoredAuthScope -> Flux.defer(() -> {
+        return Flux.defer(() -> {
                     RunContext.set(runId);
                     // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
                     Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
@@ -358,22 +347,21 @@ public class DefaultChatServiceImpl implements ChatService {
 
                     Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
                     return merged
-                    // Capture ThreadLocal state after begin(userId) so downstream scheduler hops
-                    // restore the authenticated SecurityContext instead of an empty caller context.
-                    .contextCapture()
                     .concatWith(Flux.defer(() -> {
                         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
                         return Flux.<StreamingEvent>just(new StreamingEvent.Final(runId, latencyMs, 0, 0));
                     }));
-                }),
-                Runnable::run)
+                })
         .subscribeOn(chatStreamingScheduler)
+        // Capture caller ThreadLocals (including SecurityContext) before subscribeOn moves
+        // subscription to the streaming scheduler, then restore them on downstream hops.
+        .contextCapture()
         // D-03: register the subscription-cancel callback BEFORE tokens flow. Disposable is a
         // @FunctionalInterface, so a () -> subscription.cancel() lambda satisfies the registry
         // contract. cancellationRegistry.cancel(runId) disposes -> cancels the upstream -> tears
         // down the whole pipeline (tool sink + content Flux).
         .doOnSubscribe(subscription ->
-                cancellationRegistry.register(runId, (reactor.core.Disposable) subscription::cancel))
+                cancellationRegistry.register(runId, subscription::cancel))
         .onErrorResume(ex -> Flux.just(mapToStreamingError(ex)))
         .doFinally(signalType -> {
             RunContext.clear();

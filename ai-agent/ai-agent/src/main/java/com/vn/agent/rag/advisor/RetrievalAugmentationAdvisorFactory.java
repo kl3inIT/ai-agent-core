@@ -2,6 +2,7 @@ package com.vn.agent.rag.advisor;
 
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -38,6 +39,11 @@ public class RetrievalAugmentationAdvisorFactory {
 
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(retriever)
+                // Spring AI defaults to "empty-context => refuse". Keep RAG optional for
+                // general chat/tooling flows by allowing the model to answer when no KB docs match.
+                .queryAugmenter(ContextualQueryAugmenter.builder()
+                        .allowEmptyContext(true)
+                        .build())
                 .order(ADVISOR_ORDER)
                 .build();
     }

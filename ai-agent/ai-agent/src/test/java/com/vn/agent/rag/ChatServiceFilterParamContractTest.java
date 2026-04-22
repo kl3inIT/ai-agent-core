@@ -7,14 +7,11 @@ import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingSinkHolder;
-import com.vn.agent.rag.CancellationRegistry;
-import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.guard.RateLimitGuard;
 import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
-import io.jmix.core.security.SystemAuthenticator;
 import jakarta.validation.Validator;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,10 +26,8 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -62,7 +57,6 @@ class ChatServiceFilterParamContractTest {
     BaselineContextProvider baselineContextProvider;
     RetrievalFilterBuilder retrievalFilterBuilder;
     CurrentAuthentication currentAuthentication;
-    SystemAuthenticator systemAuthenticator;
     RateLimitGuard rateLimitGuard;
     TokenBudgetGuard tokenBudgetGuard;
     AuditWriter auditWriter;
@@ -87,7 +81,6 @@ class ChatServiceFilterParamContractTest {
         baselineContextProvider = mock(BaselineContextProvider.class);
         retrievalFilterBuilder = mock(RetrievalFilterBuilder.class);
         currentAuthentication = mock(CurrentAuthentication.class);
-        systemAuthenticator = mock(SystemAuthenticator.class);
         rateLimitGuard = mock(RateLimitGuard.class);
         tokenBudgetGuard = mock(TokenBudgetGuard.class);
         auditWriter = mock(AuditWriter.class);
@@ -129,7 +122,7 @@ class ChatServiceFilterParamContractTest {
 
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder,
-                currentAuthentication, systemAuthenticator, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
+                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
                 reactor.core.scheduler.Schedulers.immediate(),
                 cancellationRegistry,
                 streamingSinkHolder);
@@ -186,16 +179,14 @@ class ChatServiceFilterParamContractTest {
     }
 
     @Test
-    void stream_wrapsSubscription_inPerUserAuthenticationScope() {
+    void stream_doesNotManuallyToggleSystemAuthenticatorScope() {
         ChatClient.StreamResponseSpec streamSpec = mock(ChatClient.StreamResponseSpec.class);
         when(requestSpec.stream()).thenReturn(streamSpec);
         when(streamSpec.chatResponse()).thenReturn(reactor.core.publisher.Flux.empty());
 
         service.stream("alice", null, "hello", null).blockLast();
 
-        var order = inOrder(systemAuthenticator, conversationGateway);
-        order.verify(systemAuthenticator).begin("alice");
-        order.verify(conversationGateway).loadOrCreate("alice", null, "hello");
-        order.verify(systemAuthenticator).end();
+        verify(conversationGateway).loadOrCreate("alice", null, "hello");
+        verify(currentAuthentication, atLeastOnce()).getAuthentication();
     }
 }
