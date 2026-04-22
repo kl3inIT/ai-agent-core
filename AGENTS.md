@@ -6,7 +6,13 @@ This file provides guidance to AI coding agents when working with code in this r
 
 - For detailed guidance on specific Jmix features, ALWAYS use the Skill tool and available Jmix skills.
 - Use Context7 jmix-framework/jmix-context7 library for Jmix reference information and code examples.
+- When DB inspection/query is needed, use `postgresmcp` first instead of JetBrains MCP.
 - Use Jetbrains MCP to check file problems with `get_file_problems("path/to/file.ext", onlyErrors=false)`
+
+## Local Memory
+
+- If additional reference implementation is needed, use `D:\Study materials spring 2026\EXE101\ai\jmix-ai-backend`.
+- If OpenRouter access is needed, read `OPENROUTER_API_KEY` from `.env` (do not hardcode secrets).
 
 ## Project
 
@@ -146,3 +152,60 @@ After writing or modifying code, validate using this sequence:
     - Verify data displays correctly
     - Click or do things that should trigger UI logic
     - Test CRUD operations
+
+## Project Conventions (User Feedback)
+
+Distilled standing preferences for this project. Apply by default; deviate only with explicit justification.
+
+### Architecture & Security
+
+- **AI is just another Jmix client.** Run under the current user's Jmix security context. Rely on `AccessManager` / `DataManager` for entity-, attribute-, and row-level control. Do NOT introduce an AI-specific exposure layer (e.g. `AiExposureRule`, `EntityExposurePolicy` SPI, `ExposureRuleListView`) unless a real use case surfaces that native Jmix security cannot express.
+- **Reuse Jmix built-ins over parallel layers.** Before building any metadata, security, or query layer for the AI tool surface, check `Metadata`, `AccessManager`, `DataManager`, `FetchPlan`, `MetadataTools` first. The only pieces the add-on should own are the thin LLM-facing bits Jmix doesn't provide:
+  1. Schema shaping for tools (what the LLM sees)
+  2. Strict literal coercion (type safety at the prompt boundary)
+  3. Path-depth governance (traversal limits)
+  4. Result-size limits (context budget)
+  5. Prompt-injection-safe result formatting
+  "Ai*" DTOs are justified only for the LLM tool-surface shape.
+- **Pragmatic module structure.** Keep module count minimal. Defer splits (e.g. headless/UI separation) until a named consumer or concrete requirement justifies it. "Future flexibility" is not sufficient justification.
+- **SPI contributors only for app-specific behavior.** Baseline runtime context (current user, roles, locale, conversation id) is built into the add-on — contributors do NOT receive it as input. Reserve SPIs for domain-specific instructions, external-system context, or business rules the add-on cannot know in advance.
+- **No ArchUnit (yet).** Enforce architectural constraints via code review and regular tests. Revisit only if the rule set grows or drift appears. The same bar applies to other static-enforcement tooling.
+
+### Code Style
+
+- **No abbreviated identifiers.** Spell names fully: `userEditableIndex`, `metaClass`, `metaProperty`, `datatype` — never `uei`, `mc`, `mp`, `dt`, `ctx`. Short loop vars (`i`, `e` in catch) remain fine.
+
+### Jmix UI — Single Review Gate
+
+**1. Jmix Flow UI first, raw Vaadin last.**
+- XML view descriptors are the default for layout, fields, actions, data containers/loaders, dialogs, filters, bindings.
+- Prefer Jmix components: `dataGrid`, `formLayout`, `tabSheet`, `upload`, `genericFilter`, `DialogWindows`/`Dialogs`, `ViewNavigators`, standard list/detail actions, role-based view/menu policies.
+- Java view controllers are for orchestration, event handling, validation, and small glue — not for layout trees expressible in XML.
+- Raw Vaadin or programmatic Java UI only when Jmix has no equivalent; the deviation must be explicitly justified in the PR/commit message.
+
+**2. Event wiring via Jmix's official event types — never invent event class names.**
+- Buttons: `@Subscribe("buttonId")` with `ClickEvent<Button>`, or bind the button to a declared `<action>` + `@Subscribe("componentId.actionId")` / `@Install`.
+- Data loaders/containers: `@Install(to = "loaderId", subject = "loadDelegate")`, `@Subscribe(id = "containerId", target = Target.DATA_CONTAINER)` for `ItemChangeEvent`, `ItemPropertyChangeEvent`, `CollectionChangeEvent`.
+- View lifecycle: `@Subscribe` on official events listed by Jmix Studio's Handlers panel (e.g. `InitEvent`, `BeforeShowEvent`, `ReadyEvent`, `BeforeCloseEvent`, `AfterCloseEvent`, `AttachEvent`, `DetachEvent`, `QueryParametersChangeEvent`).
+- Fields: `@Subscribe("fieldId")` with `ComponentValueChangeEvent` / `TypedValueChangeEvent`.
+- Renderers/validators/delegates: `@Supply` / `@Install` — not programmatic registration.
+- Do NOT use raw Vaadin `addClickListener(...)` / `addValueChangeListener(...)` in controllers when `@Subscribe` can express the same wiring — raw listeners bypass the view lifecycle and DI.
+
+**3. Resolving uncertainty (component choice, XML syntax, event type, pattern) — lookup order:**
+1. **Jmix Studio Handlers panel** for the target component/view (canonical source of truth for "what events exist").
+2. **Context7** — query `jmix-framework/jmix-context7` with a specific question (e.g. "Jmix Button handlers", "Jmix dataGrid selection event", "Jmix CollectionLoader events").
+3. **Official Jmix docs** at `docs.jmix.io`.
+4. **GitHub**: `jmix-framework/jmix`, `jmix-framework/jmix-samples`, and `jmix-ai-backend` for real usages.
+5. `jmix-ai-backend` for analogous screens (chat, parameters, knowledge-base, audit, dialogs, navigation, data loading) — generalize patterns, don't copy domain details blindly.
+
+Never guess annotation parameters, event class names, or XML element names from memory. If you can't cite where the event type is documented, you haven't verified it yet.
+
+### Workflow — JetBrains MCP after Java work
+
+When wrapping up a meaningful chunk of Java work (refactor, feature, multi-file change, anything you'd consider "done and ready to commit"), run `mcp__jetbrains__get_file_problems(filePath, onlyErrors=false)` on touched files in parallel and triage before reporting completion. Not required for trivial edits (typo, single-line rename, comment).
+
+Triage rules:
+- **Fix:** diamond operators, missing `@NonNull` on overrides in `@NonNullApi` packages, javadoc errors (e.g. `@link` to private member), `Objects::nonNull` over lambda, `List.getLast()` over `list.get(size-1)`, real bugs.
+- **Skip:** defensive null checks in belt-and-suspenders guards, `@Tool`/SPI methods flagged "never used" (Spring AI reflection), stylistic `if → switch` rewrites, condition-always-true/false on intentional contract guards.
+
+If JetBrains MCP is not connected, say so and wait — don't silently skip. Pair with module-scoped tests (`./gradlew :module:test`) when behavior could plausibly change.

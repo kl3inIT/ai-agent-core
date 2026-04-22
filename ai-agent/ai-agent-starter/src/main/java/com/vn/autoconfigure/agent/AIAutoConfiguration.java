@@ -10,6 +10,7 @@ import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
+import org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -32,16 +33,28 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       JDBC repository so the {@code ChatMemory} builder sees the dual-layer decorator (D-08).</li>
  * </ul>
  *
- * <p><b>Ordering note (bean-collision fix):</b> {@code @AutoConfigureAfter(OpenAiEmbeddingAutoConfiguration.class)}
- * is required so that OpenAI's {@code openAiEmbeddingModel} bean is registered before this
- * autoconfig's {@code @ConditionalOnMissingBean} passthrough is evaluated. Without the ordering
- * directive both beans can end up in the context and pgvector's
- * {@code PgVectorStoreAutoConfiguration.vectorStore(EmbeddingModel)} fails with
- * {@code NoUniqueBeanDefinitionException}. The {@code spring-ai-starter-model-openai}
- * dependency in {@code ai-agent-starter.gradle} guarantees the referenced class is on the
- * classpath.</p>
+ * <p><b>Ordering notes (bean-collision fixes):</b></p>
+ * <ul>
+ *   <li>{@code after = OpenAiEmbeddingAutoConfiguration.class} — OpenAI's
+ *       {@code openAiEmbeddingModel} bean must be registered before this autoconfig's
+ *       {@code @ConditionalOnMissingBean} passthrough is evaluated. Without the ordering
+ *       directive both beans can end up in the context and pgvector's
+ *       {@code PgVectorStoreAutoConfiguration.vectorStore(EmbeddingModel)} fails with
+ *       {@code NoUniqueBeanDefinitionException}.</li>
+ *   <li>{@code before = PgVectorStoreAutoConfiguration.class} — our
+ *       {@link #aiAgentVectorStore aiAgentVectorStore} bean MUST register first so Spring
+ *       AI's auto-configured {@code PgVectorStore} (which carries {@code @ConditionalOnMissingBean}
+ *       and defaults to table {@code public.vector_store}) is skipped. Without this directive
+ *       Spring AI's bean wins, targets a non-existent table, and every VectorStore call fails
+ *       with {@code relation "public.vector_store" does not exist}.</li>
+ * </ul>
+ * <p>The {@code spring-ai-starter-model-openai} and {@code spring-ai-starter-vector-store-pgvector}
+ * dependencies in {@code ai-agent.gradle} (api-scope) guarantee the referenced autoconfig classes
+ * are on the classpath.</p>
  */
-@AutoConfiguration(after = OpenAiEmbeddingAutoConfiguration.class)
+@AutoConfiguration(
+        after = OpenAiEmbeddingAutoConfiguration.class,
+        before = PgVectorStoreAutoConfiguration.class)
 @Import({AIConfiguration.class})
 public class AIAutoConfiguration {
 
@@ -91,10 +104,10 @@ public class AIAutoConfiguration {
      * caught at startup by pgvector's own dimension check.
      */
     @Bean
-    @ConditionalOnMissingBean
-    public VectorStore aiAgentVectorStore(JdbcTemplate jdbcTemplate,
-                                          EmbeddingModel embeddingModel,
-                                          AiAgentEmbeddingProperties embeddingProps) {
+    @ConditionalOnMissingBean(PgVectorStore.class)
+    public PgVectorStore aiAgentVectorStore(JdbcTemplate jdbcTemplate,
+                                            EmbeddingModel embeddingModel,
+                                            AiAgentEmbeddingProperties embeddingProps) {
         return PgVectorStore.builder(jdbcTemplate, embeddingModel)
                 .vectorTableName("AI_AGENT_KB_VECTOR_STORE")
                 .initializeSchema(false)

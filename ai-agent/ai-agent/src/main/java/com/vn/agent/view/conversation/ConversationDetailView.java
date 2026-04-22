@@ -15,6 +15,7 @@ import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
+import io.jmix.flowui.view.EditedEntityContainer;
 import io.jmix.flowui.view.StandardDetailView;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.ViewComponent;
@@ -46,6 +47,7 @@ import java.util.UUID;
 @Route(value = "ai-agent/conversations/:id", layout = DefaultMainViewParent.class)
 @ViewController("AiAgent_Conversation.detail")
 @ViewDescriptor("conversation-detail-view.xml")
+@EditedEntityContainer("conversationDc")
 public class ConversationDetailView extends StandardDetailView<AiConversation> {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationDetailView.class);

@@ -21,7 +21,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,9 +40,9 @@ import java.util.UUID;
  *   <li>{@link ChunkMetadata#DOCUMENT_ID} — {@code document.id.toString()} (used by D-21 delete)</li>
  *   <li>{@link ChunkMetadata#EMBEDDING_MODEL} — current configured model (D-03 drift filter)</li>
  *   <li>{@link ChunkMetadata#ALLOWED_ROLES} — JSON-parsed list of role codes from the entity</li>
- *   <li>{@link ChunkMetadata#ROLE_FLAG_PREFIX}{@code <lowercase-code>} = {@code true} — Option A
- *       flattened role flags, lowercased via {@link Locale#ROOT} so the filter keys match
- *       regardless of role-code casing (threat T-05-03-08 mitigation).</li>
+ *   <li>{@code role_<normalized-code>} = {@code true} — Option A flattened role flags,
+ *       normalized via {@link ChunkMetadata#normalizeRoleCode(String)} so filter keys are valid
+ *       JSONPath member names (threat T-05-03-08 mitigation).</li>
  * </ul>
  *
  * <p><b>RAG-03 atomicity</b>: on any failure, the catch block deletes all chunks already written
@@ -240,16 +239,14 @@ public class AsyncIngestionWorker {
                             List<String> allowedRoles, String embeddingModel) {
         // Copy into a fresh mutable map — splitter-produced Documents may have unmodifiable metadata.
         Map<String, Object> merged = new HashMap<>();
-        if (chunk.getMetadata() != null) {
-            merged.putAll(chunk.getMetadata());
-        }
+        merged.putAll(chunk.getMetadata());
         merged.put(ChunkMetadata.SOURCE, doc.getFileName());
         merged.put(ChunkMetadata.DOCUMENT_ID, doc.getId().toString());
         merged.put(ChunkMetadata.EMBEDDING_MODEL, embeddingModel);
         merged.put(ChunkMetadata.ALLOWED_ROLES, List.copyOf(allowedRoles));
         for (String role : allowedRoles) {
             if (role == null || role.isBlank()) continue;
-            merged.put(ChunkMetadata.ROLE_FLAG_PREFIX + role.toLowerCase(Locale.ROOT), true);
+            merged.put(ChunkMetadata.roleFlagKey(role), true);
         }
         return chunk.mutate().metadata(merged).build();
     }

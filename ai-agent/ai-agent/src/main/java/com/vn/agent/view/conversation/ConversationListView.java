@@ -94,6 +94,7 @@ public class ConversationListView extends StandardListView<AiConversation> {
             AiConversation row = e.getItem();
             if (row != null) {
                 viewNavigators.detailView(this, AiConversation.class)
+                        .withViewClass(ConversationDetailView.class)
                         .editEntity(row)
                         .navigate();
             }

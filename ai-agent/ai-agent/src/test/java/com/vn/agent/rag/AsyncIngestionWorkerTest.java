@@ -23,7 +23,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -127,7 +126,7 @@ class AsyncIngestionWorkerTest {
             assertThat(md).containsEntry(ChunkMetadata.EMBEDDING_MODEL,
                     "openai/text-embedding-3-small");
             assertThat(md).containsKey(ChunkMetadata.ALLOWED_ROLES);
-            assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user", true);
+            assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("ai-agent-user"), true);
         }
         verify(statusWriter).markReady(eq(id), anyInt());
         verify(statusWriter, never()).markFailed(any(), any());
@@ -144,10 +143,12 @@ class AsyncIngestionWorkerTest {
 
         Document anyChunk = captureAddedChunks().get(0);
         Map<String, Object> md = anyChunk.getMetadata();
-        assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user", true);
-        assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "editor", true);
+        assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("ai-agent-user"), true);
+        assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("Editor"), true);
         // Original-case key MUST NOT appear — filter lookup side is always lowercase.
         assertThat(md).doesNotContainKey(ChunkMetadata.ROLE_FLAG_PREFIX + "Editor");
+        // Hyphenated role codes must be normalized for JSONPath-safe filter keys.
+        assertThat(md).doesNotContainKey(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user");
     }
 
     @Test

@@ -44,6 +44,19 @@ class RetrievalFilterBuilderTest {
         return new UsernamePasswordAuthenticationToken("user", "n/a", list);
     }
 
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int from = 0;
+        while (true) {
+            int idx = text.indexOf(needle, from);
+            if (idx < 0) {
+                return count;
+            }
+            count++;
+            from = idx + needle.length();
+        }
+    }
+
     // Test A — D-06 admin bypass ON
     @Test
     void admin_with_bypass_on_returns_null() {
@@ -65,10 +78,10 @@ class RetrievalFilterBuilderTest {
         String rendered = exp.toString();
         assertThat(rendered).contains(ChunkMetadata.EMBEDDING_MODEL);
         assertThat(rendered).contains(EMBEDDING_MODEL);
-        assertThat(rendered).contains(ChunkMetadata.ROLE_FLAG_PREFIX + AiAgentAdminRole.CODE);
+        assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE));
     }
 
-    // Test C — non-admin gets eq(embeddingModel) AND role_user-flag
+    // Test C — non-admin gets model pin + normalized role flag
     @Test
     void non_admin_gets_embedding_pin_and_role_flag() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
@@ -80,7 +93,7 @@ class RetrievalFilterBuilderTest {
         String rendered = exp.toString();
         assertThat(rendered).contains(ChunkMetadata.EMBEDDING_MODEL);
         assertThat(rendered).contains(EMBEDDING_MODEL);
-        assertThat(rendered).contains(ChunkMetadata.ROLE_FLAG_PREFIX + AiAgentUserRole.CODE);
+        assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
         // Non-admin path must NOT contain the fail-closed sentinel.
         assertThat(rendered).doesNotContain("__none__");
     }
@@ -111,8 +124,11 @@ class RetrievalFilterBuilderTest {
 
         assertThat(exp).isNotNull();
         String rendered = exp.toString();
-        assertThat(rendered).contains(ChunkMetadata.ROLE_FLAG_PREFIX + AiAgentUserRole.CODE);
-        assertThat(rendered).contains(ChunkMetadata.ROLE_FLAG_PREFIX + "custom-host-role");
+        assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
+        assertThat(rendered).contains(ChunkMetadata.roleFlagKey("custom-host-role"));
+        assertThat(rendered).doesNotContain(ChunkMetadata.ROLE_FLAG_PREFIX + "custom-host-role");
+        // Guard precedence sensitivity in SQL/JSONPath converters: model pin is repeated per role.
+        assertThat(countOccurrences(rendered, ChunkMetadata.EMBEDDING_MODEL)).isGreaterThanOrEqualTo(2);
         // The two role clauses must be OR-ed (D-09 ANY), not AND-ed.
         assertThat(rendered).contains("OR");
     }

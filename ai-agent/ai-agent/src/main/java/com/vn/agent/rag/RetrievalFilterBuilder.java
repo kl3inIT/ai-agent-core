@@ -10,7 +10,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,14 +21,14 @@ import java.util.stream.Collectors;
  *       holds {@link AiAgentAdminRole#CODE}, returns {@code null}. The caller (DefaultChatServiceImpl)
  *       MUST skip setting the {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param
  *       when this returns {@code null}; the retriever then runs without any filter.</li>
- *   <li><b>Non-admin</b> — returns {@code eq(embeddingModel, current) AND (OR over role_* flags)}
+ *   <li><b>Non-admin</b> — returns {@code OR over (eq(embeddingModel,current) AND role_* flag)}
  *       (D-03 embedding-model drift clause + D-09 ANY role-overlap semantics).</li>
  *   <li><b>Empty roles / null authentication</b> — returns a fail-closed filter that matches
  *       zero chunks via the sentinel {@code documentId == "__none__"} (D-05).</li>
  * </ul>
  *
  * <p>Role flags use Option A flattening per PATTERNS.md — each role code becomes a
- * {@code role_<lowercase-code>} boolean-true metadata key. This is portable across Spring AI
+ * normalized {@code role_<normalized-code>} boolean-true metadata key. This is portable across Spring AI
  * vector-store adapters (RESEARCH Pitfall #1). The ingestion worker (Plan 05-03) MUST mirror this
  * flattening when writing {@code Document.metadata}.</p>
  */
@@ -68,13 +67,18 @@ public class RetrievalFilterBuilder {
         }
 
         // D-09 ANY semantics via Option A flattened role flags.
-        FilterExpressionBuilder.Op roleOverlap = null;
+        // Compose as OR of conjunctions to avoid relying on converter parenthesization:
+        // (model && roleA) || (model && roleB) || ...
+        FilterExpressionBuilder.Op scopedAnyRole = null;
         for (String role : roles) {
-            String key = ChunkMetadata.ROLE_FLAG_PREFIX + role.toLowerCase(Locale.ROOT);
-            FilterExpressionBuilder.Op clause = b.eq(key, true);
-            roleOverlap = (roleOverlap == null) ? clause : b.or(roleOverlap, clause);
+            String key = ChunkMetadata.roleFlagKey(role);
+            FilterExpressionBuilder.Op roleClause = b.eq(key, true);
+            FilterExpressionBuilder.Op modelAndRole = b.and(modelPin, roleClause);
+            scopedAnyRole = (scopedAnyRole == null)
+                    ? modelAndRole
+                    : b.or(scopedAnyRole, modelAndRole);
         }
 
-        return b.and(modelPin, roleOverlap).build();
+        return scopedAnyRole.build();
     }
 }

@@ -1,0 +1,141 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/admin/.gradle/wrapper/dists/gradle-8.14.4-bin/92wwslzcyst3phie3o264zltu/gradle-8.14.4/lib/native-platform-0.22-milestone-28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :ai-agent:ai-agent:compileJava UP-TO-DATE
+> Task :ai-agent:ai-agent-starter:compileJava UP-TO-DATE
+> Task :jmix-app:bootBuildInfo
+> Task :ai-agent:ai-agent:processResources UP-TO-DATE
+> Task :ai-agent:ai-agent:enhanceJmixMain SKIPPED
+> Task :ai-agent:ai-agent:copyJmixEnhancingResourcesMain SKIPPED
+> Task :ai-agent:ai-agent:classes UP-TO-DATE
+
+> Task :jmix-app:cleanConf
+Load properties (profile = null)
+Found file: application.properties
+Delete directory: D:\DTH\ai-agent-core\jmix-app/.jmix/conf
+
+> Task :ai-agent:ai-agent:jar
+> Task :ai-agent:ai-agent-starter:processResources UP-TO-DATE
+> Task :ai-agent:ai-agent-starter:classes UP-TO-DATE
+> Task :ai-agent:ai-agent-starter:jar UP-TO-DATE
+> Task :jmix-app:compileJava
+> Task :jmix-app:vaadinPrepareFrontend UP-TO-DATE
+> Task :jmix-app:processResources UP-TO-DATE
+
+> Task :jmix-app:enhanceJmixMain
+Enhancing entities in project ':jmix-app' for source set 'main'
+Project entities:
+    JPA: [com.vn.jmixapp.entity.OrderLine, com.vn.jmixapp.entity.Customer, com.vn.jmixapp.entity.Product, com.vn.jmixapp.entity.User, com.vn.jmixapp.entity.Order];
+    DTO: [];
+Project converters: [].
+Running EclipseLink enhancer in project ':jmix-app' for source set 'main'
+Running Jmix enhancer in project ':jmix-app' for source set 'main'
+
+> Task :jmix-app:copyJmixEnhancingResourcesMain
+> Task :jmix-app:classes
+> Task :jmix-app:resolveMainClassName
+
+> Task :jmix-app:bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+[32m :: Spring Boot :: [39m             [2m (v3.5.13)[0;39m
+
+[2m2026-04-22T23:39:40.843+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.vn.jmixapp.JmixAppApplication       [0;39m [2m:[0;39m Starting JmixAppApplication using Java 21.0.9 with PID 59620 (D:\DTH\ai-agent-core\jmix-app\build\classes\java\main started by admin in D:\DTH\ai-agent-core\jmix-app)
+[2m2026-04-22T23:39:40.846+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.vn.jmixapp.JmixAppApplication       [0;39m [2m:[0;39m No active profile set, falling back to 1 default profile: "default"
+[2m2026-04-22T23:39:44.471+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mio.jmix.core.JmixModulesProcessor       [0;39m [2m:[0;39m Using Jmix modules: [io.jmix.core, io.jmix.security, io.jmix.flowui, io.jmix.securityflowui, io.jmix.data, io.jmix.eclipselink, com.vn.agent, io.jmix.datatools, io.jmix.datatoolsflowui, io.jmix.flowuidata, io.jmix.gridexportflowui, io.jmix.localfs, io.jmix.securitydata, com.vn.jmixapp]
+[2m2026-04-22T23:39:46.191+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.b.w.embedded.tomcat.TomcatWebServer [0;39m [2m:[0;39m Tomcat initialized with port 8081 (http)
+[2m2026-04-22T23:39:46.218+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.apache.catalina.core.StandardService  [0;39m [2m:[0;39m Starting service [Tomcat]
+[2m2026-04-22T23:39:46.218+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.apache.catalina.core.StandardEngine   [0;39m [2m:[0;39m Starting Servlet engine: [Apache Tomcat/10.1.53]
+[2m2026-04-22T23:39:46.289+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.a.c.c.C.[Tomcat].[localhost].[/]      [0;39m [2m:[0;39m Initializing Spring embedded WebApplicationContext
+[2m2026-04-22T23:39:46.290+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mw.s.c.ServletWebServerApplicationContext[0;39m [2m:[0;39m Root WebApplicationContext: initialization completed in 5020 ms
+[2m2026-04-22T23:39:46.648+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mi.j.c.i.s.JmixModulesClasspathScanner   [0;39m [2m:[0;39m Classpath scan completed in 132 ms
+[2m2026-04-22T23:39:47.066+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mio.jmix.core.impl.MetadataLoader        [0;39m [2m:[0;39m Metadata initialized in 221 ms
+[2m2026-04-22T23:40:04.193+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.VaadinServletContextInitializer [0;39m [2m:[0;39m Search for subclasses and classes with annotations took 16137 ms
+[2m2026-04-22T23:40:04.194+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.VaadinServletContextInitializer [0;39m [2m:[0;39m Due to slow search it is recommended to use the allowed-packages feature to make scanning faster.
+
+See the allowed-packages section in the docs at https://vaadin.com/docs/latest/flow/integrations/spring/configuration#special-configuration-parameters
+[2m2026-04-22T23:40:05.574+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.b.d.startup.DevModeStartupListener  [0;39m [2m:[0;39m Starting dev-mode updaters in D:\DTH\ai-agent-core\jmix-app folder.
+[2m2026-04-22T23:40:05.673+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.f.s.FullDependenciesScanner     [0;39m [2m:[0;39m Visited 190 classes. Took 72 ms.
+[2m2026-04-22T23:40:05.676+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.frontend.BundleValidationUtil   [0;39m [2m:[0;39m Checking if a development mode bundle build is needed
+[2m2026-04-22T23:40:06.517+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.frontend.BundleValidationUtil   [0;39m [2m:[0;39m A development mode bundle build is not needed
+[2m2026-04-22T23:40:06.583+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.s.frontend.TaskCopyFrontendFiles  [0;39m [2m:[0;39m Copying frontend resources from jar files ...
+[2m2026-04-22T23:40:06.728+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.zaxxer.hikari.HikariDataSource      [0;39m [2m:[0;39m HikariPool-1 - Starting...
+[2m2026-04-22T23:40:06.737+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.s.frontend.TaskCopyFrontendFiles  [0;39m [2m:[0;39m Visited 21 resources. Took 154 ms.
+[2m2026-04-22T23:40:06.910+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.server.frontend.TaskUpdateImports [0;39m [2m:[0;39m Use the './' prefix for files in the 'D:\DTH\ai-agent-core\jmix-app\.\src\main\frontend' folder: 'generated/jar-resources/theme/lumo/checkbox/jmix-switch-styles.js', please update your annotations.
+[2m2026-04-22T23:40:07.077+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.zaxxer.hikari.pool.HikariPool       [0;39m [2m:[0;39m HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@76f0702e
+[2m2026-04-22T23:40:07.081+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.zaxxer.hikari.HikariDataSource      [0;39m [2m:[0;39m HikariPool-1 - Start completed.
+[2m2026-04-22T23:40:07.259+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.server.frontend.TaskUpdateImports [0;39m [2m:[0;39m Use the './' prefix for files in the 'D:\DTH\ai-agent-core\jmix-app\.\src\main\frontend' folder: 'generated/jar-resources/theme/lumo/side-panel-layout/jmix-side-panel-layout-styles.js', please update your annotations.
+[2m2026-04-22T23:40:07.278+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.server.frontend.TaskUpdateImports [0;39m [2m:[0;39m Use the './' prefix for files in the 'D:\DTH\ai-agent-core\jmix-app\.\src\main\frontend' folder: 'generated/jar-resources/theme/lumo/side-panel-layout/jmix-side-panel-layout-closer-styles.js', please update your annotations.
+[2m2026-04-22T23:40:07.327+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.server.frontend.TaskUpdateImports [0;39m [2m:[0;39m Use the './' prefix for files in the 'D:\DTH\ai-agent-core\jmix-app\.\src\main\frontend' folder: 'generated/jar-resources/theme/lumo/side-dialog/jmix-side-dialog-overlay.js', please update your annotations.
+[2m2026-04-22T23:40:07.328+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [in-dev-server-1] [0;39m[36mc.v.f.server.frontend.TaskUpdateImports [0;39m [2m:[0;39m Use the './' prefix for files in the 'D:\DTH\ai-agent-core\jmix-app\.\src\main\frontend' folder: 'generated/jar-resources/theme/lumo/side-dialog/jmix-side-dialog-overlay-styles.js', please update your annotations.
+[2m2026-04-22T23:40:07.396+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.database                      [0;39m [2m:[0;39m Set default schema name to public
+[2m2026-04-22T23:40:08.283+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading from public.databasechangelog
+[2m2026-04-22T23:40:08.964+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/010-init-user.xml
+[2m2026-04-22T23:40:08.980+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/020-customer.xml
+[2m2026-04-22T23:40:08.995+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/030-product.xml
+[2m2026-04-22T23:40:09.011+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/040-order.xml
+[2m2026-04-22T23:40:09.024+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/050-order-line.xml
+[2m2026-04-22T23:40:09.037+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/2026/04/21-165655-0729782d.xml
+[2m2026-04-22T23:40:09.053+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading resource: com/vn/jmixapp/liquibase/changelog/2026/04/22-232508-0729782d.xml
+[2m2026-04-22T23:40:10.025+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.lockservice                   [0;39m [2m:[0;39m Successfully acquired change log lock
+[2m2026-04-22T23:40:10.054+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.command                       [0;39m [2m:[0;39m Using deploymentId: 6876006705
+[2m2026-04-22T23:40:10.077+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Reading from public.databasechangelog
+[2m2026-04-22T23:40:10.150+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.ui                            [0;39m [2m:[0;39m Running Changeset: com/vn/agent/liquibase/changelog/060-ai-chat-memory.xml::2-postgres-recreate::ai-agent
+[2m2026-04-22T23:40:10.266+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m relation "spring_ai_chat_memory" already exists, skipping
+[2m2026-04-22T23:40:10.267+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.290+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m relation "spring_ai_chat_memory_conversation_id_timestamp_idx" already exists, skipping
+[2m2026-04-22T23:40:10.291+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.308+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m ChangeSet com/vn/agent/liquibase/changelog/060-ai-chat-memory.xml::2-postgres-recreate::ai-agent ran successfully in 156ms
+[2m2026-04-22T23:40:10.353+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.ui                            [0;39m [2m:[0;39m Running Changeset: com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml::3-postgres-recreate::ai-agent
+[2m2026-04-22T23:40:10.369+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m extension "vector" already exists, skipping
+[2m2026-04-22T23:40:10.369+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.377+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m extension "uuid-ossp" already exists, skipping
+[2m2026-04-22T23:40:10.377+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.387+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m relation "ai_agent_kb_vector_store" already exists, skipping
+[2m2026-04-22T23:40:10.387+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.398+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.executor                      [0;39m [2m:[0;39m relation "idx_ai_agent_kb_vector_store__embedding" already exists, skipping
+[2m2026-04-22T23:40:10.398+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.405+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m ChangeSet com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml::3-postgres-recreate::ai-agent ran successfully in 52ms
+[2m2026-04-22T23:40:10.422+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.ui                            [0;39m [2m:[0;39m Running Changeset: com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml::4-postgres-normalize-role-keys::ai-agent
+[2m2026-04-22T23:40:10.452+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m Custom SQL executed
+[2m2026-04-22T23:40:10.459+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.changelog                     [0;39m [2m:[0;39m ChangeSet com/vn/agent/liquibase/changelog/070-ai-kb-vector-store.xml::4-postgres-normalize-role-keys::ai-agent ran successfully in 37ms
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m UPDATE SUMMARY
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m Run:                          3
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m Previously run:              42
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m Filtered out:                 8
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m -------------------------------
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m Total change sets:           53
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m FILTERED CHANGE SETS SUMMARY
+[2m2026-04-22T23:40:10.489+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m DBMS mismatch:                8
+[2m2026-04-22T23:40:10.493+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.util                          [0;39m [2m:[0;39m Update summary generated
+[2m2026-04-22T23:40:10.497+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.command                       [0;39m [2m:[0;39m Update command completed successfully.
+[2m2026-04-22T23:40:10.497+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.ui                            [0;39m [2m:[0;39m Liquibase: Update has been successful. Rows affected: 3
+[2m2026-04-22T23:40:10.519+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.lockservice                   [0;39m [2m:[0;39m Successfully released change log lock
+[2m2026-04-22T23:40:10.527+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mliquibase.command                       [0;39m [2m:[0;39m Command execution complete
+[2m2026-04-22T23:40:12.261+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mi.j.d.i.JmixBaseEntityManagerFactoryBean[0;39m [2m:[0;39m Using persistence.xml at com/vn/jmixapp/persistence.xml for 'main' store
+[2m2026-04-22T23:40:12.317+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.o.j.p.PersistenceUnitReader         [0;39m [2m:[0;39m persistence.xml should be located inside META-INF directory; cannot determine persistence unit root URL for class path resource [com/vn/jmixapp/persistence.xml]
+[2m2026-04-22T23:40:13.359+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mi.j.d.impl.JmixEntityManagerFactoryBean [0;39m [2m:[0;39m Initialized JPA EntityManagerFactory for persistence unit 'main'
+[2m2026-04-22T23:40:14.514+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.a.v.pgvector.PgVectorStore          [0;39m [2m:[0;39m Using the vector table name: AI_AGENT_KB_VECTOR_STORE. Is empty: false
+[2m2026-04-22T23:40:14.517+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.a.v.pgvector.PgVectorStore          [0;39m [2m:[0;39m Initializing PGVectorStore schema for table: AI_AGENT_KB_VECTOR_STORE in schema: public
+[2m2026-04-22T23:40:14.518+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.a.v.pgvector.PgVectorStore          [0;39m [2m:[0;39m vectorTableValidationsEnabled false
+[2m2026-04-22T23:40:14.708+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.a.a.AiAgentGuardAutoConfiguration   [0;39m [2m:[0;39m No CacheManager bean found — registered default dynamic ConcurrentMapCacheManager (pre-touched ai-agent.rateLimit + ai-agent.tokenBreaker; Jmix caches auto-create on demand)
+[2m2026-04-22T23:40:14.725+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.a.o.ChatStreamingSchedulerConfig    [0;39m [2m:[0;39m Reactor automatic context propagation enabled (propagates Spring Security SecurityContext across streaming scheduler hops).
+[2m2026-04-22T23:40:15.576+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mr$InitializeUserDetailsManagerConfigurer[0;39m [2m:[0;39m Global AuthenticationManager configured with UserDetailsService bean with name UserRepository
+[2m2026-04-22T23:40:16.164+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mio.jmix.flowui.view.ViewRegistry        [0;39m [2m:[0;39m ViewRegistry initialized in 124 ms
+[2m2026-04-22T23:40:18.427+07:00[0;39m [33m WARN[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.s.c.a.web.builders.WebSecurity      [0;39m [2m:[0;39m You are asking Spring Security to ignore Ant [pattern='/VAADIN/push/**']. This is not recommended -- please use permitAll via HttpSecurity#authorizeHttpRequests instead.
+[2m2026-04-22T23:40:19.369+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.f.s.DefaultDeploymentConfiguration  [0;39m [2m:[0;39m 
+Vaadin is running in DEVELOPMENT mode - do not use for production deployments.
+[2m2026-04-22T23:40:19.501+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mo.s.b.w.embedded.tomcat.TomcatWebServer [0;39m [2m:[0;39m Tomcat started on port 8081 (http) with context path '/'
+[2m2026-04-22T23:40:19.627+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.vn.jmixapp.JmixAppApplication       [0;39m [2m:[0;39m Started JmixAppApplication in 39.745 seconds (process running for 40.43)
+[2m2026-04-22T23:40:19.629+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mcom.vn.jmixapp.JmixAppApplication       [0;39m [2m:[0;39m Application started at http://localhost:8081
+[2m2026-04-22T23:40:19.644+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.vn.jmixapp.ai.ChatServiceSmokeRunner  [0;39m [2m:[0;39m ChatServiceSmokeRunner: ChatService bean present: class=com.vn.agent.DefaultChatServiceImpl
+[2m2026-04-22T23:40:19.956+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36meclipselink.logging.all                 [0;39m [2m:[0;39m EclipseLink, version: Eclipse Persistence Services - 4.0.6-3-jmix.v202511172336-9dc6ae0a264e78253f0d9518d0a389b982412bfa
+[2m2026-04-22T23:40:20.492+07:00[0;39m [32m INFO[0;39m [35m59620[0;39m [2m--- [           main] [0;39m[36mc.v.b.d.DevModeHandlerManagerImpl       [0;39m [2m:[0;39m Application running at http://localhost:8081/

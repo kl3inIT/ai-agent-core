@@ -12,6 +12,8 @@ import com.vn.agent.entity.AiParameters;
 import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
+import io.jmix.flowui.action.list.CreateAction;
+import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.kit.component.button.JmixButton;
@@ -56,6 +58,10 @@ public class ParametersListView extends StandardListView<AiParameters> {
     private JmixButton setActiveBtn;
     @ViewComponent
     private CollectionLoader<AiParameters> parametersDl;
+    @ViewComponent("parametersDataGrid.createAction")
+    private CreateAction<AiParameters> createAction;
+    @ViewComponent("parametersDataGrid.editAction")
+    private EditAction<AiParameters> editAction;
 
     @Autowired
     private ParametersService parametersService;
@@ -72,6 +78,8 @@ public class ParametersListView extends StandardListView<AiParameters> {
     @Subscribe
     public void onInit(final InitEvent event) {
         setActiveBtn.setEnabled(false);
+        createAction.setViewClass(ParametersDetailView.class);
+        editAction.setViewClass(ParametersDetailView.class);
 
         // Grid selection → button enabled state: kept raw per the review's carve-out
         // for dynamic grid selection wiring.

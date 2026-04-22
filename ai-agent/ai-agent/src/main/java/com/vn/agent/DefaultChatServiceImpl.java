@@ -357,7 +357,11 @@ public class DefaultChatServiceImpl implements ChatService {
                     }
 
                     Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
-                    return merged.concatWith(Flux.defer(() -> {
+                    return merged
+                    // Capture ThreadLocal state after begin(userId) so downstream scheduler hops
+                    // restore the authenticated SecurityContext instead of an empty caller context.
+                    .contextCapture()
+                    .concatWith(Flux.defer(() -> {
                         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
                         return Flux.<StreamingEvent>just(new StreamingEvent.Final(runId, latencyMs, 0, 0));
                     }));

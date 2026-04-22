@@ -127,7 +127,7 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
                             ChunkMetadata.DOCUMENT_ID, otherId.toString(),
                             ChunkMetadata.EMBEDDING_MODEL, "other-model-not-current",
                             ChunkMetadata.ALLOWED_ROLES, List.of(AiAgentUserRole.CODE),
-                            ChunkMetadata.ROLE_FLAG_PREFIX + AiAgentUserRole.CODE, true))
+                            ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE), true))
                     .build();
             vectorStore.add(List.of(outOfModel));
 
