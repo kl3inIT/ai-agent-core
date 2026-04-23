@@ -63,10 +63,11 @@ subprojects {
     publishing {
         repositories {
             maven {
-                url = 'https://myrepo/releases/'
+                name = 'CustomNexus'
+                url = 'https://nexus.x2h.com.vn/repository/jmix-internal-snapshots/' // Replace with your Nexus repo URL
                 credentials {
-                    username rootProject.hasProperty('uploadUser') ? rootProject['uploadUser'] : 'admin'
-                    password rootProject.hasProperty('uploadPassword') ? rootProject['uploadPassword'] : 'admin'
+                    username = project.findProperty('nexusUsername')
+                    password = project.findProperty('nexusPassword')
                 }
                 allowInsecureProtocol = true
             }

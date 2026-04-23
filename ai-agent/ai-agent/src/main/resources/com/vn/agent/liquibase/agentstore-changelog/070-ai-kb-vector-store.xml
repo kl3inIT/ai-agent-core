@@ -7,8 +7,8 @@
 
     <!--
         pgvector extension + AI_AGENT_KB_VECTOR_STORE table.
-        Gated to PostgreSQL via dbms attribute AND preConditions onFail="MARK_RAN"
-        (belt-and-suspenders per Pitfall #3). HSQLDB boot skips the entire changeset.
+        PostgreSQL-only via dbms attribute and preConditions onFail="MARK_RAN"
+        (belt-and-suspenders per Pitfall #3).
 
         Table shape matches the Spring AI PgVectorStore reference schema exactly
         (id uuid DEFAULT uuid_generate_v4, content text, metadata json, embedding vector(1536)).
@@ -29,35 +29,6 @@
         <preConditions onFail="MARK_RAN" onFailMessage="Not PostgreSQL — skipping AI_AGENT_KB_VECTOR_STORE DDL">
             <dbms type="postgresql"/>
         </preConditions>
-        <sql>
-            CREATE TABLE IF NOT EXISTS AI_AGENT_KB_VECTOR_STORE (
-                id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-                content text,
-                metadata json,
-                embedding vector(1536)
-            );
-        </sql>
-        <sql>
-            CREATE INDEX IF NOT EXISTS IDX_AI_AGENT_KB_VECTOR_STORE__EMBEDDING
-            ON AI_AGENT_KB_VECTOR_STORE USING HNSW (embedding vector_cosine_ops);
-        </sql>
-    </changeSet>
-
-    <!--
-        Recreate guard: if vector table/index are dropped out-of-band after id=2 ran,
-        Liquibase will not re-run id=2 because it is already EXECUTED. This runAlways
-        changeset re-applies idempotent DDL so the environment self-heals on next boot.
-    -->
-    <changeSet id="3-postgres-recreate" author="ai-agent" dbms="postgresql" runAlways="true">
-        <preConditions onFail="MARK_RAN" onFailMessage="Not PostgreSQL - skipping AI_AGENT_KB_VECTOR_STORE recreate guard">
-            <dbms type="postgresql"/>
-        </preConditions>
-        <sql>
-            CREATE EXTENSION IF NOT EXISTS vector;
-        </sql>
-        <sql>
-            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-        </sql>
         <sql>
             CREATE TABLE IF NOT EXISTS AI_AGENT_KB_VECTOR_STORE (
                 id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
