@@ -120,17 +120,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     @Subscribe("stopButton")
     public void onStopButtonClick(final ClickEvent<Button> event) {
-        // D-04 — MUST route through the registry so the audit row records CANCELLED.
-        if (activeRunId != null) {
-            cancellationRegistry.cancel(activeRunId);
-        }
+        stopActiveStream();
     }
 
     // ---- Public API --------------------------------------------------------
 
     public void setConversationId(UUID cid) {
-        if (isStreaming() && activeRunId != null) {
-            cancellationRegistry.cancel(activeRunId);
+        if (isStreaming()) {
+            stopActiveStream();
         }
         this.conversationId = cid;
         items.clear();
@@ -171,12 +168,25 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     public void startNewChat() {
-        if (isStreaming() && activeRunId != null) {
-            cancellationRegistry.cancel(activeRunId);
+        if (isStreaming()) {
+            stopActiveStream();
         }
         items.clear();
         if (messageList != null) messageList.setItems(items);
         conversationId = null;
+    }
+
+    private void stopActiveStream() {
+        // D-04 — route through the registry when runId is known so CANCELLED is audited.
+        if (activeRunId != null) {
+            cancellationRegistry.cancel(activeRunId);
+            return;
+        }
+        Disposable streamDisposable = activeStream;
+        if (streamDisposable != null && !streamDisposable.isDisposed()) {
+            streamDisposable.dispose();
+            finishStreamInternal();
+        }
     }
 
     // ---- Streaming ---------------------------------------------------------
