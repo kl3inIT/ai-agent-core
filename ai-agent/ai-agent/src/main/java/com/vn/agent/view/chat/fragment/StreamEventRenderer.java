@@ -95,10 +95,11 @@ public final class StreamEventRenderer {
                 yield prefix + "\n- [%s](/ai-agent/knowledge?documentId=%s)"
                         .formatted(c.documentId().toString(), c.documentId());
             }
-            case StreamingEvent.Error err ->
-                    "\n\n---\n**%s:** %s".formatted(
-                            labels.getOrDefault("chatView.stream.error", "error"),
-                            err.messageKey());
+            case StreamingEvent.Error err -> {
+                String errorLabel = labels.getOrDefault("chatView.stream.error", "error");
+                String errorText = labels.getOrDefault(err.messageKey(), err.messageKey());
+                yield "\n\n---\n**%s:** %s".formatted(errorLabel, errorText);
+            }
             case StreamingEvent.Final f ->
                     // v1 — skip closing summary per RESEARCH Open Question 2.
                     "";

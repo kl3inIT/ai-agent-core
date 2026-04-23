@@ -287,6 +287,20 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         labels.put("chatView.stream.outcome.ERROR", resolveLabel("chatView.stream.outcome.ERROR", "error"));
         labels.put("chatView.stream.outcome.FLAGGED", resolveLabel("chatView.stream.outcome.FLAGGED", "flagged"));
         labels.put("chatView.stream.error", resolveLabel("chatView.stream.error", "error"));
+        labels.put("chatView.error.generic",
+                resolveLabel("chatView.error.generic", "Something went wrong. Please try again."));
+        labels.put("chatView.error.conversationNotFound",
+                resolveLabel("chatView.error.conversationNotFound", "Conversation not found or no longer accessible."));
+        labels.put("ai-agent.guard.rate-limit-exceeded",
+                resolveLabel("ai-agent.guard.rate-limit-exceeded", "Too many requests — please wait before trying again."));
+        labels.put("ai-agent.guard.token-budget-exhausted",
+                resolveLabel("ai-agent.guard.token-budget-exhausted",
+                        "This conversation has reached its token limit. Start a new chat to continue."));
+        labels.put("ai-agent.guard.iteration-cap-exceeded",
+                resolveLabel("ai-agent.guard.iteration-cap-exceeded",
+                        "The assistant could not complete the task within the allowed number of steps."));
+        labels.put("ai-agent.guard.tool-vetoed",
+                resolveLabel("ai-agent.guard.tool-vetoed", "This action was blocked by policy."));
     }
 
     private String resolveLabel(String key, String fallback) {
