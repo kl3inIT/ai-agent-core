@@ -3,12 +3,13 @@ package com.vn.agent.entity;
 import io.jmix.core.entity.annotation.JmixGeneratedValue;
 import io.jmix.core.metamodel.annotation.InstanceName;
 import io.jmix.core.metamodel.annotation.JmixEntity;
+import io.jmix.core.metamodel.annotation.Store;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Store(name = "agentstore")
 @JmixEntity
 @Entity(name = "ai_AiParameters")
 @Table(name = "AI_AGENT_PARAMETERS", indexes = {
@@ -17,7 +18,7 @@ import java.util.UUID;
 public class AiParameters {
 
     @Id
-    @Column(name = "ID")
+    @Column(name = "ID", nullable = false)
     @JmixGeneratedValue
     private UUID id;
 
@@ -38,13 +39,13 @@ public class AiParameters {
     @Column(name = "BODY_YAML")
     private String bodyYaml;
 
-    @Column(name = "CREATED_BY", length = 255)
+    @Column(name = "CREATED_BY")
     private String createdBy;
 
     @Column(name = "CREATED_DATE")
     private OffsetDateTime createdDate;
 
-    @Column(name = "LAST_MODIFIED_BY", length = 255)
+    @Column(name = "LAST_MODIFIED_BY")
     private String lastModifiedBy;
 
     @Column(name = "LAST_MODIFIED_DATE")

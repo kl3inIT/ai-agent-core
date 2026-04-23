@@ -6,12 +6,13 @@ import io.jmix.core.entity.annotation.OnDelete;
 import io.jmix.core.metamodel.annotation.DependsOnProperties;
 import io.jmix.core.metamodel.annotation.InstanceName;
 import io.jmix.core.metamodel.annotation.JmixEntity;
+import io.jmix.core.metamodel.annotation.Store;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Store(name = "agentstore")
 @JmixEntity
 @Entity(name = "ai_AiMessage")
 @Table(name = "AI_AGENT_MESSAGE", indexes = {
@@ -20,7 +21,7 @@ import java.util.UUID;
 public class AiMessage {
 
     @Id
-    @Column(name = "ID")
+    @Column(name = "ID", nullable = false)
     @JmixGeneratedValue
     private UUID id;
 

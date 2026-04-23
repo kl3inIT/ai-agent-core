@@ -3,12 +3,13 @@ package com.vn.agent.entity;
 import io.jmix.core.entity.annotation.JmixGeneratedValue;
 import io.jmix.core.metamodel.annotation.InstanceName;
 import io.jmix.core.metamodel.annotation.JmixEntity;
+import io.jmix.core.metamodel.annotation.Store;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Store(name = "agentstore")
 @JmixEntity
 @Entity(name = "ai_AiKnowledgeDocument")
 @Table(name = "AI_AGENT_KNOWLEDGE_DOCUMENT", indexes = {
@@ -18,7 +19,7 @@ import java.util.UUID;
 public class AiKnowledgeDocument {
 
     @Id
-    @Column(name = "ID")
+    @Column(name = "ID", nullable = false)
     @JmixGeneratedValue
     private UUID id;
 
@@ -28,7 +29,7 @@ public class AiKnowledgeDocument {
 
     @InstanceName
     @NotNull
-    @Column(name = "FILE_NAME", nullable = false, length = 255)
+    @Column(name = "FILE_NAME", nullable = false)
     private String fileName;
 
     @Column(name = "MIME_TYPE", length = 128)
@@ -48,13 +49,13 @@ public class AiKnowledgeDocument {
     @Column(name = "ALLOWED_ROLES_JSON")
     private String allowedRolesJson;
 
-    @Column(name = "CREATED_BY", length = 255)
+    @Column(name = "CREATED_BY")
     private String createdBy;
 
     @Column(name = "CREATED_DATE")
     private OffsetDateTime createdDate;
 
-    @Column(name = "LAST_MODIFIED_BY", length = 255)
+    @Column(name = "LAST_MODIFIED_BY")
     private String lastModifiedBy;
 
     @Column(name = "LAST_MODIFIED_DATE")

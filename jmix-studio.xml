@@ -1,14 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="IgnoredChangelogIncludeConfig">
+    <datastore-include-infos>
+      <datastore-include-info datastore-name="main" />
+    </datastore-include-infos>
+  </component>
   <component name="JmixDataStoreSettingsManager">
     <moduleSettings>
       <entry key="ai-agent-addon.ai-agent.main">
         <ModuleSettings>
           <option name="dataStoreOptionsV2">
             <map>
+              <entry key="agentstore">
+                <value>
+                  <DataStoreSettingsV2>
+                    <option name="generateDdlType" value="CREATE_AND_UPDATE" />
+                    <option name="supportedTypes">
+                      <option value="postgres" />
+                    </option>
+                  </DataStoreSettingsV2>
+                </value>
+              </entry>
               <entry key="main">
                 <value>
                   <DataStoreSettingsV2 />
+                </value>
+              </entry>
+            </map>
+          </option>
+          <option name="dataStores">
+            <map>
+              <entry key="agentstore">
+                <value>
+                  <DataStore>
+                    <SavedDbProperties>
+                      <option name="databaseName" value="agentstore" />
+                      <option name="dbType" value="postgres" />
+                      <option name="dbmsVersion" />
+                      <option name="host" value="10.123.123.174" />
+                      <option name="pass" value="admin123" />
+                      <option name="port" value="5555" />
+                      <option name="url" value="jdbc:postgresql://10.123.123.174:5555/agentstore" />
+                      <option name="user" value="postgres" />
+                    </SavedDbProperties>
+                  </DataStore>
                 </value>
               </entry>
             </map>
@@ -19,6 +54,15 @@
         <ModuleSettings>
           <option name="dataStoreOptionsV2">
             <map>
+              <entry key="agentstore">
+                <value>
+                  <DataStoreSettingsV2>
+                    <option name="supportedTypes">
+                      <option value="postgres" />
+                    </option>
+                  </DataStoreSettingsV2>
+                </value>
+              </entry>
               <entry key="main">
                 <value>
                   <DataStoreSettingsV2 />
