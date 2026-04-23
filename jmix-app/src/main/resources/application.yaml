@@ -1,8 +1,0 @@
-spring:
-  ai:
-    openai:
-      api-key: ${OPENROUTER_API_KEY:none}
-      base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api}
-      chat:
-        options:
-          model: ${OPENROUTER_MODEL:openai/gpt-4o-mini}

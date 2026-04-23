@@ -18,6 +18,7 @@ import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.EditedEntityContainer;
 import io.jmix.flowui.view.StandardDetailView;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -67,8 +68,14 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
     @Subscribe
     public void onReady(final ReadyEvent event) {
         // The XML <dataLoadCoordinator auto="true"/> already triggers messagesDl once
-        // the :conv parameter is available from conversationDc. Avoid an extra manual
-        // load — just render whatever the container holds after the auto-load fires.
+        // the :container_conversationDc parameter is available from conversationDc.
+        // Avoid an extra manual load — just render whatever is currently in the container.
+        renderTranscript(messagesDc.getItems());
+    }
+
+    @Subscribe(id = "messagesDc", target = Target.DATA_CONTAINER)
+    public void onMessagesDcCollectionChange(
+            final CollectionContainer.CollectionChangeEvent<AiMessage> event) {
         renderTranscript(messagesDc.getItems());
     }
 

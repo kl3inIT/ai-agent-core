@@ -6,7 +6,7 @@ trigger: |
   can view conversation history và chỗ list conversation đang lưu per question chứ không phải per conversation
   <!-- DATA_END -->
 created: 2026-04-23T00:00:00Z
-updated: 2026-04-23T02:15:00Z
+updated: 2026-04-23T03:20:00Z
 ---
 
 # Debug Session: list-conversation-per-question
@@ -21,17 +21,16 @@ updated: 2026-04-23T02:15:00Z
 
 ## Current Focus
 
-hypothesis: UI never stores the newly created conversation id from streaming final event.
-test: trace `conversationId` from `ChatPanelFragment` submit -> `DefaultChatServiceImpl.stream` -> emitted `StreamingEvent.Final`.
-expecting: after first turn, panel state receives generated `conversationId` and reuses it for next turns.
+hypothesis: UI did not guarantee a stable `conversationId` before sending a turn; if the stream handoff is missed, next submit still uses `null`.
+test: reserve/reuse conversation id in `ChatPanelFragment` before starting stream.
+expecting: all turns in one chat route to the same `AiConversation`.
 next_action: completed.
 
 ## Evidence
 
-- `ChatPanelFragment.onSubmit()` called `chatService.stream(userId, conversationId, text, null)` with `conversationId=null` for new chat.
-- `DefaultChatServiceImpl.stream()` created a conversation via `conversationGateway.loadOrCreate(...)` and got `convId`.
-- `StreamingEvent.Final` previously emitted only `runId + metrics`, so UI had no way to capture `convId`.
-- Because UI `conversationId` stayed null, every next question triggered another `loadOrCreate(..., null, ...)` -> new row per question.
+- `ChatPanelFragment.onSubmit()` previously called `chatService.stream(userId, conversationId, text, null)` directly.
+- New chats therefore depended on downstream stream-event handoff to backfill local `conversationId`.
+- If the handoff is missed, local `conversationId` remains `null`, and next question creates a fresh `AiConversation`.
 
 ## Eliminated
 
@@ -39,17 +38,16 @@ next_action: completed.
 
 ## Resolution
 
-**Root cause:** Streaming final event did not carry `conversationId`, so chat UI could not retain the generated conversation id after first message in a new chat.
+**Root cause:** Chat UI did not guarantee local conversation-id continuity before each submit; it depended on post-start stream handoff, so missed handoff produced per-question conversation creation.
 
 **Fix:**
-1. Extended `StreamingEvent.Final` to include `conversationId`.
-2. Updated `DefaultChatServiceImpl.stream()` to emit `new StreamingEvent.Final(runId, convId, latencyMs, ...)`.
-3. Updated `ChatPanelFragment` to set its local `conversationId` from `StreamingEvent.Final` when current id is null.
-4. Updated tests to new `StreamingEvent.Final` signature.
+1. Added `ensureConversationIdForSubmit(userId, firstMessage)` in `ChatPanelFragment`.
+2. `onSubmit()` now resolves/stores conversation id before calling `chatService.stream(...)`.
+3. Added `ChatPanelFragmentConversationIdTest` to guard create-once/reuse semantics.
 
 **Verification:**
 1. Ran:
-   - `./gradlew :ai-agent:ai-agent:test --tests "com.vn.agent.view.chat.RenderStreamEventTest" --tests "com.vn.agent.view.chat.ChatViewStreamTest"`
+   - `./gradlew :ai-agent:ai-agent:test --tests "com.vn.agent.view.chat.fragment.ChatPanelFragmentConversationIdTest" --tests "com.vn.agent.view.chat.ChatViewStreamTest" --tests "com.vn.agent.view.chat.ChatViewStopTest"`
 2. Result: `BUILD SUCCESSFUL`.
 3. Expected runtime behavior after fix:
    - first question in new chat creates one conversation;
