@@ -9,9 +9,6 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
-import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vn.agent.entity.AiKnowledgeDocument;
@@ -34,6 +31,7 @@ import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Supply;
+import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -44,9 +42,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.event.EventListener;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,8 +76,7 @@ import java.util.UUID;
 @Route(value = "ai-agent/knowledge", layout = DefaultMainViewParent.class)
 @ViewController(id = "AiAgent_KnowledgeBase.list")
 @ViewDescriptor(path = "knowledge-base-view.xml")
-public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
-        implements BeforeEnterObserver {
+public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseView.class);
 
@@ -191,19 +186,22 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
         });
     }
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        QueryParameters qp = event.getLocation().getQueryParameters();
-        Map<String, List<String>> params = qp.getParameters();
-        List<String> docIds = params.get("documentId");
-        if (docIds == null || docIds.isEmpty()) {
-            return;
-        }
-        try {
-            pendingSelectionDocumentId = UUID.fromString(docIds.get(0));
-        } catch (IllegalArgumentException ex) {
-            log.debug("Ignoring malformed documentId query param: {}", docIds.get(0));
-        }
+    /**
+     * Jmix-native deep-link hook. Fires after {@code InitEvent} on navigation-opened views —
+     * see Jmix docs: Flow UI → Views → View Events → QueryParametersChangeEvent.
+     * The captured id is applied after the loader finishes via {@link #selectPendingDocumentIfNeeded()}.
+     */
+    @Subscribe
+    public void onQueryParametersChange(final View.QueryParametersChangeEvent event) {
+        event.getQueryParameters()
+                .getSingleParameter("documentId")
+                .ifPresent(raw -> {
+                    try {
+                        pendingSelectionDocumentId = UUID.fromString(raw);
+                    } catch (IllegalArgumentException ex) {
+                        log.debug("Ignoring malformed documentId query param: {}", raw);
+                    }
+                });
     }
 
     // --- Internals -------------------------------------------------------------
