@@ -30,16 +30,17 @@ public class AuditListenerDispatcher {
     }
 
     /**
-     * Notify every registered {@link AuditListener} that a tool-call audit row has been written.
-     * Any {@link Throwable} from a listener is caught and logged — it never propagates.
+     * Notify every registered {@link AuditListener} that an audit row has been written for the
+     * given {@code kind} (CHAT finish / TOOL / RETRIEVAL / host-defined). Any {@link Throwable}
+     * from a listener is caught and logged — it never propagates to the chat thread.
      */
-    public void dispatchToolCallAudited(UUID auditId) {
+    public void dispatchEventAudited(UUID auditId, String kind) {
         for (AuditListener listener : listeners) {
             try {
-                listener.onToolCallAudited(auditId);
+                listener.onEventAudited(auditId, kind);
             } catch (Throwable t) {
-                log.warn("AuditListener {} threw on auditId={}; suppressed",
-                        listener.getClass().getName(), auditId, t);
+                log.warn("AuditListener {} threw on auditId={} kind={}; suppressed",
+                        listener.getClass().getName(), auditId, kind, t);
             }
         }
     }

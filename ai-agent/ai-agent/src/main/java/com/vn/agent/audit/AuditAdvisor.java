@@ -84,21 +84,26 @@ public class AuditAdvisor implements CallAdvisor {
         String promptHash = hashPrompt(request);
         long startNanos = System.nanoTime();
         String errorClass = null;
+        UUID rootAuditId = null;
 
         try {
-            auditWriter.writeChatPre(runId, userUsername, conversationId, promptHash);
+            rootAuditId = auditWriter.writeChatStart(runId, userUsername, conversationId, promptHash);
+            RunContext.setRootAuditId(rootAuditId);   // D-10: advertise to downstream hooks (tool decorator + retrieval)
             return chain.nextCall(request);
         } catch (Throwable t) {
-            errorClass = t.getClass().getName();
+            errorClass = t.getClass().getSimpleName();   // D-02: simpleName, not fully-qualified
             throw t;
         } finally {
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            String outcome = errorClass == null ? "SUCCESS" : "ERROR";
             try {
-                auditWriter.writeChatPost(runId, userUsername, conversationId, latencyMs, errorClass);
+                if (rootAuditId != null) {
+                    auditWriter.writeChatFinish(rootAuditId, latencyMs, outcome, errorClass);
+                }
             } catch (Throwable t2) {
-                log.warn("writeChatPost failed for runId={}", runId, t2);
+                log.warn("writeChatFinish failed for rootAuditId={}", rootAuditId, t2);
             }
-            RunContext.clear();
+            RunContext.clear();   // Pitfall #2: clear AFTER finish — tool/retrieval hooks run inside chain.nextCall
         }
     }
 

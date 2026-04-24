@@ -110,15 +110,8 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
 
         String cappedInput = cap(toolInput, ARGUMENTS_JSON_MAX_CHARS);
 
-        // PRE row — write eagerly so it survives even if delegate throws AND its tx rolls back.
-        try {
-            auditWriter.writeToolCall(runId, userUsername, conversationId, toolName,
-                    cappedInput, /*resultSummary*/ null, 0L,
-                    AiToolCallOutcome.SUCCESS,  // sentinel; POST records real outcome
-                    /*denialReason*/ null, /*errorClass*/ null, "PRE");
-        } catch (Throwable t) {
-            log.warn("Tool PRE audit failed runId={} tool={}", runId, toolName, t);
-        }
+        // Plan 07.2 (D-01): children are append-only — no PRE row. One row per tool invocation,
+        // written in the finally block below with parentId = RunContext.getRootAuditId().
 
         // Plan 07-02: correlate ToolCall / ToolResult pair via a single id. The pair is
         // consumed by StreamEventRenderer (Plan 07.1-02) which matches the ToolResult back
@@ -145,12 +138,13 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             String resultSummary = output == null
                     ? cap(errorMessage, RESULT_SUMMARY_MAX_CHARS)
                     : cap(output, RESULT_SUMMARY_MAX_CHARS);
+            UUID parentId = RunContext.getRootAuditId();   // may be null defensively (out-of-chain calls — D-10)
             try {
-                auditWriter.writeToolCall(runId, userUsername, conversationId, toolName,
+                auditWriter.writeToolCall(parentId, runId, userUsername, conversationId, toolName,
                         cappedInput, resultSummary, latencyMs, outcome,
-                        /*denialReason*/ null, errorClass, "POST");
+                        /*denialReason*/ null, errorClass);
             } catch (Throwable t2) {
-                log.warn("Tool POST audit failed runId={} tool={}", runId, toolName, t2);
+                log.warn("Tool audit write failed runId={} tool={}", runId, toolName, t2);
             }
             // Plan 07-02: emit post-exit ToolResult to the streaming sink (both success + error paths).
             final String emittedSummary = resultSummary;

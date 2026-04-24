@@ -107,12 +107,12 @@ public class AuditWriter {
     public void writeChatFinish(UUID rootId, long latencyMs, String outcome, String errorClass) {
         AiAuditEvent root = dataManager.load(AiAuditEvent.class)
                 .id(rootId)
-                .fetchPlan(fp -> fp.addProperty("kind")
-                        .addProperty("outcome")
-                        .addProperty("latencyMs")
-                        .addProperty("finishedAt")
-                        .addProperty("errorClass")
-                        .addProperty("startedAt"))   // CRITICAL: NEVER include "children" — Pitfall #1
+                .fetchPlan(fp -> fp.add("kind")
+                        .add("outcome")
+                        .add("latencyMs")
+                        .add("finishedAt")
+                        .add("errorClass")
+                        .add("startedAt"))   // CRITICAL: NEVER include "children" — Pitfall #1
                 .optional()
                 .orElse(null);
         if (root == null) {
@@ -160,7 +160,7 @@ public class AuditWriter {
         if (parentId != null) {
             AiAuditEvent parent = dataManager.load(AiAuditEvent.class)
                     .id(parentId)
-                    .fetchPlan(fp -> fp.addProperty("id"))   // no children fetch — Pitfall #1
+                    .fetchPlan(fp -> fp.add("id"))   // no children fetch — Pitfall #1
                     .optional().orElse(null);
             if (parent != null) {
                 row.setParent(parent);
@@ -210,7 +210,7 @@ public class AuditWriter {
         if (parentId != null) {
             AiAuditEvent parent = dataManager.load(AiAuditEvent.class)
                     .id(parentId)
-                    .fetchPlan(fp -> fp.addProperty("id"))
+                    .fetchPlan(fp -> fp.add("id"))
                     .optional().orElse(null);
             if (parent != null) {
                 row.setParent(parent);
