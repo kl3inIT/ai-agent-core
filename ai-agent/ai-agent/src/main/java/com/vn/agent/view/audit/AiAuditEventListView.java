@@ -180,11 +180,13 @@ public class AiAuditEventListView extends StandardListView<AiAuditEvent> {
         }
         String tool = toolFilter.getValue();
         if (tool != null && !tool.isBlank()) {
-            where.add("e.eventName = :tool");
+            where.add("(e.eventName = :tool or exists (select c from ai_AiAuditEvent c "
+                    + "where c.parent = e and c.eventName = :tool))");
         }
         AiToolCallOutcome outcome = outcomeFilter.getValue();
         if (outcome != null) {
-            where.add("e.outcome = :outcome");
+            where.add("(e.outcome = :outcome or exists (select c from ai_AiAuditEvent c "
+                    + "where c.parent = e and c.outcome = :outcome))");
         }
         LocalDateTime from = dateFromFilter.getValue();
         if (from != null) {

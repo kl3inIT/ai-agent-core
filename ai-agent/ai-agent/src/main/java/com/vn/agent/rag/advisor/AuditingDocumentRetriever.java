@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
+import org.springframework.lang.NonNull;
 
 import java.util.List;
 import java.util.UUID;
@@ -17,7 +18,7 @@ import java.util.UUID;
  * {@code AiAuditEvent} row per {@link #retrieve(Query)} invocation (D-09). Parent id is read from
  * {@link RunContext#getRootAuditId()} (set by {@code AuditAdvisor} before the advisor chain runs)
  * so every retrieval row chains under the current chat turn's root. Not a Spring
- * {@code @Component} — instantiated inline by {@link RetrievalAugmentationAdvisorFactory}.
+ * {@code @Component} â€” instantiated inline by {@link RetrievalAugmentationAdvisorFactory}.
  *
  * <p><b>SECURITY (Phase 5 Pitfall #3 preserved):</b> this wrapper only READS the current request's
  * filter state from {@link RunContext} for audit purposes. It does NOT apply any static filter to
@@ -47,7 +48,7 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
     }
 
     @Override
-    public List<Document> retrieve(Query query) {
+    public @NonNull List<Document> retrieve(@NonNull Query query) {
         UUID parentId = RunContext.getRootAuditId();
         UUID runId = RunContext.get();
         String userUsername = safeUsername();
@@ -68,9 +69,9 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
                 Integer topK = RunContext.getRetrievalTopK();
                 String filtersJson = RunContext.getRetrievalFiltersJson();
                 int hitCount = docs == null ? 0 : docs.size();
-                Double topScore = (docs == null || docs.isEmpty()) ? null : safeScore(docs.get(0));
+                Double topScore = (docs == null || docs.isEmpty()) ? null : safeScore(docs.getFirst());
                 String queryText = safeQueryText(query);
-                auditWriter.writeRetrieval(parentId, runId, userUsername, null,
+                auditWriter.writeRetrieval(parentId, runId, userUsername, RunContext.getConversationId(),
                         queryText, topK, hitCount, topScore, filtersJson, latencyMs, outcome, errorClass);
             } catch (Throwable t2) {
                 log.warn("Retrieval audit write failed for parentId={} runId={}", parentId, runId, t2);

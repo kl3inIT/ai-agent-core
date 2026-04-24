@@ -23,6 +23,7 @@ public final class RunContext {
 
     private static final ThreadLocal<UUID> CURRENT = new ThreadLocal<>();
     private static final ThreadLocal<UUID> ROOT_AUDIT_ID = new ThreadLocal<>();
+    private static final ThreadLocal<UUID> CONVERSATION_ID = new ThreadLocal<>();
     private static final ThreadLocal<Integer> RETRIEVAL_TOPK = new ThreadLocal<>();
     private static final ThreadLocal<String> RETRIEVAL_FILTERS_JSON = new ThreadLocal<>();
 
@@ -39,6 +40,12 @@ public final class RunContext {
 
     /** Root audit row id for the in-progress chat turn, or {@code null} outside a run. */
     public static UUID getRootAuditId() { return ROOT_AUDIT_ID.get(); }
+
+    /** Advertise the conversation id for downstream child audit rows. */
+    public static void setConversationId(UUID id) { CONVERSATION_ID.set(id); }
+
+    /** Conversation id for the in-progress chat turn, or {@code null} outside a run. */
+    public static UUID getConversationId() { return CONVERSATION_ID.get(); }
 
     /** Per-run retrieval {@code topK} carrier (populated by RAG advisor for retrieval audit row). */
     public static void setRetrievalTopK(Integer topK) { RETRIEVAL_TOPK.set(topK); }
@@ -61,6 +68,7 @@ public final class RunContext {
     public static void clear() {
         CURRENT.remove();
         ROOT_AUDIT_ID.remove();
+        CONVERSATION_ID.remove();
         RETRIEVAL_TOPK.remove();
         RETRIEVAL_FILTERS_JSON.remove();
     }

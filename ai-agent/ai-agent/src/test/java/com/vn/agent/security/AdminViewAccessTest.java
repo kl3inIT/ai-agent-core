@@ -65,6 +65,7 @@ class AdminViewAccessTest {
         assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();
+        assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.detailDialog")).isTrue();
     }
 
     @Test
