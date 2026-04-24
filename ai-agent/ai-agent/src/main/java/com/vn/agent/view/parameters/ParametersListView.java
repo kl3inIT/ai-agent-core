@@ -7,6 +7,8 @@ import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
@@ -30,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -60,6 +63,8 @@ public class ParametersListView extends StandardListView<AiParameters> {
     private CreateAction<AiParameters> createAction;
     @ViewComponent("parametersDataGrid.editAction")
     private EditAction<AiParameters> editAction;
+    @ViewComponent("parametersDataGrid.removeAction")
+    private io.jmix.flowui.action.list.RemoveAction<AiParameters> removeAction;
 
     @Autowired
     private ParametersService parametersService;
@@ -98,6 +103,21 @@ public class ParametersListView extends StandardListView<AiParameters> {
             AiParametersBody body = parsedBodyFor(row);
             return body == null ? "" : Objects.toString(body.model(), "");
         });
+    }
+
+    @Supply(to = "parametersDataGrid.actions", subject = "renderer")
+    private Renderer<AiParameters> parametersDataGridActionsRenderer() {
+        return DataGridRenderers.buildActionsColumn(
+                uiComponents,
+                EnumSet.of(ActionColumnType.EDIT, ActionColumnType.DELETE),
+                (row, type) -> {
+                    parametersDataGrid.select(row);
+                    switch (type) {
+                        case EDIT -> editAction.execute();
+                        case DELETE -> removeAction.execute();
+                        default -> { }
+                    }
+                });
     }
 
     /** Status column — Vaadin Badge via ComponentRenderer. */

@@ -59,6 +59,7 @@
                 <column property="phase" header="msg:///auditList.column.phase"/>
                 <column key="outcome" header="msg:///auditList.column.outcome"/>
                 <column property="latencyMs" header="msg:///auditList.column.latencyMs"/>
+                <column key="actions" header="msg:///common.column.actions"/>
             </columns>
         </dataGrid>
     </layout>

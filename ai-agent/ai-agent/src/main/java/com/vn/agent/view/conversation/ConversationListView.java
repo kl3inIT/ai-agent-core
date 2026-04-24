@@ -6,8 +6,11 @@ import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiConversation;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
@@ -24,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -68,6 +72,8 @@ public class ConversationListView extends StandardListView<AiConversation> {
     private ViewNavigators viewNavigators;
     @Autowired
     private DataManager dataManager;
+    @Autowired
+    private UiComponents uiComponents;
 
     private boolean isAdmin;
 
@@ -105,6 +111,24 @@ public class ConversationListView extends StandardListView<AiConversation> {
     @Supply(to = "conversationsDataGrid.messageCount", subject = "renderer")
     private Renderer<AiConversation> conversationsDataGridMessageCountRenderer() {
         return new TextRenderer<>(row -> String.valueOf(countMessages(row.getId())));
+    }
+
+    @Supply(to = "conversationsDataGrid.actions", subject = "renderer")
+    private Renderer<AiConversation> conversationsDataGridActionsRenderer() {
+        return DataGridRenderers.buildActionsColumn(
+                uiComponents,
+                EnumSet.of(ActionColumnType.VIEW),
+                this::onRowAction);
+    }
+
+    private void onRowAction(AiConversation row, ActionColumnType type) {
+        switch (type) {
+            case VIEW -> viewNavigators.detailView(this, AiConversation.class)
+                    .withViewClass(ConversationDetailView.class)
+                    .editEntity(row)
+                    .navigate();
+            default -> { }
+        }
     }
 
     @Subscribe("titleFilter")

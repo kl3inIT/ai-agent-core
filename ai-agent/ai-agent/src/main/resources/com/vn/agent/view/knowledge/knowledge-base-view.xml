@@ -42,6 +42,7 @@
                 <column property="mimeType" header="msg:///knowledgeBase.column.mimeType"/>
                 <column key="status" header="msg:///knowledgeBase.column.status"/>
                 <column property="createdDate" header="msg:///knowledgeBase.column.uploadedDate"/>
+                <column key="actions" header="msg:///common.column.actions"/>
             </columns>
         </dataGrid>
         <hbox id="rowActionsBar" spacing="true">

@@ -41,6 +41,7 @@
                 <column key="model" header="msg:///parametersList.column.model"/>
                 <column key="status" header="msg:///parametersList.column.active"/>
                 <column property="createdDate"/>
+                <column key="actions" header="msg:///common.column.actions"/>
             </columns>
         </dataGrid>
     </layout>

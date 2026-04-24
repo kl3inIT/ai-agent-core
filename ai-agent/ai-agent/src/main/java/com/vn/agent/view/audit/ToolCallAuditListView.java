@@ -7,6 +7,8 @@ import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import io.jmix.core.DataManager;
 import io.jmix.core.Messages;
 import io.jmix.flowui.DialogWindows;
@@ -32,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -116,6 +119,19 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
                 dialogWindow.open();
             }
         });
+    }
+
+    @Supply(to = "auditsDataGrid.actions", subject = "renderer")
+    private Renderer<AiToolCallAudit> auditsDataGridActionsRenderer() {
+        return DataGridRenderers.buildActionsColumn(
+                uiComponents,
+                EnumSet.of(ActionColumnType.VIEW),
+                (row, type) -> {
+                    DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
+                            dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
+                    dialogWindow.getView().setAudit(row);
+                    dialogWindow.open();
+                });
     }
 
     /** D-22 Outcome badge renderer. */

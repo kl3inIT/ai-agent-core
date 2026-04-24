@@ -32,6 +32,7 @@
                 <!-- messageCount column renderer wired in ConversationListView.onInit via per-row DataManager count (plan path b). -->
                 <column key="messageCount" header="msg:///conversationList.column.messageCount"/>
                 <column property="createdBy" header="msg:///conversationList.column.user" visible="false"/>
+                <column key="actions" header="msg:///common.column.actions"/>
             </columns>
         </dataGrid>
     </layout>

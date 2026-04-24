@@ -13,6 +13,8 @@ import com.vaadin.flow.server.streams.UploadHandler;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
 import io.jmix.core.Messages;
@@ -42,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -143,6 +146,21 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     @Supply(to = "documentsDataGrid.status", subject = "renderer")
     private Renderer<AiKnowledgeDocument> documentsDataGridStatusRenderer() {
         return new ComponentRenderer<>(this::createStatusBadge, this::updateStatusBadge);
+    }
+
+    @Supply(to = "documentsDataGrid.actions", subject = "renderer")
+    private Renderer<AiKnowledgeDocument> documentsDataGridActionsRenderer() {
+        return DataGridRenderers.buildActionsColumn(
+                uiComponents,
+                EnumSet.of(ActionColumnType.RELOAD, ActionColumnType.DELETE),
+                (row, type) -> {
+                    documentsDataGrid.select(row);
+                    switch (type) {
+                        case RELOAD -> onReingestClick();
+                        case DELETE -> onDeleteClick();
+                        default -> { }
+                    }
+                });
     }
 
     @Subscribe("documentsDataGrid.reingest")
