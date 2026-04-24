@@ -12,20 +12,20 @@ files:
 
 ## Problem
 
-Hiện tại add-on đã lọc schema theo `AccessManager` và chặn query bằng `DataManager`, nhưng LLM chỉ nhìn thấy phần "được phép" qua `list_entities` và các lỗi rời rạc như `access_denied` / `unknown_entity`. Nó chưa có một bức tranh đầy đủ về quyền của user hiện tại để trả lời nhất quán kiểu:
+The add-on already filters the schema through `AccessManager` and blocks data reads through `DataManager`, but the LLM only sees the "allowed" surface through `list_entities` plus isolated errors such as `access_denied` and `unknown_entity`. It does not yet have a complete picture of the current user's permissions, so it cannot answer consistently in cases like:
 
-- "bạn có quyền đọc entity A nhưng không được xem attribute B"
-- "bạn không có quyền với entity này"
-- "filter path này bị cấm vì hop giữa quan hệ không readable"
+- "you can read entity A but not attribute B"
+- "you do not have permission for this entity"
+- "this filter path is denied because an intermediate relationship hop is not readable"
 
-Thiếu permission inventory làm cho UX security phụ thuộc vào việc model tự suy luận từ lỗi tool. Điều đó khiến câu trả lời thiếu ổn định, khó audit, và khó đạt đúng behavior mong muốn khi user hỏi trực tiếp về quyền hiện tại của mình.
+Without a permission inventory, the security UX depends on the model inferring too much from tool errors. That makes answers less stable, harder to audit, and less likely to match the intended behavior when a user directly asks what they are or are not allowed to access.
 
 ## Solution
 
-TBD — hướng triển khai cần làm rõ trong một phase/task riêng:
+TBD — the implementation should be clarified in a dedicated follow-up task or phase:
 
-- thiết kế một permission inventory cho LLM ở mức entity + attribute, tính theo current user trên mỗi request
-- quyết định rõ có lộ denied-entity names cho model hay không; đây là tradeoff trực tiếp với mục tiêu "không có quyền thì coi như không biết entity tồn tại"
-- nếu chấp nhận lộ denied list, thêm tool hoặc baseline context có cấu trúc để model biết allowed/denied surface thay vì suy ra từ lỗi
-- nếu không chấp nhận lộ denied list, vẫn cần inventory nội bộ để map error → user-facing explanation mà không làm model đoán bừa
-- thêm test contract cho các câu trả lời permission-aware để tránh hồi quy khi thay đổi prompt/tool surface
+- design a permission inventory for the LLM at entity and attribute level, computed per request for the current user
+- make an explicit decision about whether denied entity names may be revealed to the model; this is the direct tradeoff against the goal that "if access is denied, the model should behave as if the entity does not exist"
+- if revealing denied names is acceptable, add a structured tool or baseline context so the model learns the allowed/denied surface directly instead of inferring it from errors
+- if revealing denied names is not acceptable, still build an internal inventory so the system can map tool errors to clear user-facing explanations without encouraging guessing
+- add prompt- or integration-level tests for permission-aware responses so the behavior remains stable as the tool surface evolves

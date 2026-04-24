@@ -12,20 +12,20 @@ files:
 
 ## Problem
 
-Khi tool trả về `unknown_entity`, model hiện vẫn có xu hướng tự đoán sang entity khác thay vì quay lại nguồn sự thật (`list_entities`) hoặc hỏi lại user. Về mặt code, `BuiltInDataTools.resolveReadableEntityOrThrow(...)` đã trả lỗi có cấu trúc (`unknown_entity`, `reason = no entity named ...`), nhưng orchestration/prompt hiện chưa ràng buộc hành vi retry của LLM.
+When a tool returns `unknown_entity`, the model still tends to guess a different entity instead of going back to the source of truth (`list_entities`) or asking the user to clarify. At the code level, `BuiltInDataTools.resolveReadableEntityOrThrow(...)` already returns a structured error (`unknown_entity`, `reason = no entity named ...`), but the orchestration/prompt layer does not yet constrain the LLM's retry behavior.
 
-Hệ quả:
+Consequences:
 
-- tool contract không deterministic: cùng một lỗi nhưng model có thể tự suy diễn khác nhau
-- user thấy agent "bịa" entity gần nghĩa thay vì nói rõ không có entity đó
-- sau này nếu muốn phân biệt rõ `unknown_entity` với `access_denied`, hành vi suy đoán tự do sẽ làm security UX khó kiểm soát
+- the tool contract is not deterministic: the same error can lead to different model guesses
+- the user sees the agent invent a nearby entity instead of stating clearly that the entity does not exist
+- if we later want a strict distinction between `unknown_entity` and `access_denied`, unconstrained guessing will make the security UX harder to control
 
 ## Solution
 
-TBD — hướng nên chốt trong một thay đổi riêng:
+TBD — likely to be addressed in a dedicated follow-up change:
 
-- bổ sung contract rõ cho tool-calling: gặp `unknown_entity` thì bắt buộc quay lại `list_entities` đúng một lần, không được tự đoán entity khác
-- nếu `list_entities` không cho ra match rõ ràng thì model phải hỏi lại user hoặc trả lời thẳng là không có entity phù hợp
-- cân nhắc đưa hint hành động tiếp theo vào `ToolErrorDto.expected` cho `unknown_entity`
-- bổ sung system prompt/tool guidance để cấm "semantic guessing" khi tên entity không có trong tool surface hiện tại
-- khoá behavior bằng test integration hoặc prompt-contract test để tránh hồi quy
+- add an explicit tool-calling contract: on `unknown_entity`, the model must go back to `list_entities` exactly once and must not guess a different entity
+- if `list_entities` does not produce a clear match, the model should ask the user to clarify or state that no matching entity exists
+- consider putting the next valid action into `ToolErrorDto.expected` for `unknown_entity`
+- extend the system prompt/tool guidance to forbid semantic guessing when an entity name is not present in the current tool surface
+- lock the behavior with an integration test or prompt-contract test so it does not regress
