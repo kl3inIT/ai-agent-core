@@ -103,6 +103,7 @@ configurations.implementation {
 }
 
 tasks.named('test') {
+    maxHeapSize = '2g'
     useJUnitPlatform {
         // Default test task excludes:
         //  - @Tag("live")   — requires OPENROUTER_API_KEY (see liveTest task)
