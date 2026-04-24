@@ -24,6 +24,7 @@ import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.parameters.Overrides;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.rag.RetrievalFilterBuilder;
+import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
@@ -113,6 +114,7 @@ public class DefaultChatServiceImpl implements ChatService {
     private final AiParametersResolver parametersResolver;
     private final BaselineContextProvider baselineContextProvider;
     private final RetrievalFilterBuilder retrievalFilterBuilder;
+    private final AiAgentRagProperties ragProperties;
     private final CurrentAuthentication currentAuthentication;
     private final RateLimitGuard rateLimitGuard;
     private final TokenBudgetGuard tokenBudgetGuard;
@@ -128,6 +130,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                   AiParametersResolver parametersResolver,
                                   BaselineContextProvider baselineContextProvider,
                                   RetrievalFilterBuilder retrievalFilterBuilder,
+                                  AiAgentRagProperties ragProperties,
                                   CurrentAuthentication currentAuthentication,
                                   RateLimitGuard rateLimitGuard,
                                   TokenBudgetGuard tokenBudgetGuard,
@@ -142,6 +145,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.parametersResolver = parametersResolver;
         this.baselineContextProvider = baselineContextProvider;
         this.retrievalFilterBuilder = retrievalFilterBuilder;
+        this.ragProperties = ragProperties;
         this.currentAuthentication = currentAuthentication;
         this.rateLimitGuard = rateLimitGuard;
         this.tokenBudgetGuard = tokenBudgetGuard;
@@ -205,6 +209,14 @@ public class DefaultChatServiceImpl implements ChatService {
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
             Authentication runtimeAuth = safeGetAuthentication();
             Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
+
+            // 7.2 D-09/D-10: stash retrieval params on RunContext so AuditingDocumentRetriever
+            // can record topK + filtersJson on the RETRIEVAL audit row. Cleared by AuditAdvisor.finally
+            // via RunContext.clear() (and defensively again by this method's outer finally).
+            // null filter overwrite is intentional defense-in-depth against stale ThreadLocal state
+            // on pooled Vaadin request threads (T-07.2-05).
+            RunContext.setRetrievalTopK(ragProperties.resolvedTopK());
+            RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
             ChatClientResponse clientResp = chatClient.prompt()
                     .system(composedSystemPrompt)
@@ -303,6 +315,11 @@ public class DefaultChatServiceImpl implements ChatService {
                                     : "");
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
+
+                    // 7.2 D-09/D-10: stash retrieval params so AuditingDocumentRetriever can
+                    // record topK + filtersJson on the streamed-turn RETRIEVAL audit row.
+                    RunContext.setRetrievalTopK(ragProperties.resolvedTopK());
+                    RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
                     Flux<StreamingEvent> content;
                     try {
