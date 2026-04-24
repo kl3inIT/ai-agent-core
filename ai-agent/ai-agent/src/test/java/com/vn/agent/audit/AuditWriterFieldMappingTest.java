@@ -1,10 +1,12 @@
 package com.vn.agent.audit;
 
 import com.vn.agent.AITestConfiguration;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
-import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.spi.AuditKind;
 import com.vn.agent.test_support.StubChatModelConfiguration;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
 import io.jmix.core.security.SystemAuthenticator;
@@ -14,29 +16,23 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * W14 - Field mapping regression guard. Proves:
+ * Phase 7.2 — Field-mapping regression guard for the tree-lite {@link AiAuditEvent} rewrite. Proves:
  *
  * <ul>
- *   <li>{@link AuditWriter#writeChatPre} and {@link AuditWriter#writeToolCall} persist rows that,
- *       round-tripped through {@link DataManager}, return exactly the values passed in via the
- *       real {@link AiToolCallAudit} getters (runId, kind, phase, userUsername, toolName,
- *       argumentsJson, resultSummary, outcome, latencyMs, startedAt, finishedAt, promptHash,
- *       denialReason, conversation FK).</li>
- *   <li>The entity exposes NO legacy accessor names from the B1 bug — {@code inputJson},
- *       {@code outputJson}, {@code success}, {@code errorMessage}, {@code userId},
- *       {@code createdBy}, {@code createdAt}, or {@code conversationId} as a scalar setter.
- *       Reflective check catches any future re-introduction.</li>
+ *   <li>{@link AuditWriter#writeChatStart} INSERTs the mutable root — {@code outcome},
+ *       {@code eventName}, {@code finishedAt} remain {@code null} until
+ *       {@link AuditWriter#writeChatFinish} closes the run (D-01 invariant).</li>
+ *   <li>{@link AuditWriter#writeChatFinish} then populates {@code outcome}, {@code latencyMs}, and
+ *       {@code finishedAt} in place on the same row id (children-less fetch plan — Pitfall #1).</li>
+ *   <li>{@link AuditWriter#writeToolCall} persists TOOL children with the new signature
+ *       (parentId first, no PHASE literal) and carries {@code argumentsJson}, {@code resultSummary},
+ *       {@code latencyMs}, and {@code denialReason} round-trip.</li>
  * </ul>
  */
 @SpringBootTest(classes = AITestConfiguration.class)
@@ -44,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(StubChatModelConfiguration.class)
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
 class AuditWriterFieldMappingTest {
 
     @Autowired AuditWriter auditWriter;
@@ -53,26 +49,41 @@ class AuditWriterFieldMappingTest {
     @Autowired SystemAuthenticator systemAuthenticator;
 
     @Test
-    void writeChatPre_persists_with_real_field_set_only() {
+    void writeChatStart_thenFinish_persistsMutableRootInvariants() {
         systemAuthenticator.runWithSystem(() -> {
             UUID runId = UUID.randomUUID();
             UUID convId = createTestConversation("user-A");
 
-            UUID auditId = auditWriter.writeChatPre(runId, "user-A", convId, "abc123hash");
-
-            AiToolCallAudit row = dataManager.load(AiToolCallAudit.class).id(auditId).one();
-            assertThat(row.getRunId()).isEqualTo(runId);
-            assertThat(row.getKind()).isEqualTo("CHAT");
-            assertThat(row.getPhase()).isEqualTo("PRE");
-            assertThat(row.getUserUsername()).isEqualTo("user-A");
-            assertThat(row.getToolName()).isEqualTo(AuditWriter.CHAT_TOOL_NAME_SENTINEL);
-            assertThat(row.getOutcome()).isEqualTo(AiToolCallOutcome.SUCCESS);
-            assertThat(row.getStartedAt()).isNotNull();
-            assertThat(row.getPromptHash()).isEqualTo("abc123hash");
-            assertThat(row.getConversation())
+            // --- Phase 1: writeChatStart — start-time invariants (D-01 mutable root) ---
+            UUID auditId = auditWriter.writeChatStart(runId, "user-A", convId, "abc123hash");
+            AiAuditEvent started = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            assertThat(started.getRunId()).isEqualTo(runId);
+            assertThat(started.getKind()).isEqualTo(AuditKind.CHAT);
+            assertThat(started.getEventName()).isNull();                 // no <chat> sentinel
+            assertThat(started.getOutcomeRaw()).isNull();                // outcome null until writeChatFinish
+            assertThat(started.getOutcome()).isNull();
+            assertThat(started.getFinishedAt()).isNull();                // finishedAt null until finish
+            assertThat(started.getParent()).isNull();                    // root has no parent
+            assertThat(started.getStartedAt()).isNotNull();
+            assertThat(started.getUserUsername()).isEqualTo("user-A");
+            assertThat(started.getPromptHash()).isEqualTo("abc123hash");
+            assertThat(started.getConversation())
                     .isNotNull()
                     .extracting("id")
                     .isEqualTo(convId);
+
+            // --- Phase 2: writeChatFinish — UPDATE in place, same id, now populated ---
+            auditWriter.writeChatFinish(auditId, 42L, "SUCCESS", null);
+            AiAuditEvent finished = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            assertThat(finished.getId()).isEqualTo(auditId);              // same row
+            assertThat(finished.getOutcomeRaw()).isEqualTo("SUCCESS");
+            assertThat(finished.getFinishedAt()).isNotNull();
+            assertThat(finished.getLatencyMs()).isEqualTo(42L);
+            assertThat(finished.getErrorClass()).isNull();
+            // Preserved across the UPDATE:
+            assertThat(finished.getKind()).isEqualTo(AuditKind.CHAT);
+            assertThat(finished.getUserUsername()).isEqualTo("user-A");
+            assertThat(finished.getPromptHash()).isEqualTo("abc123hash");
         });
     }
 
@@ -82,23 +93,22 @@ class AuditWriterFieldMappingTest {
             UUID runId = UUID.randomUUID();
             UUID convId = createTestConversation("user-A");
 
-            UUID auditId = auditWriter.writeToolCall(runId, "user-A", convId, "echo",
-                    "{\"in\":1}", "{\"out\":1}", 12L,
-                    AiToolCallOutcome.SUCCESS, null, null, "POST");
+            UUID auditId = auditWriter.writeToolCall(/*parentId*/ null, runId, "user-A", convId,
+                    "echo", "{\"in\":1}", "{\"out\":1}", 12L,
+                    AiToolCallOutcome.SUCCESS, /*denialReason*/ null, /*errorClass*/ null);
 
-            AiToolCallAudit row = dataManager.load(AiToolCallAudit.class).id(auditId).one();
+            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
             assertThat(row.getRunId()).isEqualTo(runId);
-            assertThat(row.getKind()).isEqualTo("TOOL");
-            assertThat(row.getPhase()).isEqualTo("POST");
+            assertThat(row.getKind()).isEqualTo(AuditKind.TOOL);
+            assertThat(row.getEventName()).isEqualTo("echo");             // D-01: tool name goes to eventName
             assertThat(row.getUserUsername()).isEqualTo("user-A");
-            assertThat(row.getToolName()).isEqualTo("echo");
             // Real fields are argumentsJson / resultSummary (NOT the legacy inputJson / outputJson).
             assertThat(row.getArgumentsJson()).contains("\"in\"");
             assertThat(row.getResultSummary()).contains("\"out\"");
             assertThat(row.getOutcome()).isEqualTo(AiToolCallOutcome.SUCCESS);
             assertThat(row.getLatencyMs()).isEqualTo(12L);
             assertThat(row.getStartedAt()).isNotNull();
-            assertThat(row.getFinishedAt()).isNotNull(); // POST sets finishedAt
+            assertThat(row.getFinishedAt()).isNotNull();                 // D-01: children stamped at insert
             assertThat(row.getConversation()).isNotNull().extracting("id").isEqualTo(convId);
         });
     }
@@ -107,35 +117,14 @@ class AuditWriterFieldMappingTest {
     void writeToolCall_with_BLOCKED_outcome_persists_denialReason() {
         systemAuthenticator.runWithSystem(() -> {
             UUID convId = createTestConversation("user-A");
-            UUID auditId = auditWriter.writeToolCall(UUID.randomUUID(), "user-A", convId,
-                    "createOrder", "{}", null, 3L,
-                    AiToolCallOutcome.BLOCKED, "Insufficient role: ADMIN required", null, "POST");
+            UUID auditId = auditWriter.writeToolCall(/*parentId*/ null, UUID.randomUUID(),
+                    "user-A", convId, "createOrder", "{}", null, 3L,
+                    AiToolCallOutcome.BLOCKED, "Insufficient role: ADMIN required", null);
 
-            AiToolCallAudit row = dataManager.load(AiToolCallAudit.class).id(auditId).one();
+            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
             assertThat(row.getOutcome()).isEqualTo(AiToolCallOutcome.BLOCKED);
             assertThat(row.getDenialReason()).isEqualTo("Insufficient role: ADMIN required");
         });
-    }
-
-    @Test
-    void entity_does_not_have_legacy_field_names() {
-        // AiToolCallAudit specifically does NOT extend Auditable — it has its own startedAt/finishedAt
-        // timeline. Any future change introducing these getter/setter names must force a deliberate
-        // code review of AuditWriter (which only sets the real field names).
-        List<String> forbidden = List.of(
-                "getInputJson", "getOutputJson", "getSuccess",
-                "getErrorMessage", "getUserId", "getCreatedBy", "getCreatedAt",
-                "setInputJson", "setOutputJson", "setSuccess",
-                "setErrorMessage", "setUserId", "setCreatedBy", "setCreatedAt",
-                "setConversationId");
-        Set<String> actual = Arrays.stream(AiToolCallAudit.class.getMethods())
-                .map(Method::getName)
-                .collect(Collectors.toSet());
-        for (String f : forbidden) {
-            assertThat(actual)
-                    .as("Legacy field %s must not appear on AiToolCallAudit (B1 regression guard)", f)
-                    .doesNotContain(f);
-        }
     }
 
     private UUID createTestConversation(String owner) {

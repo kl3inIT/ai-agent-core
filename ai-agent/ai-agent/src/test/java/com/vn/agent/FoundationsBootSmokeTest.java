@@ -5,12 +5,13 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiParameters;
-import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.security.AiAgentAdminRole;
 import com.vn.agent.security.AiAgentUserRole;
 import com.vn.agent.security.AiAgentUserRowLevelRole;
+import com.vn.agent.spi.AuditKind;
 import com.vn.agent.spi.AuditListener;
 import com.vn.agent.spi.ContextContributor;
 import com.vn.agent.spi.CustomIngester;
@@ -105,7 +106,8 @@ class FoundationsBootSmokeTest {
     void liquibase_applies_on_hsqldb() {
         assertTableExists("AI_AGENT_CONVERSATION");
         assertTableExists("AI_AGENT_MESSAGE");
-        assertTableExists("AI_AGENT_TOOL_CALL_AUDIT");
+        assertTableExists("AI_AGENT_AUDIT_EVENT");
+        assertTableAbsent("AI_AGENT_TOOL_CALL_AUDIT");
         assertTableExists("AI_AGENT_PARAMETERS");
         assertTableExists("AI_AGENT_KNOWLEDGE_DOCUMENT");
         assertTableExists("SPRING_AI_CHAT_MEMORY");
@@ -149,16 +151,17 @@ class FoundationsBootSmokeTest {
             assertEquals(savedConv.getId(), loadedMsg.getConversation().getId());
             assertEquals("hello", loadedMsg.getContent());
 
-            // --- AiToolCallAudit ---
-            AiToolCallAudit audit = metadata.create(AiToolCallAudit.class);
-            audit.setToolName("sampleTool");
+            // --- AiAuditEvent (tree-lite; Phase 7.2 rewrite of former AiToolCallAudit) ---
+            AiAuditEvent audit = metadata.create(AiAuditEvent.class);
+            audit.setKind(AuditKind.TOOL);
+            audit.setEventName("sampleTool");
             audit.setOutcome(AiToolCallOutcome.SUCCESS);
             audit.setStartedAt(OffsetDateTime.now());
-            AiToolCallAudit savedAudit = dataManager.save(audit);
-            AiToolCallAudit loadedAudit = dataManager.load(AiToolCallAudit.class)
+            AiAuditEvent savedAudit = dataManager.save(audit);
+            AiAuditEvent loadedAudit = dataManager.load(AiAuditEvent.class)
                     .id(savedAudit.getId()).one();
             assertEquals(savedAudit.getId(), loadedAudit.getId());
-            assertEquals("sampleTool", loadedAudit.getToolName());
+            assertEquals("sampleTool", loadedAudit.getEventName());
 
             // --- AiParameters ---
             AiParameters params = metadata.create(AiParameters.class);
@@ -261,7 +264,7 @@ class FoundationsBootSmokeTest {
         assertDoesNotThrow(() -> toolGuard.check("any-tool", Map.of("k", "v")));
 
         // AuditListener: no-op (does not throw).
-        assertDoesNotThrow(() -> auditListener.onToolCallAudited(UUID.randomUUID()));
+        assertDoesNotThrow(() -> auditListener.onEventAudited(UUID.randomUUID(), AuditKind.TOOL));
 
         // CustomIngester: "noop" / "No-op" / empty.
         assertEquals("noop", customIngester.getId());
