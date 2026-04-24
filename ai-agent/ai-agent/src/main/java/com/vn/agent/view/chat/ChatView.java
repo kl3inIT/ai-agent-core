@@ -3,9 +3,6 @@ package com.vn.agent.view.chat;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
-import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.orchestration.ConversationNotFoundException;
 import com.vn.agent.view.chat.fragment.ChatPanelFragment;
@@ -16,12 +13,12 @@ import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardView;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -30,21 +27,25 @@ import java.util.UUID;
 @Route(value = "ai-agent/chat", layout = DefaultMainViewParent.class)
 @ViewController("AiAgent_Chat")
 @ViewDescriptor("chat-view.xml")
-public class ChatView extends StandardView implements BeforeEnterObserver {
+public class ChatView extends StandardView {
 
     @ViewComponent private ChatPanelFragment chatPanelFragment;
     @Autowired private Dialogs dialogs;
     @Autowired private MessageSource messages;
     @Autowired private Notifications notifications;
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        QueryParameters qp = event.getLocation().getQueryParameters();
-        List<String> idValues = qp.getParameters().getOrDefault("conversationId", List.of());
-        if (idValues.isEmpty()) { chatPanelFragment.setConversationId(null); return; }
+    @Subscribe
+    public void onQueryParametersChange(final View.QueryParametersChangeEvent event) {
+        String raw = event.getQueryParameters()
+                .getSingleParameter("conversationId")
+                .orElse(null);
+        if (raw == null) {
+            chatPanelFragment.setConversationId(null);
+            return;
+        }
         UUID id;
         try {
-            id = UUID.fromString(idValues.get(0));
+            id = UUID.fromString(raw);
         } catch (IllegalArgumentException ex) {
             notifyGenericError();
             chatPanelFragment.setConversationId(null);

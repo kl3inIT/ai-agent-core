@@ -1,8 +1,6 @@
 package com.vn.agent.view.parameters;
 
-import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -18,12 +16,13 @@ import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.component.grid.DataGrid;
-import io.jmix.flowui.kit.component.button.JmixButton;
+import io.jmix.flowui.kit.action.ActionPerformedEvent;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Supply;
+import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -46,7 +45,7 @@ import java.util.Locale;
  * tab. D-14: "Set active" button commits immediately (no confirm). D-28 admin-gated.</p>
  *
  * <p>Parsed-body results are cached per-row in a concurrent map keyed by entity id; the cache
- * is cleared on every loader reload via {@code addPostLoadListener}.</p>
+ * is cleared on every loader reload via a {@code PostLoadEvent} handler on {@code parametersDl}.</p>
  */
 @Route(value = "ai-agent/parameters", layout = DefaultMainViewParent.class)
 @ViewController(id = "AiAgent_Parameters.list")
@@ -57,8 +56,6 @@ public class ParametersListView extends StandardListView<AiParameters> {
 
     @ViewComponent
     private DataGrid<AiParameters> parametersDataGrid;
-    @ViewComponent
-    private JmixButton setActiveBtn;
     @ViewComponent
     private CollectionLoader<AiParameters> parametersDl;
     @ViewComponent("parametersDataGrid.createAction")
@@ -82,21 +79,18 @@ public class ParametersListView extends StandardListView<AiParameters> {
 
     @Subscribe
     public void onInit(final InitEvent event) {
-        setActiveBtn.setEnabled(false);
         createAction.setViewClass(ParametersDetailView.class);
         editAction.setViewClass(ParametersDetailView.class);
-
-        // Grid selection → button enabled state: kept raw per the review's carve-out
-        // for dynamic grid selection wiring.
-        parametersDataGrid.addSelectionListener(e ->
-                setActiveBtn.setEnabled(e.getFirstSelectedItem().isPresent()));
 
         // Active-row highlight (left border + tint via Lumo variables; applied via part name).
         parametersDataGrid.setPartNameGenerator(p ->
                 Boolean.TRUE.equals(p.getActive()) ? "ai-agent-active-row" : null);
+    }
 
-        // Invalidate parsed cache on any reload so renderers re-read fresh bodyYaml.
-        parametersDl.addPostLoadListener(e -> parsedCache.clear());
+    /** Invalidate parsed cache on any reload so renderers re-read fresh bodyYaml. */
+    @Subscribe(id = "parametersDl", target = Target.DATA_LOADER)
+    public void onParametersDlPostLoad(final CollectionLoader.PostLoadEvent<AiParameters> event) {
+        parsedCache.clear();
     }
 
     /** Model column — parsed from bodyYaml, NEVER raw blob. */
@@ -131,13 +125,9 @@ public class ParametersListView extends StandardListView<AiParameters> {
         badge.getElement().getThemeList().add(active ? "success" : "contrast");
     }
 
-    @Subscribe("setActiveBtn")
-    public void onSetActiveBtnClick(final ClickEvent<Button> event) {
-        onSetActiveClick();
-    }
-
     /** D-14: immediate commit, no confirm dialog. */
-    private void onSetActiveClick() {
+    @Subscribe("parametersDataGrid.setActive")
+    public void onSetActiveAction(final ActionPerformedEvent event) {
         AiParameters row = parametersDataGrid.getSingleSelectedItem();
         if (row == null) {
             return;

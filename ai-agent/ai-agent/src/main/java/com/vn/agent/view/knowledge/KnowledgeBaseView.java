@@ -43,7 +43,6 @@ import org.springframework.context.event.EventListener;
 
 import java.util.Collections;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -178,22 +177,16 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             return;
         }
         ui.access(() -> {
-            Optional<AiKnowledgeDocument> row = documentsDc.getItems().stream()
-                    .filter(d -> event.documentId().equals(d.getId()))
-                    .findFirst();
-            if (row.isPresent()) {
-                AiKnowledgeDocument doc = row.get();
-                doc.setStatus(event.status());
-                if (event.status() == AiKnowledgeDocumentStatus.FAILED) {
-                    doc.setErrorMessage(event.errorMessage());
-                } else {
-                    doc.setErrorMessage(null);
-                }
-                documentsDc.replaceItem(doc);
-            } else {
+            AiKnowledgeDocument doc = documentsDc.getItemOrNull(event.documentId());
+            if (doc == null) {
                 // Row not currently loaded (new upload from another tab) — trigger reload.
                 documentsDl.load();
+                return;
             }
+            doc.setStatus(event.status());
+            doc.setErrorMessage(event.status() == AiKnowledgeDocumentStatus.FAILED
+                    ? event.errorMessage() : null);
+            documentsDc.replaceItem(doc);
         });
     }
 
@@ -247,10 +240,10 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             return;
         }
         pendingSelectionDocumentId = null;
-        documentsDc.getItems().stream()
-                .filter(d -> documentId.equals(d.getId()))
-                .findFirst()
-                .ifPresent(documentsDataGrid::select);
+        AiKnowledgeDocument doc = documentsDc.getItemOrNull(documentId);
+        if (doc != null) {
+            documentsDataGrid.select(doc);
+        }
     }
 
     private static String statusTheme(AiKnowledgeDocumentStatus status) {

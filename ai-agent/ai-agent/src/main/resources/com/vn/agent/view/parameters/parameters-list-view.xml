@@ -21,7 +21,7 @@
             <button id="editBtn" action="parametersDataGrid.editAction"/>
             <button id="removeBtn" action="parametersDataGrid.removeAction"/>
             <button id="setActiveBtn"
-                    text="msg:///parametersList.action.setActive"
+                    action="parametersDataGrid.setActive"
                     themeNames="primary success"/>
         </hbox>
         <dataGrid id="parametersDataGrid"
@@ -32,6 +32,9 @@
                 <action id="createAction" type="list_create"/>
                 <action id="editAction" type="list_edit"/>
                 <action id="removeAction" type="list_remove"/>
+                <action id="setActive"
+                        type="list_itemTracking"
+                        text="msg:///parametersList.action.setActive"/>
             </actions>
             <columns resizable="true">
                 <column property="profileName" header="msg:///parametersList.column.name"/>
