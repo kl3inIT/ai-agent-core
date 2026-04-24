@@ -98,10 +98,11 @@ public class GuardedToolCallingManager implements ToolCallingManager {
         if (next > cap) {
             final String username = resolveUsername();
             safeAudit(() -> auditWriter.writeToolCall(
+                    RunContext.getRootAuditId(),
                     RunContext.get(), username, /* conversationId */ null,
                     CHAT_SENTINEL_TOOL_NAME, /* argumentsJson */ null, /* resultSummary */ null,
                     0L, AiToolCallOutcome.BLOCKED, "iteration-cap-exceeded",
-                    /* errorClass */ null, "REQUEST"));
+                    /* errorClass */ null));
             throw new IterationCapExceededException(cap);
         }
 
@@ -119,10 +120,11 @@ public class GuardedToolCallingManager implements ToolCallingManager {
                 final String denialReason = "tool-vetoed:"
                         + (veto.getMessage() == null ? "" : veto.getMessage());
                 safeAudit(() -> auditWriter.writeToolCall(
+                        RunContext.getRootAuditId(),
                         RunContext.get(), username, /* conversationId */ null,
                         toolName, argumentsJson, /* resultSummary */ null, 0L,
                         AiToolCallOutcome.BLOCKED, denialReason,
-                        /* errorClass */ null, "PRE"));
+                        /* errorClass */ null));
                 throw veto;
             }
         }

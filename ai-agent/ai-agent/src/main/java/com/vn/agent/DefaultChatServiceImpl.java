@@ -490,10 +490,10 @@ public class DefaultChatServiceImpl implements ChatService {
      */
     private void auditDenial(UUID runId, String userUsername, UUID convId, String denialKey) {
         try {
-            auditWriter.writeToolCall(runId, userUsername, convId,
+            auditWriter.writeToolCall(RunContext.getRootAuditId(), runId, userUsername, convId,
                     GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME,
                     /* argumentsJson */ null, /* resultSummary */ null, 0L,
-                    AiToolCallOutcome.BLOCKED, denialKey, /* errorClass */ null, "REQUEST");
+                    AiToolCallOutcome.BLOCKED, denialKey, /* errorClass */ null);
         } catch (Throwable t) {
             log.warn("Denial audit failed runId={} key={}", runId, denialKey, t);
         }
@@ -506,11 +506,11 @@ public class DefaultChatServiceImpl implements ChatService {
      */
     private void auditFlagged(UUID runId, String userUsername, UUID convId, String patternKey) {
         try {
-            auditWriter.writeToolCall(runId, userUsername, convId,
+            auditWriter.writeToolCall(RunContext.getRootAuditId(), runId, userUsername, convId,
                     GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME,
                     /* argumentsJson */ null, /* resultSummary */ null, 0L,
                     AiToolCallOutcome.FLAGGED, "flagged:" + patternKey,
-                    /* errorClass */ null, "POST");
+                    /* errorClass */ null);
         } catch (Throwable t) {
             log.warn("Flagged audit failed runId={} key={}", runId, patternKey, t);
         }
