@@ -13,7 +13,7 @@ import io.jmix.flowui.DialogWindows;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.component.combobox.JmixComboBox;
 import io.jmix.flowui.component.datetimepicker.TypedDateTimePicker;
-import io.jmix.flowui.component.grid.DataGrid;
+import io.jmix.flowui.component.grid.TreeDataGrid;
 import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DialogWindow;
@@ -37,28 +37,30 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * UI-06. Admin-only list view over {@link AiAuditEvent} rows.
+ * UI-06 / D-11. Admin-only tree list view over {@link AiAuditEvent} rows.
  *
- * <p>Phase 07.2 Plan 02 migration: swapped underlying entity from the deleted
- * {@code AiToolCallAudit} to the tree-lite {@link AiAuditEvent}. The tool-name filter
- * now filters by {@code eventName}, and the legacy {@code phase} column is gone —
- * {@code kind} (CHAT / TOOL / RETRIEVAL) replaces it. Full redesign (tree rendering
- * etc.) is tracked under Plan 04.</p>
+ * <p>Phase 07.2 Plan 04 full redesign: renders one expandable row per root CHAT
+ * event; expand reveals TOOL + RETRIEVAL children via Jmix {@code @Composition}
+ * fetch plan (no client-side grouping). Base query is root-only
+ * ({@code e.parent is null}); children come from the hierarchical fetch plan
+ * declared in the XML descriptor.</p>
+ *
+ * <p>URL {@code /ai-agent/audit} preserved — stakeholder-facing.</p>
  */
 @Route(value = "ai-agent/audit", layout = DefaultMainViewParent.class)
-@ViewController(id = "AiAgent_ToolCallAudit.list")
-@ViewDescriptor(path = "tool-call-audit-list-view.xml")
-public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
+@ViewController(id = "AiAgent_AiAuditEvent.list")
+@ViewDescriptor(path = "ai-audit-event-list-view.xml")
+public class AiAuditEventListView extends StandardListView<AiAuditEvent> {
 
-    private static final Logger log = LoggerFactory.getLogger(ToolCallAuditListView.class);
+    private static final Logger log = LoggerFactory.getLogger(AiAuditEventListView.class);
 
     private static final String BASE_QUERY =
-            "select e from ai_AiAuditEvent e";
+            "select e from ai_AiAuditEvent e where e.parent is null";
     private static final String BASE_ORDER =
             " order by e.startedAt desc";
 
     @ViewComponent
-    private DataGrid<AiAuditEvent> auditsDataGrid;
+    private TreeDataGrid<AiAuditEvent> auditsDataGrid;
     @ViewComponent
     private CollectionLoader<AiAuditEvent> auditsDl;
     @ViewComponent
@@ -108,8 +110,8 @@ public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
     }
 
     private void openDetailDialog(AiAuditEvent row) {
-        DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
-                dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
+        DialogWindow<AiAuditEventDetailDialog> dialogWindow =
+                dialogWindows.view(this, AiAuditEventDetailDialog.class).build();
         dialogWindow.getView().setAudit(row);
         dialogWindow.open();
     }
@@ -122,7 +124,7 @@ public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
                 row -> messages.getMessage("auditList.outcome."
                         + (row.getOutcome() == null ? "success"
                                 : row.getOutcome().name().toLowerCase(Locale.ROOT))),
-                row -> ToolCallAuditDetailDialog.outcomeTheme(row.getOutcome()));
+                row -> AiAuditEventDetailDialog.outcomeTheme(row.getOutcome()));
     }
 
     @Subscribe("userFilter")
@@ -194,7 +196,7 @@ public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
         }
 
         if (!where.isEmpty()) {
-            jpql.append(" where ").append(String.join(" and ", where));
+            jpql.append(" and ").append(String.join(" and ", where));
         }
         jpql.append(BASE_ORDER);
 
@@ -228,7 +230,7 @@ public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
     }
 
     /** Convenience for tests: expose the composed dialog type. */
-    static Class<ToolCallAuditDetailDialog> detailDialogType() {
-        return ToolCallAuditDetailDialog.class;
+    static Class<AiAuditEventDetailDialog> detailDialogType() {
+        return AiAuditEventDetailDialog.class;
     }
 }

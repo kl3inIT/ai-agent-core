@@ -4,10 +4,12 @@
       focusComponent="auditsDataGrid">
     <data>
         <collection id="auditsDc" class="com.vn.agent.entity.AiAuditEvent">
-            <fetchPlan extends="_base"/>
+            <fetchPlan extends="_base">
+                <property name="children" fetchPlan="_base"/>
+            </fetchPlan>
             <loader id="auditsDl" readOnly="true">
                 <query>
-                    <![CDATA[select e from ai_AiAuditEvent e order by e.startedAt desc]]>
+                    <![CDATA[select e from ai_AiAuditEvent e where e.parent is null order by e.startedAt desc]]>
                 </query>
             </loader>
         </collection>
@@ -21,7 +23,7 @@
                        placeholder="msg:///auditList.filter.user"
                        clearButtonVisible="true"/>
             <comboBox id="toolFilter"
-                      placeholder="msg:///auditList.filter.tool"
+                      placeholder="msg:///auditList.filter.eventName"
                       clearButtonVisible="true"/>
             <comboBox id="outcomeFilter"
                       placeholder="msg:///auditList.filter.outcome"
@@ -43,11 +45,12 @@
                     text="msg:///auditList.action.exportJson"
                     action="auditsDataGrid.jsonExport"/>
         </hbox>
-        <dataGrid id="auditsDataGrid"
-                  dataContainer="auditsDc"
-                  width="100%"
-                  minHeight="20em"
-                  themeNames="compact">
+        <treeDataGrid id="auditsDataGrid"
+                      dataContainer="auditsDc"
+                      hierarchyProperty="children"
+                      width="100%"
+                      minHeight="20em"
+                      themeNames="compact">
             <actions>
                 <action id="excelExport" type="grdexp_excelExport"/>
                 <action id="jsonExport" type="grdexp_jsonExport"/>
@@ -61,6 +64,6 @@
                 <column property="latencyMs" header="msg:///auditList.column.latencyMs"/>
                 <column key="actions" header="msg:///common.column.actions"/>
             </columns>
-        </dataGrid>
+        </treeDataGrid>
     </layout>
 </view>
