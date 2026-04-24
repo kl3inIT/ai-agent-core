@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-04-24T16:17:49.052Z"
+status: "Phase 07.2 complete (5/5 plans, test-green, verification PASS 26/26 must-haves)"
+last_updated: "2026-04-24T18:00:00.000Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 58
-  completed_plans: 50
-  percent: 86
+  completed_plans: 55
+  percent: 95
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 07.1 — adopt-vaadin-messagelist-messageinput-for-chat-view
+**Current focus:** Phase 08 — Integration Hardening & Release Readiness (7.1 awaiting UAT; 7.2 complete)
 
 ## Phase Status
 
@@ -36,7 +36,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
-| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | Not planned yet — urgent refactor to replace custom chat component tree with stock Vaadin messages API per `jmix-ai-backend` reference |
+| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (awaiting human UAT on Plan 07.1-07) |
+| 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
 ## Active Milestone
