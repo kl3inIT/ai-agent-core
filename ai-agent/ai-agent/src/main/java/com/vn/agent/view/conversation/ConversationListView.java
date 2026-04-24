@@ -3,23 +3,24 @@ package com.vn.agent.view.conversation;
 import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
-import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
+import io.jmix.core.entity.KeyValueEntity;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
-import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.component.grid.DataGrid;
+import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Supply;
+import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -27,8 +28,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -37,18 +42,10 @@ import java.util.UUID;
  * <p>Non-admin users see only conversations where {@code createdBy = currentUser}; admins
  * see every conversation plus an additional "User" column + user filter field.</p>
  *
- * <p>Messages count column is computed per-row via {@link DataManager} count query —
- * path (b) fallback from the plan (per-row N queries accepted for v1; typical
- * non-admin result sets are small because row-level security already narrows to
- * the current user). Admin pages with many conversations may warrant moving to
- * a {@code KeyValueCollectionLoader} JPQL projection in a future optimization
- * pass. See 07-04 SUMMARY for the trade-off.</p>
- *
- * <p>Row-level security (Jmix {@code AiAgentUserRowLevelRole}) remains the source of
- * truth for ownership. The {@link #isAdmin} flag only decides which UI affordances
- * show up (extra column, extra filter). A non-admin who spoofs {@code isAdmin=true}
- * client-side still gets only their rows because DataManager applies the row-level
- * predicate server-side (T-07-12).</p>
+ * <p>Messages count column is computed once per page via a single grouped JPQL query on
+ * {@code PostLoadEvent} — no per-row N+1. Row-level security (Jmix
+ * {@code AiAgentUserRowLevelRole}) remains the source of truth for ownership; the
+ * {@link #isAdmin} flag only controls UI affordances (extra column, extra filter).</p>
  */
 @Route(value = "ai-agent/conversations", layout = DefaultMainViewParent.class)
 @ViewController("AiAgent_Conversation.list")
@@ -77,40 +74,53 @@ public class ConversationListView extends StandardListView<AiConversation> {
 
     private boolean isAdmin;
 
+    /** Per-page message counts keyed by conversation id. Refreshed on every loader reload. */
+    private final Map<UUID, Long> messageCounts = new HashMap<>();
+
     @Subscribe
     public void onInit(final InitEvent event) {
         this.isAdmin = currentUserIsAdmin();
 
-        // Admin-visible affordances.
         userFilter.setVisible(isAdmin);
         conversationsDataGrid.getColumnByKey("createdBy").setVisible(isAdmin);
 
-        // Filter bar — debounce user input via LAZY, reload on every change. The
-        // reload wiring itself is declarative via @Subscribe("<fieldId>") handlers below.
-        titleFilter.setValueChangeMode(ValueChangeMode.LAZY);
-        userFilter.setValueChangeMode(ValueChangeMode.LAZY);
-
-        // Double-click a row → open detail view. Retained as a raw listener because
-        // ItemDoubleClickEvent carries per-row context (the item) that the handler
-        // needs synchronously for navigation — this is the kind of dynamic grid
-        // wiring the review carves out as acceptable.
         conversationsDataGrid.addItemDoubleClickListener(e -> {
-            AiConversation row = e.getItem();
-            if (row != null) {
-                viewNavigators.detailView(this, AiConversation.class)
-                        .withViewClass(ConversationDetailView.class)
-                        .editEntity(row)
-                        .navigate();
+            if (e.getItem() != null) {
+                onRowAction(e.getItem(), ActionColumnType.VIEW);
             }
         });
 
         rebuildQuery();
     }
 
-    /** Messages count column — per-row DataManager count. Small result sets per user. */
+    /** Batch-load message counts for the current page in a single query. */
+    @Subscribe(id = "conversationsDl", target = Target.DATA_LOADER)
+    public void onConversationsDlPostLoad(final CollectionLoader.PostLoadEvent<AiConversation> event) {
+        messageCounts.clear();
+        List<AiConversation> items = event.getLoadedEntities();
+        if (items.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = items.stream().map(AiConversation::getId).toList();
+        try {
+            List<KeyValueEntity> rows = dataManager.loadValues(
+                            "select m.conversation.id, count(m) from ai_AiMessage m "
+                                    + "where m.conversation.id in :ids group by m.conversation.id")
+                    .properties("cid", "cnt")
+                    .parameter("ids", ids)
+                    .list();
+            for (KeyValueEntity row : rows) {
+                messageCounts.put(row.getValue("cid"), row.getValue("cnt"));
+            }
+        } catch (Exception ex) {
+            log.warn("messageCount batch lookup failed for {} conversations", ids.size(), ex);
+        }
+    }
+
     @Supply(to = "conversationsDataGrid.messageCount", subject = "renderer")
     private Renderer<AiConversation> conversationsDataGridMessageCountRenderer() {
-        return new TextRenderer<>(row -> String.valueOf(countMessages(row.getId())));
+        return new TextRenderer<>(row ->
+                String.valueOf(messageCounts.getOrDefault(row.getId(), 0L)));
     }
 
     @Supply(to = "conversationsDataGrid.actions", subject = "renderer")
@@ -144,13 +154,9 @@ public class ConversationListView extends StandardListView<AiConversation> {
     }
 
     /**
-     * Admin probe helper — extracted so the 07-07 {@code ConversationListRoleFilterTest}
-     * can stub via reflection or a Spring slice. Package-private to permit test overrides.
-     *
-     * <p>Uses Jmix {@link AccessManager} + {@link UiShowViewContext} to probe an
-     * admin-only view id (AI Agent ToolCallAudit list). This is the same plumbing
-     * Vaadin navigation walks at runtime, so role drift or renamed roles cannot
-     * produce a false positive — unlike string-matching authority codes.</p>
+     * Admin probe helper — package-private so 07-07 {@code ConversationListRoleFilterTest}
+     * can stub via reflection or a Spring slice. Uses Jmix {@link AccessManager} +
+     * {@link UiShowViewContext} to probe an admin-only view id.
      */
     boolean currentUserIsAdmin() {
         try {
@@ -169,50 +175,41 @@ public class ConversationListView extends StandardListView<AiConversation> {
      * is an admin-only substring match on {@code createdBy}.
      */
     private void rebuildQuery() {
-        StringBuilder jpql = new StringBuilder("select e from ai_AiConversation e");
-        boolean hasWhere = false;
+        String title = normalized(titleFilter.getValue());
+        String userSub = isAdmin ? normalized(userFilter.getValue()) : null;
 
-        String title = titleFilter.getValue();
-        if (title != null && !title.isBlank()) {
-            jpql.append(" where lower(e.title) like :title");
-            hasWhere = true;
+        StringBuilder jpql = new StringBuilder("select e from ai_AiConversation e");
+        List<String> where = new ArrayList<>(2);
+        if (title != null) {
+            where.add("lower(e.title) like :title");
         }
-        String userSub = isAdmin ? userFilter.getValue() : null;
-        if (userSub != null && !userSub.isBlank()) {
-            jpql.append(hasWhere ? " and" : " where");
-            jpql.append(" lower(e.createdBy) like :userSub");
+        if (userSub != null) {
+            where.add("lower(e.createdBy) like :userSub");
+        }
+        if (!where.isEmpty()) {
+            jpql.append(" where ").append(String.join(" and ", where));
         }
         jpql.append(" order by e.createdDate desc");
 
         conversationsDl.setQuery(jpql.toString());
-        if (title != null && !title.isBlank()) {
-            conversationsDl.setParameter("title", "%" + title.toLowerCase(Locale.ROOT) + "%");
-        } else {
-            conversationsDl.removeParameter("title");
-        }
-        if (userSub != null && !userSub.isBlank()) {
-            conversationsDl.setParameter("userSub", "%" + userSub.toLowerCase(Locale.ROOT) + "%");
-        } else {
-            conversationsDl.removeParameter("userSub");
-        }
+        applyLikeParam("title", title);
+        applyLikeParam("userSub", userSub);
         conversationsDl.load();
     }
 
-    /** Per-row message count. Returns 0 on any failure so the grid renders cleanly. */
-    private long countMessages(UUID conversationId) {
-        if (conversationId == null) {
-            return 0L;
-        }
-        try {
-            Long n = dataManager.loadValue(
-                            "select count(m) from ai_AiMessage m where m.conversation.id = :cid",
-                            Long.class)
-                    .parameter("cid", conversationId)
-                    .one();
-            return n == null ? 0L : n;
-        } catch (Exception ex) {
-            log.debug("messageCount lookup failed for {}: {}", conversationId, ex.getMessage());
-            return 0L;
+    private void applyLikeParam(String name, String normalized) {
+        if (normalized == null) {
+            conversationsDl.removeParameter(name);
+        } else {
+            conversationsDl.setParameter(name, "%" + normalized + "%");
         }
     }
+
+    private static String normalized(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.toLowerCase(Locale.ROOT);
+    }
+
 }

@@ -1,22 +1,22 @@
 package com.vn.agent.view.parameters;
 
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiParameters;
-import com.vn.agent.utils.DataGridRenderers;
-import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
+import com.vn.agent.utils.NotificationUtils;
 import io.jmix.core.Messages;
-import io.jmix.flowui.action.list.CreateAction;
-import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
+import io.jmix.flowui.action.list.CreateAction;
+import io.jmix.flowui.action.list.EditAction;
+import io.jmix.flowui.action.list.RemoveAction;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.kit.action.ActionPerformedEvent;
 import io.jmix.flowui.model.CollectionLoader;
@@ -33,10 +33,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * UI-04 Parameters list (admin-only via {@code AiAgentAdminRole @ViewPolicy} in 07-01).
@@ -64,7 +64,7 @@ public class ParametersListView extends StandardListView<AiParameters> {
     @ViewComponent("parametersDataGrid.editAction")
     private EditAction<AiParameters> editAction;
     @ViewComponent("parametersDataGrid.removeAction")
-    private io.jmix.flowui.action.list.RemoveAction<AiParameters> removeAction;
+    private RemoveAction<AiParameters> removeAction;
 
     @Autowired
     private ParametersService parametersService;
@@ -77,8 +77,9 @@ public class ParametersListView extends StandardListView<AiParameters> {
     @Autowired
     private UiComponents uiComponents;
 
-    /** Per-view cache: parse YAML once per row render pass; invalidated on reload. */
-    private final Map<UUID, AiParametersBody> parsedCache = new ConcurrentHashMap<>();
+    /** Per-view cache: parse YAML once per row render pass; invalidated on reload. Grid
+     * renderers run on the UI thread per {@code UI.access}, so a plain HashMap is safe. */
+    private final Map<UUID, AiParametersBody> parsedCache = new HashMap<>();
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -110,36 +111,27 @@ public class ParametersListView extends StandardListView<AiParameters> {
         return DataGridRenderers.buildActionsColumn(
                 uiComponents,
                 EnumSet.of(ActionColumnType.EDIT, ActionColumnType.DELETE),
-                (row, type) -> {
-                    parametersDataGrid.select(row);
-                    switch (type) {
-                        case EDIT -> editAction.execute();
-                        case DELETE -> removeAction.execute();
-                        default -> { }
-                    }
-                });
+                this::onRowAction);
     }
 
-    /** Status column — Vaadin Badge via ComponentRenderer. */
+    private void onRowAction(AiParameters row, ActionColumnType type) {
+        parametersDataGrid.select(row);
+        switch (type) {
+            case EDIT -> editAction.execute();
+            case DELETE -> removeAction.execute();
+            default -> { }
+        }
+    }
+
+    /** Status column — Vaadin Badge. */
     @Supply(to = "parametersDataGrid.status", subject = "renderer")
     private Renderer<AiParameters> parametersDataGridStatusRenderer() {
-        return new ComponentRenderer<>(this::createStatusBadge, this::updateStatusBadge);
-    }
-
-    private Span createStatusBadge() {
-        Span badge = uiComponents.create(Span.class);
-        badge.getElement().getThemeList().add("badge");
-        return badge;
-    }
-
-    private void updateStatusBadge(Span badge, AiParameters row) {
-        boolean active = Boolean.TRUE.equals(row.getActive());
-        String key = active ? "parametersList.badge.active" : "parametersList.column.active";
-        badge.setText(messages.getMessage(key));
-        // Reset theme list — ComponentRenderer reuses the Span across rows.
-        badge.getElement().getThemeList().clear();
-        badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add(active ? "success" : "contrast");
+        return DataGridRenderers.buildBadgeColumn(
+                uiComponents,
+                row -> messages.getMessage(Boolean.TRUE.equals(row.getActive())
+                        ? "parametersList.badge.active"
+                        : "parametersList.column.active"),
+                row -> Boolean.TRUE.equals(row.getActive()) ? "success" : "contrast");
     }
 
     /** D-14: immediate commit, no confirm dialog. */
@@ -158,9 +150,8 @@ public class ParametersListView extends StandardListView<AiParameters> {
                     .show();
         } catch (Exception ex) {
             log.warn("setActive failed for profile {}", row.getId(), ex);
-            notifications.create(buildErrorMessage("parametersList.error.setActive", ex))
-                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
-                    .show();
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "parametersList.error.setActive", ex);
         }
     }
 
@@ -178,15 +169,6 @@ public class ParametersListView extends StandardListView<AiParameters> {
                 return null;
             }
         });
-    }
-
-    private String buildErrorMessage(String key, Exception ex) {
-        String message = messages.getMessage(key);
-        String detail = ex.getMessage();
-        if (detail == null || detail.isBlank()) {
-            return message;
-        }
-        return message + " " + detail;
     }
 
 }

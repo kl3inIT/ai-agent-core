@@ -1,8 +1,6 @@
 package com.vn.agent.view.audit;
 
 import com.vaadin.flow.component.AbstractField;
-import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiToolCallAudit;
@@ -111,12 +109,8 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         // D-21 Row-click opens detail dialog. Retained as a raw listener because the
         // ItemClickEvent carries the per-row entity the dialog needs.
         auditsDataGrid.addItemClickListener(e -> {
-            AiToolCallAudit row = e.getItem();
-            if (row != null) {
-                DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
-                        dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
-                dialogWindow.getView().setAudit(row);
-                dialogWindow.open();
+            if (e.getItem() != null) {
+                openDetailDialog(e.getItem());
             }
         });
     }
@@ -126,38 +120,25 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         return DataGridRenderers.buildActionsColumn(
                 uiComponents,
                 EnumSet.of(ActionColumnType.VIEW),
-                (row, type) -> {
-                    DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
-                            dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
-                    dialogWindow.getView().setAudit(row);
-                    dialogWindow.open();
-                });
+                (row, type) -> openDetailDialog(row));
+    }
+
+    private void openDetailDialog(AiToolCallAudit row) {
+        DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
+                dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
+        dialogWindow.getView().setAudit(row);
+        dialogWindow.open();
     }
 
     /** D-22 Outcome badge renderer. */
     @Supply(to = "auditsDataGrid.outcome", subject = "renderer")
     private Renderer<AiToolCallAudit> auditsDataGridOutcomeRenderer() {
-        return new ComponentRenderer<>(this::createOutcomeBadge, this::updateOutcomeBadge);
-    }
-
-    private Span createOutcomeBadge() {
-        Span badge = uiComponents.create(Span.class);
-        badge.getElement().getThemeList().add("badge");
-        return badge;
-    }
-
-    private void updateOutcomeBadge(Span badge, AiToolCallAudit row) {
-        AiToolCallOutcome outcome = row.getOutcome();
-        String key = "auditList.outcome." + (outcome == null ? "success" : outcome.name().toLowerCase(Locale.ROOT));
-        badge.setText(messages.getMessage(key));
-        // Reset theme list — ComponentRenderer reuses the Span across rows.
-        badge.getElement().getThemeList().clear();
-        badge.getElement().getThemeList().add("badge");
-        for (String variant : ToolCallAuditDetailDialog.outcomeTheme(outcome).split(" ")) {
-            if (!variant.isBlank()) {
-                badge.getElement().getThemeList().add(variant);
-            }
-        }
+        return DataGridRenderers.buildBadgeColumn(
+                uiComponents,
+                row -> messages.getMessage("auditList.outcome."
+                        + (row.getOutcome() == null ? "success"
+                                : row.getOutcome().name().toLowerCase(Locale.ROOT))),
+                row -> ToolCallAuditDetailDialog.outcomeTheme(row.getOutcome()));
     }
 
     @Subscribe("userFilter")
