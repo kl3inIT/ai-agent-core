@@ -1,10 +1,8 @@
 package com.vn.agent.view.knowledge;
 
 import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -22,8 +20,8 @@ import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.component.upload.JmixUpload;
+import io.jmix.flowui.kit.action.ActionPerformedEvent;
 import io.jmix.flowui.kit.action.ActionVariant;
-import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.upload.TemporaryStorage;
@@ -88,10 +86,6 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     private CollectionLoader<AiKnowledgeDocument> documentsDl;
     @ViewComponent
     private CollectionContainer<AiKnowledgeDocument> documentsDc;
-    @ViewComponent
-    private JmixButton reingestBtn;
-    @ViewComponent
-    private JmixButton deleteBtn;
 
     @Autowired
     private KnowledgeDocumentUploadService uploadService;
@@ -114,18 +108,6 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     @Subscribe
     public void onInit(final InitEvent event) {
-        reingestBtn.setEnabled(false);
-        deleteBtn.setEnabled(false);
-        // Selection → action-button enabled state: kept raw because this is the
-        // "dynamic grid selection → button enabled" carve-out allowed by the review.
-        documentsDataGrid.addSelectionListener(e -> {
-            boolean selected = e.getFirstSelectedItem().isPresent();
-            reingestBtn.setEnabled(selected);
-            deleteBtn.setEnabled(selected);
-        });
-
-        // Upload wiring keeps files inside Jmix temporary storage while using
-        // Vaadin's current UploadHandler API instead of deprecated receiver access.
         documentsDl.addPostLoadListener(e -> selectPendingDocumentIfNeeded());
         configureUploadHandling();
     }
@@ -135,13 +117,13 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         return new ComponentRenderer<>(this::createStatusBadge, this::updateStatusBadge);
     }
 
-    @Subscribe("reingestBtn")
-    public void onReingestButtonClick(final ClickEvent<Button> event) {
+    @Subscribe("documentsDataGrid.reingest")
+    public void onReingestAction(final ActionPerformedEvent event) {
         onReingestClick();
     }
 
-    @Subscribe("deleteBtn")
-    public void onDeleteButtonClick(final ClickEvent<Button> event) {
+    @Subscribe("documentsDataGrid.delete")
+    public void onDeleteAction(final ActionPerformedEvent event) {
         onDeleteClick();
     }
 
