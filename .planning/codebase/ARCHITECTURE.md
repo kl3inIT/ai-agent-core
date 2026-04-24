@@ -1,202 +1,262 @@
 # Architecture
 
-**Analysis Date:** 2026-04-18
+**Analysis Date:** 2026-04-24
 
 ## Pattern Overview
 
-**Overall:** Jmix 2.8 modular layered architecture (Spring Boot 3 + Vaadin Flow) split into a host application and a reusable add-on, wired together through a Gradle composite build.
+**Overall:** Composite Gradle workspace containing a reusable Jmix add-on, a Spring Boot auto-configuration starter, and a host Jmix sample application.
 
 **Key Characteristics:**
-- Multi-project composite Gradle build: root `ai-agent-core` aggregates two included builds — `jmix-app` (runnable application) and `ai-agent` (Jmix add-on with starter module).
-- Jmix module pattern: each logical unit is a Spring `@Configuration` annotated with `@JmixModule(dependsOn = ...)` that contributes view controllers, actions, messages, and menu entries.
-- Classic Jmix layering inside the host app: `entity` (JPA domain), `security` (role interfaces + Spring Security config + user repository), `view` (Vaadin Flow UI with XML descriptors + Java controllers), application bootstrap class at package root.
-- Spring Boot auto-configuration glue: the add-on exposes `AIAutoConfiguration` via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` so depending on `ai-agent-starter` automatically imports `AIConfiguration`.
-- Declarative UI: Vaadin views are defined as XML descriptors loaded by Jmix FlowUI controllers; data binding and actions are wired via XML (`<data>`, `<collection>`, `<loader>`, `<action>`).
-- Schema-as-code: Liquibase changelogs under `src/main/resources/com/vn/jmixapp/liquibase/` are executed automatically on startup via the `main.liquibase.change-log` property.
+- Use `settings.gradle` at the repository root to compose `ai-agent/` and `jmix-app/` through Gradle `includeBuild` boundaries.
+- Keep reusable AI/Jmix behavior in `ai-agent/ai-agent/src/main/java/com/vn/agent`; keep auto-configuration glue in `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent`.
+- Treat `jmix-app/src/main/java/com/vn/jmixapp` as a host application and integration sample that consumes `com.vn:ai-agent-starter`.
+- Let Jmix security, metadata, `DataManager`, row-level roles, and FetchPlans remain the governing substrate for AI tool access.
+- Place Flow UI layouts in XML resources and keep Java controllers focused on orchestration and event handling.
 
 ## Layers
 
-**Bootstrap / Application Layer:**
-- Purpose: Boot the Spring context, configure the Vaadin shell (theme, PWA, push), expose the primary `DataSource` bean.
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/`
-- Contains: `JmixAppApplication` (the `@SpringBootApplication` entry point implementing `AppShellConfigurator`).
-- Depends on: `ai-agent-starter` (add-on), Jmix core/data/security/flowui starters, HSQLDB at runtime.
-- Used by: Spring Boot runtime (`./gradlew bootRun`).
+**Composite Workspace Layer:**
+- Purpose: Aggregates independently buildable Gradle projects without merging their module graphs.
+- Location: `settings.gradle`
+- Contains: Root composite wiring via `includeBuild 'jmix-app'` and `includeBuild 'ai-agent'`.
+- Depends on: Gradle composite builds.
+- Used by: IDE import, local development, and sample app dependency substitution.
 
-**Entity Layer (Domain Model):**
-- Purpose: JPA/Jmix persistent entities.
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/entity/`
-- Contains: `User.java` — `@JmixEntity` + `@Entity` + `@Table(name = "USER_")`, UUID id with `@JmixGeneratedValue`, `@Version`, `@InstanceName` computed display name, implements `JmixUserDetails` + `HasTimeZone`.
-- Depends on: `io.jmix.core`, `io.jmix.security.authentication`, Jakarta Persistence, Jakarta Validation.
-- Used by: Views (`UserListView`, `UserDetailView`), security (`DatabaseUserRepository`), Liquibase schema (`USER_` table).
+**Add-On Core Module:**
+- Purpose: Provides the reusable AI agent Jmix module: entities, services, tools, RAG, guardrails, audit, security roles, and Flow UI screens.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent`
+- Contains: `AIConfiguration`, `ChatService`, entities under `entity/`, built-in tools under `tools/`, orchestration under `orchestration/`, and views under `view/`.
+- Depends on: Jmix core/data/security/Flow UI, Spring AI chat, Spring AI RAG, pgvector vector store, JDBC chat memory, and Spring Cache.
+- Used by: `ai-agent/ai-agent-starter` via `api project(':ai-agent')` and by host applications via the starter artifact.
 
-**Security Layer:**
-- Purpose: Role definitions, user repository integration, custom Spring Security filter chains.
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/security/`
-- Contains:
-  - `FullAccessRole.java` — `@ResourceRole` interface granting `EntityPolicy`, `EntityAttributePolicy`, `ViewPolicy`, `MenuPolicy`, `SpecificPolicy` all-access.
-  - `UiMinimalRole.java` — `@ResourceRole(scope = SecurityScope.UI)` extending `UiMinimalPolicies`, granting access to `MainView` and `LoginView`.
-  - `DatabaseUserRepository.java` — `@Primary @Component("UserRepository")` extending `AbstractDatabaseUserRepository<User>`; initializes system user with `FullAccessRole`.
-  - `JmixAppSecurityConfiguration.java` — adds a custom `SecurityFilterChain` for `/public/**` at `JmixSecurityFilterChainOrder.CUSTOM`.
-- Depends on: `io.jmix.security`, `io.jmix.securitydata`, `io.jmix.securityflowui`, Spring Security.
-- Used by: Jmix security starters at runtime; Liquibase seed (admin + role assignment in `010-init-user.xml`).
+**Starter Auto-Configuration Module:**
+- Purpose: Bridges the add-on into Spring Boot host apps through conditional auto-configuration.
+- Location: `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent`
+- Contains: `AIAutoConfiguration`, `AiToolsAutoConfiguration`, `AiAgentGuardAutoConfiguration`, and `SpiDefaultsAutoConfiguration`.
+- Depends on: `ai-agent/ai-agent`, Spring Boot autoconfigure, Spring AI OpenAI starter, and Spring AI JDBC chat memory starter.
+- Used by: Host apps through `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
 
-**View / UI Layer:**
-- Purpose: Vaadin Flow UI screens orchestrated by Jmix FlowUI.
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/view/` (controllers) and `jmix-app/src/main/resources/com/vn/jmixapp/view/` (XML descriptors, one subdirectory per view family).
-- Contains:
-  - `view/main/MainView.java` + `main-view.xml` — root layout (`@Route("")`) extending `StandardMainView`; customizes user-menu rendering via `@Install(to = "userMenu", subject = "...")`.
-  - `view/login/LoginView.java` + `login-view.xml` — `@Route("login")` extending `StandardView`, wraps `JmixLoginForm`, uses `LoginViewSupport.authenticate(AuthDetails.of(...))` on `LoginEvent`.
-  - `view/user/UserListView.java` + `user-list-view.xml` — `@Route(value = "users", layout = MainView.class)` extending `StandardListView<User>`; XML defines `<collection>` + `<loader>` with JPQL, `genericFilter`, `dataGrid`, and Jmix security actions (`sec_showRoleAssignments`, `sec_changePassword`, etc.).
-  - `view/user/UserDetailView.java` + `user-detail-view.xml` — `@Route(value = "users/:id", layout = MainView.class)` extending `StandardDetailView<User>`; lifecycle hooks `@Subscribe` on `InitEvent`, `InitEntityEvent`, `ReadyEvent`, `ValidationEvent`, `BeforeSaveEvent`, `AfterSaveEvent`; uses `PasswordEncoder` to hash new-user passwords.
-- Depends on: Entity layer, Jmix FlowUI, Vaadin Flow components.
-- Used by: Menu (`menu.xml`) and Vaadin router.
+**Host Application Layer:**
+- Purpose: Demonstrates and exercises the add-on inside a standard Jmix application with domain entities, security roles, sample views, and host-contributed tools.
+- Location: `jmix-app/src/main/java/com/vn/jmixapp`
+- Contains: `JmixAppApplication`, domain entities in `entity/`, business services in `service/`, views in `view/`, security roles in `security/`, and host AI extensions in `ai/`.
+- Depends on: `com.vn:ai-agent-starter:0.0.1-SNAPSHOT`, Jmix starters, Spring Boot, Vaadin, and Spring AI tool annotations.
+- Used by: Local runtime verification and integration scenarios.
 
-**Add-on Layer (`ai-agent`):**
-- Purpose: Reusable Jmix module meant to be consumed by other Jmix applications as a starter.
-- Location: `ai-agent/ai-agent/` (core module) and `ai-agent/ai-agent-starter/` (auto-configuration module).
-- Contains:
-  - `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java` — `@Configuration @ComponentScan @ConfigurationPropertiesScan @JmixModule(dependsOn = {EclipselinkConfiguration.class, FlowuiConfiguration.class})`; exposes `AI_AIViewControllers` and `AI_AIActions` beans with base package `com.vn.agent`.
-  - `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties` — sets `jmix.ui.menu-config=com/vn/agent/menu.xml`, `jmix.core.available-locales=en`.
-  - `ai-agent/ai-agent/src/main/resources/com/vn/agent/menu.xml` — registers the `AI` top-level menu.
-  - `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages.properties` — add-on i18n strings.
-  - `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AIAutoConfiguration.java` — `@AutoConfiguration @Import(AIConfiguration.class)`.
-  - `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` — registers `com.vn.autoconfigure.agent.AIAutoConfiguration`.
-- Depends on: `jmix-core`, `jmix-data` (core module also pulls `jmix-eclipselink`, `jmix-flowui`, `jmix-flowui-themes`); starter has `api project(':ai-agent')` + `spring-boot-autoconfigure`.
-- Used by: `jmix-app/build.gradle` via `implementation 'com.vn:ai-agent-starter:0.0.1-SNAPSHOT'`, which causes Spring Boot to auto-import `AIConfiguration`, register its view controllers/actions, and compose the `AI` menu into the running application.
+**Domain Entity Layer:**
+- Purpose: Defines persistent data models for both the reusable add-on and sample host app.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/entity` and `jmix-app/src/main/java/com/vn/jmixapp/entity`
+- Contains: AI entities such as `AiConversation`, `AiMessage`, `AiToolCallAudit`, `AiParameters`, `AiKnowledgeDocument`; host entities such as `Customer`, `Order`, `OrderLine`, `Product`, and `User`.
+- Depends on: Jmix entity annotations, JPA, Liquibase changelogs, and message bundles.
+- Used by: Jmix `DataManager`, Flow UI data containers/loaders, built-in tools, audit writers, RAG services, and sample app services.
 
-**Persistence Layer:**
-- Purpose: Database schema management and ORM.
-- Location: `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/`
-- Contains: `changelog.xml` master file that `<include>`s Jmix-provided changelogs (`/io/jmix/data/liquibase/changelog.xml`, `/io/jmix/flowuidata/liquibase/changelog.xml`, `/io/jmix/securitydata/liquibase/changelog.xml`) and `<includeAll path="/com/vn/jmixapp/liquibase/changelog"/>`, plus `changelog/010-init-user.xml` (creates `USER_` table, unique username index, seeds admin user + `SEC_ROLE_ASSIGNMENT` row).
-- Depends on: EclipseLink ORM via `io.jmix.data:jmix-eclipselink-starter`.
-- Used by: Spring Boot startup (Liquibase auto-runs), DataManager-based queries.
+**Orchestration Layer:**
+- Purpose: Builds chat clients, resolves run context and parameters, persists conversations/messages, projects chat memory, and coordinates streaming events.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration`
+- Contains: `ChatClientFactory`, `ConversationGateway`, `BaselineContextProvider`, `AiParametersResolver`, `ProjectingChatMemoryRepository`, `RunContext`, and streaming support classes.
+- Depends on: Spring AI chat APIs, Jmix authentication/security context, `DataManager`, parameters service, RAG advisors, tools, and guard advisors.
+- Used by: `DefaultChatServiceImpl`, `ChatPanelFragment`, and tests under `ai-agent/ai-agent/src/test/java/com/vn/agent/orchestration`.
+
+**Tool Surface Layer:**
+- Purpose: Exposes controlled LLM-facing operations against Jmix metadata and data while honoring current-user security.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/tools`
+- Contains: `BuiltInDataTools`, `AgentToolCallbacks`, `ToolLimits`, `ToolResultFormatter`, `ToolErrorDto`, and payload DTO records.
+- Depends on: `CurrentUserSchemaAccess`, Jmix `Metadata`, `AccessManager`, `DataManager`, structured filters, fetch plans, and Spring AI tool callback APIs.
+- Used by: `AiToolsAutoConfiguration`, `ChatClientFactory`, host `ToolContributor` beans, and tool audit decorators.
+
+**Structured Filter Layer:**
+- Purpose: Converts LLM-provided filter ASTs into bounded Jmix conditions with strict literal coercion.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/filter`
+- Contains: `FilterNode`, `LeafNode`, `AndNode`, `OrNode`, `NotNode`, `FilterLiteralValueConverter`, and `StructuredFilterConditionMapper`.
+- Depends on: Jmix metadata/datatype services and tool depth limits.
+- Used by: `BuiltInDataTools` for `find_records`, `count_records`, and related data access operations.
+
+**RAG Layer:**
+- Purpose: Handles knowledge document upload, ingestion, deletion, role-scoped retrieval filters, and retrieval augmentation advisor creation.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/rag`
+- Contains: `KnowledgeDocumentUploadService`, `KnowledgeDocumentService`, `AsyncIngestionWorker`, `IngesterManager`, `RetrievalFilterBuilder`, `ClasspathMarkdownIngester`, and `advisor/RetrievalAugmentationAdvisorFactory`.
+- Depends on: Spring AI vector store/RAG APIs, Jmix `DataManager`, `AiKnowledgeDocument`, `AiAgentRagProperties`, task executor `aiAgentIngestExecutor`, and application events.
+- Used by: `KnowledgeBaseView`, `ChatClientFactory`, asynchronous ingestion flows, and tests under `ai-agent/ai-agent/src/test/java/com/vn/agent/rag`.
+
+**Guardrail Layer:**
+- Purpose: Applies iteration limits, token budget checks, rate limits, output scanning, and tool veto logic.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/guard`
+- Contains: `GuardedToolCallingManager`, `RateLimitGuard`, `TokenBudgetGuard`, `OutputScannerAdvisor`, `IterationCounter`, `AiAgentGuardProperties`, and exception types.
+- Depends on: Spring AI advisor/tool-calling APIs, Spring Cache, configured scanner patterns, and `ToolGuard` SPI beans.
+- Used by: `AiAgentGuardAutoConfiguration`, `ChatClientFactory`, and `DefaultChatServiceImpl` request execution.
+
+**Audit Layer:**
+- Purpose: Records and dispatches tool-call and advisor audit events for observability and UI inspection.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/audit`
+- Contains: `AuditAdvisor`, `ToolCallbackAuditDecorator`, `AuditWriter`, `AuditListenerDispatcher`, and `ToolCallAdvisorBuilderConstants`.
+- Depends on: Spring AI advisor/tool callback APIs, `AiToolCallAudit`, `DataManager`, and `AuditListener` SPI.
+- Used by: Chat execution, tool callback wrapping, and `ToolCallAuditListView` / `ToolCallAuditDetailDialog`.
+
+**Parameters Layer:**
+- Purpose: Stores, validates, seeds, and resolves YAML-backed AI runtime parameter profiles.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/parameters`
+- Contains: `AiParametersBody`, `AiParametersBodyYamlMapper`, `ParametersService`, `DefaultParamsSeeder`, `Overrides`, and `ParametersValidationException`.
+- Depends on: Jackson YAML, Jakarta validation, `AiParameters`, and `DataManager`.
+- Used by: `AiParametersResolver`, `ParametersListView`, `ParametersDetailView`, and chat client construction.
+
+**Flow UI Layer:**
+- Purpose: Provides user-facing add-on screens for chat, conversations, knowledge base, parameters, and audit.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/view` and `ai-agent/ai-agent/src/main/resources/com/vn/agent/view`
+- Contains: Java controllers paired with XML descriptors including `ChatView`, `ChatPanelFragment`, `KnowledgeBaseView`, `ConversationListView`, `ConversationDetailView`, `ParametersListView`, and audit views.
+- Depends on: Jmix Flow UI, XML descriptors, message bundles, view/menu policies, reusable UI fragments, and services.
+- Used by: Jmix menu entries in `ai-agent/ai-agent/src/main/resources/com/vn/agent/menu.xml` and host app navigation.
+
+**SPI Extension Layer:**
+- Purpose: Provides app-specific extension seams without duplicating Jmix-native security or metadata layers.
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/spi`
+- Contains: `ToolContributor`, `ToolGuard`, `PromptContextContributor`, `ContextContributor`, `CustomIngester`, and `AuditListener`.
+- Depends on: Spring bean discovery and add-on orchestration contracts.
+- Used by: Host extension `jmix-app/src/main/java/com/vn/jmixapp/ai/OrderSummaryToolContributor.java`, default auto-configuration, and chat/tool assembly.
 
 ## Data Flow
 
-**Typical list-then-edit UI request flow:**
+**Chat Request Flow:**
 
-1. Browser hits `/users` -> Vaadin router resolves `UserListView` (`@Route("users", layout = MainView.class)`).
-2. `StandardListView<User>` loads `user-list-view.xml`; the `<dataLoadCoordinator auto="true"/>` facet triggers `usersDl` loader.
-3. Loader executes JPQL `select e from User e order by e.username` against `DataManager` (wired by Jmix using the `@Primary` `DataSource` bean in `JmixAppApplication`).
-4. EclipseLink returns `User` entities populated according to the `_base` fetch plan; results bind to `usersDataGrid`.
-5. User clicks `createAction` / `editAction` -> Jmix navigates to `UserDetailView` via `@Route("users/:id")`.
-6. `UserDetailView` lifecycle hooks run (`InitEvent`, `InitEntityEvent`, `ReadyEvent`); on save, `@Subscribe BeforeSaveEvent` hashes the password with the injected `PasswordEncoder`, then Jmix persists via `DataManager`.
+1. User navigates to `ChatView` at `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java`, which hosts `ChatPanelFragment` from `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`.
+2. `ChatPanelFragment` delegates prompt execution to `ChatService` implemented by `DefaultChatServiceImpl` in `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java`.
+3. `DefaultChatServiceImpl` creates a `RunContext`, uses `ConversationGateway` to load/create conversation state, and asks `ChatClientFactory` for a configured Spring AI `ChatClient`.
+4. `ChatClientFactory` composes baseline context, parameter profile, prompt contributors, RAG advisor, audit advisor, output scanner advisor, built-in and contributed tools, and guarded tool-calling support.
+5. Spring AI invokes tools through decorated callbacks; built-in data tools use Jmix metadata/security/data APIs under the current user security context.
+6. `ConversationGateway` persists user/assistant messages, `ProjectingChatMemoryRepository` projects memory to Spring AI JDBC memory, and streaming events flow back to the UI through `StreamingSinkHolder`.
 
-**Authentication flow:**
+**Built-In Data Tool Flow:**
 
-1. Anonymous request hits `/login` -> `LoginView` renders `JmixLoginForm`.
-2. Form submit fires `LoginEvent`; `LoginView.onLogin` calls `loginViewSupport.authenticate(AuthDetails.of(username, password).withLocale(...).withRememberMe(...))`.
-3. Spring Security uses `DatabaseUserRepository` (`@Primary` bean named `UserRepository`) to load the `User` entity.
-4. Authorities are resolved via role assignments stored in `SEC_ROLE_ASSIGNMENT` (seeded by `010-init-user.xml` with `system-full-access`).
-5. On failure (`BadCredentialsException`, `DisabledException`, `LockedException`, `AccessDeniedException`), the form error flag is set.
+1. `AgentToolCallbacks` in `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/AgentToolCallbacks.java` exposes methods from `BuiltInDataTools` as Spring AI tool callbacks.
+2. `CurrentUserSchemaAccess` in `ai-agent/ai-agent/src/main/java/com/vn/agent/metadata/CurrentUserSchemaAccess.java` filters visible entities and properties through Jmix metadata and security checks.
+3. `StructuredFilterConditionMapper` maps filter nodes from `ai-agent/ai-agent/src/main/java/com/vn/agent/filter` into Jmix conditions while enforcing property-path depth and literal conversion.
+4. `BuiltInDataTools` executes read-only loads/counts through `DataManager` and formats prompt-safe results through `ToolResultFormatter`.
+5. `ToolCallbackAuditDecorator` and `AuditWriter` persist tool call metadata in `AiToolCallAudit` for `ToolCallAuditListView`.
 
-**Add-on contribution flow:**
+**RAG Ingestion Flow:**
 
-1. `jmix-app` declares `implementation 'com.vn:ai-agent-starter:0.0.1-SNAPSHOT'`.
-2. Spring Boot reads `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` from the starter and registers `AIAutoConfiguration`.
-3. `AIAutoConfiguration` `@Import`s `AIConfiguration`, which activates `@ComponentScan` on `com.vn.agent`, registers view-controller and action scanners, and loads `module.properties`.
-4. Jmix merges the add-on menu (`com/vn/agent/menu.xml`) with the host menu (`com/vn/jmixapp/menu.xml`) into the composite menu (`jmix.ui.composite-menu=true`).
+1. `KnowledgeBaseView` in `ai-agent/ai-agent/src/main/java/com/vn/agent/view/knowledge/KnowledgeBaseView.java` accepts user document operations through the Flow UI XML view.
+2. `KnowledgeDocumentUploadService` creates or updates `AiKnowledgeDocument` records and schedules asynchronous ingestion work.
+3. `AsyncIngestionWorker` uses `IngesterManager`, configured splitters, and Spring AI `VectorStore` to chunk and store embeddings.
+4. `DocumentStatusChangedEvent` in `ai-agent/ai-agent/src/main/java/com/vn/agent/push/DocumentStatusChangedEvent.java` communicates status changes back to UI/push consumers.
+5. `RetrievalAugmentationAdvisorFactory` builds a retrieval advisor that `ChatClientFactory` includes in chat requests.
+6. `RetrievalFilterBuilder` constrains retrieval by current user/role metadata stored with document chunks.
+
+**Host Tool Contribution Flow:**
+
+1. Host app adds a Spring bean implementing `ToolContributor`, such as `jmix-app/src/main/java/com/vn/jmixapp/ai/OrderSummaryToolContributor.java`.
+2. `SpiDefaultsAutoConfiguration` and `AiToolsAutoConfiguration` collect available SPI beans and built-in tool callbacks.
+3. `ChatClientFactory` includes host-contributed `@Tool` methods alongside built-in callbacks.
+4. Host tools remain trusted host code and must use Jmix `DataManager`/FetchPlans for security-aware data access.
 
 **State Management:**
-- UI state is kept in Jmix view containers (`<collection>`, `<loader>`) defined in XML and wired into controllers via `@ViewComponent`.
-- Authentication/session state is handled by Vaadin `VaadinSession` and Spring Security; current user exposed via `CurrentUserSubstitution` (used in `MainView`).
-- Persistent state lives in the relational DB via EclipseLink; default runtime store is file-based HSQLDB (`.jmix/hsqldb/jmixapp`).
+- Persist conversations and messages through `AiConversation` and `AiMessage` in `ai-agent/ai-agent/src/main/java/com/vn/agent/entity`.
+- Persist tool-call audit records through `AiToolCallAudit` and Liquibase changelogs under `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog`.
+- Store parameter profiles in `AiParameters` and YAML bodies managed by `ParametersService`.
+- Store knowledge document lifecycle in `AiKnowledgeDocument`; embeddings live in pgvector tables created by `070-ai-kb-vector-store.xml`.
+- Use Spring AI JDBC chat memory through `ProjectingChatMemoryRepository` rather than treating memory as only in-process state.
 
 ## Key Abstractions
 
-**Jmix Module:**
-- Purpose: A self-contained Spring configuration declaring its Jmix dependencies, scanned packages for views/actions, and property sources.
-- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java`.
-- Pattern: `@Configuration @ComponentScan @ConfigurationPropertiesScan @JmixModule(dependsOn = {...}) @PropertySource(...)` + `ViewControllersConfiguration` and `ActionsConfiguration` beans keyed by module-prefixed names.
+**Jmix Module Configuration:**
+- Purpose: Registers the add-on with Jmix scanning, Flow UI view/action discovery, module properties, async ingestion, and vector-store defaults.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties`
+- Pattern: `@JmixModule`, `@ComponentScan`, `@ConfigurationPropertiesScan`, module-local `ViewControllersConfiguration`, and conditional beans.
 
-**Jmix Entity:**
-- Purpose: Domain class that participates in Jmix metadata (instance names, lifecycle, security metadata).
-- Examples: `jmix-app/src/main/java/com/vn/jmixapp/entity/User.java`.
-- Pattern: `@JmixEntity` + JPA `@Entity`/`@Table`, UUID `@Id` with `@JmixGeneratedValue`, `@Version`, `@InstanceName` + `@DependsOnProperties`, `@Secret`/`@SystemLevel` for sensitive columns.
+**Spring Boot Starter Auto-Configuration:**
+- Purpose: Enables host applications to consume the add-on by adding the starter dependency.
+- Examples: `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AIAutoConfiguration.java`, `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+- Pattern: Conditional auto-configuration classes imported through Spring Boot 3 `AutoConfiguration.imports`.
 
-**View Controller (Jmix FlowUI):**
-- Purpose: Pair a Java class with an XML layout descriptor to build a Vaadin screen.
-- Examples: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java` + `user-detail-view.xml`.
-- Pattern: `@Route(...)` + `@ViewController(id = "...")` + `@ViewDescriptor(path = "...-view.xml")` extending `StandardListView`/`StandardDetailView`/`StandardView`/`StandardMainView`. Components from XML are injected with `@ViewComponent`; Spring beans with `@Autowired`; lifecycle handled via `@Subscribe` methods.
+**Chat Service Boundary:**
+- Purpose: Public application-facing boundary for prompt execution.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/ChatService.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java`
+- Pattern: Interface plus Spring-managed implementation that delegates context assembly to orchestration collaborators.
 
-**Resource Role:**
-- Purpose: Declarative RBAC — permissions expressed as annotations on interface methods.
-- Examples: `FullAccessRole.java`, `UiMinimalRole.java`.
-- Pattern: `@ResourceRole(name, code, scope?)` on an interface, with `@EntityPolicy`, `@EntityAttributePolicy`, `@ViewPolicy`, `@MenuPolicy`, `@SpecificPolicy` on no-arg methods.
+**Run Context:**
+- Purpose: Captures per-request user, roles, locale, conversation, and runtime parameter context.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/RunContext.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/BaselineContextProvider.java`
+- Pattern: Immutable context DTO assembled from Jmix current authentication and request inputs.
 
-**Database User Repository:**
-- Purpose: Bridge between Jmix security and the custom `User` entity.
-- Example: `jmix-app/src/main/java/com/vn/jmixapp/security/DatabaseUserRepository.java`.
-- Pattern: Extend `AbstractDatabaseUserRepository<T extends JmixUserDetails>`; mark `@Primary @Component("UserRepository")`; override `getUserClass`, `initSystemUser`, `initAnonymousUser`.
+**Tool Callback Assembly:**
+- Purpose: Converts built-in and host-contributed tool methods into Spring AI callbacks under audit and guard wrappers.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/AgentToolCallbacks.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/ToolCallbackAuditDecorator.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/guard/GuardedToolCallingManager.java`
+- Pattern: Decorator and collector composition around Spring AI tool abstractions.
 
-**Auto-Configured Starter:**
-- Purpose: Zero-config inclusion of the add-on.
-- Example: `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AIAutoConfiguration.java` + `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
-- Pattern: `@AutoConfiguration @Import(AIConfiguration.class)` class registered through the Spring Boot 3 `AutoConfiguration.imports` mechanism; starter `ai-agent-starter.gradle` re-exports the core module with `api project(':ai-agent')` and sets `jmix { entitiesEnhancing { enabled = false } }`.
+**Security Roles:**
+- Purpose: Grants add-on menus/views/entities and row-level access according to Jmix role policy mechanisms.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/security/AiAgentUserRole.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/security/AiAgentAdminRole.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/security/AiAgentUserRowLevelRole.java`
+- Pattern: Jmix `@ResourceRole` and row-level role interfaces instead of AI-specific exposure rules.
+
+**Flow UI View Pair:**
+- Purpose: Keeps UI layout declarative and controller code behavior-focused.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationListView.java` with `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/conversation/conversation-list-view.xml`
+- Pattern: `@Route`, `@ViewController`, `@ViewDescriptor` Java controller paired with XML descriptor and message bundle keys.
+
+**Host Extension SPI:**
+- Purpose: Lets applications add domain-specific tools, context, guards, audit listeners, or custom ingesters.
+- Examples: `ai-agent/ai-agent/src/main/java/com/vn/agent/spi/ToolContributor.java`, `jmix-app/src/main/java/com/vn/jmixapp/ai/OrderSummaryToolContributor.java`
+- Pattern: Spring beans implementing narrow interfaces; baseline runtime context remains internal to the add-on.
 
 ## Entry Points
 
-**HTTP / UI entry point:**
+**Composite Build:**
+- Location: `settings.gradle`
+- Triggers: Gradle/IDE import at the repository root.
+- Responsibilities: Includes `ai-agent` and `jmix-app` as composite builds.
+
+**Add-On Module Configuration:**
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java`
+- Triggers: Jmix/Spring context startup when the module is on the classpath.
+- Responsibilities: Registers the Jmix module, scans add-on beans/properties, configures view/action packages, async ingestion executor, and default vector store support.
+
+**Starter Auto-Configuration Imports:**
+- Location: `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+- Triggers: Spring Boot auto-configuration discovery.
+- Responsibilities: Imports add-on auto-configurations into host applications.
+
+**Host Spring Boot Application:**
 - Location: `jmix-app/src/main/java/com/vn/jmixapp/JmixAppApplication.java`
-- Triggers: `./gradlew bootRun` (Spring Boot launches on http://localhost:8080).
-- Responsibilities: `@SpringBootApplication` main, Vaadin `@Push` / `@Theme("jmix-app")` / `@PWA`, defines `@Primary` `DataSource` bound to `main.datasource.*`, logs startup URL in `ApplicationStartedEvent`.
+- Triggers: `bootRun` or packaged application startup.
+- Responsibilities: Starts the sample Jmix app, configures datasource beans, and logs the runtime URL.
 
-**Default route (`/`):**
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/view/main/MainView.java`
-- Triggers: Vaadin router when authenticated.
-- Responsibilities: Render application shell, customize user menu via `@Install` methods.
+**Chat UI Route:**
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java`
+- Triggers: Navigation to the add-on chat route from menu or URL.
+- Responsibilities: Hosts the reusable chat panel and initializes conversation-aware query parameters.
 
-**Login route (`/login`):**
-- Location: `jmix-app/src/main/java/com/vn/jmixapp/view/login/LoginView.java`
-- Triggers: Any unauthenticated navigation (default per `jmix.ui.login-view-id=LoginView`).
-- Responsibilities: Present `JmixLoginForm`, call `LoginViewSupport.authenticate(...)`, manage locale selection, inject default credentials (`ui.login.defaultUsername/defaultPassword`).
+**Knowledge Base UI Route:**
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/knowledge/KnowledgeBaseView.java`
+- Triggers: Navigation to `ai-agent/knowledge`.
+- Responsibilities: Manages document upload, status display, delete/cancel actions, and ingestion UI feedback.
 
-**Add-on auto-configuration entry point:**
-- Location: `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AIAutoConfiguration.java`
-- Triggers: Spring Boot auto-configuration scan when `ai-agent-starter` is on the classpath.
-- Responsibilities: Pull in `AIConfiguration` and register it with the host Spring context.
+**Conversation Admin/User Routes:**
+- Location: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationListView.java` and `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationDetailView.java`
+- Triggers: Navigation to `ai-agent/conversations` or `ai-agent/conversations/:id`.
+- Responsibilities: Lists accessible conversations, displays transcripts, and redirects continuation into chat.
 
-**Test entry point (add-on):**
-- Location: `ai-agent/ai-agent/src/test/java/com/vn/agent/AITestConfiguration.java`
-- Triggers: `@SpringBootTest` tests such as `AITest.contextLoads`.
-- Responsibilities: `@SpringBootConfiguration @EnableAutoConfiguration @Import(AIConfiguration.class)`, provides `@Primary` embedded HSQL `DataSource`.
+**Host Tool Bean:**
+- Location: `jmix-app/src/main/java/com/vn/jmixapp/ai/OrderSummaryToolContributor.java`
+- Triggers: Spring component scanning in the host application.
+- Responsibilities: Contributes a domain-specific `summarize_customer_orders` tool.
 
 ## Error Handling
 
-**Strategy:** Rely on Jmix/Vaadin/Spring defaults; explicit handling is limited to authentication errors and view validation.
+**Strategy:** Fail closed for security-sensitive and budget-sensitive operations; return prompt-safe structured tool errors for user-correctable input; persist operational failures in audit/status entities where useful.
 
 **Patterns:**
-- Authentication exceptions caught in `LoginView.onLogin` (`BadCredentialsException`, `DisabledException`, `LockedException`, `AccessDeniedException`) — logged via SLF4J and surfaced as a login-form error flag.
-- Form validation handled declaratively in XML (`jakarta.validation` constraints on entity fields — e.g., `@Email` on `User.email`) and imperatively in `UserDetailView.onValidation` (password confirmation check pushes into `event.getErrors()`).
-- User notifications shown via Jmix `Notifications` API (`UserDetailView.onAfterSave` emits a warning about unassigned roles with `NotificationVariant.LUMO_WARNING`).
+- Throw typed runtime exceptions for guard failures from `ai-agent/ai-agent/src/main/java/com/vn/agent/guard`, such as `RateLimitExceededException`, `TokenBudgetExhaustedException`, and `IterationCapExceededException`.
+- Use `ToolUserError` and `ToolErrorDto` in `ai-agent/ai-agent/src/main/java/com/vn/agent/tools` for LLM-facing validation errors instead of leaking stack traces.
+- Use `ParametersValidationException` in `ai-agent/ai-agent/src/main/java/com/vn/agent/parameters/ParametersValidationException.java` for invalid YAML/parameter bodies.
+- Use `ConversationNotFoundException` in `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/ConversationNotFoundException.java` for invalid conversation references.
+- Mark knowledge documents failed through `KnowledgeDocumentService` / `AsyncIngestionWorker` rather than leaving ambiguous in-progress records.
+- Persist tool call outcomes in `AiToolCallAudit` through `AuditWriter` for post-run diagnosis.
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- SLF4J everywhere (`LoggerFactory.getLogger(...)`).
-- Levels configured in `jmix-app/src/main/resources/application.properties` (`logging.level.eclipselink.logging.sql`, `logging.level.io.jmix.*`, `logging.level.org.springframework.security`, etc.).
-- ANSI colors enabled (`spring.output.ansi.enabled=always`).
-
-**Validation:**
-- Jakarta Bean Validation annotations on entity fields (`@Email`).
-- Imperative validation in view `@Subscribe`d `ValidationEvent` handlers with i18n messages through `MessageBundle`.
-
-**Authentication:**
-- Jmix security starters + custom `JmixAppSecurityConfiguration` for `/public/**` passthrough at `JmixSecurityFilterChainOrder.CUSTOM` order.
-- `DatabaseUserRepository` bridges the custom `User` entity to Spring Security via `AbstractDatabaseUserRepository`.
-- Passwords hashed at save time in `UserDetailView.onBeforeSave` via injected `PasswordEncoder`; seed admin uses `{noop}admin` placeholder.
-
-**Internationalization:**
-- Available locales configured via `jmix.core.available-locales=vi,en` (host) and `=en` (add-on).
-- Messages in `jmix-app/src/main/resources/com/vn/jmixapp/messages_en.properties` and `messages_vi.properties` (37 lines each); add-on messages in `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages.properties`.
-- All UI text referenced through `msg://` keys in view XML and `MessageBundle`/`Messages` in controllers.
-
-**Configuration:**
-- Host app: `jmix-app/src/main/resources/application.properties` (datasource, Liquibase, Jmix UI, default credentials, logging).
-- Add-on: `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties` loaded via `@PropertySource` in `AIConfiguration`.
-- Tests: `ai-agent/ai-agent/src/test/resources/com/vn/agent/test-app.properties`.
+**Logging:** Use SLF4J in application and service classes; preserve correlation context across async RAG work through `MdcPropagatingTaskDecorator` in `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/MdcPropagatingTaskDecorator.java`.
+**Validation:** Validate structured filters through metadata-aware converters in `ai-agent/ai-agent/src/main/java/com/vn/agent/filter`; validate parameter YAML through `AiParametersBodyYamlMapper` and Jakarta validation in `ai-agent/ai-agent/src/main/java/com/vn/agent/parameters`.
+**Authentication:** Use the current Jmix security context through `CurrentAuthentication`, `AccessManager`, Jmix resource roles, and row-level roles; do not add a parallel AI exposure policy layer.
 
 ---
 
-*Architecture analysis: 2026-04-18*
+*Architecture analysis: 2026-04-24*

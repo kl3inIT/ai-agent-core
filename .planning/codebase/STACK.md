@@ -1,126 +1,104 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-18
+**Analysis Date:** 2026-04-24
 
 ## Languages
 
 **Primary:**
-- Java 17 - All application code, Jmix entities, services, view controllers, and security configuration across `jmix-app/src/main/java/` and `ai-agent/ai-agent/src/main/java/`
+- Java 21 - All production and test code in `ai-agent/ai-agent/src/main/java`, `ai-agent/ai-agent-starter/src/main/java`, and `jmix-app/src/main/java`; Gradle toolchains in `ai-agent/build.gradle` and `jmix-app/build.gradle` require `JavaLanguageVersion.of(21)` with `options.release = 21` for add-on modules.
 
 **Secondary:**
-- XML - View descriptors (`jmix-app/src/main/resources/com/vn/jmixapp/view/**/*.xml`), Liquibase changelogs (`jmix-app/src/main/resources/com/vn/jmixapp/liquibase/**`), menu config (`jmix-app/src/main/resources/com/vn/jmixapp/menu.xml`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/menu.xml`)
-- Properties - Message bundles and application config (`jmix-app/src/main/resources/com/vn/jmixapp/messages_en.properties`, `messages_vi.properties`, `application.properties`)
-- Groovy - Gradle build scripts (`build.gradle`, `settings.gradle`, `ai-agent.gradle`, `ai-agent-starter.gradle`, `jmix-app/build.gradle`)
-- CSS - Vaadin theme styling (`jmix-app/src/main/frontend/themes/jmix-app/*.css`)
-- HTML - Frontend shell (`jmix-app/src/main/frontend/index.html`)
+- Groovy Gradle DSL - Build configuration in `build.gradle`, `settings.gradle`, `ai-agent/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`, `ai-agent/ai-agent-starter/ai-agent-starter.gradle`, and `jmix-app/build.gradle`.
+- XML - Jmix Flow UI descriptors and Liquibase changelogs in `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/**`, `jmix-app/src/main/resources/com/vn/jmixapp/view/**`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/**`, and `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/**`.
+- Properties/YAML - Application configuration in `jmix-app/src/main/resources/application.properties`, `jmix-app/src/main/resources/application-hsqldb.properties`, test configuration in `ai-agent/ai-agent/src/test/resources/com/vn/agent/test-app.properties`, and default AI parameters in `ai-agent/ai-agent-starter/src/main/resources/default-params.yaml`.
 
 ## Runtime
 
 **Environment:**
-- Java 17 (JVM) — required by Jmix 2.8 / Spring Boot 3
-- Vaadin Flow server-side UI runtime embedded in the Spring Boot application
+- JVM 21 - Required by Gradle toolchain settings in `ai-agent/build.gradle` and `jmix-app/build.gradle`; use Java 21 locally even if older project notes mention Java 17.
+- Spring Boot 3.x via Jmix 2.8.1 - Bootstraps `jmix-app/src/main/java/com/vn/jmixapp/JmixAppApplication.java` and starter auto-configurations in `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent`.
 
 **Package Manager:**
-- Gradle 8.14.4 (via wrapper in `gradle/wrapper/gradle-wrapper.properties`)
-- Composite build: root `settings.gradle` uses `includeBuild 'jmix-app'` and `includeBuild 'ai-agent'`
-- Lockfile: not present (no `gradle.lockfile`)
+- Gradle Wrapper 8.14.4 - Wrapper properties in `gradle/wrapper/gradle-wrapper.properties`, `ai-agent/gradle/wrapper/gradle-wrapper.properties`, and `jmix-app/gradle/wrapper/gradle-wrapper.properties`.
+- Lockfile: missing - No `gradle.lockfile` or dependency-locking files detected.
+- Composite build: root `settings.gradle` includes `jmix-app` and `ai-agent`; `jmix-app/settings.gradle` can include `../ai-agent` when opened standalone.
 
 ## Frameworks
 
 **Core:**
-- Jmix 2.8.0 - Low-code business application framework (BOM `io.jmix:jmix-bom:2.8.0`, Gradle plugin `io.jmix:2.8.0` declared in `jmix-app/build.gradle` and `ai-agent/build.gradle`)
-- Spring Boot 3 - Application container (pulled transitively via Jmix BOM; `spring-boot-starter-web` declared in `jmix-app/build.gradle`)
-- Vaadin Flow - Server-driven UI framework; `com.vaadin` Gradle plugin applied in `jmix-app/build.gradle`; `@Theme`, `@Push`, `@PWA` used in `jmix-app/src/main/java/com/vn/jmixapp/JmixAppApplication.java`
-- EclipseLink - JPA provider via `io.jmix.data:jmix-eclipselink-starter`
-- Spring Security - Pulled through `io.jmix.security:jmix-security-starter` and configured in `jmix-app/src/main/java/com/vn/jmixapp/security/JmixAppSecurityConfiguration.java`
-- Liquibase - Database migrations; master changelog at `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog.xml`
+- Jmix 2.8.1 - Main application framework and BOM configured in `ai-agent/build.gradle` and `jmix-app/build.gradle`; used for entities, DataManager access, security roles, Flow UI, Liquibase integration, and add-on packaging.
+- Spring Boot - Application runtime, auto-configuration, cache abstraction, testing, and web stack through Jmix and dependencies in `jmix-app/build.gradle` and `ai-agent/ai-agent-starter/ai-agent-starter.gradle`.
+- Spring AI 1.1.4 - Chat client, OpenAI/OpenRouter model starter, JDBC chat memory repository, pgvector vector store, Tika document ingestion, RAG, and tool annotations configured in `ai-agent/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`, `ai-agent/ai-agent-starter/ai-agent-starter.gradle`, and `jmix-app/build.gradle`.
+- Vaadin Flow via Jmix Flow UI - UI views and components in `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/**`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/**`, `jmix-app/src/main/resources/com/vn/jmixapp/view/**`, and `jmix-app/src/main/java/com/vn/jmixapp/view/**`.
 
 **Testing:**
-- JUnit 5 (JUnit Platform) - `useJUnitPlatform()` in `jmix-app/build.gradle` and `ai-agent/ai-agent/ai-agent.gradle`; `junit-vintage-engine` explicitly excluded
-- Spring Boot Test - `org.springframework.boot:spring-boot-starter-test`
-- Jmix FlowUI Test Assist - `io.jmix.flowui:jmix-flowui-test-assist` for `@UiTest` (see `jmix-app/src/test/java/com/vn/jmixapp/user/UserUiTest.java`)
+- JUnit 5 / Spring Boot Test - Test runner configured in `ai-agent/ai-agent/ai-agent.gradle` and `jmix-app/build.gradle`; default add-on tests exclude `live`, `rag-it`, and `eval` tags.
+- Jmix Flow UI Test Assist - UI testing support declared in `jmix-app/build.gradle` and used by host app UI tests under `jmix-app/src/test/java`.
+- Testcontainers PostgreSQL 1.19.8 - RAG/pgvector integration test support declared in `ai-agent/ai-agent/ai-agent.gradle`; `integrationTest` runs `@Tag("rag-it")` tests and requires Docker.
+- Spring AI Test 1.1.4 - AI test helpers declared in `ai-agent/ai-agent/ai-agent.gradle` and `ai-agent/ai-agent-starter/ai-agent-starter.gradle`.
+- ASM 9.9 - Bytecode-level read-only tool enforcement tests declared in `ai-agent/ai-agent/ai-agent.gradle`.
 
 **Build/Dev:**
-- Gradle 8.14.4 wrapper
-- `io.jmix` Gradle plugin 2.8.0 - Jmix project setup and entity enhancement
-- `com.vaadin` plugin - Vaadin bundle/frontend build (`optimizeBundle = false`)
-- `org.springframework.boot` plugin - Boot packaging / `bootRun`
-- `org.jetbrains.gradle.plugin.idea-ext` 1.1.9 - IntelliJ IDEA project metadata
+- Jmix Gradle Plugin 2.8.1 - Configures add-on modules via `ai-agent/build.gradle` and host app via `jmix-app/build.gradle`.
+- Spring Dependency Management Plugin 1.1.6 - Imports Spring AI BOM in `ai-agent/build.gradle`.
+- Spring Boot Gradle Plugin - Applied by Jmix/Spring plugins in `jmix-app/build.gradle` for `bootRun` and executable app tasks.
+- Vaadin Gradle Plugin - Applied in `jmix-app/build.gradle` with `com.vaadin` for Flow UI frontend build support.
+- Maven Publish - Add-on modules publish `com.vn:ai-agent` and `com.vn:ai-agent-starter` from `ai-agent/build.gradle`.
 
 ## Key Dependencies
 
-**Critical (Jmix starters declared in `jmix-app/build.gradle`):**
-- `io.jmix.core:jmix-core-starter` - Jmix core runtime
-- `io.jmix.data:jmix-eclipselink-starter` - JPA/EclipseLink ORM integration
-- `io.jmix.security:jmix-security-starter` - Security core
-- `io.jmix.security:jmix-security-flowui-starter` - UI security integration
-- `io.jmix.security:jmix-security-data-starter` - Data-level security (row/attribute policies)
-- `io.jmix.localfs:jmix-localfs-starter` - Local filesystem file storage
-- `io.jmix.flowui:jmix-flowui-starter` - Jmix Vaadin Flow UI
-- `io.jmix.flowui:jmix-flowui-data-starter` - UI data binding
-- `io.jmix.flowui:jmix-flowui-themes` - Jmix themes
-- `io.jmix.datatools:jmix-datatools-starter` + `jmix-datatools-flowui-starter` - Admin/data tooling
-- `com.vn:ai-agent-starter:0.0.1-SNAPSHOT` - Local AI agent add-on (composite-built from `ai-agent/`)
-
-**Add-on (`ai-agent/ai-agent/ai-agent.gradle`, `ai-agent/ai-agent-starter/ai-agent-starter.gradle`):**
-- `io.jmix.core:jmix-core`, `io.jmix.data:jmix-data`, `io.jmix.flowui:jmix-flowui-starter`, `io.jmix.flowui:jmix-flowui-themes`
-- `org.springframework.boot:spring-boot-autoconfigure` — registers `com.vn.autoconfigure.agent.AIAutoConfiguration` via `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+**Critical:**
+- `io.jmix.core:jmix-core-starter` / `io.jmix.data:jmix-eclipselink-starter` / `io.jmix.security:jmix-security-starter` - Core Jmix runtime, persistence, and security in `ai-agent/ai-agent/ai-agent.gradle` and `jmix-app/build.gradle`.
+- `io.jmix.flowui:jmix-flowui-starter` and `io.jmix.security:jmix-security-flowui-starter` - Add-on and host Flow UI screens plus role annotations in `ai-agent/ai-agent/ai-agent.gradle` and `jmix-app/build.gradle`.
+- `org.springframework.ai:spring-ai-starter-model-openai:1.1.4` - OpenAI-compatible model client used by the starter in `ai-agent/ai-agent-starter/ai-agent-starter.gradle`; configured for OpenRouter in `jmix-app/src/main/resources/application.properties` and `ai-agent/ai-agent/src/test/resources/com/vn/agent/test-app.properties`.
+- `org.springframework.ai:spring-ai-client-chat:1.1.4` - ChatClient and `@Tool` annotations used by add-on code and host tool contributors; declared in `ai-agent/ai-agent/ai-agent.gradle` and explicitly in `jmix-app/build.gradle`.
+- `org.springframework.ai:spring-ai-model-chat-memory-repository-jdbc:1.1.4` and `org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc:1.1.4` - JDBC chat memory projection layer and starter integration in `ai-agent/ai-agent/ai-agent.gradle` and `ai-agent/ai-agent-starter/ai-agent-starter.gradle`.
+- `org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4` - pgvector-backed vector store public API for RAG in `ai-agent/ai-agent/ai-agent.gradle`.
+- `org.springframework.ai:spring-ai-rag:1.1.4` - Retrieval augmentation advisor and document retriever public API in `ai-agent/ai-agent/ai-agent.gradle`.
 
 **Infrastructure:**
-- `org.hsqldb:hsqldb` - Embedded HSQLDB database (runtimeOnly in main; testRuntimeOnly in add-on)
-- `com.google.common.base.Strings` (Guava) - Used in `jmix-app/src/main/java/com/vn/jmixapp/JmixAppApplication.java` (provided transitively)
-
-**Excluded (explicit in both `jmix-app/build.gradle` and `ai-agent/ai-agent/ai-agent.gradle`):**
-- `com.vaadin:hilla`, `com.vaadin:hilla-dev`, `com.vaadin:copilot` - Hilla/copilot features disabled (`hilla.active=false` in `jmix-app/gradle.properties`)
+- `org.postgresql:postgresql` - PostgreSQL JDBC runtime in `ai-agent/ai-agent/ai-agent.gradle` and `jmix-app/build.gradle`.
+- `org.hsqldb:hsqldb` - Local fallback/test database in `jmix-app/build.gradle`, `jmix-app/src/main/resources/application-hsqldb.properties`, and `ai-agent/ai-agent/ai-agent.gradle` tests.
+- `org.springframework.boot:spring-boot-starter-cache` - Cache abstraction backing rate limit and token budget guards in `ai-agent/ai-agent/ai-agent.gradle` and `ai-agent/ai-agent/src/main/java/com/vn/agent/guard/**`.
+- `com.fasterxml.jackson.dataformat:jackson-dataformat-yaml` - Strict YAML serialization/deserialization for AI parameters in `ai-agent/ai-agent/ai-agent.gradle` and parameter code under `ai-agent/ai-agent/src/main/java/com/vn/agent/parameters/**`.
+- `jakarta.validation:jakarta.validation-api` - Validation annotations for parameter records in `ai-agent/ai-agent/ai-agent.gradle`.
+- `org.springframework.ai:spring-ai-tika-document-reader:1.1.4` - Knowledge document extraction in `ai-agent/ai-agent/ai-agent.gradle` and RAG ingestion code under `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/**`.
+- `com.vladsch.flexmark:flexmark`, `flexmark-ext-tables`, `flexmark-ext-autolink` - Markdown rendering for assistant output in `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/MarkdownRenderer.java`.
+- `com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer` - Sanitizes rendered assistant HTML in `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/MarkdownRenderer.java`.
+- `io.jmix.gridexport:jmix-gridexport-flowui-starter` - Export actions for AI audit screens in `ai-agent/ai-agent/ai-agent.gradle` and views under `ai-agent/ai-agent/src/main/java/com/vn/agent/view/audit/**`.
 
 ## Configuration
 
 **Environment:**
-- Application properties: `jmix-app/src/main/resources/application.properties`
-  - Datasource: `main.datasource.url=jdbc:hsqldb:file:.jmix/hsqldb/jmixapp`, user `sa`, empty password
-  - Liquibase: `main.liquibase.change-log=com/vn/jmixapp/liquibase/changelog.xml`
-  - UI: `jmix.ui.login-view-id=LoginView`, `jmix.ui.main-view-id=MainView`, `jmix.ui.menu-config=com/vn/jmixapp/menu.xml`, `jmix.ui.composite-menu=true`
-  - Locales: `jmix.core.available-locales=vi,en`
-  - Default credentials: `ui.login.defaultUsername=admin`, `ui.login.defaultPassword=admin`
-  - Vaadin: `vaadin.launch-browser=false`
-  - Logging levels for `eclipselink.logging.sql`, `io.jmix.core.datastore`, `io.jmix.core.AccessLogger`, `io.jmix`, `org.springframework.security`, `org.atmosphere`
-- Test properties: `jmix-app/src/test/resources/application-test.properties` — isolated HSQLDB file `jdbc:hsqldb:file:.jmix/hsqldb/jmixapp_test`
-- Add-on module properties: `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties` — `jmix.ui.menu-config=com/vn/agent/menu.xml`, `jmix.core.available-locales=en`
-- No `.env` files present in repository
+- Host app imports developer environment files with `spring.config.import=optional:file:.env[.properties],optional:file:../.env[.properties]` in `jmix-app/src/main/resources/application.properties`; `.env` exists at repo root and must not be read or committed with secrets.
+- OpenRouter/OpenAI-compatible API key is configured with `OPENROUTER_API_KEY` through Spring property placeholders in `jmix-app/src/main/resources/application.properties` and `ai-agent/ai-agent/src/test/resources/com/vn/agent/test-app.properties`.
+- OpenRouter model defaults are set through `jmix.ai-agent.defaults.*` and `spring.ai.openai.chat.options.model` in `jmix-app/src/main/resources/application.properties`; add-on tests provide stub defaults in `ai-agent/ai-agent/src/test/resources/com/vn/agent/test-app.properties`.
+- PostgreSQL datasource settings for main and agentstore stores live in `jmix-app/src/main/resources/application.properties`; do not copy credential values from this file into docs or code.
+- HSQLDB fallback profile lives in `jmix-app/src/main/resources/application-hsqldb.properties` for local boot with `--spring.profiles.active=hsqldb`.
 
 **Build:**
-- `build.gradle` (root) - defines `group = 'com.vn'`, `version = '0.0.1-SNAPSHOT'`; no subproject config (composite build)
-- `jmix-app/build.gradle` - Jmix application module
-- `ai-agent/build.gradle` - applies `java-library`, `maven-publish`, `io.jmix` to subprojects; publishes to `https://myrepo/releases/`
-- `gradle.properties` (both) - `org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8`; `jmix-app/gradle.properties` adds `hilla.active=false`
-- `settings.gradle` (root composite) - `rootProject.name = 'ai-agent-core'`, includes `jmix-app` and `ai-agent` builds
-- `ai-agent/settings.gradle` - `rootProject.name = 'ai-agent-addon'`, includes `ai-agent` and `ai-agent-starter`
-
-**Repositories:**
-- `mavenCentral()`
-- `https://global.repo.jmix.io/repository/public` (Jmix artifacts)
+- Root composite build files: `settings.gradle`, `build.gradle`, and `gradle.properties`.
+- Add-on build files: `ai-agent/settings.gradle`, `ai-agent/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`, and `ai-agent/ai-agent-starter/ai-agent-starter.gradle`.
+- Host app build files: `jmix-app/settings.gradle`, `jmix-app/build.gradle`, and `jmix-app/gradle.properties`.
+- Spring Boot auto-configuration imports are declared in `ai-agent/ai-agent-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
+- Jmix module metadata lives in `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties`.
+- Liquibase master changelogs live in `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog.xml`, `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog.xml`, and `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/agentstore-changelog.xml`.
 
 ## Platform Requirements
 
 **Development:**
-- Java 17 JDK
-- Gradle 8.14.4 (provided via wrapper)
-- IntelliJ IDEA recommended (Jmix Studio project file `jmix-studio.xml` present)
-- Node.js toolchain provided by Vaadin plugin for frontend bundling
+- Use Java 21 and Gradle Wrapper 8.14.4 from `gradlew` / `gradlew.bat`.
+- Use `./gradlew bootRun` from the root composite or `jmix-app` build to start the host app; `jmix-app/build.gradle` sets `com.vn.jmixapp.JmixAppApplication` as the main class.
+- Use PostgreSQL with pgvector for full RAG behavior because `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog/070-ai-kb-vector-store.xml` manages vector-store schema and `spring-ai-starter-vector-store-pgvector` expects pgvector support.
+- Use Docker for `./gradlew :ai-agent:ai-agent:integrationTest` because Testcontainers PostgreSQL is required for `@Tag("rag-it")` tests.
+- Set `OPENROUTER_API_KEY` only for live tests or real chat calls; `./gradlew :ai-agent:ai-agent:test` excludes `live` tests by default.
 
 **Production:**
-- Spring Boot executable JAR (built via `bootJar`)
-- Default HTTP port 8080
-- Requires writable working directory for HSQLDB file storage (`.jmix/hsqldb/`) and local filesystem storage (Jmix LocalFS)
-- Publishing target configured as Maven repository at `https://myrepo/releases/` (placeholder) in `ai-agent/build.gradle`
-
-## Spring AI (add-on surface)
-
-- **Spring AI version:** 1.1.4 — pinned via `org.springframework.ai:spring-ai-bom:1.1.4` in the add-on functional module's `dependencyManagement` block. Version upgraded between Phase 1 wave start and Phase 2 start per D-10 (see `.planning/phases/02-foundations/02-CONTEXT.md`). All `spring-ai-starter-*` artifacts resolve without explicit versions.
-- **Milestone repo required:** `https://repo.spring.io/milestone` is added to repositories since 1.1.4 is a milestone release.
-
-> Footnote: BOM upgraded to 1.1.4 between Phase 1 wave start and Phase 2 start. BOM pinned in `ai-agent/build.gradle`. Table deltas verified in `.planning/phases/02-foundations/02-RESEARCH.md` §"Spring AI version delta". See `.planning/REQUIREMENTS.md` Scope Changes Log (D-10).
+- Deployment target is a Jmix/Spring Boot application consuming `com.vn:ai-agent-starter:0.0.1-SNAPSHOT` as shown in `jmix-app/build.gradle`.
+- Runtime database target is PostgreSQL for the host `main` store and `agentstore` additional store configured in `jmix-app/src/main/resources/application.properties`.
+- AI model access is OpenAI-compatible HTTP through Spring AI’s OpenAI starter, configured to OpenRouter through `spring.ai.openai.base-url` and `OPENROUTER_API_KEY`.
+- Add-on artifacts publish to the custom Nexus repository configured in `ai-agent/build.gradle`; local composite builds avoid requiring published snapshots during development.
 
 ---
 
-*Stack analysis: 2026-04-18 (Spring AI pinned at 1.1.4 per D-10)*
+*Stack analysis: 2026-04-24*

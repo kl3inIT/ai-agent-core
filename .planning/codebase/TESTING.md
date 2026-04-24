@@ -1,199 +1,192 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-18
+**Analysis Date:** 2026-04-24
 
 ## Test Framework
 
 **Runner:**
-- JUnit 5 (Jupiter) via `useJUnitPlatform()` declared in every Gradle module (`jmix-app/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`).
-- `spring-boot-starter-test` with `org.junit.vintage:junit-vintage-engine` explicitly excluded — Jupiter only.
-- UI tests add `io.jmix.flowui:jmix-flowui-test-assist` (`jmix-app/build.gradle`).
-- `junit-platform-launcher` is added as `testRuntimeOnly` in `ai-agent/ai-agent/ai-agent.gradle`.
+- JUnit Jupiter via Gradle `Test` tasks.
+- Config: `ai-agent/ai-agent/ai-agent.gradle`, `jmix-app/build.gradle`.
+- Default add-on test task excludes `@Tag("live")`, `@Tag("rag-it")`, and `@Tag("eval")` in `ai-agent/ai-agent/ai-agent.gradle`.
 
-**Assertion Libraries:**
-- AssertJ (`org.assertj.core.api.Assertions.assertThat`) — primary for integration tests (`UserTest.java`).
-- JUnit Jupiter `Assertions` — used in UI tests for null/not-null checks (`UserUiTest.java`).
+**Assertion Library:**
+- AssertJ from `spring-boot-starter-test`, used with `assertThat(...)` in tests such as `jmix-app/src/test/java/com/vn/jmixapp/ai/ChatServiceToolIntegrationTest.java`.
+- JUnit assertions are used where appropriate, but AssertJ is the dominant readability pattern.
 
-**Run Commands (from `CLAUDE.md`):**
+**Run Commands:**
 ```bash
-./gradlew test                                                              # Run all tests
-./gradlew test --tests "com.company.sample.order.OrderServiceTest"          # Run single class
-./gradlew test --tests "com.company.sample.order.OrderServiceTest.testOrderCalculations"  # Single method
+./gradlew test                                      # Run all default tests across composite builds
+./gradlew :ai-agent:ai-agent:test                  # Run add-on default tests
+./gradlew :jmix-app:test                           # Run host sample app tests
+./gradlew :ai-agent:ai-agent:evalTest              # Run @Tag("eval") rubric tests
+./gradlew :ai-agent:ai-agent:integrationTest       # Run @Tag("rag-it") tests; requires Docker/Testcontainers
+./gradlew :ai-agent:ai-agent:liveTest              # Run @Tag("live") tests; requires OPENROUTER_API_KEY
+./gradlew :ai-agent:ai-agent:check                 # Run default checks and Docker-gated integrationTest when Docker is available
 ```
-Gradle has no default `--watch` task; no coverage plugin (JaCoCo) is configured.
 
 ## Test File Organization
 
 **Location:**
-- Separate test source tree under `src/test/java`, mirroring production package structure.
-- Test utilities live in a `test_support` sub-package (e.g., `jmix-app/src/test/java/com/vn/jmixapp/test_support/`).
+- Add-on tests are under `ai-agent/ai-agent/src/test/java/com/vn/agent/**` and reuse `src/test/resources/**` fixtures.
+- Host sample tests are under `jmix-app/src/test/java/com/vn/jmixapp/**` with test profile configuration in `jmix-app/src/test/resources/application-test.properties`.
+- Evaluation fixtures live under `ai-agent/ai-agent/src/test/resources/eval/**` and are executed by tests tagged `@Tag("eval")`.
 
 **Naming:**
-- `<Entity>Test` for integration/data tests (`UserTest`, `AITest`).
-- `<Entity>UiTest` for Vaadin Flow UI tests (`UserUiTest`).
-- Test method names use snake_case prefixed with `test_`: `test_saveAndLoad`, `test_createUser`. `AITest.contextLoads` is the smoke-test exception.
+- Test classes end with `Test`, for example `FoundationsBootSmokeTest.java`, `ConversationGatewayTest.java`, and `UserUiTest.java`.
+- Test methods use behavior-oriented names such as `findRecordsOrderRoundTrip()` and `describeEntityAdminPathSurfacesStructuredJson()`.
+- Tagged suites remain in the normal `src/test` source set; Gradle task selection is driven by JUnit tags rather than separate source sets.
 
 **Structure:**
-```
-jmix-app/src/test/
-├── java/com/vn/jmixapp/
-│   ├── user/
-│   │   ├── UserTest.java          # Data/integration test
-│   │   └── UserUiTest.java        # UI test
-│   └── test_support/
-│       └── AuthenticatedAsAdmin.java
-└── resources/
-    └── application-test.properties
-
-ai-agent/ai-agent/src/test/
-├── java/com/vn/agent/
-│   ├── AITest.java                # Context-loads smoke test
-│   └── AITestConfiguration.java   # Test @SpringBootConfiguration
-└── resources/com/vn/agent/
-    ├── liquibase/changelog.xml
-    └── test-app.properties
+```text
+ai-agent/ai-agent/src/test/java/com/vn/agent/<feature>/*Test.java
+ai-agent/ai-agent/src/test/resources/eval/*.yaml
+jmix-app/src/test/java/com/vn/jmixapp/<feature>/*Test.java
+jmix-app/src/test/resources/application-test.properties
 ```
 
 ## Test Structure
 
-**Suite Organization (from `jmix-app/src/test/java/com/vn/jmixapp/user/UserTest.java`):**
+**Suite Organization:**
 ```java
 @SpringBootTest
 @ExtendWith(AuthenticatedAsAdmin.class)
 @ActiveProfiles("test")
-public class UserTest {
+class ChatServiceToolIntegrationTest {
 
+    @Autowired AgentToolCallbacks agentToolCallbacks;
+    @Autowired BuiltInDataTools builtInDataTools;
     @Autowired DataManager dataManager;
-    @Autowired PasswordEncoder passwordEncoder;
-    @Autowired UserRepository userRepository;
-
-    User savedUser;
+    @Autowired Metadata metadata;
+    @Autowired SystemAuthenticator systemAuthenticator;
 
     @Test
-    void test_saveAndLoad() {
-        User user = dataManager.create(User.class);
-        user.setUsername("test-user-" + System.currentTimeMillis());
-        user.setPassword(passwordEncoder.encode("test-passwd"));
-        savedUser = dataManager.save(user);
-
-        User loadedUser = dataManager.load(User.class).id(user.getId()).one();
-        assertThat(loadedUser).isEqualTo(user);
-
-        UserDetails userDetails = userRepository.loadUserByUsername(user.getUsername());
-        assertThat(userDetails).isEqualTo(user);
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (savedUser != null) dataManager.remove(savedUser);
+    void perRequestAssemblyIncludesBuiltInsAndHostContributor() {
+        ToolCallback[] callbacks = agentToolCallbacks.forCurrentUser();
+        assertThat(callbacks.length).isGreaterThanOrEqualTo(7);
     }
 }
 ```
 
 **Patterns:**
-- **Full Spring context.** `@SpringBootTest` is mandatory; no Mockito-based unit tests exist in the repository.
-- **Active profile:** `@ActiveProfiles("test")` to load `application-test.properties`.
-- **Authentication:** Inject `AuthenticatedAsAdmin` via `@ExtendWith` to wrap each test in `SystemAuthenticator.begin("admin") / end()` (see `test_support/AuthenticatedAsAdmin.java`).
-- **Unique test data:** Use `System.currentTimeMillis()` to suffix usernames and avoid collisions across runs.
-- **Narrative comments** separate Arrange/Act/Assert phases inside each test.
-
-**Setup/Teardown:**
-- No `@BeforeEach` in observed tests; authentication is handled by the extension.
-- `@AfterEach tearDown()` deletes created entities. UI test uses a broad cleanup query: `dataManager.load(User.class).query("e.username like ?1", "test-user-%").list().forEach(dataManager::remove);` — runs unconditionally.
+- Use `@SpringBootTest` for business logic, persistence, auto-configuration, role, and tool wiring tests.
+- Use Jmix test support extensions such as `AuthenticatedAsAdmin` under `jmix-app/src/test/java/com/vn/jmixapp/test_support/AuthenticatedAsAdmin.java`.
+- Use `@ActiveProfiles("test")` for Jmix/Spring Boot tests that need test database and profile-specific properties.
+- Use `SystemAuthenticator` to seed data or run setup that should bypass row-level policies, then assert through secured `DataManager` paths.
+- Keep integration smoke tests focused on end-to-end contracts rather than exhaustive UI rendering.
 
 ## Mocking
 
-**Framework:**
-- Mockito is available transitively via `spring-boot-starter-test`, but **no mocks are used** in the observed tests. The repository favours full `@SpringBootTest` integration tests over unit tests with mocks.
+**Framework:** Mockito via `spring-boot-starter-test`; Spring test support is available for application-context tests.
 
-**What to Mock:** Not applicable in the current test suite.
+**Patterns:**
+```java
+@Test
+void serviceHandlesCollaboratorResult() {
+    Collaborator collaborator = mock(Collaborator.class);
+    when(collaborator.call()).thenReturn("ok");
+
+    Service service = new Service(collaborator);
+
+    assertThat(service.run()).isEqualTo("ok");
+}
+```
+
+**What to Mock:**
+- Mock LLM providers, clock-like collaborators, prompt-boundary collaborators, and small service dependencies when testing deterministic logic under `ai-agent/ai-agent/src/main/java/com/vn/agent/**`.
+- Use Spring AI test support for chat-model behavior where possible; keep live model calls in `@Tag("live")` tests.
+- Mock or fake SPI contributors when testing aggregation behavior, such as tool contributor assembly in `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/**`.
 
 **What NOT to Mock:**
-- `DataManager`, `UserRepository`, `PasswordEncoder`, `ViewNavigators` — always injected real beans.
-- Database layer — replaced with an embedded HSQL DB (see Fixtures section), not mocked.
+- Do not mock Jmix `DataManager`, `Metadata`, `AccessManager`, or row-level security when the test is asserting Jmix integration semantics.
+- Do not replace `ApplicationEventPublisher` with `@SpyBean`; use real Spring events and event capture patterns.
+- Do not mock entity construction; create entities with `Metadata.create()` or `DataManager.create()`.
 
 ## Fixtures and Factories
 
 **Test Data:**
-- Created ad-hoc inside each test via `DataManager.create(User.class)` followed by setters. No shared factory/builder classes.
-- No `@Sql`, `@DataSet`, or fixture files; Liquibase runs at startup to build schema.
+```java
+systemAuthenticator.runWithSystem(() -> {
+    Customer customer = metadata.create(Customer.class);
+    customer.setName("Test Buyer " + System.currentTimeMillis());
+    customer.setEmail("test.buyer@example.com");
+    dataManager.save(customer);
+
+    Order order = metadata.create(Order.class);
+    order.setNumber("ORD-" + System.currentTimeMillis());
+    order.setCustomer(customer);
+    dataManager.save(order);
+});
+```
 
 **Location:**
-- None. Test data is inline in the test method; cleanup is done in `@AfterEach`.
-
-## Test Database
-
-**`jmix-app` (integration + UI):**
-- HSQL file-based DB. `jmix-app/src/test/resources/application-test.properties`:
-  ```properties
-  main.datasource.url=jdbc:hsqldb:file:.jmix/hsqldb/jmixapp_test
-  main.datasource.username=sa
-  main.datasource.password=
-  ```
-- Schema is built by Liquibase at startup from `src/main/resources/com/vn/jmixapp/liquibase/changelog.xml`.
-
-**`ai-agent` module:**
-- Uses an embedded in-memory HSQL DB with a unique name per test context in `AITestConfiguration.java`:
-  ```java
-  @Bean @Primary
-  DataSource dataSource() {
-      return new EmbeddedDatabaseBuilder()
-              .generateUniqueName(true)
-              .setType(EmbeddedDatabaseType.HSQL)
-              .build();
-  }
-  ```
-- Annotated with `@SpringBootConfiguration`, `@EnableAutoConfiguration`, `@Import(AIConfiguration.class)`, `@JmixModule`, `@PropertySource("classpath:/com/vn/agent/test-app.properties")`.
-- Liquibase changelog for tests: `ai-agent/ai-agent/src/test/resources/com/vn/agent/liquibase/changelog.xml`.
+- Host authentication helpers live in `jmix-app/src/test/java/com/vn/jmixapp/test_support/**`.
+- Test data for evaluation rubrics lives in `ai-agent/ai-agent/src/test/resources/eval/**`.
+- Spring/Jmix profile properties live in `jmix-app/src/test/resources/application-test.properties` and add-on test resources under `ai-agent/ai-agent/src/test/resources/**`.
 
 ## Coverage
 
-**Requirements:** None enforced. No JaCoCo, Kover, or coverage plugin detected.
+**Requirements:** None enforced by a coverage plugin in `build.gradle`, `ai-agent/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`, or `jmix-app/build.gradle`.
 
-**View Coverage:** Not configured.
+**View Coverage:**
+```bash
+./gradlew :ai-agent:ai-agent:test --tests "com.vn.agent.orchestration.ConversationGatewayTest"
+./gradlew :jmix-app:test --tests "com.vn.jmixapp.ai.ChatServiceToolIntegrationTest"
+```
 
 ## Test Types
 
-**Smoke / Context-Loads:**
-- `ai-agent/ai-agent/src/test/java/com/vn/agent/AITest.java` — `@SpringBootTest` with an empty `contextLoads()` method verifying the Jmix module starts.
+**Unit Tests:**
+- Scope deterministic service, guard, filter, DTO, prompt-boundary, and utility behavior under `ai-agent/ai-agent/src/main/java/com/vn/agent/**`.
+- Prefer constructor-created subjects and mocked/fake collaborators for pure logic.
+- Keep assertions precise with AssertJ and avoid broad string-only checks unless testing serialized tool output.
 
 **Integration Tests:**
-- `jmix-app/src/test/java/com/vn/jmixapp/user/UserTest.java` — exercises `DataManager`, entity persistence, and `UserRepository` against the real Spring context and HSQL DB.
+- Use `@SpringBootTest` to validate Jmix entity mappings, Liquibase, DataManager access, auto-configuration, roles, Spring AI tool callbacks, and host add-on wiring.
+- Tag Docker/Testcontainers-backed pgvector/RAG tests with `@Tag("rag-it")`; run them with `./gradlew :ai-agent:ai-agent:integrationTest`.
+- Keep `./gradlew test` green without Docker by relying on tag exclusion and Docker availability gates in `ai-agent/ai-agent/ai-agent.gradle`.
 
-**UI Tests:**
-- `jmix-app/src/test/java/com/vn/jmixapp/user/UserUiTest.java` — Jmix Flow UI integration test using `@UiTest` + `FlowuiTestAssistConfiguration`.
-  ```java
-  @UiTest
-  @SpringBootTest(classes = {JmixAppApplication.class, FlowuiTestAssistConfiguration.class})
-  @ActiveProfiles("test")
-  public class UserUiTest { ... }
-  ```
-- Uses `ViewNavigators` to navigate, `UiTestUtils.getCurrentView()` to grab the active view, and `UiTestUtils.getComponent(view, "id")` to retrieve Vaadin components by id.
-- Interacts through real component API (`createBtn.click()`, `usernameField.setValue(...)`), asserts by inspecting `DataGrid<User>.getItems()`.
-
-**Unit Tests / E2E:**
-- No pure unit tests (Mockito-only) detected.
-- No E2E framework (Playwright, Selenium) integrated in the repo. `CLAUDE.md` mentions Playwright MCP only as an ad-hoc UI verification aid when the app is running manually.
+**E2E Tests:**
+- Jmix UI tests use `@UiTest` with `FlowuiTestAssistConfiguration`, as in `jmix-app/src/test/java/com/vn/jmixapp/user/UserUiTest.java`.
+- UI tests are present but selective; most add-on UI contracts are verified through view/controller support tests and service-level tests.
+- Browser/manual verification is still expected for complex Flow UI behavior when the app is running at `http://localhost:8080`.
 
 ## Common Patterns
 
-**JUnit Extensions:**
-- Custom extension `AuthenticatedAsAdmin` implements `BeforeEachCallback` + `AfterEachCallback`; pulls `SystemAuthenticator` from the Spring `ApplicationContext` via `SpringExtension.getApplicationContext(context)` and wraps each test in `begin("admin") / end()`.
-
-**Navigation in UI Tests:**
+**Async Testing:**
 ```java
-viewNavigators.view(UiTestUtils.getCurrentView(), UserListView.class).navigate();
-UserListView userListView = UiTestUtils.getCurrentView();
-JmixButton createBtn = UiTestUtils.getComponent(userListView, "createButton");
-createBtn.click();
+@Test
+void publishesStreamingEvent() {
+    conversationGateway.sendMessage(conversationId, "hello");
+
+    assertThat(eventCapture.events())
+            .anySatisfy(event -> assertThat(event.conversationId()).isEqualTo(conversationId));
+}
 ```
 
-**Async Testing:** No async/reactive tests present. Test logic is strictly synchronous (Vaadin Flow server-side model).
+**Error Testing:**
+```java
+@Test
+void rejectsInvalidToolInput() {
+    assertThatThrownBy(() -> converter.convert(invalidLiteral))
+            .isInstanceOf(ToolUserError.class)
+            .hasMessageContaining("invalid");
+}
+```
 
-**Error Testing:** No explicit `assertThrows` patterns observed; error paths are covered implicitly via UI validation events.
+## Validation Workflow
 
-**Cleanup Strategy:** Broad `WHERE e.username LIKE 'test-user-%'` sweeps in `@AfterEach` for UI tests to handle mid-test failures that leave persisted entities behind.
+**Local Sequence:**
+- Run JetBrains inspections on touched Java/XML files with `mcp__jetbrains__get_file_problems(filePath, onlyErrors=false)` after meaningful code changes.
+- Run the narrowest affected test class first with `./gradlew :module:test --tests "fully.qualified.TestClass"`.
+- Run the containing module test task after targeted tests pass.
+- Run `./gradlew :ai-agent:ai-agent:check` on machines with Docker so `integrationTest` participates in the verification gate.
+- Run `./gradlew :ai-agent:ai-agent:evalTest` when changing parameters, structured output, prompt formatting, guardrails, or eval fixtures.
+
+**Environment Notes:**
+- `liveTest` requires `OPENROUTER_API_KEY`; read it from `.env` when needed and never hardcode or document secret values.
+- `integrationTest` requires Docker for Testcontainers pgvector.
+- HSQLDB file-lock flakiness is documented in `.planning/STATE.md`; stop lingering app/test JVMs before re-running database-heavy tests on Windows.
 
 ---
 
-*Testing analysis: 2026-04-18*
+*Testing analysis: 2026-04-24*

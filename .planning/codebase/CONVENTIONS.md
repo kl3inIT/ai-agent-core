@@ -1,150 +1,133 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-04-18
+**Analysis Date:** 2026-04-24
 
 ## Naming Patterns
 
 **Files:**
-- Java classes: `PascalCase.java` (e.g., `UserListView.java`, `DatabaseUserRepository.java`, `AIAutoConfiguration.java`)
-- View XML descriptors: `kebab-case.xml` matching the view (e.g., `user-list-view.xml`, `user-detail-view.xml`) in `jmix-app/src/main/resources/com/vn/jmixapp/view/**`
-- Gradle modules use lowercase hyphenless/hyphenated names: `ai-agent.gradle`, `ai-agent-starter.gradle`
-- Resource bundles: `messages.properties`, `messages_en.properties`, `messages_vi.properties` — ALWAYS maintain all locales in parallel
+- Use Java `PascalCase.java` for classes and records under `ai-agent/ai-agent/src/main/java/com/vn/agent/**` and `jmix-app/src/main/java/com/vn/jmixapp/**`.
+- Use Jmix XML descriptor names in kebab-case matching the view controller, such as `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/chat/chat-view.xml` and `jmix-app/src/main/resources/com/vn/jmixapp/view/order/order-detail-view.xml`.
+- Use numbered Liquibase changelogs under `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/changelog/**` and `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog/**`.
+- Use `*Test.java` for all JUnit tests under `ai-agent/ai-agent/src/test/java/**` and `jmix-app/src/test/java/**`.
 
-**Classes:**
-- Views: suffix with `View` (e.g., `MainView`, `UserListView`, `UserDetailView`, `LoginView`)
-- Configurations: suffix with `Configuration` (e.g., `AIConfiguration`, `AIAutoConfiguration`, `AITestConfiguration`, `JmixAppSecurityConfiguration`)
-- Repositories: suffix with `Repository` (e.g., `DatabaseUserRepository`)
-- Security roles: suffix with `Role`, defined as interfaces (e.g., `FullAccessRole`, `UiMinimalRole`)
-- Test classes: suffix with `Test` or `UiTest` (e.g., `UserTest`, `UserUiTest`, `AITest`)
-
-**Functions/Methods:**
-- `camelCase`. Standard JavaBean accessors: `getXxx`/`setXxx`/`isXxx`. Examples: `generateUserName`, `initDefaultCredentials`, `createAvatar`.
-- Spring Jmix event handlers use `on<EventName>` pattern: `onInit`, `onInitEntity`, `onReady`, `onValidation`, `onBeforeSave`, `onAfterSave`, `onLogin` (see `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java`).
+**Functions:**
+- Use lower camelCase method names with explicit intent, for example `forCurrentUser()` in `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/AgentToolCallbacks.java` and `currentUserIsAdmin()` in `ai-agent/ai-agent/src/main/java/com/vn/agent/view/conversation/ConversationListView.java`.
+- Test methods use behavior names without underscores, such as `perRequestAssemblyIncludesBuiltInsAndHostContributor()` in `jmix-app/src/test/java/com/vn/jmixapp/ai/ChatServiceToolIntegrationTest.java`.
+- Spring `@Bean` methods describe the bean contract, as in auto-configuration classes under `ai-agent/ai-agent-starter/src/main/java/com/vn/agent/autoconfigure/**`.
 
 **Variables:**
-- `camelCase` fields; `final` parameters are common (e.g., `setId(final UUID id)` in `User.java`).
-- Constants: `UPPER_SNAKE_CASE` with `String CODE = "..."` pattern for role codes (e.g., `FullAccessRole.CODE = "system-full-access"`).
+- Use full, non-abbreviated identifiers: `metaClass`, `metaProperty`, `datatype`, `currentAuthentication`, `conversationGateway`, and `userEditableIndex` are preferred over short forms.
+- Short loop variables such as `i` and exception variables such as `e` are acceptable only in narrow local scopes.
+- Test setup variables should reveal domain intent, for example `orderNumber`, `loadedUser`, and `systemAuthenticator` in `jmix-app/src/test/java/**`.
 
-**Types / Packages:**
-- Base package: `com.vn.*`. Jmix app uses `com.vn.jmixapp`, agent module uses `com.vn.agent`, starter uses `com.vn.autoconfigure.agent`.
-- Feature subpackages: `entity/`, `view/<entity>/`, `security/`, `test_support/`.
-
-**Database Columns:**
-- `UPPER_SNAKE_CASE` (e.g., `USER_`, `USERNAME`, `FIRST_NAME`, `TIME_ZONE_ID`). Table names end with `_` to avoid SQL keyword clashes (`USER_`). Indexes: `IDX_<TABLE>__ON_<COLUMN>` (e.g., `IDX_USER__ON_USERNAME`).
-
-**Message Keys:**
-- Fully-qualified: `<package>/<view-or-entity>.<field>` (e.g., `com.vn.jmixapp.view.user/UserListView.title`, `com.vn.jmixapp.entity/User.username`). See `jmix-app/src/main/resources/com/vn/jmixapp/messages_en.properties`.
+**Types:**
+- Jmix entities use `Ai*` names in the add-on (`AiConversation`, `AiMessage`, `AiKnowledgeDocument`) under `ai-agent/ai-agent/src/main/java/com/vn/agent/entity/**`.
+- DTOs and records use explicit suffixes like `Dto`, `Body`, `Request`, `Response`, or `Event`, for example `ChatResponseDto.java`, `AiParametersBody.java`, and `StreamingEvent.java`.
+- SPI interfaces live under `ai-agent/ai-agent/src/main/java/com/vn/agent/spi/**` and describe extension points such as tool contributors, audit listeners, and prompt contributors.
+- Security roles use role interface names ending in `Role`, such as `AiAgentUserRole.java`, `AiAgentAdminRole.java`, and `SampleDataRole.java`.
 
 ## Code Style
 
 **Formatting:**
-- No explicit formatter config (`.editorconfig`, `.prettierrc`, Checkstyle, Spotless) detected. IDE defaults (IntelliJ Jmix Studio) are assumed.
-- 4-space indentation; opening braces on the same line (K&R).
-- Trailing newline at end of file.
+- Java source uses 4-space indentation and standard Java brace style throughout `ai-agent/ai-agent/src/main/java/**` and `jmix-app/src/main/java/**`.
+- Imports are explicit for application/Jmix/Spring classes; wildcard imports appear in some entity files for `jakarta.persistence.*`, so keep new imports explicit unless the surrounding file already uses a wildcard group.
+- No repository-level `.editorconfig`, Checkstyle, PMD, Spotless, or formatter config is detected; match surrounding file formatting instead of introducing a new formatter.
+- Gradle files use Groovy DSL and single-quoted dependency coordinates in `ai-agent/build.gradle`, `ai-agent/ai-agent/ai-agent.gradle`, and `jmix-app/build.gradle`.
 
 **Linting:**
-- No standalone linter (e.g., Checkstyle, PMD, SpotBugs) configured in any `build.gradle`. Quality is enforced via Jmix Studio and JetBrains MCP `get_file_problems` (see `CLAUDE.md`).
-
-**Modifiers:**
-- `final` on method parameters is idiomatic (e.g., `public void setUsername(final String username)`, `public void onInit(final InitEvent event)`).
-- Fields are `private` with explicit getters/setters. No Lombok is permitted (see `CLAUDE.md` forbidden list).
+- No dedicated lint task or static analysis plugin is detected in `build.gradle`, `ai-agent/build.gradle`, or `jmix-app/build.gradle`.
+- Use JetBrains inspections as the primary local lint signal after Java changes, especially `mcp__jetbrains__get_file_problems` on touched Java/XML files.
+- Treat inspection fixes as required for real bugs, missing nullability on overrides in `@NonNullApi` packages, diamond operators, broken Javadoc links, and modern collection idioms already accepted by the project.
 
 ## Import Organization
 
-**Order (observed in `UserDetailView.java`, `MainView.java`, `LoginView.java`):**
-1. Project-local imports (`com.vn.*`)
-2. Third-party imports (`com.vaadin.*`, `io.jmix.*`, `org.springframework.*`, `org.slf4j.*`, etc.)
-3. `jakarta.*` imports
-4. `java.*` / `java.util.*` imports
+**Order:**
+1. Static imports first in tests, for example AssertJ imports in `jmix-app/src/test/java/com/vn/jmixapp/ai/ChatServiceToolIntegrationTest.java`.
+2. Project imports such as `com.vn.agent.*` or `com.vn.jmixapp.*`.
+3. Jmix, Vaadin, Spring, Spring AI, Jackson, and Jakarta imports.
+4. Java standard library imports.
 
-- No wildcard imports except for related Jmix packages (e.g., `io.jmix.flowui.view.*` in view controllers).
-- No `import static` except in tests (`import static org.assertj.core.api.Assertions.assertThat;`).
-
-**Path Aliases:** N/A (Java).
+**Path Aliases:**
+- Java package roots are `com.vn.agent` for the add-on module and `com.vn.jmixapp` for the sample host application.
+- Resource packages mirror Java packages: `ai-agent/ai-agent/src/main/resources/com/vn/agent/**` and `jmix-app/src/main/resources/com/vn/jmixapp/**`.
+- No TypeScript-style aliases are detected; do not assume frontend aliasing outside generated Vaadin files.
 
 ## Error Handling
 
 **Patterns:**
-- Catch specific exception types, never generic `Exception`. Example from `LoginView.onLogin`:
-  ```java
-  } catch (final BadCredentialsException | DisabledException | LockedException | AccessDeniedException e) {
-      log.warn("Login failed for user '{}': {}", event.getUsername(), e.toString());
-      event.getSource().setError(true);
-  }
-  ```
-- UI validation surfaces errors via Jmix `ValidationEvent.getErrors().add(...)` using a message-bundle key, not hardcoded strings (see `UserDetailView.onValidation`).
-- `throws Exception` only where Spring signatures demand it (e.g., `SecurityFilterChain publicFilterChain(HttpSecurity http) throws Exception` in `JmixAppSecurityConfiguration.java`).
-- Stream terminal operations that must yield a value use `.orElseThrow()` (e.g., `UserUiTest.test_createUser`).
+- User-facing tool failures are represented with explicit exceptions and safe JSON results, especially under `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/**` and `ai-agent/ai-agent/src/main/java/com/vn/agent/guard/**`.
+- Guardrail failures use domain exceptions such as `IterationCapExceededException`, `RateLimitExceededException`, `TokenBudgetExhaustedException`, and `StructuredOutputException` in `ai-agent/ai-agent/src/main/java/com/vn/agent/guard/**`.
+- Conversation lookup failures use explicit exceptions such as `ConversationNotFoundException.java` in `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/ConversationNotFoundException.java`.
+- Jmix data access should go through `DataManager` and the current security context; do not introduce `EntityManager` for application logic.
 
 ## Logging
 
-**Framework:** SLF4J (`org.slf4j.Logger` / `LoggerFactory`). Never `System.out`.
+**Framework:** SLF4J
 
 **Patterns:**
-- Per-class logger: `private static final Logger log = LoggerFactory.getLogger(LoginView.class);`
-- Parameterised messages with `{}` placeholders: `log.warn("Login failed for user '{}': {}", event.getUsername(), e.toString());`
-- `JmixAppApplication` uses ad-hoc `LoggerFactory.getLogger(JmixAppApplication.class)` inside an event listener for startup messages.
+- Use `LoggerFactory.getLogger(CurrentClass.class)` for production logging, as seen in `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/AuditAdvisor.java`.
+- Log lifecycle, audit, streaming, and guardrail events where the message supports debugging without leaking prompt contents or secrets.
+- Avoid `System.out` in production code; Gradle lifecycle logging is confined to build scripts such as `ai-agent/ai-agent/ai-agent.gradle`.
 
 ## Comments
 
 **When to Comment:**
-- Javadoc on classes that provide extension points or non-obvious behaviour (e.g., `JmixAppSecurityConfiguration` documents `SecurityFilterChain` ordering with an embedded `<pre>` example; `AuthenticatedAsAdmin` describes JUnit extension usage).
-- Short one-line JavaDoc on test classes stating intent (e.g., `/** Sample integration test for the User entity. */`).
-- Inline comments in tests narrate setup/act/assert steps (see `UserUiTest.test_createUser`).
+- Add comments for non-obvious dependency scope, verification gates, and intentional deviations, as seen in `ai-agent/ai-agent/ai-agent.gradle` around Spring AI, RAG, eval, and integration test tasks.
+- Keep business logic comments concise and focused on invariants, security boundaries, or compatibility constraints.
+- Do not add comments that restate obvious Java control flow.
 
-**JavaDoc/TSDoc:** Standard JavaDoc. `{@link ...}` used for cross-referencing Spring/Jmix classes.
+**JSDoc/TSDoc:**
+- Use JavaDoc on public SPI contracts and tests that encode phase decisions, for example `jmix-app/src/test/java/com/vn/jmixapp/ai/ChatServiceToolIntegrationTest.java`.
+- JavaDoc can reference project decisions or phase contracts when tests are executable documentation.
+- No TSDoc convention is applicable; frontend code is primarily Vaadin/Jmix-generated resources.
 
 ## Function Design
 
-**Size:** Methods stay small and focused; view logic is decomposed into private helpers (e.g., `MainView.createAvatar`, `generateUserName`, `isSubstituted`; `LoginView.initLocales`, `initDefaultCredentials`).
+**Size:** Keep functions focused on one orchestration or domain operation; move reusable business logic into services under `ai-agent/ai-agent/src/main/java/com/vn/agent/**` or `jmix-app/src/main/java/com/vn/jmixapp/service/**` instead of view controllers.
 
-**Parameters:** Prefer `final` on parameters. Pass domain objects (`User`, `UserDetails`) rather than primitives.
+**Parameters:** Prefer strongly typed parameters and records for boundary models; use strict literal coercion at LLM tool boundaries under `ai-agent/ai-agent/src/main/java/com/vn/agent/filter/**` and `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/**`.
 
-**Return Values:**
-- Null-safe returns for collections: `return authorities != null ? authorities : Collections.emptyList();` (`User.getAuthorities()`).
-- Defensive boolean checks: `Boolean.TRUE.equals(active)` instead of unboxing.
-- `Strings.nullToEmpty(...)` (Guava) for string concatenation defence (`MainView.generateUserName`).
+**Return Values:** Return domain DTOs/records or safe serialized tool results; avoid returning mutable internal state from services and tool-surface classes.
 
 ## Module Design
 
-**Exports:** Plain `public` classes. No barrel files.
+**Exports:**
+- Add-on runtime code lives in `ai-agent/ai-agent/src/main/java/com/vn/agent/**`; auto-configuration lives in `ai-agent/ai-agent-starter/src/main/java/com/vn/agent/autoconfigure/**`.
+- Public SPIs live in `ai-agent/ai-agent/src/main/java/com/vn/agent/spi/**`; only add SPI when host-specific behavior is required.
+- Host sample code lives in `jmix-app/src/main/java/com/vn/jmixapp/**` and should remain sample/consumer-facing.
 
-**Packaging:**
-- Jmix modular layout per `CLAUDE.md`: `entity/`, `service/`, `view/<entity>/`, `security/`, `test_support/`.
-- Each view package owns both the Java controller and the `*.xml` descriptor under `src/main/resources/com/vn/jmixapp/view/<entity>/`.
-- Multi-project Gradle build: `ai-agent-core` (root), `ai-agent/ai-agent`, `ai-agent/ai-agent-starter`, `jmix-app`. Starters re-export configurations via `@AutoConfiguration` + `@Import` (see `AIAutoConfiguration.java`).
+**Barrel Files:**
+- Java has no barrel-file pattern; package-level organization is the primary navigation mechanism.
+- Spring auto-configuration registration uses `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` where applicable in the starter module.
 
-## Dependency Injection
+## Jmix Practices
+
+**Entities:**
+- Use `@JmixEntity`, UUID id with `@JmixGeneratedValue`, `@Version`, and `@InstanceName` in entities such as `ai-agent/ai-agent/src/main/java/com/vn/agent/entity/AiConversation.java`.
+- Use `@Composition` for parent-child aggregates, for example conversation/message relationships in `ai-agent/ai-agent/src/main/java/com/vn/agent/entity/AiConversation.java` and `AiMessage.java`.
+- Instantiate entities with `Metadata.create()` or `DataManager.create()` in tests and services; do not call entity constructors directly.
+- Do not use Lombok on Jmix entities.
 
 **Views:**
-- `@ViewComponent` for XML-declared components (fields `usernameField`, `passwordField`, `messageBundle` in `UserDetailView.java`).
-- `@Autowired` for Spring beans (`Notifications`, `EntityStates`, `PasswordEncoder`, `Messages`, `UiComponents`).
-- Field injection is accepted in views (framework idiom).
+- Use XML descriptors for layouts, data containers, actions, filters, and bindings under `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/**` and `jmix-app/src/main/resources/com/vn/jmixapp/view/**`.
+- Java view controllers should orchestrate lifecycle, events, navigation, validation, and glue only; keep business logic out of `*View.java`.
+- Wire events with official Jmix annotations such as `@Subscribe`, `@Install`, and `@Supply`; avoid raw Vaadin listener registration when Jmix event wiring can express the same behavior.
+- Use `msg://` keys for labels, titles, placeholders, and button text; add keys to all locale bundles such as `messages_en.properties` and `messages_vi.properties`.
 
-**Services / Repositories:**
-- Constructor injection is mandated by `CLAUDE.md`. Field injection is forbidden in services.
+**Security:**
+- Define resource roles as interfaces under `ai-agent/ai-agent/src/main/java/com/vn/agent/security/**` or `jmix-app/src/main/java/com/vn/jmixapp/security/**`.
+- Use Jmix role annotations such as `@ResourceRole`, `@EntityPolicy`, `@EntityAttributePolicy`, `@ViewPolicy`, and `@MenuPolicy`.
+- Treat AI as another Jmix client: rely on `AccessManager`, `DataManager`, row-level roles, and the current user's security context.
 
-## Jmix-Specific Rules
+## Validation Workflow
 
-- Entities: `@JmixEntity` + `@Entity` + UUID `@Id` with `@JmixGeneratedValue`, `@Version` field, `@InstanceName` with `@DependsOnProperties` (see `User.java`).
-- Never instantiate entities via `new`; use `DataManager.create(...)` / `Metadata.create(...)` (see `UserTest.test_saveAndLoad`).
-- Data access uses `DataManager` fluent API, never `EntityManager`.
-- Views are annotated with `@Route`, `@ViewController(id = "...")`, `@ViewDescriptor(path = "...")` and extend `StandardListView`/`StandardDetailView`/`StandardView`/`StandardMainView`.
-- Security roles are **interfaces** annotated with `@ResourceRole`; policies via `@EntityPolicy`, `@EntityAttributePolicy`, `@ViewPolicy`, `@MenuPolicy`, `@SpecificPolicy` (see `FullAccessRole.java`, `UiMinimalRole.java`).
-- All UI text goes through `msg://` keys or `MessageBundle.getMessage(...)`. No hardcoded UI strings.
-- Every message must be added to all locale files (`messages_en.properties`, `messages_vi.properties`).
-- Password handling: hash with `PasswordEncoder.encode(...)` in `onBeforeSave` before persisting (`UserDetailView.onBeforeSave`).
-
-## Forbidden (from `CLAUDE.md`)
-
-- Lombok on entities.
-- Entity instantiation via constructor.
-- `EntityManager`.
-- Business logic inside view controllers.
-- Hardcoded UI text.
-- Single-locale message additions.
-- Edits in `frontend/generated/`.
+**Required Checks:**
+- After meaningful Java/XML changes, run JetBrains file inspections for touched files with `mcp__jetbrains__get_file_problems(filePath, onlyErrors=false)`.
+- Run targeted Gradle tests first, then broader module tests when behavior changes.
+- Use `./gradlew :ai-agent:ai-agent:test` for add-on unit/integration-smoke coverage and `./gradlew :jmix-app:test` for host app coverage.
+- Use `./gradlew :ai-agent:ai-agent:integrationTest` only when Docker/Testcontainers are available.
+- Use `./gradlew :ai-agent:ai-agent:evalTest` for evaluation rubrics and `./gradlew :ai-agent:ai-agent:liveTest` only when `OPENROUTER_API_KEY` is available.
 
 ---
 
-*Convention analysis: 2026-04-18*
+*Convention analysis: 2026-04-24*
