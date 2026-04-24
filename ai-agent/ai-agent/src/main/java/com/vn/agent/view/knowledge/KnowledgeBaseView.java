@@ -8,6 +8,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.QueryParameters;
@@ -20,6 +21,7 @@ import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.component.upload.JmixUpload;
@@ -31,6 +33,7 @@ import io.jmix.flowui.upload.TemporaryStorage;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Supply;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -107,6 +110,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
     private MessageSource messageSource;
     @Autowired
     private TemporaryStorage temporaryStorage;
+    @Autowired
+    private UiComponents uiComponents;
 
     /** Captured onAttach so the push listener can UI.access() the correct UI per-browser-tab. */
     private volatile UI ownerUi;
@@ -124,14 +129,15 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
             deleteBtn.setEnabled(selected);
         });
 
-        // Status column — Vaadin Badge via ComponentRenderer (D-17).
-        documentsDataGrid.getColumnByKey("status")
-                .setRenderer(new ComponentRenderer<>(doc -> renderStatusBadge(doc)));
-
         // Upload wiring keeps files inside Jmix temporary storage while using
         // Vaadin's current UploadHandler API instead of deprecated receiver access.
         documentsDl.addPostLoadListener(e -> selectPendingDocumentIfNeeded());
         configureUploadHandling();
+    }
+
+    @Supply(to = "documentsDataGrid.status", subject = "renderer")
+    private Renderer<AiKnowledgeDocument> documentsDataGridStatusRenderer() {
+        return new ComponentRenderer<>(this::createStatusBadge, this::updateStatusBadge);
     }
 
     @Subscribe("reingestBtn")
@@ -202,19 +208,30 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument>
 
     // --- Internals -------------------------------------------------------------
 
-    private Span renderStatusBadge(AiKnowledgeDocument doc) {
+    private Span createStatusBadge() {
+        Span badge = uiComponents.create(Span.class);
+        badge.getElement().getThemeList().add("badge");
+        return badge;
+    }
+
+    private void updateStatusBadge(Span badge, AiKnowledgeDocument doc) {
         AiKnowledgeDocumentStatus status = doc.getStatus();
         Locale locale = UI.getCurrent().getLocale();
         String key = "knowledgeBase.status." + (status == null ? "pending" : status.name().toLowerCase(Locale.ROOT));
         String fallback = status == null ? "Pending" : status.name();
-        String label = messageSource.getMessage(key, null, fallback, locale);
-        Span badge = new Span(label);
+        badge.setText(messageSource.getMessage(key, null, fallback, locale));
+        // Reset theme list — ComponentRenderer reuses the Span across rows, so stale
+        // variants from a previous row would leak onto the current one.
+        badge.getElement().getThemeList().clear();
         badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add(statusTheme(status));
+        for (String variant : statusTheme(status).split(" ")) {
+            badge.getElement().getThemeList().add(variant);
+        }
         if (status == AiKnowledgeDocumentStatus.FAILED && doc.getErrorMessage() != null) {
             badge.getElement().setAttribute("title", doc.getErrorMessage());
+        } else {
+            badge.getElement().removeAttribute("title");
         }
-        return badge;
     }
 
     private void selectPendingDocumentIfNeeded() {

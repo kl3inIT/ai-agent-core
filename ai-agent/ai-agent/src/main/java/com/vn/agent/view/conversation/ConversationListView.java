@@ -1,6 +1,7 @@
 package com.vn.agent.view.conversation;
 
 import com.vaadin.flow.component.AbstractField;
+import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.Route;
@@ -15,6 +16,7 @@ import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Supply;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -77,10 +79,6 @@ public class ConversationListView extends StandardListView<AiConversation> {
         userFilter.setVisible(isAdmin);
         conversationsDataGrid.getColumnByKey("createdBy").setVisible(isAdmin);
 
-        // Messages count column — per-row DataManager count. Small result sets per user.
-        conversationsDataGrid.getColumnByKey("messageCount")
-                .setRenderer(new TextRenderer<>(row -> String.valueOf(countMessages(row.getId()))));
-
         // Filter bar — debounce user input via LAZY, reload on every change. The
         // reload wiring itself is declarative via @Subscribe("<fieldId>") handlers below.
         titleFilter.setValueChangeMode(ValueChangeMode.LAZY);
@@ -101,6 +99,12 @@ public class ConversationListView extends StandardListView<AiConversation> {
         });
 
         rebuildQuery();
+    }
+
+    /** Messages count column — per-row DataManager count. Small result sets per user. */
+    @Supply(to = "conversationsDataGrid.messageCount", subject = "renderer")
+    private Renderer<AiConversation> conversationsDataGridMessageCountRenderer() {
+        return new TextRenderer<>(row -> String.valueOf(countMessages(row.getId())));
     }
 
     @Subscribe("titleFilter")

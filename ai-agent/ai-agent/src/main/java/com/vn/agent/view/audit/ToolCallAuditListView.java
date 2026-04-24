@@ -4,11 +4,13 @@ import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
 import io.jmix.core.DataManager;
 import io.jmix.flowui.DialogWindows;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.component.combobox.JmixComboBox;
 import io.jmix.flowui.component.datetimepicker.TypedDateTimePicker;
 import io.jmix.flowui.component.grid.DataGrid;
@@ -18,6 +20,7 @@ import io.jmix.flowui.view.DialogWindow;
 import io.jmix.flowui.view.DefaultMainViewParent;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Supply;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
@@ -90,6 +93,8 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     private MessageSource messageSource;
     @Autowired
     private DialogWindows dialogWindows;
+    @Autowired
+    private UiComponents uiComponents;
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -102,10 +107,6 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
 
         userFilter.setValueChangeMode(com.vaadin.flow.data.value.ValueChangeMode.LAZY);
 
-        // D-22 Outcome badge renderer.
-        auditsDataGrid.getColumnByKey("outcome")
-                .setRenderer(new ComponentRenderer<>(this::renderOutcomeBadge));
-
         // D-21 Row-click opens detail dialog. Retained as a raw listener because the
         // ItemClickEvent carries the per-row entity the dialog needs.
         auditsDataGrid.addItemClickListener(e -> {
@@ -117,6 +118,33 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
                 dialogWindow.open();
             }
         });
+    }
+
+    /** D-22 Outcome badge renderer. */
+    @Supply(to = "auditsDataGrid.outcome", subject = "renderer")
+    private Renderer<AiToolCallAudit> auditsDataGridOutcomeRenderer() {
+        return new ComponentRenderer<>(this::createOutcomeBadge, this::updateOutcomeBadge);
+    }
+
+    private Span createOutcomeBadge() {
+        Span badge = uiComponents.create(Span.class);
+        badge.getElement().getThemeList().add("badge");
+        return badge;
+    }
+
+    private void updateOutcomeBadge(Span badge, AiToolCallAudit row) {
+        AiToolCallOutcome outcome = row.getOutcome();
+        Locale locale = UI.getCurrent().getLocale();
+        String key = "auditList.outcome." + (outcome == null ? "success" : outcome.name().toLowerCase(Locale.ROOT));
+        badge.setText(messageSource.getMessage(key, null, outcome == null ? "" : outcome.name(), locale));
+        // Reset theme list — ComponentRenderer reuses the Span across rows.
+        badge.getElement().getThemeList().clear();
+        badge.getElement().getThemeList().add("badge");
+        for (String variant : ToolCallAuditDetailDialog.outcomeTheme(outcome).split(" ")) {
+            if (!variant.isBlank()) {
+                badge.getElement().getThemeList().add(variant);
+            }
+        }
     }
 
     @Subscribe("userFilter")
@@ -147,17 +175,6 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     public void onDateToFilterChange(
             final AbstractField.ComponentValueChangeEvent<TypedDateTimePicker<LocalDateTime>, LocalDateTime> event) {
         rebuildQuery();
-    }
-
-    private Span renderOutcomeBadge(AiToolCallAudit row) {
-        AiToolCallOutcome outcome = row.getOutcome();
-        Locale locale = UI.getCurrent().getLocale();
-        String key = "auditList.outcome." + (outcome == null ? "success" : outcome.name().toLowerCase(Locale.ROOT));
-        String label = messageSource.getMessage(key, null, outcome == null ? "" : outcome.name(), locale);
-        Span badge = new Span(label);
-        badge.getElement().getThemeList().add("badge");
-        badge.getElement().getThemeList().add(ToolCallAuditDetailDialog.outcomeTheme(outcome));
-        return badge;
     }
 
     private List<String> loadDistinctToolNames() {
