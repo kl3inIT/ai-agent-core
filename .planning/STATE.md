@@ -177,8 +177,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 4
+**Count:** 6
 
+- `2026-04-24-add-dedicated-chat-speech-and-file-task-input.md` — Add dedicated chat speech and file task input
+- `2026-04-24-add-intent-driven-extraction-to-prefilled-jmix-forms.md` — Add intent-driven extraction to prefilled Jmix forms
 - `2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md` — Redesign audit schema as tree-lite (PARENT_ID) before adding retrieval kind
 - `2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — Audit vector-store retrieval path and full RAG flow vs jmix-ai-backend
 - `2026-04-24-enforce-unknown-entity-retry-contract.md` — Enforce unknown_entity retry contract
