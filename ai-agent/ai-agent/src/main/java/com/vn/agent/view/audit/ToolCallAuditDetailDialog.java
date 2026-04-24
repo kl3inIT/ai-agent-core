@@ -3,7 +3,7 @@ package com.vn.agent.view.audit;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
-import com.vn.agent.entity.AiToolCallAudit;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
 import io.jmix.flowui.component.textarea.JmixTextArea;
 import io.jmix.flowui.component.textfield.TypedTextField;
@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * UI-06 / D-21. Modal dialog rendering the full audit fields for a single
- * {@link AiToolCallAudit} row. Opened by a row-click listener in
+ * {@link AiAuditEvent} row. Opened by a row-click listener in
  * {@link ToolCallAuditListView}.
  *
  * <p>All structure now lives in a Jmix view descriptor opened through
@@ -42,9 +42,9 @@ public class ToolCallAuditDetailDialog extends StandardView {
     @ViewComponent
     private TypedTextField<String> userField;
     @ViewComponent
-    private TypedTextField<String> toolField;
+    private TypedTextField<String> kindField;
     @ViewComponent
-    private TypedTextField<String> phaseField;
+    private TypedTextField<String> eventNameField;
     @ViewComponent
     private TypedTextField<String> runIdField;
     @ViewComponent
@@ -60,12 +60,12 @@ public class ToolCallAuditDetailDialog extends StandardView {
     @ViewComponent
     private JmixTextArea resultField;
 
-    public void setAudit(AiToolCallAudit audit) {
+    public void setAudit(AiAuditEvent audit) {
         Objects.requireNonNull(audit, "audit must not be null");
         startedAtField.setValue(fmt(audit.getStartedAt()));
         userField.setValue(Objects.toString(audit.getUserUsername(), ""));
-        toolField.setValue(Objects.toString(audit.getToolName(), ""));
-        phaseField.setValue(Objects.toString(audit.getPhase(), ""));
+        kindField.setValue(Objects.toString(audit.getKind(), ""));
+        eventNameField.setValue(Objects.toString(audit.getEventName(), ""));
         runIdField.setValue(uuidStr(audit.getRunId()));
         latencyMsField.setValue(audit.getLatencyMs() == null ? "" : audit.getLatencyMs().toString());
         errorClassField.setValue(Objects.toString(audit.getErrorClass(), ""));

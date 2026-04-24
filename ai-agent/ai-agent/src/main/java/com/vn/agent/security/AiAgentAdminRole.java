@@ -4,7 +4,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiParameters;
-import com.vn.agent.entity.AiToolCallAudit;
+import com.vn.agent.entity.AiAuditEvent;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
@@ -24,7 +24,7 @@ public interface AiAgentAdminRole {
 
     @EntityPolicy(entityClass = AiConversation.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiMessage.class, actions = EntityPolicyAction.ALL)
-    @EntityPolicy(entityClass = AiToolCallAudit.class, actions = EntityPolicyAction.ALL)
+    @EntityPolicy(entityClass = AiAuditEvent.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiParameters.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiKnowledgeDocument.class, actions = EntityPolicyAction.ALL)
     void adminAccess();

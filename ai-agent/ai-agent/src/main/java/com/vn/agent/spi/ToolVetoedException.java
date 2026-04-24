@@ -5,7 +5,7 @@ package com.vn.agent.spi;
  * Unchecked so tool bodies are not forced to declare {@code throws}.
  *
  * <p><b>Contract:</b> the message is persisted verbatim as
- * {@code AiToolCallAudit.denialReason} and surfaced to operators in the audit UI. Avoid
+ * {@code AiAuditEvent.denialReason} and surfaced to operators in the audit UI. Avoid
  * leaking sensitive data in the message — treat it as user-visible.</p>
  */
 public class ToolVetoedException extends RuntimeException {

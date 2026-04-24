@@ -3,7 +3,7 @@ package com.vn.agent.view.audit;
 import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
-import com.vn.agent.entity.AiToolCallAudit;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
@@ -37,45 +37,30 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * UI-06. Admin-only list view over {@link AiToolCallAudit} rows.
+ * UI-06. Admin-only list view over {@link AiAuditEvent} rows.
  *
- * <p>Wires:
- * <ul>
- *     <li>D-19 — typed filter bar (user / tool / outcome / date range) with declarative
- *         {@code @Subscribe("<fieldId>")} valueChange handlers that rebuild the loader's
- *         JPQL and reload. Jmix {@code <genericFilter>} is also declared in XML so admins
- *         have the full condition-builder for ad-hoc queries.</li>
- *     <li>D-20 — grid actions {@code grdexp_excelExport} / {@code grdexp_jsonExport}
- *         wired via XML {@code type=} attribute. Toolbar buttons bind to these actions
- *         via {@code action="auditsDataGrid.excelExport"}. Both exports honour the
- *         active filter bar automatically because gridexport streams through the
- *         DataProvider (RESEARCH Pitfall §gridexport).</li>
- *     <li>D-21 — row-click opens a {@link ToolCallAuditDetailDialog} modal. Retained
- *         as a raw {@code addItemClickListener} because ItemClickEvent carries the
- *         per-row entity needed for the dialog (dynamic grid-row wiring carve-out).</li>
- *     <li>D-22 — Outcome column renders as a themed Vaadin Badge.</li>
- * </ul>
- * </p>
- *
- * <p>Admin-only per the {@code AiAgent_ToolCallAudit.list} entry in
- * {@code AiAgentAdminRole.adminViews()} wired in 07-01.</p>
+ * <p>Phase 07.2 Plan 02 migration: swapped underlying entity from the deleted
+ * {@code AiToolCallAudit} to the tree-lite {@link AiAuditEvent}. The tool-name filter
+ * now filters by {@code eventName}, and the legacy {@code phase} column is gone —
+ * {@code kind} (CHAT / TOOL / RETRIEVAL) replaces it. Full redesign (tree rendering
+ * etc.) is tracked under Plan 04.</p>
  */
 @Route(value = "ai-agent/audit", layout = DefaultMainViewParent.class)
 @ViewController(id = "AiAgent_ToolCallAudit.list")
 @ViewDescriptor(path = "tool-call-audit-list-view.xml")
-public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
+public class ToolCallAuditListView extends StandardListView<AiAuditEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(ToolCallAuditListView.class);
 
     private static final String BASE_QUERY =
-            "select e from ai_AiToolCallAudit e";
+            "select e from ai_AiAuditEvent e";
     private static final String BASE_ORDER =
             " order by e.startedAt desc";
 
     @ViewComponent
-    private DataGrid<AiToolCallAudit> auditsDataGrid;
+    private DataGrid<AiAuditEvent> auditsDataGrid;
     @ViewComponent
-    private CollectionLoader<AiToolCallAudit> auditsDl;
+    private CollectionLoader<AiAuditEvent> auditsDl;
     @ViewComponent
     private TypedTextField<String> userFilter;
     @ViewComponent
@@ -99,15 +84,14 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     @Subscribe
     public void onInit(final InitEvent event) {
         // Populate filter combos.
-        toolFilter.setItems(loadDistinctToolNames());
+        toolFilter.setItems(loadDistinctEventNames());
         outcomeFilter.setItems(Arrays.asList(AiToolCallOutcome.values()));
         outcomeFilter.setItemLabelGenerator(o -> messages.getMessage(
                 "auditList.outcome." + o.name().toLowerCase(Locale.ROOT)));
 
         userFilter.setValueChangeMode(com.vaadin.flow.data.value.ValueChangeMode.LAZY);
 
-        // D-21 Row-click opens detail dialog. Retained as a raw listener because the
-        // ItemClickEvent carries the per-row entity the dialog needs.
+        // D-21 Row-click opens detail dialog.
         auditsDataGrid.addItemClickListener(e -> {
             if (e.getItem() != null) {
                 openDetailDialog(e.getItem());
@@ -116,14 +100,14 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     }
 
     @Supply(to = "auditsDataGrid.actions", subject = "renderer")
-    private Renderer<AiToolCallAudit> auditsDataGridActionsRenderer() {
+    private Renderer<AiAuditEvent> auditsDataGridActionsRenderer() {
         return DataGridRenderers.buildActionsColumn(
                 uiComponents,
                 EnumSet.of(ActionColumnType.VIEW),
                 (row, type) -> openDetailDialog(row));
     }
 
-    private void openDetailDialog(AiToolCallAudit row) {
+    private void openDetailDialog(AiAuditEvent row) {
         DialogWindow<ToolCallAuditDetailDialog> dialogWindow =
                 dialogWindows.view(this, ToolCallAuditDetailDialog.class).build();
         dialogWindow.getView().setAudit(row);
@@ -132,7 +116,7 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
 
     /** D-22 Outcome badge renderer. */
     @Supply(to = "auditsDataGrid.outcome", subject = "renderer")
-    private Renderer<AiToolCallAudit> auditsDataGridOutcomeRenderer() {
+    private Renderer<AiAuditEvent> auditsDataGridOutcomeRenderer() {
         return DataGridRenderers.buildBadgeColumn(
                 uiComponents,
                 row -> messages.getMessage("auditList.outcome."
@@ -171,14 +155,14 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         rebuildQuery();
     }
 
-    private List<String> loadDistinctToolNames() {
+    private List<String> loadDistinctEventNames() {
         try {
             return dataManager.loadValue(
-                            "select distinct e.toolName from ai_AiToolCallAudit e order by e.toolName",
+                            "select distinct e.eventName from ai_AiAuditEvent e where e.eventName is not null order by e.eventName",
                             String.class)
                     .list();
         } catch (Exception ex) {
-            log.debug("Unable to pre-load tool names for filter combo: {}", ex.getMessage());
+            log.debug("Unable to pre-load event names for filter combo: {}", ex.getMessage());
             return List.of();
         }
     }
@@ -194,7 +178,7 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         }
         String tool = toolFilter.getValue();
         if (tool != null && !tool.isBlank()) {
-            where.add("e.toolName = :tool");
+            where.add("e.eventName = :tool");
         }
         AiToolCallOutcome outcome = outcomeFilter.getValue();
         if (outcome != null) {

@@ -13,7 +13,7 @@ import io.jmix.securityflowui.role.annotation.ViewPolicy;
  * <p>End users MUST additionally be assigned {@link AiAgentUserRowLevelRole} so the
  * ownership predicate is applied; this role alone would expose all rows.</p>
  *
- * <p>No policies on {@code AiToolCallAudit}, {@code AiParameters}, or
+ * <p>No policies on {@code AiAuditEvent}, {@code AiParameters}, or
  * {@code AiKnowledgeDocument} — users have zero access to those entities (D-07).
  * No DELETE — users cannot delete their own conversations in v1.
  * No attribute-level, view, or menu policies in Phase 2 (deferred per D-07).</p>

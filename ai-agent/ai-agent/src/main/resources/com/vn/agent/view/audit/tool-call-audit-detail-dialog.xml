@@ -8,11 +8,11 @@
         <textField id="userField"
                    label="msg:///auditList.detail.user"
                    readOnly="true"/>
-        <textField id="toolField"
-                   label="msg:///auditList.detail.tool"
+        <textField id="kindField"
+                   label="msg:///auditList.detail.kind"
                    readOnly="true"/>
-        <textField id="phaseField"
-                   label="msg:///auditList.detail.phase"
+        <textField id="eventNameField"
+                   label="msg:///auditList.detail.eventName"
                    readOnly="true"/>
         <textField id="runIdField"
                    label="msg:///auditList.detail.runId"

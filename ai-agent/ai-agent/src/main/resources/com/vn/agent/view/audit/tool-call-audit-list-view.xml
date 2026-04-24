@@ -3,11 +3,11 @@
       title="msg:///auditList.title"
       focusComponent="auditsDataGrid">
     <data>
-        <collection id="auditsDc" class="com.vn.agent.entity.AiToolCallAudit">
+        <collection id="auditsDc" class="com.vn.agent.entity.AiAuditEvent">
             <fetchPlan extends="_base"/>
             <loader id="auditsDl" readOnly="true">
                 <query>
-                    <![CDATA[select e from ai_AiToolCallAudit e order by e.startedAt desc]]>
+                    <![CDATA[select e from ai_AiAuditEvent e order by e.startedAt desc]]>
                 </query>
             </loader>
         </collection>
@@ -55,8 +55,8 @@
             <columns resizable="true">
                 <column property="startedAt" header="msg:///auditList.column.createdDate"/>
                 <column property="userUsername" header="msg:///auditList.column.user"/>
-                <column property="toolName" header="msg:///auditList.column.tool"/>
-                <column property="phase" header="msg:///auditList.column.phase"/>
+                <column property="kind" header="msg:///auditList.column.kind"/>
+                <column property="eventName" header="msg:///auditList.column.eventName"/>
                 <column key="outcome" header="msg:///auditList.column.outcome"/>
                 <column property="latencyMs" header="msg:///auditList.column.latencyMs"/>
                 <column key="actions" header="msg:///common.column.actions"/>
