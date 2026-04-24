@@ -24,16 +24,16 @@ import java.util.UUID;
 /**
  * UI-06 / D-21. Modal dialog rendering the full audit fields for a single
  * {@link AiAuditEvent} row. Opened by a row-click listener in
- * {@link ToolCallAuditListView}.
+ * {@link AiAuditEventListView}.
  *
- * <p>All structure now lives in a Jmix view descriptor opened through
- * {@code DialogWindows.view(...)}. The controller only binds current row values and
- * outcome badge state.</p>
+ * <p>Fields for all three kinds (CHAT / TOOL / RETRIEVAL) are always rendered;
+ * unpopulated fields display empty strings — simpler than conditional visibility
+ * and visually inoffensive given the low-complexity schema.</p>
  */
-@ViewController("AiAgent_ToolCallAudit.detailDialog")
-@ViewDescriptor("tool-call-audit-detail-dialog.xml")
+@ViewController("AiAgent_AiAuditEvent.detailDialog")
+@ViewDescriptor("ai-audit-event-detail-dialog.xml")
 @DialogMode(width = "var(--lumo-size-xl-plus, 960px)", draggable = true, resizable = true, closeOnEsc = true)
-public class ToolCallAuditDetailDialog extends StandardView {
+public class AiAuditEventDetailDialog extends StandardView {
 
     @ViewComponent
     private MessageBundle messageBundle;
@@ -48,17 +48,29 @@ public class ToolCallAuditDetailDialog extends StandardView {
     @ViewComponent
     private TypedTextField<String> runIdField;
     @ViewComponent
+    private TypedTextField<String> parentField;
+    @ViewComponent
     private TypedTextField<String> latencyMsField;
     @ViewComponent
     private TypedTextField<String> errorClassField;
     @ViewComponent
     private TypedTextField<String> denialReasonField;
     @ViewComponent
+    private TypedTextField<String> topKField;
+    @ViewComponent
+    private TypedTextField<String> hitCountField;
+    @ViewComponent
+    private TypedTextField<String> topScoreField;
+    @ViewComponent
     private Span outcomeBadge;
     @ViewComponent
     private JmixTextArea argumentsField;
     @ViewComponent
     private JmixTextArea resultField;
+    @ViewComponent
+    private JmixTextArea queryTextField;
+    @ViewComponent
+    private JmixTextArea filtersJsonField;
 
     public void setAudit(AiAuditEvent audit) {
         Objects.requireNonNull(audit, "audit must not be null");
@@ -67,11 +79,17 @@ public class ToolCallAuditDetailDialog extends StandardView {
         kindField.setValue(Objects.toString(audit.getKind(), ""));
         eventNameField.setValue(Objects.toString(audit.getEventName(), ""));
         runIdField.setValue(uuidStr(audit.getRunId()));
+        parentField.setValue(audit.getParent() == null ? "" : audit.getParent().getId().toString());
         latencyMsField.setValue(audit.getLatencyMs() == null ? "" : audit.getLatencyMs().toString());
         errorClassField.setValue(Objects.toString(audit.getErrorClass(), ""));
         denialReasonField.setValue(Objects.toString(audit.getDenialReason(), ""));
         argumentsField.setValue(Objects.toString(audit.getArgumentsJson(), ""));
         resultField.setValue(Objects.toString(audit.getResultSummary(), ""));
+        queryTextField.setValue(Objects.toString(audit.getQueryText(), ""));
+        topKField.setValue(audit.getTopK() == null ? "" : audit.getTopK().toString());
+        hitCountField.setValue(audit.getHitCount() == null ? "" : audit.getHitCount().toString());
+        topScoreField.setValue(audit.getTopScore() == null ? "" : audit.getTopScore().toString());
+        filtersJsonField.setValue(Objects.toString(audit.getFiltersJson(), ""));
         applyOutcomeBadge(audit.getOutcome());
     }
 
