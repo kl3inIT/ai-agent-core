@@ -17,15 +17,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Plan 07-07b Task 1 — pure-unit locale-parity contract.
  *
- * <p>Asserts that {@code messages.properties} (EN) and {@code messages_vi.properties} (VI)
- * bundles carry identical key sets — any drift would silently fall back to EN for
- * Vietnamese users on a Phase 7 view (UI-08 / UI-09).
+ * <p>Asserts that EN and VI bundles carry identical key sets in every location —
+ * root package and each per-view package bundle. Drift between locales would silently
+ * fall back to EN for Vietnamese users on a Phase 7 view (UI-08 / UI-09).
  *
- * <p>Also sanity-checks that the Phase 7 UI prefixes (chatView., conversationList., …)
- * are present in the EN bundle so a rename there does not quietly dissolve a whole view's
- * i18n. The VI side is covered by the identical-key-set assertion.
+ * <p>Also sanity-checks that the Phase 7 UI prefixes are present in at least one
+ * bundle so a rename there does not quietly dissolve a whole view's i18n.
  */
 class LocaleParityTest {
+
+    /** Every (en, vi) bundle pair that must agree on key sets. */
+    private static final List<BundlePair> BUNDLES = List.of(
+            new BundlePair("root", "/com/vn/agent/messages_en.properties", "/com/vn/agent/messages_vi.properties"),
+            new BundlePair("view/knowledge",
+                    "/com/vn/agent/view/knowledge/messages_en.properties",
+                    "/com/vn/agent/view/knowledge/messages_vi.properties")
+    );
+
+    private record BundlePair(String name, String enResource, String viResource) {
+    }
 
     private static Properties load(String resource) throws IOException {
         Properties props = new Properties();
@@ -49,47 +59,55 @@ class LocaleParityTest {
 
     @Test
     void bundlesHaveIdenticalKeySets() throws IOException {
-        Properties en = load("/com/vn/agent/messages_en.properties");
-        Properties vi = load("/com/vn/agent/messages_vi.properties");
+        for (BundlePair pair : BUNDLES) {
+            Properties en = load(pair.enResource());
+            Properties vi = load(pair.viResource());
 
-        Set<Object> enKeys = new HashSet<>(en.keySet());
-        enKeys.removeIf(LocaleParityTest::isLocaleSpecificKey);
-        Set<Object> viKeys = new HashSet<>(vi.keySet());
-        viKeys.removeIf(LocaleParityTest::isLocaleSpecificKey);
+            Set<Object> enKeys = new HashSet<>(en.keySet());
+            enKeys.removeIf(LocaleParityTest::isLocaleSpecificKey);
+            Set<Object> viKeys = new HashSet<>(vi.keySet());
+            viKeys.removeIf(LocaleParityTest::isLocaleSpecificKey);
 
-        Set<Object> enOnly = new HashSet<>(enKeys);
-        enOnly.removeAll(viKeys);
-        Set<Object> viOnly = new HashSet<>(viKeys);
-        viOnly.removeAll(enKeys);
+            Set<Object> enOnly = new HashSet<>(enKeys);
+            enOnly.removeAll(viKeys);
+            Set<Object> viOnly = new HashSet<>(viKeys);
+            viOnly.removeAll(enKeys);
 
-        assertThat(new TreeSet<>(enOnly))
-                .as("Keys present in messages.properties but missing from messages_vi.properties")
-                .isEmpty();
-        assertThat(new TreeSet<>(viOnly))
-                .as("Keys present in messages_vi.properties but missing from messages.properties")
-                .isEmpty();
-        assertThat(enKeys).as("EN bundle must have non-locale-display keys").isNotEmpty();
+            assertThat(new TreeSet<>(enOnly))
+                    .as("[%s] keys present in EN but missing from VI", pair.name())
+                    .isEmpty();
+            assertThat(new TreeSet<>(viOnly))
+                    .as("[%s] keys present in VI but missing from EN", pair.name())
+                    .isEmpty();
+            assertThat(enKeys).as("[%s] EN bundle must have non-locale-display keys", pair.name()).isNotEmpty();
+        }
     }
 
     @Test
-    void allPhase7KeysPresent() throws IOException {
-        Properties en = load("/com/vn/agent/messages_en.properties");
+    void allPhase7PrefixesPresent() throws IOException {
+        // Each entry: the EN resource + a prefix expected to exist in it. Prefixes are
+        // checked against the bundle they belong to after the per-view migration.
+        List<PrefixCheck> checks = List.of(
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "chatView."),
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "conversationList."),
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "conversationDetail."),
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "parametersList."),
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "parametersDetail."),
+                new PrefixCheck("/com/vn/agent/messages_en.properties", "auditList."),
+                // Knowledge base migrated to per-view bundle — prefix lookup adjusted.
+                new PrefixCheck("/com/vn/agent/view/knowledge/messages_en.properties", "confirm.")
+        );
 
-        List<String> requiredPrefixes = List.of(
-                "chatView.",
-                "conversationList.",
-                "conversationDetail.",
-                "parametersList.",
-                "parametersDetail.",
-                "knowledgeBase.",
-                "auditList.");
-
-        for (String prefix : requiredPrefixes) {
+        for (PrefixCheck check : checks) {
+            Properties en = load(check.resource());
             boolean hasKey = en.keySet().stream()
-                    .anyMatch(k -> ((String) k).startsWith(prefix));
+                    .anyMatch(k -> ((String) k).startsWith(check.prefix()));
             assertThat(hasKey)
-                    .as("At least one key with prefix %s must exist in messages.properties", prefix)
+                    .as("At least one key with prefix '%s' must exist in %s", check.prefix(), check.resource())
                     .isTrue();
         }
+    }
+
+    private record PrefixCheck(String resource, String prefix) {
     }
 }
