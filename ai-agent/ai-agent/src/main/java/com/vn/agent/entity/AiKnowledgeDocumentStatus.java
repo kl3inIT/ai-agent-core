@@ -1,6 +1,7 @@
 package com.vn.agent.entity;
 
 import io.jmix.core.metamodel.datatype.EnumClass;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 public enum AiKnowledgeDocumentStatus implements EnumClass<String> {
@@ -8,7 +9,8 @@ public enum AiKnowledgeDocumentStatus implements EnumClass<String> {
     PENDING("PENDING"),
     PROCESSING("PROCESSING"),
     READY("READY"),
-    FAILED("FAILED");
+    FAILED("FAILED"),
+    CANCELLED("CANCELLED");
 
     private final String id;
 
@@ -17,6 +19,7 @@ public enum AiKnowledgeDocumentStatus implements EnumClass<String> {
     }
 
     @Override
+    @NonNull
     public String getId() {
         return id;
     }

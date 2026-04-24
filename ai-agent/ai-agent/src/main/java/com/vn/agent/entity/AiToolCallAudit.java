@@ -4,12 +4,13 @@ import io.jmix.core.entity.annotation.JmixGeneratedValue;
 import io.jmix.core.metamodel.annotation.DependsOnProperties;
 import io.jmix.core.metamodel.annotation.InstanceName;
 import io.jmix.core.metamodel.annotation.JmixEntity;
+import io.jmix.core.metamodel.annotation.Store;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Store(name = "agentstore")
 @JmixEntity
 @Entity(name = "ai_AiToolCallAudit")
 @Table(name = "AI_AGENT_TOOL_CALL_AUDIT", indexes = {
@@ -19,7 +20,7 @@ import java.util.UUID;
 public class AiToolCallAudit {
 
     @Id
-    @Column(name = "ID")
+    @Column(name = "ID", nullable = false)
     @JmixGeneratedValue
     private UUID id;
 
@@ -31,7 +32,7 @@ public class AiToolCallAudit {
     @JoinColumn(name = "CONVERSATION_ID")
     private AiConversation conversation;
 
-    @Column(name = "USER_USERNAME", length = 255)
+    @Column(name = "USER_USERNAME")
     private String userUsername;
 
     @NotNull
@@ -62,6 +63,21 @@ public class AiToolCallAudit {
 
     @Column(name = "FINISHED_AT")
     private OffsetDateTime finishedAt;
+
+    @Column(name = "RUN_ID")
+    private UUID runId;
+
+    @Column(name = "KIND", length = 8)
+    private String kind;
+
+    @Column(name = "PHASE", length = 8)
+    private String phase;
+
+    @Column(name = "PROMPT_HASH", length = 64)
+    private String promptHash;
+
+    @Column(name = "ERROR_CLASS")
+    private String errorClass;
 
     @InstanceName
     @DependsOnProperties({"toolName", "outcome"})
@@ -94,4 +110,14 @@ public class AiToolCallAudit {
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
     public OffsetDateTime getFinishedAt() { return finishedAt; }
     public void setFinishedAt(OffsetDateTime finishedAt) { this.finishedAt = finishedAt; }
+    public UUID getRunId() { return runId; }
+    public void setRunId(UUID runId) { this.runId = runId; }
+    public String getKind() { return kind; }
+    public void setKind(String kind) { this.kind = kind; }
+    public String getPhase() { return phase; }
+    public void setPhase(String phase) { this.phase = phase; }
+    public String getPromptHash() { return promptHash; }
+    public void setPromptHash(String promptHash) { this.promptHash = promptHash; }
+    public String getErrorClass() { return errorClass; }
+    public void setErrorClass(String errorClass) { this.errorClass = errorClass; }
 }

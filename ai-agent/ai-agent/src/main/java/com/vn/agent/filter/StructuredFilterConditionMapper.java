@@ -103,7 +103,7 @@ public class StructuredFilterConditionMapper {
             coerced = filterLiteralValueConverter.convertListValues(value, terminalProperty);
         } else if (PropertyCondition.Operation.IS_SET.equals(propertyConditionOperation)) {
             Boolean booleanValue = filterLiteralValueConverter.convertBooleanValue(value, property);
-            coerced = negated ? !booleanValue : booleanValue;
+            coerced = negated != booleanValue;
         } else {
             coerced = filterLiteralValueConverter.convertValue(value, terminalProperty);
         }

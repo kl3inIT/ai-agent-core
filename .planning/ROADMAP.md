@@ -13,9 +13,10 @@
 | 2 | Foundations | Entities, Liquibase, roles, SPI interfaces (no ArchUnit per D-10) | ENT-01..04, SEC-01..04, SPI-01, SPI-02, SPI-03, SPI-05, SPI-06, SPI-07 (interfaces only) | 4 |
 | 3 | Metadata Runtime & Six Tools | Metamodel scanner + per-user schema + 6 DataManager-backed read tools | TOOL-01..08, SPI-01 (impl) | 5 |
 | 4 | Orchestration Core | ChatClient + advisor chain + JDBC memory + audit | ORCH-01..06, AUD-01..05, SPI-02/03 (impl), SPI-06 (impl) | 5 |
-| 5 | RAG Layer | KB ingestion + pgvector + role-scoped retrieval | RAG-01..08, SPI-07 (impl) | 4 |
+| 5 | RAG Layer | 5/5 | ✅ Complete |  |
 | 6 | Parameters & Guardrails | Parameter profiles + structured output + iteration/token caps + injection scanner | PARAM-01..05, GUARD-01..06, SPI-05 (impl) | 4 |
 | 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit | UI-01..06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10) | 5 |
+| 7.1 | Adopt Vaadin MessageList/MessageInput (INSERTED) | Replace custom chat component tree with stock Vaadin messages API per `jmix-ai-backend` reference | UI-01, UI-02 (re-implementation) | 5 |
 | 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..05, TEST-07 (TEST-06 dropped per D-10) | 4 |
 
 **Total v1 requirements mapped:** 69 of 69 ✓ (was 73 pre-D-10; `AiExposureRule`/SPI-04/SPI-08/UI-07/TEST-06 dropped)
@@ -160,6 +161,15 @@ Plans:
 
 **Needs research phase:** YES — re-verify advisor ordering in M4; probe Vaadin Flow streaming with `ToolCallAdvisor`.
 
+**Plans:** 5 plans
+
+Plans:
+- [x] 04-01-PLAN.md — Schema migration: AiToolCallAudit runId/kind/phase/promptHash/errorClass columns + i18n (AUD-03)
+- [x] 04-02-PLAN.md — Foundations: AiAgentDefaultsProperties, RunContext, ConversationNotFoundException, AiParametersResolver, BaselineContextProvider (SPI-02, SPI-03, ORCH-06)
+- [x] 04-03-PLAN.md — Audit pipeline: AuditWriter REQUIRES_NEW + AuditAdvisor + ToolCallbackAuditDecorator + AuditListenerFanOut + OQ-1 closure (AUD-01, AUD-02, AUD-04, AUD-05, SPI-06)
+- [x] 04-04-PLAN.md — Orchestration wiring: ChatClientFactory advisor chain, ConversationGateway opacity, ProjectingChatMemoryRepository dual-layer, DefaultChatServiceImpl rewrite (ORCH-01..05)
+- [x] 04-05-PLAN.md — Integration tests: advisor ordering, ownership opacity, audit durability, dual-layer parity, listener fan-out, live OpenRouter (TEST-02, TEST-03, TEST-05)
+
 ---
 
 ### Phase 5 — RAG Layer
@@ -185,6 +195,15 @@ Plans:
 4. Delete-document removes both `AiKnowledgeDocument` row and associated vector chunks in one transaction
 
 **Needs research phase:** YES — verify `QuestionAnswerAdvisor` vs `RetrievalAugmentationAdvisor` in M4; confirm `FILTER_EXPRESSION` API shape.
+
+**Plans:** 3/5 plans executed
+
+Plans:
+- [x] 05-01-PLAN.md — pgvector + EmbeddingModel bean wiring + config props + bean-collision test (RAG-02)
+- [x] 05-02-PLAN.md — RetrievalFilterBuilder + RetrievalAugmentationAdvisor + DefaultChatServiceImpl per-request FILTER_EXPRESSION (RAG-04, RAG-05)
+- [x] 05-03-PLAN.md — Ingestion pipeline: IngestionStatusWriter, CancellationRegistry, AsyncIngestionWorker, MdcPropagatingTaskDecorator, aiAgentIngestExecutor (RAG-01, RAG-03)
+- [x] 05-04-PLAN.md — Services + SPI: KnowledgeDocumentUploadService, KnowledgeDocumentService delete/reingest, IngesterManager, ClasspathMarkdownIngester, i18n (RAG-06, RAG-07, RAG-08, SPI-07)
+- [x] 05-05-PLAN.md — Integration tests: upload→READY, role-scoped retrieval, atomic delete, fail-closed, retry+failure, FILTER_EXPRESSION contract, sample ingester default-off (RAG-01, RAG-03..08)
 
 ---
 
@@ -214,6 +233,15 @@ Plans:
 
 **Needs research phase:** YES — `StructuredOutputValidationAdvisor` existence probe; per-model capability detection.
 
+**Plans:** 5 plans
+
+Plans:
+- [x] 06-01-PLAN.md — Foundation types: exceptions, Overrides, AiParametersBody, AiAgentGuardProperties, FLAGGED enum, i18n keys (PARAM-01/02, GUARD-01..06)
+- [x] 06-02-PLAN.md — Parameters layer: AiParametersBodyYamlMapper, ParametersService (setActive D-06), DefaultParamsSeeder, AiParametersResolver Overrides + contributor-chain overloads, default-params.yaml (PARAM-01..05, SPI-05)
+- [x] 06-03-PLAN.md — Guard components: RateLimitGuard, TokenBudgetGuard, IterationCounter, GuardedToolCallingManager, OutputScannerAdvisor, AiAgentGuardAutoConfiguration (GUARD-01..06, D-12/21)
+- [x] 06-04-PLAN.md — Orchestration wiring: ChatService overloads, DefaultChatServiceImpl guard preamble + scanner promotion + askTyped retry + typed-exception mapper, ChatClientFactory advisor chain (PARAM-01/05, GUARD-01/02/03/05, STRUCT-01/02, SPI-05)
+- [x] 06-05-PLAN.md — Tests: 12 eval rubrics (E-01..E-12) + 4 YAML fixtures + I18nParityTest + autoconfig boot test + evalTest gradle task
+
 ---
 
 ### Phase 7 — Flow UI
@@ -227,7 +255,7 @@ Plans:
 - `ConversationListView` + `ConversationDetailView` (ownership filter; replay)
 - `ParametersListView` + `ParametersDetailView` (YAML editor + validation; `Set active` action)
 - `KnowledgeBaseView` (upload, list, status, delete, reingest)
-- `ToolCallAuditListView` (filter by user/tool/outcome/date; CSV export)
+- `ToolCallAuditListView` (filter by user/tool/outcome/date; Excel + JSON export via Jmix `gridexport` add-on)
 - `menu.xml` with `aiAgent.*` namespaced ids; role-gated visibility
 - Full `messages_en.properties` + `messages_vi.properties` coverage (zero hardcoded strings)
 - Navigation wiring via `ViewNavigators`; `@ViewController` + `@ViewDescriptor` conventions
@@ -236,10 +264,50 @@ Plans:
 1. Fresh `jmix-app` boot → menu shows `AI Agent` section; `Chat` visible to any user; admin views visible only to `AiAgentAdminRole`
 2. End-to-end Playwright/manual: user sends a chat message → response streams (or renders blocking) → tool calls expand to show args → citation link opens source document
 3. Admin uploads a doc → appears in KB view with status transitioning PENDING → READY
-4. Audit view CSV export produces valid UTF-8 CSV
+4. Audit view Excel export produces a valid `.xlsx` file and JSON export produces valid UTF-8 JSON; both honor current filter + sort
 5. Bilingual smoke: switching locale `en ↔ vi` flips every user-visible label
 
 **Needs research phase:** Partial — reuses P4 streaming validation; Vaadin upload patterns standard.
+
+**Plans:** 8 plans
+
+Plans:
+- [x] 07-01-PLAN.md — Wave 1 foundations: deps, @Push AppShell, MarkdownRenderer, StreamingEvent sealed DTOs, menu.xml, AiAgentAdminRole @ViewPolicy, bilingual messages bundles
+- [x] 07-02-PLAN.md — Wave 1 backend: ChatService.stream(...) Flux<StreamingEvent> + IngestionStatusWriter afterCommit DocumentStatusChangedEvent
+- [x] 07-03-PLAN.md — Wave 3 ChatView + ChatPanelFragment + MessageBubble/ToolCallCard/CitationDialog components (UI-01, UI-02)
+- [x] 07-04-PLAN.md — Wave 4 ConversationListView + ConversationDetailView role-aware filter + replay (UI-03)
+- [x] 07-05-PLAN.md — Wave 2 ParametersListView + ParametersDetailView Form + YAML preview tab (UI-04)
+- [x] 07-06-PLAN.md — Wave 2 KnowledgeBaseView + ToolCallAuditListView + detail dialog + gridexport actions (UI-05, UI-06)
+- [x] 07-07a-PLAN.md — Wave 0 test skeletons: 11 failing/disabled JUnit stubs so plans 07-01..07-06 have real test files to target (Nyquist RED)
+- [x] 07-07b-PLAN.md — Wave 5 green fill: un-disable + implement the 11 test bodies scaffolded by 07-07a (UI-08, UI-09, UI-10)
+
+---
+
+### Phase 7.1 — Adopt Vaadin MessageList / MessageInput for Chat View (INSERTED)
+
+**Goal:** Replace the custom chat UI stack (`ChatPanelFragment` + `MessageBubbleComponent` + `ToolCallCardComponent` + `MarkdownRenderer`) with Vaadin's built-in `com.vaadin.flow.component.messages.MessageList` + `MessageInput`, modeled on the `jmix-ai-backend` reference. Meaningful code reduction; stock Vaadin delivers markdown rendering, user colors, timestamps, and auto-scroll for free.
+
+**Why urgent:** Phase 7 UAT surfaced that the custom chat stack is both heavier than needed and regression-prone; the reference implementation shows a ~200-line path covering the same streaming + tool-call + sources behavior. Before shipping phase 8 we want the chat view on the supported Vaadin primitives, not the custom component tree.
+
+**Requirements:** UI-01 (re-implementation), UI-02 (re-implementation) — no new roadmap requirements; scoped as UI architecture refactor of existing ones.
+
+**Deliverables:**
+- Replace `ChatPanelFragment` body with `MessageList` (markdown-enabled) + `MessageInput` composition
+- Delete `MessageBubbleComponent`, `ToolCallCardComponent`, `MarkdownRenderer` (fold responsibilities into a `renderStreamEvent(StreamingEvent) -> String` markdown formatter following the reference)
+- Re-wire `ChatService.stream(...)` subscription to `doOnNext`/`doOnError`/`doOnComplete` with `ui.access(...)` and `MessageListItem.appendText(...)`
+- Preserve phase 7 guarantees: conversation-id query param handling, `New chat` with unsaved-confirm dialog, Stop action, citation deep-link to KB, i18n coverage
+- Update phase 7 tests that referenced the deleted component classes; keep streaming + conversation tests
+
+**Success criteria:**
+1. `ChatView` + fragment ≤ ~250 lines combined (reference parity target)
+2. No references to `MessageBubbleComponent` / `ToolCallCardComponent` / `MarkdownRenderer` remain in source or tests
+3. Playwright UAT for Chat passes: streaming tokens render, tool-call events render as markdown blocks, citations surface as clickable links, `New chat` + conversation-id param work
+4. `./gradlew test` green; existing phase 7 tests updated (not skipped) where they referenced deleted types
+5. i18n keys still resolve (consumes the messages_en.properties rename from pre-UAT fix)
+
+**Needs research phase:** Minimal — reference implementation at `D:\Study materials spring 2026\EXE101\ai\jmix-ai-backend\src\main\java\io\jmix\ai\backend\view\chat\ChatView.java` is the spec. Verify Vaadin `MessageList.setMarkdown(true)` and `MessageListItem.appendText(...)` API surface via Context7 before planning.
+
+**Plans:** not planned yet — run `/gsd-plan-phase 7.1`
 
 ---
 
@@ -317,4 +385,4 @@ P7 depends on P3, P4, P5, P6. P8 depends on all.
 
 ---
 
-*Last updated: 2026-04-18 after Phase 02 planning — D-10 applied*
+*Last updated: 2026-04-21 after Phase 07 planning*

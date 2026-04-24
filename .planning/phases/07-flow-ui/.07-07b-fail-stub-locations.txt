@@ -1,0 +1,11 @@
+ai-agent/ai-agent/src/test/java/com/vn/agent/i18n/LocaleParityTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/push/DocumentStatusPushTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/push/PushAutoConfigTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/security/AdminViewAccessTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/audit/ToolCallAuditListViewTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStopTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStreamTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/MarkdownRendererXssTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/conversation/ConversationListRoleFilterTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/knowledge/KnowledgeBaseUploadTest.java
+ai-agent/ai-agent/src/test/java/com/vn/agent/view/parameters/ParametersDetailYamlPreviewTest.java

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///auditList.title"
+      focusComponent="auditsDataGrid">
+    <data>
+        <collection id="auditsDc" class="com.vn.agent.entity.AiToolCallAudit">
+            <fetchPlan extends="_base"/>
+            <loader id="auditsDl" readOnly="true">
+                <query>
+                    <![CDATA[select e from ai_AiToolCallAudit e order by e.startedAt desc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+    </facets>
+    <layout padding="true" spacing="true">
+        <hbox id="filterBar" spacing="true" padding="false" alignItems="BASELINE">
+            <textField id="userFilter"
+                       placeholder="msg:///auditList.filter.user"
+                       clearButtonVisible="true"/>
+            <comboBox id="toolFilter"
+                      placeholder="msg:///auditList.filter.tool"
+                      clearButtonVisible="true"/>
+            <comboBox id="outcomeFilter"
+                      placeholder="msg:///auditList.filter.outcome"
+                      clearButtonVisible="true"/>
+            <dateTimePicker id="dateFromFilter"
+                            placeholder="msg:///auditList.filter.dateRange"/>
+            <dateTimePicker id="dateToFilter"/>
+        </hbox>
+        <genericFilter id="auditsGenericFilter"
+                       dataLoader="auditsDl">
+            <properties include=".*"/>
+        </genericFilter>
+        <hbox id="exportBar" spacing="true">
+            <button id="excelExportBtn"
+                    text="msg:///auditList.action.exportExcel"
+                    themeNames="primary"
+                    action="auditsDataGrid.excelExport"/>
+            <button id="jsonExportBtn"
+                    text="msg:///auditList.action.exportJson"
+                    action="auditsDataGrid.jsonExport"/>
+        </hbox>
+        <dataGrid id="auditsDataGrid"
+                  dataContainer="auditsDc"
+                  width="100%"
+                  minHeight="20em"
+                  themeNames="compact">
+            <actions>
+                <action id="excelExport" type="grdexp_excelExport"/>
+                <action id="jsonExport" type="grdexp_jsonExport"/>
+            </actions>
+            <columns resizable="true">
+                <column property="startedAt" header="msg:///auditList.column.createdDate"/>
+                <column property="userUsername" header="msg:///auditList.column.user"/>
+                <column property="toolName" header="msg:///auditList.column.tool"/>
+                <column property="phase" header="msg:///auditList.column.phase"/>
+                <column key="outcome" header="msg:///auditList.column.outcome"/>
+                <column property="latencyMs" header="msg:///auditList.column.latencyMs"/>
+            </columns>
+        </dataGrid>
+    </layout>
+</view>

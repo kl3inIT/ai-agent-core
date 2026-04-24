@@ -12,9 +12,6 @@
     <include file="/io/jmix/flowuidata/liquibase/changelog.xml"/>
     <include file="/io/jmix/securitydata/liquibase/changelog.xml"/>
 
-    <!-- ai-agent add-on (Phase 2) -->
-    <include file="/com/vn/agent/liquibase/changelog.xml"/>
-
     <includeAll path="/com/vn/jmixapp/liquibase/changelog"/>
 
 </databaseChangeLog>

@@ -4,10 +4,62 @@ dependencies {
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
     implementation 'io.jmix.security:jmix-security-starter'
+    // Plan 07-01: @MenuPolicy + @ViewPolicy annotations live in jmix-security-flowui
+    // (package io.jmix.securityflowui.role.annotation). Required by AiAgentAdminRole.adminViews().
+    implementation 'io.jmix.security:jmix-security-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
     implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
+
+    // Plan 04-04: ProjectingChatMemoryRepository decorates JdbcChatMemoryRepository (D-08 dual-layer).
+    implementation 'org.springframework.ai:spring-ai-model-chat-memory-repository-jdbc:1.1.4'
+
+    // Plan 05-01 (RAG-02): pgvector VectorStore + Tika document reader. Do NOT add
+    // spring-ai-starter-model-openai here — Phase 4 brings it transitively via
+    // spring-ai-client-chat. Do NOT add spring-retry — RESEARCH D-16 override uses
+    // built-in spring.ai.retry.* instead of hand-rolled @Retryable.
+    //
+    // pgvector is declared at `api` scope because AIAutoConfiguration (in the sibling
+    // ai-agent-starter module, which declares `api project(':ai-agent')`) references
+    // VectorStore / PgVectorStore types on its public API surface (bean signatures).
+    // Without `api`, those types would not be visible on the starter's compile
+    // classpath. Rule 3 deviation recorded in 05-01-SUMMARY.md. Tika stays at
+    // `implementation` scope because it's only referenced from internal workers.
+    api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4'
+    implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.4'
+
+    // Plan 05-02 (RAG-04): RetrievalAugmentationAdvisor + VectorStoreDocumentRetriever
+    // live in spring-ai-rag. Keep the version explicit here because this module is
+    // consumed both via composite build and via mavenLocal, and the Spring AI BOM
+    // imported by the dependency-management plugin is not exported to downstream
+    // consumers as a versioned dependency declaration.
+    // Declared at `api` scope because RetrievalAugmentationAdvisorFactory
+    // exposes RetrievalAugmentationAdvisor as a public @Bean and ChatClientFactory accepts
+    // it as a parameter — both are visible to the ai-agent-starter module.
+    api 'org.springframework.ai:spring-ai-rag:1.1.4'
+
+    // Plan 06-02 (PARAM-02/D-05): YAML ser/de for AiParametersBody (strict-on-write) +
+    // Jakarta Bean Validation API for @NotBlank/@DecimalMin/etc. constraints on that record.
+    // Hibernate Validator is already transitively pulled by Jmix/Spring Boot; no explicit
+    // declaration needed here. Versions are resolved via Spring Boot BOM.
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'jakarta.validation:jakarta.validation-api'
+
+    // Plan 06-03 (GUARD-01/GUARD-02, D-12): Spring Cache starter powers the per-user
+    // RateLimitGuard (cache "ai-agent.rateLimit") and the per-conversation TokenBudgetGuard
+    // (cache "ai-agent.tokenBreaker"). AiAgentGuardAutoConfiguration registers a default
+    // ConcurrentMapCacheManager when the host has not declared its own CacheManager.
+    // BOM-versioned — no explicit version.
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // Plan 07-01 (D-07, D-20): markdown rendering + XSS sanitizer for assistant output;
+    // Jmix gridexport add-on for ToolCallAuditListView Excel+JSON actions (D-20).
+    implementation 'com.vladsch.flexmark:flexmark:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
+    implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20220608.1'
+    implementation 'io.jmix.gridexport:jmix-gridexport-flowui-starter'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
@@ -34,6 +86,14 @@ dependencies {
     // backward-compatible and adds major-version 69 support (Rule 3 deviation recorded in
     // 03-04-SUMMARY.md).
     testImplementation 'org.ow2.asm:asm:9.9'
+
+    // Plan 05-01 — downstream RAG plan integration tests (Plan 05-05) will need
+    // Testcontainers Postgres + spring-ai-test. Pulled onto the classpath now so
+    // Plan 05-01's bean-collision test compiles against a complete test tier.
+    testImplementation 'org.testcontainers:postgresql:1.19.8'
+    testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
+    testImplementation 'org.springframework.ai:spring-ai-test:1.1.4'
+    implementation 'org.postgresql:postgresql'
 }
 
 configurations.implementation {
@@ -44,8 +104,31 @@ configurations.implementation {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'live'
+        // Default test task excludes:
+        //  - @Tag("live")   — requires OPENROUTER_API_KEY (see liveTest task)
+        //  - @Tag("rag-it") — requires Docker for Testcontainers pgvector (see integrationTest)
+        //  - @Tag("eval")   — Phase 6 evaluation rubric tests (see evalTest task, Plan 06-05)
+        // Integration tests are additionally gated at class level by an isDockerAvailable()
+        // condition so sandboxed / forensic runs skip them cleanly without stack traces.
+        excludeTags 'live', 'rag-it', 'eval'
     }
+}
+
+// --- Plan 06-05: evaluation rubric suite --------------------------------------------------
+// Phase 6 ships 12 evaluation rubrics (E-01..E-12) whose contract lives in
+// `.planning/phases/06-parameters-structured-output-guardrails/06-AI-SPEC.md`. Tests are
+// tagged `@Tag("eval")` so `./gradlew test` stays fast and the eval suite is opted into
+// explicitly via `./gradlew evalTest`. Corpus fixtures (src/test/resources/eval/*.yaml)
+// drive the parameterised tests so rubric drift surfaces as a test-count change in CI log.
+tasks.register('evalTest', Test) {
+    description = 'Runs Phase 6 evaluation rubric tests (@Tag("eval")).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
 }
 
 tasks.register('liveTest', Test) {
@@ -57,4 +140,42 @@ tasks.register('liveTest', Test) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     shouldRunAfter tasks.named('test')
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Run @Tag("rag-it") Phase-5 integration tests (require Docker for Testcontainers pgvector).'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'rag-it'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
+}
+
+// WR-03: wire integrationTest into `check` when Docker is available so the phase-5
+// contracts (upload → READY, role-scoped retrieval, atomic delete, failure cleanup)
+// are part of the normal verification path on CI and any developer machine that has
+// Docker running. Gating on isDockerAvailable keeps ./gradlew check green on boxes
+// that cannot run Testcontainers without adding an opt-in env var.
+//
+// CI MUST run ./gradlew check (or ./gradlew integrationTest explicitly) on a host
+// with Docker so pgvector-backed assertions gate every PR.
+tasks.named('check') {
+    if (isDockerAvailableForCheck()) {
+        dependsOn tasks.named('integrationTest')
+    } else {
+        logger.lifecycle("[ai-agent] Docker not detected — skipping integrationTest in `check`. " +
+                "Run `./gradlew integrationTest` on a host with Docker (required before merge).")
+    }
+}
+
+static boolean isDockerAvailableForCheck() {
+    try {
+        Process p = new ProcessBuilder('docker', 'info').redirectErrorStream(true).start()
+        boolean done = p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+        return done && p.exitValue() == 0
+    } catch (Throwable ignored) {
+        return false
+    }
 }

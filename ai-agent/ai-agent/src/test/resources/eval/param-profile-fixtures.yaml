@@ -1,0 +1,40 @@
+# Eval corpus for ParametersService/YamlMapper (E-09 adjacent validation coverage).
+# Drives ParametersServiceTest's strict-on-write rejection cases (D-05).
+cases:
+  - name: valid-default
+    yaml: |
+      model: openai/gpt-4o-mini
+      temperature: 0.2
+      topP: 1.0
+      maxTokens: 2048
+      systemPrompt: "You are helpful."
+    expectInvalid: false
+    expectMessageKey: null
+  - name: unknown-key
+    yaml: |
+      model: openai/gpt-4o-mini
+      temperature: 0.2
+      maxTokens: 2048
+      systemPrompt: "hi"
+      topP: 1.0
+      bogusField: true
+    expectInvalid: true
+    expectMessageKey: "ai-agent.parameters.yaml.unknown-key"
+  - name: temperature-out-of-range
+    yaml: |
+      model: openai/gpt-4o-mini
+      temperature: 2.5
+      maxTokens: 2048
+      systemPrompt: "hi"
+      topP: 1.0
+    expectInvalid: true
+    expectMessageKey: "ai-agent.parameters.yaml.invalid"
+  - name: blank-model
+    yaml: |
+      model: ""
+      temperature: 0.2
+      maxTokens: 2048
+      systemPrompt: "hi"
+      topP: 1.0
+    expectInvalid: true
+    expectMessageKey: "ai-agent.parameters.yaml.invalid"

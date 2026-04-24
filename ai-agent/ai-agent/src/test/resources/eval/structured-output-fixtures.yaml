@@ -1,0 +1,19 @@
+# Eval corpus for askTyped retry loop (E-06 + E-07).
+# modelReplies drives the stubbed ChatModel reply sequence (one per attempt).
+# D-19 / ROADMAP §06 success criterion #4: max attempts = 2 (initial + 1 retry).
+cases:
+  - name: happy-first-attempt
+    modelReplies: ['{"name":"Alice"}']
+    targetType: Greeting
+    expectedParsedName: Alice
+    expectsException: false
+  - name: retry-then-succeed
+    modelReplies: ['not json', '{"name":"Bob"}']
+    targetType: Greeting
+    expectedParsedName: Bob
+    expectsException: false
+  - name: exhaust-both-attempts
+    modelReplies: ['not json', '{malformed']
+    targetType: Greeting
+    expectedParsedName: null
+    expectsException: true

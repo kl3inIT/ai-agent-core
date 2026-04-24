@@ -134,13 +134,13 @@ public class BuiltInDataTools {
             if (condition == null) {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .all()
-                        .fetchPlan(FetchPlan.INSTANCE_NAME)
+                        .fetchPlan(FetchPlan.BASE)
                         .maxResults(clampedLimit + 1)
                         .list();
             } else {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .condition(condition)
-                        .fetchPlan(FetchPlan.INSTANCE_NAME)
+                        .fetchPlan(FetchPlan.BASE)
                         .maxResults(clampedLimit + 1)
                         .list();
             }
@@ -184,7 +184,7 @@ public class BuiltInDataTools {
             Object parsedId = parseEntityId(id, metaClass);
             Object entity = dataManager.load(metaClass.getJavaClass())
                     .id(parsedId)
-                    .fetchPlan(FetchPlan.INSTANCE_NAME)
+                    .fetchPlan(FetchPlan.BASE)
                     .optional()
                     .orElse(null);
             if (entity == null) {
@@ -227,7 +227,7 @@ public class BuiltInDataTools {
             }
 
             FetchPlan fetchPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
-                    .addFetchPlan(FetchPlan.INSTANCE_NAME)
+                    .addFetchPlan(FetchPlan.BASE)
                     .add(relationship, fetchPlanBuilder -> fetchPlanBuilder.addFetchPlan(FetchPlan.INSTANCE_NAME))
                     .build();
             Object rootEntity = dataManager.load(rootMetaClass.getJavaClass())

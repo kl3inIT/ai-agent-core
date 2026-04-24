@@ -15,8 +15,31 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-autoconfigure'
     implementation 'org.springframework.ai:spring-ai-starter-model-openai:1.1.4'
 
+    // Plan 04-04: dual-layer chat memory (D-08) — ProjectingChatMemoryRepository decorates this.
+    implementation 'org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc:1.1.4'
+
     testImplementation 'org.springframework.ai:spring-ai-test:1.1.4'
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        // Phase 6 Plan 06-05: `@Tag("eval")` tests (E-10 autoconfig boot) run under evalTest.
+        excludeTags 'eval'
+    }
+}
+
+// Plan 06-05: evaluation rubric E-10 (autoconfig boot) lives in this module.
+tasks.register('evalTest', Test) {
+    description = 'Runs Phase 6 evaluation rubric tests (@Tag("eval")) for the starter module.'
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags 'eval'
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    shouldRunAfter tasks.named('test')
 }

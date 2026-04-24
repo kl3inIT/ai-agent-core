@@ -81,7 +81,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(FoundationsBootSmokeTest.TestUsers.class)
 class FoundationsBootSmokeTest {
 
     @Autowired DataManager dataManager;
@@ -298,88 +297,9 @@ class FoundationsBootSmokeTest {
         assertEquals(0, count.intValue(), "Expected table absent: " + upperCaseName);
     }
 
-    /**
-     * Provisions alice / bob / admin in an {@link InMemoryUserRepository}. jmix-app's
-     * {@code DatabaseUserRepository} is not on the add-on's test classpath, so the
-     * add-on test context has no real user store by default — this nested
-     * {@code @TestConfiguration} fills that gap. Authorities are built via
-     * {@link RoleGrantedAuthorityUtils}, which is the documented Jmix 2.8 way to
-     * construct role-backed {@link GrantedAuthority} instances (verified against
-     * {@code io.jmix.security.role.RoleGrantedAuthorityUtils} sources).
-     */
-    @TestConfiguration
-    static class TestUsers {
-
-        /**
-         * Provides the {@code core_UserRepository} bean that Jmix's
-         * {@link io.jmix.core.security.CoreSecurityConfiguration} declares for full
-         * applications but that is NOT auto-configured — per the javadoc on
-         * {@code CoreSecurityConfiguration}, users are expected to extend it (or
-         * declare an equivalent bean) themselves. The add-on's test context has no
-         * application-level security configuration, so we supply the bean here using
-         * the same {@link InMemoryUserRepository} that Jmix's own default uses.
-         */
-        @Bean(name = "core_UserRepository")
-        UserRepository userRepository() {
-            return new InMemoryUserRepository();
-        }
-
-        @Bean
-        TestUserInitializer testUserInitializer(UserRepository userRepository,
-                                                RoleGrantedAuthorityUtils authorityUtils) {
-            return new TestUserInitializer(userRepository, authorityUtils);
-        }
-    }
-
-    /**
-     * Deferred-initialization helper — runs after the {@link UserRepository} bean is
-     * created so that {@link RoleGrantedAuthorityUtils} (which depends on Jmix's
-     * {@code SecurityProperties}) is fully wired before we build authorities.
-     */
-    static class TestUserInitializer {
-        private final UserRepository userRepository;
-        private final RoleGrantedAuthorityUtils authorityUtils;
-
-        TestUserInitializer(UserRepository userRepository, RoleGrantedAuthorityUtils authorityUtils) {
-            this.userRepository = userRepository;
-            this.authorityUtils = authorityUtils;
-        }
-
-        @PostConstruct
-        void init() {
-            if (!(userRepository instanceof InMemoryUserRepository repo)) {
-                throw new IllegalStateException(
-                        "Expected InMemoryUserRepository from Jmix core_UserRepository, got "
-                                + userRepository.getClass());
-            }
-            repo.addUser(buildUser("alice",
-                    AiAgentUserRole.CODE, AiAgentUserRowLevelRole.CODE));
-            repo.addUser(buildUser("bob",
-                    AiAgentUserRole.CODE, AiAgentUserRowLevelRole.CODE));
-            repo.addUser(buildAdmin("admin", AiAgentAdminRole.CODE));
-        }
-
-        private UserDetails buildUser(String username,
-                                      String resourceRoleCode,
-                                      String rowLevelRoleCode) {
-            List<GrantedAuthority> auths = new ArrayList<>();
-            auths.add(authorityUtils.createResourceRoleGrantedAuthority(resourceRoleCode));
-            auths.add(authorityUtils.createRowLevelRoleGrantedAuthority(rowLevelRoleCode));
-            return User.builder()
-                    .username(username)
-                    .password("{noop}password")
-                    .authorities(auths)
-                    .build();
-        }
-
-        private UserDetails buildAdmin(String username, String resourceRoleCode) {
-            List<GrantedAuthority> auths = new ArrayList<>();
-            auths.add(authorityUtils.createResourceRoleGrantedAuthority(resourceRoleCode));
-            return User.builder()
-                    .username(username)
-                    .password("{noop}password")
-                    .authorities(auths)
-                    .build();
-        }
-    }
+    // alice / bob / admin are provisioned by the ambient
+    // com.vn.agent.test_support.TestUsersConfiguration (inside AIConfiguration's
+    // component-scan root; loaded for every add-on @SpringBootTest). The inner
+    // @TestConfiguration that used to live here was removed in plan 07-07b Task 1
+    // to avoid double-provisioning once the ambient fixture was introduced.
 }

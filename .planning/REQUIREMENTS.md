@@ -37,11 +37,11 @@
 
 ### Orchestration (ChatClient + Advisors + Memory)
 
-- [ ] **ORCH-01**: `ChatClientFactory` builds a `ChatClient` per request with the caller's effective tool set and parameter profile (never `.defaultTools(...)` for auto-generated tools)
-- [ ] **ORCH-02**: Advisor chain ordered: `MessageChatMemoryAdvisor` (`HIGHEST_PRECEDENCE+200`) → RAG advisor (`+250`) → `ToolCallAdvisor` with `.disableInternalConversationHistory()` (`+300`) → `AuditAdvisor` (around-chain)
-- [ ] **ORCH-03**: JDBC-backed `ChatMemoryRepository` is authoritative for the model; `ConversationProjector` decorator synchronously mirrors each turn into `AiConversation`/`AiMessage` entities via `DataManager`
-- [ ] **ORCH-04**: `conversationId` scoped to user; `ChatService` rejects replay/continuation of a conversation not owned by the current user
-- [ ] **ORCH-05**: `ChatService` public API supports `ask(conversationId, question)` (blocking) and `stream(conversationId, question)` (if streaming works with tool calls in M4; otherwise graceful fallback to blocking)
+- [x] **ORCH-01**: `ChatClientFactory` builds a `ChatClient` per request with the caller's effective tool set and parameter profile (never `.defaultTools(...)` for auto-generated tools)
+- [x] **ORCH-02**: Advisor chain ordered: `MessageChatMemoryAdvisor` (`HIGHEST_PRECEDENCE+200`) → RAG advisor (`+250`) → `ToolCallAdvisor` with `.disableInternalConversationHistory()` (`+300`) → `AuditAdvisor` (around-chain)
+- [x] **ORCH-03**: JDBC-backed `ChatMemoryRepository` is authoritative for the model; `ConversationProjector` decorator synchronously mirrors each turn into `AiConversation`/`AiMessage` entities via `DataManager`
+- [x] **ORCH-04**: `conversationId` scoped to user; `ChatService` rejects replay/continuation of a conversation not owned by the current user
+- [x] **ORCH-05**: `ChatService` public API supports `ask(conversationId, question)` (blocking) and `stream(conversationId, question)` (if streaming works with tool calls in M4; otherwise graceful fallback to blocking)
 - [ ] **ORCH-06**: Default LLM provider: OpenAI-compatible via OpenRouter, configured through `spring.ai.openai.*` with `base-url` override; provider swappable by host replacing `ChatModel` bean
 
 ### Audit
@@ -54,65 +54,65 @@
 
 ### RAG (Knowledge Base)
 
-- [ ] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
-- [ ] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
-- [ ] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
-- [ ] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
-- [ ] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
-- [ ] **RAG-06**: Untagged documents refused for non-admin users (fail closed)
-- [ ] **RAG-07**: `CustomIngester` SPI + one example (e.g. URL-less markdown file) so hosts can plug in domain-specific sources
-- [ ] **RAG-08**: Admin can delete a document → corresponding vector chunks removed atomically
+- [x] **RAG-01**: Admin can upload PDF / MD / TXT / HTML via Flow UI; files read via Apache Tika (`TikaDocumentReader`)
+- [x] **RAG-02**: Single shared `EmbeddingModel` bean used for both ingestion and retrieval (mismatched models forbidden)
+- [x] **RAG-03**: Ingestion is asynchronous with status tracked on `AiKnowledgeDocument` (`PENDING` / `PROCESSING` / `READY` / `FAILED`)
+- [x] **RAG-04**: Chunks stored in pgvector with metadata: `source`, `documentId`, `embeddingModel`, `allowedRoles` (list of Jmix role codes)
+- [x] **RAG-05**: Retrieval advisor applies per-request `FILTER_EXPRESSION` derived from the caller's roles via `CurrentAuthentication`
+- [x] **RAG-06**: Untagged documents refused for non-admin users (fail closed)
+- [x] **RAG-07**: `CustomIngester` SPI + one example (e.g. URL-less markdown file) so hosts can plug in domain-specific sources
+- [x] **RAG-08**: Admin can delete a document → corresponding vector chunks removed atomically
 
 ### Parameters & Configuration
 
-- [ ] **PARAM-01**: `AiParameters` entity stores multiple profiles (YAML blob) with exactly one marked active
+- [x] **PARAM-01**: `AiParameters` entity stores multiple profiles (YAML blob) with exactly one marked active
 - [ ] **PARAM-02**: Profile fields: model id, temperature, max tokens, system prompt, enabled tool names, RAG top-k, RAG similarity threshold
-- [ ] **PARAM-03**: Per-conversation parameter override supported by `ChatService` API
-- [ ] **PARAM-04**: `default-params.yaml` bundled with starter; seeded on first startup if table empty
-- [ ] **PARAM-05**: Host can contribute additional system-prompt fragments via `PromptContextContributor` SPI
+- [x] **PARAM-03**: Per-conversation parameter override supported by `ChatService` API
+- [x] **PARAM-04**: `default-params.yaml` bundled with starter; seeded on first startup if table empty
+- [x] **PARAM-05**: Host can contribute additional system-prompt fragments via `PromptContextContributor` SPI
 
 ### Guardrails
 
-- [ ] **GUARD-01**: `ToolGuard` SPI invoked before each tool execution; veto raises a denial captured in audit
-- [ ] **GUARD-02**: `ToolCallingManager` max-iteration cap (default 6, configurable)
-- [ ] **GUARD-03**: Per-session token circuit breaker (configurable ceiling); breach returns a user-friendly error and audits the truncation
-- [ ] **GUARD-04**: Per-user rate limit on chat submissions (configurable; default 10 req/min)
-- [ ] **GUARD-05**: Output-side advisor scans model response for likely injection patterns echoed back; redacts or flags
-- [ ] **GUARD-06**: Structured output via `.entity(Class)` + `BeanOutputConverter` + bounded retry (max 2). Do not assume native structured-output support
+- [x] **GUARD-01**: `ToolGuard` SPI invoked before each tool execution; veto raises a denial captured in audit
+- [x] **GUARD-02**: `ToolCallingManager` max-iteration cap (default 6, configurable)
+- [x] **GUARD-03**: Per-session token circuit breaker (configurable ceiling); breach returns a user-friendly error and audits the truncation
+- [x] **GUARD-04**: Per-user rate limit on chat submissions (configurable; default 10 req/min)
+- [x] **GUARD-05**: Output-side advisor scans model response for likely injection patterns echoed back; redacts or flags
+- [x] **GUARD-06**: Structured output via `.entity(Class)` + `BeanOutputConverter` + bounded retry (max 2). Do not assume native structured-output support
 
 ### SPI Extension Points (functional module)
 
 - [ ] **SPI-01**: `ToolContributor` — hosts register additional `@Tool`-annotated beans
 - [ ] **SPI-02**: `ContextContributor` — inject per-request context (user, tenant, env) into prompt
 - [ ] **SPI-03**: `PromptContextContributor` — augment system prompt with host-specific instructions
-- [ ] **SPI-05**: `ToolGuard` — veto tool calls
+- [x] **SPI-05**: `ToolGuard` — veto tool calls
 - [ ] **SPI-06**: `AuditListener` — observe audit writes for side-channels
-- [ ] **SPI-07**: `CustomIngester` — plug in additional KB sources
+- [x] **SPI-07**: `CustomIngester` — plug in additional KB sources
 
 > Note: SPI-04 (`EntityExposurePolicy`) dropped per D-10. SPI-08 (per-SPI integration test with custom host impl) dropped per D-10; each SPI has a default no-op bean and is smoke-tested via the Phase 02 foundations boot test asserting defaults auto-wire.
 
 ### Built-in Flow UI
 
-- [ ] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
-- [ ] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
-- [ ] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
-- [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
-- [ ] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
-- [ ] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); CSV export
+- [x] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
+- [x] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
+- [x] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
+- [x] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
+- [x] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
+- [x] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
 
 > Note: UI-07 (`ExposureRuleListView`) dropped per D-10 (`AiExposureRule` entity removed). UI-08..UI-10 numbering preserved for cross-doc reference stability.
 
-- [ ] **UI-08**: Menu entries namespaced `aiAgent.*` in add-on `menu.xml`; labels in both `messages_en.properties` and `messages_vi.properties`
-- [ ] **UI-09**: All user-facing strings use `msg://` keys — zero hardcoded UI text
-- [ ] **UI-10**: Admin views visibility gated to `AiAgentAdminRole`
+- [x] **UI-08**: Menu entries namespaced `aiAgent.*` in add-on `menu.xml`; labels in both `messages_en.properties` and `messages_vi.properties`
+- [x] **UI-09**: All user-facing strings use `msg://` keys — zero hardcoded UI text
+- [x] **UI-10**: Admin views visibility gated to `AiAgentAdminRole`
 
 ### Testing
 
 - [ ] **TEST-01**: Three-tier structure: `src/test` (unit), `src/integrationTest` (`@SpringBootTest` with mock `ChatModel`), `@Tag("live")` tests excluded from default `./gradlew test`
-- [ ] **TEST-02**: Unit tests cover: metamodel scanner, schema filtering, tool generator, filter DSL → Condition mapping, audit entity construction, chunk metadata filter expression builder
-- [ ] **TEST-03**: Integration tests in `jmix-app` harness cover: auto-config boots; `ChatService.ask` round-trips with mock ChatModel; advisor ordering preserved; tool call audited
+- [x] **TEST-02**: Unit tests cover: metamodel scanner, schema filtering, tool generator, filter DSL → Condition mapping, audit entity construction, chunk metadata filter expression builder *(Phase 03-04 unit tests + Phase 04-05 orchestration/audit tests)*
+- [x] **TEST-03**: Integration tests in `jmix-app` harness cover: auto-config boots; `ChatService.ask` round-trips with mock ChatModel; advisor ordering preserved; tool call audited *(Phase 03-05 jmix-app ChatServiceToolIntegrationTest + Phase 04-05 OrchestrationIntegrationTest + AdvisorOrderStructuralTest + AuditDurabilityTest + DualLayerParityTest + OwnershipOpacityTest + AuditListenerFanOutTest + AuditWriterFieldMappingTest)*
 - [ ] **TEST-04**: Security negative-case suite: user without read access to an entity receives filtered schema AND execution is denied; RAG retrieval filters out forbidden roles; cross-user conversation access denied
-- [ ] **TEST-05**: `@Tag("live")` opt-in tier uses semantic-similarity assertions (`spring-ai-test`) — no brittle exact-text asserts
+- [x] **TEST-05**: `@Tag("live")` opt-in tier uses semantic-similarity assertions (`spring-ai-test`) — no brittle exact-text asserts *(Phase 04-05 ChatServiceLiveSemanticTest: @Tag("live") primary gate + @EnabledIfEnvironmentVariable OPENROUTER_API_KEY safety net + soft `containsAnyOf("pong","yes","ok","sure")` semantic assertion)*
 - [ ] **TEST-06**: (removed per D-10 — ArchUnit rules deferred per MEMORY note "Avoid ArchUnit until drift"). Code review + the existing forbidden-import convention in CLAUDE.md remain authoritative until rule drift justifies ArchUnit.
 - [ ] **TEST-07**: Clean-consumer smoke: `publishToMavenLocal` → fresh minimal Jmix app consumes `ai-agent-starter` → boots + menu registers (runs in CI on release)
 
