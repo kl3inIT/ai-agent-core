@@ -3,20 +3,19 @@ package com.vn.agent.view.knowledge;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.upload.FileRejectedEvent;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
-import com.vn.agent.utils.DataGridRenderers;
-import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
+import com.vn.agent.utils.DataGridRenderers;
+import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
+import com.vn.agent.utils.NotificationUtils;
 import io.jmix.core.Messages;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
@@ -145,7 +144,20 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     @Supply(to = "documentsDataGrid.status", subject = "renderer")
     private Renderer<AiKnowledgeDocument> documentsDataGridStatusRenderer() {
-        return new ComponentRenderer<>(this::createStatusBadge, this::updateStatusBadge);
+        return DataGridRenderers.buildBadgeColumn(
+                uiComponents,
+                doc -> messages.getMessage("knowledgeBase.status."
+                        + (doc.getStatus() == null ? "pending"
+                                : doc.getStatus().name().toLowerCase(Locale.ROOT))),
+                doc -> statusTheme(doc.getStatus()),
+                (badge, doc) -> {
+                    if (doc.getStatus() == AiKnowledgeDocumentStatus.FAILED
+                            && doc.getErrorMessage() != null) {
+                        badge.getElement().setAttribute("title", doc.getErrorMessage());
+                    } else {
+                        badge.getElement().removeAttribute("title");
+                    }
+                });
     }
 
     @Supply(to = "documentsDataGrid.actions", subject = "renderer")
@@ -228,30 +240,6 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     // --- Internals -------------------------------------------------------------
 
-    private Span createStatusBadge() {
-        Span badge = uiComponents.create(Span.class);
-        badge.getElement().getThemeList().add("badge");
-        return badge;
-    }
-
-    private void updateStatusBadge(Span badge, AiKnowledgeDocument doc) {
-        AiKnowledgeDocumentStatus status = doc.getStatus();
-        String key = "knowledgeBase.status." + (status == null ? "pending" : status.name().toLowerCase(Locale.ROOT));
-        badge.setText(messages.getMessage(key));
-        // Reset theme list — ComponentRenderer reuses the Span across rows, so stale
-        // variants from a previous row would leak onto the current one.
-        badge.getElement().getThemeList().clear();
-        badge.getElement().getThemeList().add("badge");
-        for (String variant : statusTheme(status).split(" ")) {
-            badge.getElement().getThemeList().add(variant);
-        }
-        if (status == AiKnowledgeDocumentStatus.FAILED && doc.getErrorMessage() != null) {
-            badge.getElement().setAttribute("title", doc.getErrorMessage());
-        } else {
-            badge.getElement().removeAttribute("title");
-        }
-    }
-
     private void selectPendingDocumentIfNeeded() {
         UUID documentId = pendingSelectionDocumentId;
         if (documentId == null) {
@@ -293,7 +281,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("reingest failed for {}", doc.getId(), ex);
-                                        notifyDetailedError("knowledgeBase.reingest.failed", ex.getMessage());
+                                        NotificationUtils.errorWithDetail(notifications, messages,
+                                                "knowledgeBase.reingest.failed", ex);
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -317,7 +306,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("delete failed for {}", doc.getId(), ex);
-                                        notifyDetailedError("knowledgeBase.delete.failed", ex.getMessage());
+                                        NotificationUtils.errorWithDetail(notifications, messages,
+                                                "knowledgeBase.delete.failed", ex);
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -328,13 +318,5 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         notifications.create(message)
                 .withThemeVariant(NotificationVariant.LUMO_ERROR)
                 .show();
-    }
-
-    private void notifyDetailedError(String key, String detail) {
-        String message = messages.getMessage(key);
-        if (detail != null && !detail.isBlank()) {
-            message = message + " " + detail;
-        }
-        notifyError(message);
     }
 }

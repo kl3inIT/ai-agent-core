@@ -11,6 +11,7 @@ import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
 import com.vn.agent.tools.AgentToolCallbacks;
+import com.vn.agent.utils.NotificationUtils;
 import io.jmix.core.EntityStates;
 import io.jmix.core.Messages;
 import io.jmix.flowui.Notifications;
@@ -38,6 +39,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -119,6 +121,15 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
         }
         registryToolNames = List.copyOf(toolNames);
         enabledToolsField.setItems(registryToolNames);
+
+        // Pin decimal fields to ENGLISH locale so "." is the decimal separator regardless of
+        // the user's Jmix locale. Under "vi" locale the default NumberFormat uses "," as the
+        // decimal separator, which rejects "0.1" / "0.3" with a parse error — a UX bug for
+        // values like temperature / topP / similarity threshold that users conventionally type
+        // with a dot.
+        temperatureField.setLocale(Locale.ENGLISH);
+        topPField.setLocale(Locale.ENGLISH);
+        ragSimilarityThresholdField.setLocale(Locale.ENGLISH);
     }
 
     // ---- D-12 Live YAML preview: each field's @Subscribe("fieldId") valueChange handler ----
@@ -183,9 +194,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             } catch (Exception ex) {
                 log.warn("Unable to parse existing bodyYaml for profile {}: {}",
                         edited.getId(), ex.getMessage());
-                notifications.create(buildErrorMessage("parametersDetail.error.yamlParse", ex))
-                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
-                        .show();
+                NotificationUtils.warnWithDetail(notifications, messages,
+                        "parametersDetail.error.yamlParse", ex);
             }
         }
         refreshYamlPreview();
@@ -202,9 +212,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             body = buildBodyFromForm();
         } catch (Exception ex) {
             event.preventSave();
-            notifications.create(buildErrorMessage("parametersDetail.error.invalidForm", ex))
-                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
-                    .show();
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "parametersDetail.error.invalidForm", ex);
             return;
         }
         // writeAsYaml re-runs Jakarta validation; invalid form will throw here and we block save.
@@ -212,9 +221,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             edited.setBodyYaml(yamlMapper.writeAsYaml(body));
         } catch (Exception ex) {
             event.preventSave();
-            notifications.create(buildErrorMessage("parametersDetail.error.yamlWrite", ex))
-                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
-                    .show();
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "parametersDetail.error.yamlWrite", ex);
         }
     }
 
@@ -233,9 +241,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
                     .show();
         } catch (Exception ex) {
             log.warn("setActive failed for profile {}", edited.getId(), ex);
-            notifications.create(buildErrorMessage("parametersDetail.error.setActive", ex))
-                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
-                    .show();
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "parametersDetail.error.setActive", ex);
         }
     }
 
@@ -330,15 +337,6 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
 
     private static String nullToBlank(String s) {
         return s == null ? "" : s;
-    }
-
-    private String buildErrorMessage(String key, Exception ex) {
-        String message = messages.getMessage(key);
-        String detail = ex.getMessage();
-        if (detail == null || detail.isBlank()) {
-            return message;
-        }
-        return message + " " + detail;
     }
 
 }
