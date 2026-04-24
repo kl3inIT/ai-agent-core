@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="AI_AGENT_TOOL_CALL_AUDIT"/>
+        </preConditions>
+        <dropTable tableName="AI_AGENT_TOOL_CALL_AUDIT" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createTable tableName="AI_AGENT_AUDIT_EVENT">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="PARENT_ID" type="${uuid.type}"/>
+            <column name="CONVERSATION_ID" type="${uuid.type}"/>
+            <column name="USER_USERNAME" type="varchar(255)"/>
+            <column name="RUN_ID" type="${uuid.type}"/>
+            <column name="KIND" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="EVENT_NAME" type="varchar(128)"/>
+            <column name="ARGUMENTS_JSON" type="clob"/>
+            <column name="RESULT_SUMMARY" type="clob"/>
+            <column name="QUERY_TEXT" type="clob"/>
+            <column name="TOP_K" type="int"/>
+            <column name="HIT_COUNT" type="int"/>
+            <column name="TOP_SCORE" type="double"/>
+            <column name="FILTERS_JSON" type="clob"/>
+            <column name="OUTCOME" type="varchar(16)"/>
+            <column name="DENIAL_REASON" type="varchar(512)"/>
+            <column name="ERROR_CLASS" type="varchar(255)"/>
+            <column name="PROMPT_HASH" type="varchar(64)"/>
+            <column name="LATENCY_MS" type="bigint"/>
+            <column name="STARTED_AT" type="${offsetDateTime.type}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="FINISHED_AT" type="${offsetDateTime.type}"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3" author="ai-agent">
+        <addForeignKeyConstraint
+                constraintName="FK_AI_AGENT_AUDIT_EVENT__ON_PARENT"
+                baseTableName="AI_AGENT_AUDIT_EVENT"
+                baseColumnNames="PARENT_ID"
+                referencedTableName="AI_AGENT_AUDIT_EVENT"
+                referencedColumnNames="ID"/>
+        <addForeignKeyConstraint
+                constraintName="FK_AI_AGENT_AUDIT_EVENT__ON_CONVERSATION"
+                baseTableName="AI_AGENT_AUDIT_EVENT"
+                baseColumnNames="CONVERSATION_ID"
+                referencedTableName="AI_AGENT_CONVERSATION"
+                referencedColumnNames="ID"/>
+    </changeSet>
+
+    <changeSet id="4" author="ai-agent">
+        <createIndex indexName="IDX_AI_AGENT_AUDIT_EVENT__ON_PARENT"
+                     tableName="AI_AGENT_AUDIT_EVENT">
+            <column name="PARENT_ID"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_AGENT_AUDIT_EVENT__ON_CONVERSATION"
+                     tableName="AI_AGENT_AUDIT_EVENT">
+            <column name="CONVERSATION_ID"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_AGENT_AUDIT_EVENT__ON_STARTED_AT"
+                     tableName="AI_AGENT_AUDIT_EVENT">
+            <column name="STARTED_AT"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_AGENT_AUDIT_EVENT__ON_RUN_ID"
+                     tableName="AI_AGENT_AUDIT_EVENT">
+            <column name="RUN_ID"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
