@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: "Phase 07.1 awaiting human UAT (Plan 07.1-07 checkpoint:human-verify)"
-last_updated: "2026-04-24T10:15:32.259Z"
+last_updated: "2026-04-24T10:41:14.466Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 8
@@ -177,7 +177,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 7
+**Count:** 8
 
 - `2026-04-24-refine-describe-entity-wrapper-around-selected-jmix-metadata.md` — Refine describe_entity wrapper around selected Jmix metadata
 - `2026-04-24-add-dedicated-chat-speech-and-file-task-input.md` — Add dedicated chat speech and file task input
@@ -186,3 +186,4 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - `2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — Audit vector-store retrieval path and full RAG flow vs jmix-ai-backend
 - `2026-04-24-enforce-unknown-entity-retry-contract.md` — Enforce unknown_entity retry contract
 - `2026-04-24-add-llm-permission-inventory.md` — Add LLM permission inventory
+- `2026-04-24-add-explicit-host-override-for-tool-fetch-plans.md` — Add explicit host override for tool fetch plans
