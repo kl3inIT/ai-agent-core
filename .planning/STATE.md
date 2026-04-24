@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: "Phase 07.1 awaiting human UAT (Plan 07.1-07 checkpoint:human-verify)"
-last_updated: "2026-04-24T10:13:40.975Z"
+last_updated: "2026-04-24T10:15:32.259Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 8
@@ -177,8 +177,9 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 3
+**Count:** 4
 
 - `2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md` — Redesign audit schema as tree-lite (PARENT_ID) before adding retrieval kind
 - `2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — Audit vector-store retrieval path and full RAG flow vs jmix-ai-backend
 - `2026-04-24-enforce-unknown-entity-retry-contract.md` — Enforce unknown_entity retry contract
+- `2026-04-24-add-llm-permission-inventory.md` — Add LLM permission inventory
