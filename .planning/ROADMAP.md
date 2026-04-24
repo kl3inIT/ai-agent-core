@@ -17,6 +17,7 @@
 | 6 | Parameters & Guardrails | Parameter profiles + structured output + iteration/token caps + injection scanner | PARAM-01..05, GUARD-01..06, SPI-05 (impl) | 4 |
 | 7 | Flow UI | Plug-and-play admin UI: Chat, Conversations, Parameters, KB, Audit | UI-01..06, UI-08, UI-09, UI-10 (UI-07 dropped per D-10) | 5 |
 | 7.1 | Adopt Vaadin MessageList/MessageInput (INSERTED) | Replace custom chat component tree with stock Vaadin messages API per `jmix-ai-backend` reference | UI-01, UI-02 (re-implementation) | 5 |
+| 7.2 | Redesign audit schema as tree-lite (INSERTED) | Replace flat `AI_AGENT_TOOL_CALL_AUDIT` + `KIND` discriminator with self-referential `PARENT_ID` FK; collapse PRE/POST into one row per event; rename entity; generalize `AuditListener` SPI — unblocks retrieval audit | AUD-01..05 (re-implementation), SPI-06 (breaking change) | 5 |
 | 8 | Integration & Release | Security negative tests, clean-consumer smoke, operator docs, release polish | TEST-02..05, TEST-07 (TEST-06 dropped per D-10) | 4 |
 
 **Total v1 requirements mapped:** 69 of 69 ✓ (was 73 pre-D-10; `AiExposureRule`/SPI-04/SPI-08/UI-07/TEST-06 dropped)
@@ -308,6 +309,49 @@ Plans:
 **Needs research phase:** Minimal — reference implementation at `D:\Study materials spring 2026\EXE101\ai\jmix-ai-backend\src\main\java\io\jmix\ai\backend\view\chat\ChatView.java` is the spec. Verify Vaadin `MessageList.setMarkdown(true)` and `MessageListItem.appendText(...)` API surface via Context7 before planning.
 
 **Plans:** not planned yet — run `/gsd-plan-phase 7.1`
+
+---
+
+### Phase 7.2 — Redesign Audit Schema as Tree-Lite (PARENT_ID) (INSERTED)
+
+**Goal:** Replace the flat `AI_AGENT_TOOL_CALL_AUDIT` + `KIND` discriminator with a self-referential `PARENT_ID` FK. One chat turn = one root row (`PARENT_ID = null`, `KIND = CHAT`); `TOOL` / `RETRIEVAL` / future `GUARDRAIL` events are children linked via `PARENT_ID`. Collapse `PHASE = PRE/POST` dual-row pattern into one row per event with `startedAt` + `finishedAt`. Rename entity `AiToolCallAudit` -> `AiAgentAudit` (or `AiAuditEvent`); relax `TOOL_NAME` NOT NULL -> nullable `EVENT_NAME`.
+
+**Why urgent:** Current schema has accumulated smells (`<chat>` sentinel for NOT NULL `TOOL_NAME`, PRE/POST dual-row with turn-level fields split across rows, misleading entity name, implicit parent-child via shared `RUN_ID` that blocks Jmix `@Composition` tree rendering). Adding `KIND = RETRIEVAL` on top of the legacy shape would multiply the debt with another sentinel + PHASE dance. This phase **blocks** vector-store retrieval audit work — that work will be built on the new schema.
+
+**Requirements:** AUD-01..05 (re-implementation of phase 4 audit pipeline), SPI-06 (breaking change: `AuditListener.dispatchToolCallAudited(UUID)` -> `dispatchEventAudited(UUID, String kind)`). No new roadmap requirements — scoped as architecture refactor of existing ones.
+
+**Deliverables:**
+- Liquibase changelog adding `PARENT_ID UUID` nullable column + self-FK + `IDX_..._ON_PARENT_ID`; decide table rename (`AI_AGENT_TOOL_CALL_AUDIT` -> `AI_AGENT_AUDIT_EVENT`) within this changelog or follow-up
+- Entity rename `AiToolCallAudit` -> `AiAgentAudit` with `@ManyToOne parent` + `@OneToMany(mappedBy="parent") children` annotated `@Composition`; `TOOL_NAME` (NOT NULL) -> `EVENT_NAME` (nullable)
+- `AuditWriter` rewrite: `writeChatStart(runId, user, conversationId, promptHash) -> UUID parentId`, `writeChatFinish(parentId, latencyMs, errorClass)`, `writeToolCall(parentId, ...)`, new `writeRetrieval(parentId, query, topK, hitCount, topScore, filters, latencyMs, outcome)`
+- `AuditListener` SPI: generalize `dispatchToolCallAudited(UUID)` -> `dispatchEventAudited(UUID, String kind)` (breaking change — document in ADR/memory, audit for external consumers)
+- Update `AuditAdvisor` (start/finish around one root row, not PRE/POST pair) + `ToolCallbackAuditDecorator` (insert children with `PARENT_ID`)
+- Update list view `/ai-agent/audit` to render tree (parent row with expandable children; `stepOrder` via `startedAt`) using Jmix `@Composition` fetch plan — no manual grouping
+- Data migration plan: confirm with stakeholder whether existing audit data is ephemeral (hard cutover — drop + recreate) or must be preserved (backfill: group by `runId`, synthesize root from `CHAT PRE+POST` pair, link same-`runId` `TOOL` rows via `PARENT_ID`)
+- Tests: update `AuditWriterFieldMappingTest`, `AuditDurabilityTest`, `AuditListenerDispatcherTest`; add tree-traversal test (parent + N children via `@Composition`) + retrieval audit round-trip
+
+**Success criteria:**
+1. Single-row-per-event ledger: no `PHASE = PRE/POST` dual-row pattern; no `<chat>` sentinel in `TOOL_NAME` / `EVENT_NAME`
+2. One chat turn writes exactly one root row (`PARENT_ID = null`, `KIND = CHAT`) + N child rows (tool calls / retrievals) linked via `PARENT_ID`
+3. `AuditWriter.writeRetrieval(...)` persists a retrieval event as a child of the current chat root; covered by integration test
+4. Jmix list view `/ai-agent/audit` renders tree (parent expandable to children) via `@Composition` fetch plan — no client-side grouping
+5. `AuditListener` SPI migrated to `dispatchEventAudited(UUID, String kind)`; all in-tree consumers updated; breaking change documented in ADR/memory
+6. `./gradlew test` green; `AuditWriterFieldMappingTest` + `AuditDurabilityTest` + `AuditListenerDispatcherTest` updated (not skipped); new tree-traversal + retrieval round-trip tests pass
+7. Data migration path chosen (hard cutover vs backfill) recorded in PLAN; if backfill, verified on a copy of prod/staging audit data
+
+**Open questions for planning:**
+- Append-only ledger vs mutable CHAT root row (UPDATE on finish)? Leaning mutable for clean 1-row-per-turn semantics; confirm in discuss-phase.
+- Align tree structure with `jmix-ai-backend` reference shape, or diverge deliberately? Confirm via RESEARCH.md.
+- SPI breaking change: audit external consumers; if solo codebase, break is cheap; otherwise, add deprecation path.
+- Rename timing: bundle table/entity rename with tree introduction, or split into two phases (add `PARENT_ID` first, rename later)? Bundling reduces review cycles; splitting reduces risk.
+
+**Needs research phase:** YES — verify (a) `jmix-ai-backend` audit reference shape for tree rendering, (b) Jmix `@Composition` + self-referential `@ManyToOne` fetch-plan behavior in Flow UI list view, (c) Liquibase pattern for adding self-FK + index on existing populated table (Postgres + HSQLDB).
+
+**Blocks:** `.planning/todos/pending/2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — retrieval audit implementation depends on the new schema.
+
+**Plans:** not planned yet — run `/gsd-plan-phase 7.2`
+
+**Source:** `.planning/todos/pending/2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md`
 
 ---
 

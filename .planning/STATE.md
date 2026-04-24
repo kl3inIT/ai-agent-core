@@ -116,6 +116,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 ## Session Tracking
 
 - 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
+- 2026-04-24 17:52 +07:00 — Forensic investigation complete for Phase 07 / 07.1 closure readiness. Resume from `.planning/forensics/report-20260424-175230.md`.
 - 2026-04-19 16:24 +07:00 — Plan 03-01 complete (metadata core). Next: 03-02 (FilterNode DSL / LiteralCoercer / FilterDslMapper).
 - 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
 - 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
@@ -187,3 +188,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - `2026-04-24-enforce-unknown-entity-retry-contract.md` — Enforce unknown_entity retry contract
 - `2026-04-24-add-llm-permission-inventory.md` — Add LLM permission inventory
 - `2026-04-24-add-explicit-host-override-for-tool-fetch-plans.md` — Add explicit host override for tool fetch plans
+
+### Roadmap Evolution
+
+- Phase 7.2 inserted after Phase 7.1: Redesign audit schema as tree-lite (PARENT_ID) — unblocks retrieval audit (URGENT)
