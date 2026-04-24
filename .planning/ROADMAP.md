@@ -349,7 +349,14 @@ Plans:
 
 **Blocks:** `.planning/todos/pending/2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — retrieval audit implementation depends on the new schema.
 
-**Plans:** not planned yet — run `/gsd-plan-phase 7.2`
+**Plans:** 5 plans
+
+Plans:
+- [ ] 07.2-01-PLAN.md — Liquibase 090 + AiAuditEvent entity + AuditKind + AuditListener SPI + i18n (AUD-03, SPI-06)
+- [ ] 07.2-02-PLAN.md — AuditWriter rewrite + AuditAdvisor + dispatcher + RunContext extension + SpiDefaults (AUD-01, AUD-02, AUD-04, AUD-05, SPI-06)
+- [ ] 07.2-03-PLAN.md — AuditingDocumentRetriever + RAG factory wiring + DefaultChatServiceImpl retrieval params (AUD-01, AUD-03)
+- [ ] 07.2-04-PLAN.md — AiAuditEventListView tree rendering + detail dialog + menu.xml + AiAgentAdminRole (AUD-03)
+- [ ] 07.2-05-PLAN.md — Test updates + new tree-traversal + retrieval round-trip tests (AUD-01, AUD-02, AUD-04, AUD-05, SPI-06)
 
 **Source:** `.planning/todos/pending/2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md`
 
