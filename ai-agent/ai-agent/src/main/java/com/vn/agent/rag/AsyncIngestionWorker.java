@@ -6,6 +6,7 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
+import io.jmix.core.security.SystemAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -84,6 +85,7 @@ public class AsyncIngestionWorker {
     private final AiAgentRagProperties ragProperties;
     private final AiAgentEmbeddingProperties embeddingProperties;
     private final ResourceLoader resourceLoader;
+    private final SystemAuthenticator systemAuthenticator;
 
     public AsyncIngestionWorker(IngestionStatusWriter ingestionStatusWriter,
                                 CancellationRegistry cancellationRegistry,
@@ -91,7 +93,8 @@ public class AsyncIngestionWorker {
                                 VectorStore vectorStore,
                                 AiAgentRagProperties ragProperties,
                                 AiAgentEmbeddingProperties embeddingProperties,
-                                ResourceLoader resourceLoader) {
+                                ResourceLoader resourceLoader,
+                                SystemAuthenticator systemAuthenticator) {
         this.ingestionStatusWriter = ingestionStatusWriter;
         this.cancellationRegistry = cancellationRegistry;
         this.dataManager = dataManager;
@@ -99,10 +102,19 @@ public class AsyncIngestionWorker {
         this.ragProperties = ragProperties;
         this.embeddingProperties = embeddingProperties;
         this.resourceLoader = resourceLoader;
+        this.systemAuthenticator = systemAuthenticator;
     }
 
     @Async("aiAgentIngestExecutor")
     public void ingest(UUID documentId) {
+        // Async thread has no SecurityContext — DataManager/VectorStore require an
+        // authenticated principal for policy checks. Run under Jmix system auth; the
+        // document was already role-validated by KnowledgeDocumentUploadService at upload
+        // time, and retrieval-time visibility is still enforced via per-chunk allowedRoles.
+        systemAuthenticator.runWithSystem(() -> ingestInternal(documentId));
+    }
+
+    private void ingestInternal(UUID documentId) {
         // WR-01: capture the generation at entry so later reingest() bumps mark THIS
         // worker as cancelled even if the legacy boolean flag is cleared between
         // scheduling and polling. Generation captured BEFORE markProcessing so a
