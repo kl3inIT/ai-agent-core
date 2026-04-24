@@ -160,7 +160,7 @@ public class ConversationListView extends StandardListView<AiConversation> {
      */
     boolean currentUserIsAdmin() {
         try {
-            UiShowViewContext ctx = new UiShowViewContext("AiAgent_ToolCallAudit.list");
+            UiShowViewContext ctx = new UiShowViewContext("AiAgent_AiAuditEvent.list");
             accessManager.applyRegisteredConstraints(ctx);
             return ctx.isPermitted();
         } catch (Exception ex) {

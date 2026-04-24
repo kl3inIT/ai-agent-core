@@ -10,7 +10,7 @@
               title="msg://com.vn.agent/menu.parameters"/>
         <item id="aiAgent.knowledge.list" view="AiAgent_KnowledgeBase.list"
               title="msg://com.vn.agent/menu.knowledge"/>
-        <item id="aiAgent.audit.list" view="AiAgent_ToolCallAudit.list"
+        <item id="aiAgent.audit.list" view="AiAgent_AiAuditEvent.list"
               title="msg://com.vn.agent/menu.audit"/>
     </menu>
 

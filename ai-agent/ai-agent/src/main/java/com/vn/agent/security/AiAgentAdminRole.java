@@ -40,6 +40,6 @@ public interface AiAgentAdminRole {
             "AiAgent_Conversation.list", "AiAgent_Conversation.detail",
             "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
             "AiAgent_KnowledgeBase.list",
-            "AiAgent_ToolCallAudit.list"})
+            "AiAgent_AiAuditEvent.list"})
     void adminViews();
 }
