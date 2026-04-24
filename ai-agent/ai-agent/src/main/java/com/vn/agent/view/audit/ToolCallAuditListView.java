@@ -1,7 +1,6 @@
 package com.vn.agent.view.audit;
 
 import com.vaadin.flow.component.AbstractField;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
@@ -9,6 +8,7 @@ import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
 import io.jmix.core.DataManager;
+import io.jmix.core.Messages;
 import io.jmix.flowui.DialogWindows;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.component.combobox.JmixComboBox;
@@ -27,7 +27,6 @@ import io.jmix.flowui.view.ViewDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -90,7 +89,7 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
     @Autowired
     private DataManager dataManager;
     @Autowired
-    private MessageSource messageSource;
+    private Messages messages;
     @Autowired
     private DialogWindows dialogWindows;
     @Autowired
@@ -101,9 +100,8 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
         // Populate filter combos.
         toolFilter.setItems(loadDistinctToolNames());
         outcomeFilter.setItems(Arrays.asList(AiToolCallOutcome.values()));
-        outcomeFilter.setItemLabelGenerator(o -> messageSource.getMessage(
-                "auditList.outcome." + o.name().toLowerCase(Locale.ROOT),
-                null, o.name(), UI.getCurrent().getLocale()));
+        outcomeFilter.setItemLabelGenerator(o -> messages.getMessage(
+                "auditList.outcome." + o.name().toLowerCase(Locale.ROOT)));
 
         userFilter.setValueChangeMode(com.vaadin.flow.data.value.ValueChangeMode.LAZY);
 
@@ -134,9 +132,8 @@ public class ToolCallAuditListView extends StandardListView<AiToolCallAudit> {
 
     private void updateOutcomeBadge(Span badge, AiToolCallAudit row) {
         AiToolCallOutcome outcome = row.getOutcome();
-        Locale locale = UI.getCurrent().getLocale();
         String key = "auditList.outcome." + (outcome == null ? "success" : outcome.name().toLowerCase(Locale.ROOT));
-        badge.setText(messageSource.getMessage(key, null, outcome == null ? "" : outcome.name(), locale));
+        badge.setText(messages.getMessage(key));
         // Reset theme list — ComponentRenderer reuses the Span across rows.
         badge.getElement().getThemeList().clear();
         badge.getElement().getThemeList().add("badge");

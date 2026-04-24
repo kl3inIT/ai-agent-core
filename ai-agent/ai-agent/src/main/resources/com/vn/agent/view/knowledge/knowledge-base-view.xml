@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
-      title="msg://title"
+      title="msg:///knowledgeBase.title"
       focusComponent="documentsDataGrid">
     <data>
         <collection id="documentsDc" class="com.vn.agent.entity.AiKnowledgeDocument">
@@ -20,8 +20,9 @@
                 acceptedFileTypes="application/pdf,text/markdown,text/plain,text/html,.pdf,.md,.txt,.html"
                 maxFiles="10"
                 maxFileSize="10485760"
-                dropLabel="msg://upload.placeholder"
-                uploadText="msg://upload.button"
+                dropLabel="msg:///knowledgeBase.upload.placeholder"
+                uploadText="msg:///knowledgeBase.upload.button"
+                receiverType="MultiFileTemporaryStorageBuffer"
                 width="100%"/>
         <dataGrid id="documentsDataGrid"
                   dataContainer="documentsDc"
@@ -31,16 +32,16 @@
             <actions>
                 <action id="reingest"
                         type="list_itemTracking"
-                        text="msg://action.reingest"/>
+                        text="msg:///knowledgeBase.action.reingest"/>
                 <action id="delete"
                         type="list_itemTracking"
-                        text="msg://action.delete"/>
+                        text="msg:///knowledgeBase.action.delete"/>
             </actions>
             <columns resizable="true">
-                <column property="fileName" header="msg://column.filename"/>
-                <column property="mimeType" header="msg://column.mimeType"/>
-                <column key="status" header="msg://column.status"/>
-                <column property="createdDate" header="msg://column.uploadedDate"/>
+                <column property="fileName" header="msg:///knowledgeBase.column.filename"/>
+                <column property="mimeType" header="msg:///knowledgeBase.column.mimeType"/>
+                <column key="status" header="msg:///knowledgeBase.column.status"/>
+                <column property="createdDate" header="msg:///knowledgeBase.column.uploadedDate"/>
             </columns>
         </dataGrid>
         <hbox id="rowActionsBar" spacing="true">

@@ -3,7 +3,6 @@ package com.vn.agent.view.parameters;
 import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.HasValue;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.router.Route;
@@ -13,6 +12,7 @@ import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.EntityStates;
+import io.jmix.core.Messages;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.component.codeeditor.CodeEditor;
 import io.jmix.flowui.component.multiselectcombobox.JmixMultiSelectComboBox;
@@ -32,14 +32,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -100,7 +98,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     @Autowired
     private Notifications notifications;
     @Autowired
-    private MessageSource messageSource;
+    private Messages messages;
     @Autowired
     private AgentToolCallbacks agentToolCallbacks;
     @Autowired
@@ -113,13 +111,11 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
         // ---- Tool registry discovery (no hardcoded six-tool fallback) ----
         List<String> toolNames = discoverToolNames();
         if (toolNames.isEmpty()) {
-            String label = messageSource.getMessage(
-                    "parametersDetail.toolRegistry.empty", null,
-                    "No @Tool beans registered", currentLocale());
             throw new IllegalStateException(
                     "No @Tool beans registered — ParametersDetailView requires a non-empty tool "
                             + "registry. Check Phase 3/4 tool-bean wiring; do NOT paper over this "
-                            + "with a hardcoded fallback. (" + label + ")");
+                            + "with a hardcoded fallback. ("
+                            + messages.getMessage("parametersDetail.toolRegistry.empty") + ")");
         }
         registryToolNames = List.copyOf(toolNames);
         enabledToolsField.setItems(registryToolNames);
@@ -232,9 +228,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             parametersService.setActive(edited.getId());
             edited.setActive(Boolean.TRUE);
             setActiveBtn.setEnabled(false);
-            notifications.create(messageSource.getMessage(
-                            "parametersList.action.setActive", null,
-                            "Set active", currentLocale()))
+            notifications.create(messages.getMessage("parametersList.action.setActive"))
                     .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
                     .show();
         } catch (Exception ex) {
@@ -314,9 +308,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
             yamlPreviewField.setValue(yamlMapper.writeAsYaml(body));
         } catch (Exception ex) {
             // Build/validation in progress — render a best-effort hint, not a hard error.
-            String hint = messageSource.getMessage(
-                    "parametersDetail.validation.modelRequired", null,
-                    "Fill required fields to preview YAML.", currentLocale());
+            String hint = messages.getMessage("parametersDetail.validation.modelRequired");
             yamlPreviewField.setValue("# " + hint + "\n# " + Objects.toString(ex.getMessage(), ""));
         }
     }
@@ -340,13 +332,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
         return s == null ? "" : s;
     }
 
-    private Locale currentLocale() {
-        UI ui = UI.getCurrent();
-        return ui == null ? Locale.getDefault() : ui.getLocale();
-    }
-
     private String buildErrorMessage(String key, Exception ex) {
-        String message = messageSource.getMessage(key, null, key, currentLocale());
+        String message = messages.getMessage(key);
         String detail = ex.getMessage();
         if (detail == null || detail.isBlank()) {
             return message;

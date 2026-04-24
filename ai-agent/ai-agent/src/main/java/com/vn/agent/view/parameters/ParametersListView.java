@@ -1,6 +1,5 @@
 package com.vn.agent.view.parameters;
 
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -11,6 +10,7 @@ import com.vn.agent.entity.AiParameters;
 import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
 import com.vn.agent.parameters.ParametersService;
+import io.jmix.core.Messages;
 import io.jmix.flowui.action.list.CreateAction;
 import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.Notifications;
@@ -29,13 +29,11 @@ import io.jmix.flowui.view.ViewDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Locale;
 
 /**
  * UI-04 Parameters list (admin-only via {@code AiAgentAdminRole @ViewPolicy} in 07-01).
@@ -70,7 +68,7 @@ public class ParametersListView extends StandardListView<AiParameters> {
     @Autowired
     private Notifications notifications;
     @Autowired
-    private MessageSource messageSource;
+    private Messages messages;
     @Autowired
     private UiComponents uiComponents;
 
@@ -117,8 +115,7 @@ public class ParametersListView extends StandardListView<AiParameters> {
     private void updateStatusBadge(Span badge, AiParameters row) {
         boolean active = Boolean.TRUE.equals(row.getActive());
         String key = active ? "parametersList.badge.active" : "parametersList.column.active";
-        badge.setText(messageSource.getMessage(
-                key, null, active ? "Active" : "-", UI.getCurrent().getLocale()));
+        badge.setText(messages.getMessage(key));
         // Reset theme list — ComponentRenderer reuses the Span across rows.
         badge.getElement().getThemeList().clear();
         badge.getElement().getThemeList().add("badge");
@@ -136,10 +133,7 @@ public class ParametersListView extends StandardListView<AiParameters> {
             parametersService.setActive(row.getId());
             parsedCache.clear();
             parametersDl.load();
-            String msg = messageSource.getMessage(
-                    "parametersList.action.setActive", null,
-                    "Set active", UI.getCurrent().getLocale());
-            notifications.create(msg)
+            notifications.create(messages.getMessage("parametersList.action.setActive"))
                     .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
                     .show();
         } catch (Exception ex) {
@@ -167,17 +161,12 @@ public class ParametersListView extends StandardListView<AiParameters> {
     }
 
     private String buildErrorMessage(String key, Exception ex) {
-        String message = messageSource.getMessage(key, null, key, currentLocale());
+        String message = messages.getMessage(key);
         String detail = ex.getMessage();
         if (detail == null || detail.isBlank()) {
             return message;
         }
         return message + " " + detail;
-    }
-
-    private Locale currentLocale() {
-        UI ui = UI.getCurrent();
-        return ui == null ? Locale.getDefault() : ui.getLocale();
     }
 
 }

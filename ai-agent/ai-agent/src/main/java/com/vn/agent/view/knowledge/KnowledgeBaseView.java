@@ -15,6 +15,7 @@ import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
 import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
+import io.jmix.core.Messages;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
@@ -27,7 +28,6 @@ import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.upload.TemporaryStorage;
 import io.jmix.flowui.view.DefaultMainViewParent;
-import io.jmix.flowui.view.MessageBundle;
 import io.jmix.flowui.view.StandardListView;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Supply;
@@ -81,7 +81,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseView.class);
 
-    private static final String MSG_UPLOAD_REJECTED = "upload.rejected";
+    private static final String MSG_UPLOAD_REJECTED = "knowledgeBase.upload.rejected";
 
     @ViewComponent
     private DataGrid<AiKnowledgeDocument> documentsDataGrid;
@@ -91,8 +91,6 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     private CollectionLoader<AiKnowledgeDocument> documentsDl;
     @ViewComponent
     private CollectionContainer<AiKnowledgeDocument> documentsDc;
-    @ViewComponent
-    private MessageBundle messageBundle;
 
     @Autowired
     private KnowledgeDocumentUploadService uploadService;
@@ -102,6 +100,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     private Dialogs dialogs;
     @Autowired
     private Notifications notifications;
+    @Autowired
+    private Messages messages;
     @Autowired
     private TemporaryStorage temporaryStorage;
     @Autowired
@@ -116,15 +116,15 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
             try {
                 uploadService.upload(stagedFile.toURI().toString(), metadata.contentType(), Collections.emptyList());
-                notifications.create(messageBundle.formatMessage("toast.uploadStarted", metadata.fileName())).show();
+                notifications.create(messages.formatMessage("knowledgeBase.toast.uploadStarted", metadata.fileName())).show();
                 documentsDl.load();
             } catch (IllegalArgumentException ex) {
                 log.warn("Upload rejected by staging-root allowlist: {}", ex.getMessage());
-                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
+                notifyError(messages.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
                 throw ex;
             } catch (Exception ex) {
                 log.warn("Upload failed for {}", metadata.fileName(), ex);
-                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
+                notifyError(messages.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
                 throw ex;
             }
         }, metadata -> temporaryStorage.createFile().getFile()));
@@ -132,7 +132,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     @Subscribe("documentUpload")
     public void onDocumentUploadFileRejected(final FileRejectedEvent event) {
-        notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, event.getErrorMessage()));
+        notifyError(messages.formatMessage(MSG_UPLOAD_REJECTED, event.getErrorMessage()));
     }
 
     @Subscribe(id = "documentsDl", target = Target.DATA_LOADER)
@@ -218,8 +218,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     private void updateStatusBadge(Span badge, AiKnowledgeDocument doc) {
         AiKnowledgeDocumentStatus status = doc.getStatus();
-        String key = "status." + (status == null ? "pending" : status.name().toLowerCase(Locale.ROOT));
-        badge.setText(messageBundle.getMessage(key));
+        String key = "knowledgeBase.status." + (status == null ? "pending" : status.name().toLowerCase(Locale.ROOT));
+        badge.setText(messages.getMessage(key));
         // Reset theme list — ComponentRenderer reuses the Span across rows, so stale
         // variants from a previous row would leak onto the current one.
         badge.getElement().getThemeList().clear();
@@ -264,8 +264,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             return;
         }
         dialogs.createOptionDialog()
-                .withHeader(messageBundle.formatMessage("confirm.reingest.title", doc.getFileName()))
-                .withText(messageBundle.getMessage("confirm.reingest.body"))
+                .withHeader(messages.formatMessage("knowledgeBase.confirm.reingest.title", doc.getFileName()))
+                .withText(messages.getMessage("knowledgeBase.confirm.reingest.body"))
                 .withActions(
                         new DialogAction(DialogAction.Type.OK)
                                 .withVariant(ActionVariant.PRIMARY)
@@ -275,7 +275,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("reingest failed for {}", doc.getId(), ex);
-                                        notifyDetailedError("reingest.failed", ex.getMessage());
+                                        notifyDetailedError("knowledgeBase.reingest.failed", ex.getMessage());
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -288,8 +288,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             return;
         }
         dialogs.createOptionDialog()
-                .withHeader(messageBundle.formatMessage("confirm.delete.title", doc.getFileName()))
-                .withText(messageBundle.getMessage("confirm.delete.body"))
+                .withHeader(messages.formatMessage("knowledgeBase.confirm.delete.title", doc.getFileName()))
+                .withText(messages.getMessage("knowledgeBase.confirm.delete.body"))
                 .withActions(
                         new DialogAction(DialogAction.Type.OK)
                                 .withVariant(ActionVariant.DANGER)
@@ -299,7 +299,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                         documentsDl.load();
                                     } catch (Exception ex) {
                                         log.warn("delete failed for {}", doc.getId(), ex);
-                                        notifyDetailedError("delete.failed", ex.getMessage());
+                                        notifyDetailedError("knowledgeBase.delete.failed", ex.getMessage());
                                     }
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
@@ -313,7 +313,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     }
 
     private void notifyDetailedError(String key, String detail) {
-        String message = messageBundle.getMessage(key);
+        String message = messages.getMessage(key);
         if (detail != null && !detail.isBlank()) {
             message = message + " " + detail;
         }
