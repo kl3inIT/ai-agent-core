@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ToolCallAuditListViewTest {
 
     private static final String DESCRIPTOR_PATH =
-            "/com/vn/agent/view/audit/tool-call-audit-list-view.xml";
+            "/com/vn/agent/view/audit/ai-audit-event-list-view.xml";
 
     private Document loadDescriptor() throws Exception {
         try (InputStream in = getClass().getResourceAsStream(DESCRIPTOR_PATH)) {
@@ -80,7 +80,7 @@ class ToolCallAuditListViewTest {
         }
 
         assertThat(columnKeys)
-                .as("grid must render all six audit columns")
-                .contains("startedAt", "userUsername", "toolName", "phase", "outcome", "latencyMs");
+                .as("grid must render all six tree-lite audit columns (Phase 7.2 rename: toolName->eventName, phase->kind)")
+                .contains("startedAt", "userUsername", "kind", "eventName", "outcome", "latencyMs");
     }
 }

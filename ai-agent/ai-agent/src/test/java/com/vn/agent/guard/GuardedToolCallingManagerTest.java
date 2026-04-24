@@ -105,6 +105,7 @@ class GuardedToolCallingManagerTest {
                 // Audit row written with the CHAT sentinel tool name.
                 verify(auditWriter, atLeastOnce()).writeToolCall(
                         ArgumentMatchers.<UUID>any(),
+                        ArgumentMatchers.<UUID>any(),
                         ArgumentMatchers.anyString(),
                         ArgumentMatchers.<UUID>any(),
                         eq(GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME),
@@ -113,8 +114,7 @@ class GuardedToolCallingManagerTest {
                         anyLong(),
                         eq(AiToolCallOutcome.BLOCKED),
                         eq("iteration-cap-exceeded"),
-                        ArgumentMatchers.<String>any(),
-                        eq("REQUEST"));
+                        ArgumentMatchers.<String>any());
                 return;
             }
             // Within cap: must not throw.
@@ -147,7 +147,8 @@ class GuardedToolCallingManagerTest {
                 .isInstanceOf(ToolVetoedException.class);
 
         verify(auditWriter).writeToolCall(
-                ArgumentMatchers.<UUID>any(),
+                ArgumentMatchers.<UUID>any(),                 // parentId
+                ArgumentMatchers.<UUID>any(),                 // runId
                 eq("alice"),
                 isNull(),                           // conversation id is null at decorator layer
                 eq(realToolName),                   // REAL tool name (not __chat__)
@@ -156,8 +157,7 @@ class GuardedToolCallingManagerTest {
                 anyLong(),
                 eq(AiToolCallOutcome.BLOCKED),
                 argThat(reason -> reason != null && reason.startsWith("tool-vetoed:")),
-                ArgumentMatchers.<String>any(),
-                eq("PRE"));
+                ArgumentMatchers.<String>any());
     }
 
     @Test
@@ -173,6 +173,7 @@ class GuardedToolCallingManagerTest {
 
         verify(auditWriter, atLeastOnce()).writeToolCall(
                 ArgumentMatchers.<UUID>any(),
+                ArgumentMatchers.<UUID>any(),
                 ArgumentMatchers.anyString(),
                 ArgumentMatchers.<UUID>any(),
                 eq(GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME),
@@ -181,8 +182,7 @@ class GuardedToolCallingManagerTest {
                 anyLong(),
                 eq(AiToolCallOutcome.BLOCKED),
                 eq("iteration-cap-exceeded"),
-                ArgumentMatchers.<String>any(),
-                eq("REQUEST"));
+                ArgumentMatchers.<String>any());
     }
 
     @Test

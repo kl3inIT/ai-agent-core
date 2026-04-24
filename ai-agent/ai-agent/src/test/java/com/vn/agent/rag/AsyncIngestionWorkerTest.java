@@ -5,6 +5,7 @@ import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
+import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,6 +47,7 @@ class AsyncIngestionWorkerTest {
     private AiAgentRagProperties ragProps;
     private AiAgentEmbeddingProperties embeddingProps;
     private DefaultResourceLoader resourceLoader;
+    private SystemAuthenticator systemAuthenticator;
 
     private AsyncIngestionWorker worker;
 
@@ -62,9 +64,15 @@ class AsyncIngestionWorkerTest {
         embeddingProps = new AiAgentEmbeddingProperties(
                 "openai/text-embedding-3-small", 1536, null);
         resourceLoader = new DefaultResourceLoader();
+        systemAuthenticator = mock(SystemAuthenticator.class);
+        // Stub runWithSystem(Runnable) to invoke the action inline on the test thread.
+        org.mockito.Mockito.doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(systemAuthenticator).runWithSystem(any(Runnable.class));
 
         worker = new AsyncIngestionWorker(statusWriter, cancellationRegistry, dataManager,
-                vectorStore, ragProps, embeddingProps, resourceLoader);
+                vectorStore, ragProps, embeddingProps, resourceLoader, systemAuthenticator);
     }
 
     // --- Helpers -------------------------------------------------------------
@@ -234,7 +242,7 @@ class AsyncIngestionWorkerTest {
                 new AiAgentRagProperties.Ingest(1),
                 null);
         AsyncIngestionWorker cappedWorker = new AsyncIngestionWorker(statusWriter, cancellationRegistry,
-                dataManager, vectorStore, capped, embeddingProps, resourceLoader);
+                dataManager, vectorStore, capped, embeddingProps, resourceLoader, systemAuthenticator);
 
         cappedWorker.ingest(id);
 

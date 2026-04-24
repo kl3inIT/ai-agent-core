@@ -56,7 +56,7 @@ class AdminViewAccessTest {
 
     @Test
     void deniesAuditListForNonAdmin() {
-        assertThat(permittedFor("alice", "AiAgent_ToolCallAudit.list"))
+        assertThat(permittedFor("alice", "AiAgent_AiAuditEvent.list"))
                 .as("Non-admin must NOT see ToolCallAudit list").isFalse();
     }
 
@@ -64,7 +64,7 @@ class AdminViewAccessTest {
     void allowsAdminViewsForAdmin() {
         assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
-        assertThat(permittedFor("admin", "AiAgent_ToolCallAudit.list")).isTrue();
+        assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();
     }
 
     @Test

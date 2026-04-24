@@ -120,8 +120,11 @@ class ChatServiceFilterParamContractTest {
         // advisorSpec is fluent — every .param(...) returns itself.
         when(advisorSpec.param(anyString(), any())).thenReturn(advisorSpec);
 
+        com.vn.agent.rag.config.AiAgentRagProperties ragProperties =
+                mock(com.vn.agent.rag.config.AiAgentRagProperties.class);
+        when(ragProperties.resolvedTopK()).thenReturn(5);
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
-                parametersResolver, baselineContextProvider, retrievalFilterBuilder,
+                parametersResolver, baselineContextProvider, retrievalFilterBuilder, ragProperties,
                 currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
                 reactor.core.scheduler.Schedulers.immediate(),
                 cancellationRegistry,

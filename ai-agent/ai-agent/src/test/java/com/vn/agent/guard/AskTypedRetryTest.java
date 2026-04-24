@@ -119,8 +119,11 @@ class AskTypedRetryTest {
         when(callSpec.chatClientResponse()).thenReturn(chatClientResponse);
         when(chatClientResponse.context()).thenReturn(new HashMap<>());
 
+        com.vn.agent.rag.config.AiAgentRagProperties ragProperties =
+                mock(com.vn.agent.rag.config.AiAgentRagProperties.class);
+        when(ragProperties.resolvedTopK()).thenReturn(5);
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
-                parametersResolver, baselineContextProvider, retrievalFilterBuilder,
+                parametersResolver, baselineContextProvider, retrievalFilterBuilder, ragProperties,
                 currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
                 /* chatStreamingScheduler */ null,
                 /* cancellationRegistry */ null,

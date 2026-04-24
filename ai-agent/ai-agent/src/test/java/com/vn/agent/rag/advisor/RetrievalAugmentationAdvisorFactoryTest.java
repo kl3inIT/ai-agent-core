@@ -1,6 +1,8 @@
 package com.vn.agent.rag.advisor;
 
+import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.rag.config.AiAgentRagProperties;
+import io.jmix.core.security.CurrentAuthentication;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
@@ -18,9 +20,12 @@ class RetrievalAugmentationAdvisorFactoryTest {
         VectorStore vectorStore = mock(VectorStore.class);
         AiAgentRagProperties props = new AiAgentRagProperties(
                 null, null, null, null, null, null, null, null, null);
+        AuditWriter auditWriter = mock(AuditWriter.class);
+        CurrentAuthentication currentAuthentication = mock(CurrentAuthentication.class);
 
         RetrievalAugmentationAdvisor advisor =
-                new RetrievalAugmentationAdvisorFactory().retrievalAugmentationAdvisor(vectorStore, props);
+                new RetrievalAugmentationAdvisorFactory().retrievalAugmentationAdvisor(
+                        vectorStore, props, auditWriter, currentAuthentication);
 
         Field queryAugmenterField = RetrievalAugmentationAdvisor.class.getDeclaredField("queryAugmenter");
         queryAugmenterField.setAccessible(true);
