@@ -177,8 +177,9 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 6
+**Count:** 7
 
+- `2026-04-24-refine-describe-entity-wrapper-around-selected-jmix-metadata.md` — Refine describe_entity wrapper around selected Jmix metadata
 - `2026-04-24-add-dedicated-chat-speech-and-file-task-input.md` — Add dedicated chat speech and file task input
 - `2026-04-24-add-intent-driven-extraction-to-prefilled-jmix-forms.md` — Add intent-driven extraction to prefilled Jmix forms
 - `2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md` — Redesign audit schema as tree-lite (PARENT_ID) before adding retrieval kind
