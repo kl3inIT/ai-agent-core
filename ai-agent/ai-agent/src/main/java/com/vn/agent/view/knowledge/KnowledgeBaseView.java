@@ -5,6 +5,7 @@ import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.upload.FileRejectedEvent;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
@@ -51,9 +52,12 @@ import java.util.UUID;
  * <p>Admin-only per {@code AiAgentAdminRole.adminViews()} {@code @ViewPolicy} wired in 07-01.
  * Uploads are staged into Jmix {@link TemporaryStorage} via Vaadin's non-deprecated
  * {@link UploadHandler#toFile(com.vaadin.flow.server.streams.FileUploadCallback, com.vaadin.flow.server.streams.FileFactory)}
- * path so each file lands under the same temp root validated by
+ * path — Jmix's {@code receiverType} uses {@code Upload.setReceiver(...)} which is
+ * {@code @Deprecated(since="24.8", forRemoval=true)}, so we stick with the UploadHandler
+ * callback. Each file lands under the temp root validated by
  * {@link KnowledgeDocumentUploadService#upload(String, String, java.util.Collection)} before
- * async ingestion begins.</p>
+ * async ingestion begins. Only {@link FileRejectedEvent} is wired declaratively via
+ * {@code @Subscribe} because it does not require {@code getReceiver()}.</p>
  *
  * <p><b>Size cap:</b> XML {@code maxFileSize=10485760} (10 MiB) clamps client-side uploads;
  * the server {@code KnowledgeDocumentUploadService} also enforces a character cap during
@@ -110,7 +114,26 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     @Subscribe
     public void onInit(final InitEvent event) {
-        configureUploadHandling();
+        documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
+            try {
+                uploadService.upload(stagedFile.toURI().toString(), metadata.contentType(), Collections.emptyList());
+                notifications.create(messageBundle.formatMessage("toast.uploadStarted", metadata.fileName())).show();
+                documentsDl.load();
+            } catch (IllegalArgumentException ex) {
+                log.warn("Upload rejected by staging-root allowlist: {}", ex.getMessage());
+                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
+                throw ex;
+            } catch (Exception ex) {
+                log.warn("Upload failed for {}", metadata.fileName(), ex);
+                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
+                throw ex;
+            }
+        }, metadata -> temporaryStorage.createFile().getFile()));
+    }
+
+    @Subscribe("documentUpload")
+    public void onDocumentUploadFileRejected(final FileRejectedEvent event) {
+        notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, event.getErrorMessage()));
     }
 
     @Subscribe(id = "documentsDl", target = Target.DATA_LOADER)
@@ -240,31 +263,6 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             case PROCESSING, PENDING -> "contrast";
             case CANCELLED -> "contrast tertiary";
         };
-    }
-
-    private void configureUploadHandling() {
-        documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
-            try {
-                String fileName = metadata.fileName();
-                String mimeType = metadata.contentType();
-                String uri = stagedFile.toURI().toString();
-                uploadService.upload(uri, mimeType, Collections.emptyList());
-                notifications.create(messageBundle.formatMessage("toast.uploadStarted", fileName)).show();
-                documentsDl.load();
-            } catch (IllegalArgumentException ex) {
-                // URI allowlist rejection — configuration issue; surface a clear toast.
-                log.warn("Upload rejected by staging-root allowlist: {}", ex.getMessage());
-                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
-                throw ex;
-            } catch (Exception ex) {
-                log.warn("Upload failed for {}", metadata.fileName(), ex);
-                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, metadata.fileName()));
-                throw ex;
-            }
-        }, metadata -> temporaryStorage.createFile().getFile()));
-
-        documentUpload.addFileRejectedListener(e ->
-                notifyError(messageBundle.formatMessage(MSG_UPLOAD_REJECTED, e.getErrorMessage())));
     }
 
     private void onReingestClick() {

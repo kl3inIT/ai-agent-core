@@ -34,8 +34,7 @@
                         text="msg://action.reingest"/>
                 <action id="delete"
                         type="list_itemTracking"
-                        text="msg://action.delete"
-                        variant="danger"/>
+                        text="msg://action.delete"/>
             </actions>
             <columns resizable="true">
                 <column property="fileName" header="msg://column.filename"/>
