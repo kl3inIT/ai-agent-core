@@ -194,3 +194,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 ### Roadmap Evolution
 
 - Phase 7.2 inserted after Phase 7.1: Redesign audit schema as tree-lite (PARENT_ID) — unblocks retrieval audit (URGENT)
+- 2026-04-26: Prompt-contract hardening bundle deferred to Milestone 2. Bundle = 3 todos:
+  `inject-readable-entity-inventory-into-baseline-context`,
+  `enforce-unknown-entity-retry-contract`,
+  `hide-internal-tool-and-entity-names-from-user-facing-chat`.
+  Originally proposed for M1 P8 alongside TEST-02/05 prompt-contract suite. Decision: keep M1 P8
+  scope tight to release polish (security negative tests, clean-consumer smoke, operator docs);
+  do the prompt bundle in M2 as a dedicated phase. Todos stay in pending — no phase inserted yet.
