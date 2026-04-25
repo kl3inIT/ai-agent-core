@@ -388,6 +388,17 @@ Plans:
 
 **Needs research phase:** No.
 
+**Plans:** 7 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config
+- [ ] 08-02-PLAN.md — TEST-02 + TEST-03 extensions (poisoned tool result, rollback-preserves-audit)
+- [ ] 08-03-PLAN.md — Performance smoke (datasource-proxy + per-tool query-count baseline + limit cap)
+- [ ] 08-04-PLAN.md — TEST-05 live-tier semantic golden suite (6-question YAML fixture)
+- [ ] 08-05-PLAN.md — TEST-07 clean-consumer smoke (consumer-smoke/ Gradle subproject + bootRunSmoke)
+- [ ] 08-06-PLAN.md — Operator README + SPI cookbook
+- [ ] 08-07-PLAN.md — Release polish (version 1.0.0 + secrets rotation + CHANGELOG + 3 GitHub Actions workflows)
+
 ---
 
 ## Dependency Graph
