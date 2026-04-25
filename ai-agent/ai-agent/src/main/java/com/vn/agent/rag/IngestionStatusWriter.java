@@ -2,12 +2,16 @@ package com.vn.agent.rag;
 
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
+import com.vn.agent.push.DocumentStatusChangedEvent;
 import io.jmix.core.DataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.UUID;
 
@@ -36,6 +40,14 @@ import java.util.UUID;
  * {@code chunkCount} column in the Phase 2 schema; {@link #markReady(UUID, int)} records
  * the count to the log for observability. Plan 05-04 may add the column if downstream
  * views need it — adding a field here without a Liquibase changeset would break boot.
+ *
+ * <p>Plan 07-02 adds post-commit emission of {@link DocumentStatusChangedEvent} via
+ * {@link TransactionSynchronizationManager}, mirroring the Phase 4 {@code AuditWriter.writeToolCall}
+ * pattern. Listeners (Plan 07-06 {@code KnowledgeBaseView}) subscribe via Spring's
+ * {@code @EventListener} and fan out to attached Vaadin UIs with {@code UI.access()}
+ * (RESEARCH Pattern 3). Events fire only after the REQUIRES_NEW transaction commits — on
+ * rollback (e.g., a {@code save(doc)} constraint violation) nothing is published, so
+ * listeners never observe a stale status.
  */
 @Component
 public class IngestionStatusWriter {
@@ -46,9 +58,11 @@ public class IngestionStatusWriter {
     private static final int ERROR_MESSAGE_MAX_LENGTH = 1024;
 
     private final DataManager dataManager;
+    private final ApplicationEventPublisher publisher;
 
-    public IngestionStatusWriter(DataManager dataManager) {
+    public IngestionStatusWriter(DataManager dataManager, ApplicationEventPublisher publisher) {
         this.dataManager = dataManager;
+        this.publisher = publisher;
     }
 
     /**
@@ -63,6 +77,7 @@ public class IngestionStatusWriter {
             doc.setErrorMessage(null);
             doc.setIngestedAt(null);
             dataManager.save(doc);
+            registerAfterCommit(id, AiKnowledgeDocumentStatus.PENDING, null);
         }, () -> log.warn("markPending: document {} not found", id));
     }
 
@@ -73,6 +88,7 @@ public class IngestionStatusWriter {
             doc.setStatus(AiKnowledgeDocumentStatus.PROCESSING);
             doc.setErrorMessage(null);
             dataManager.save(doc);
+            registerAfterCommit(id, AiKnowledgeDocumentStatus.PROCESSING, null);
         }, () -> log.warn("markProcessing: document {} not found", id));
     }
 
@@ -90,6 +106,7 @@ public class IngestionStatusWriter {
             doc.setIngestedAt(java.time.OffsetDateTime.now());
             dataManager.save(doc);
             log.debug("markReady: document {} ingested with {} chunks", id, chunkCount);
+            registerAfterCommit(id, AiKnowledgeDocumentStatus.READY, null);
         }, () -> log.warn("markReady: document {} not found", id));
     }
 
@@ -100,10 +117,12 @@ public class IngestionStatusWriter {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markFailed(UUID id, String userFacingMessage) {
+        final String truncatedMessage = truncate(userFacingMessage);
         dataManager.load(AiKnowledgeDocument.class).id(id).optional().ifPresentOrElse(doc -> {
             doc.setStatus(AiKnowledgeDocumentStatus.FAILED);
-            doc.setErrorMessage(truncate(userFacingMessage));
+            doc.setErrorMessage(truncatedMessage);
             dataManager.save(doc);
+            registerAfterCommit(id, AiKnowledgeDocumentStatus.FAILED, truncatedMessage);
         }, () -> log.warn("markFailed: document {} not found", id));
     }
 
@@ -114,7 +133,41 @@ public class IngestionStatusWriter {
             doc.setStatus(AiKnowledgeDocumentStatus.CANCELLED);
             doc.setErrorMessage(null);
             dataManager.save(doc);
+            registerAfterCommit(id, AiKnowledgeDocumentStatus.CANCELLED, null);
         }, () -> log.warn("markCancelled: document {} not found", id));
+    }
+
+    /**
+     * Register a {@link TransactionSynchronization} that fires only after the REQUIRES_NEW
+     * transaction commits. On rollback, Spring does not invoke {@code afterCommit}, so the
+     * event is never published — listeners observe only durable state (T-07-07 mitigation).
+     *
+     * <p>Defensive: if no synchronization is active (unexpected — REQUIRES_NEW always has
+     * one), the event is published inline and a warning is logged.</p>
+     */
+    private void registerAfterCommit(UUID documentId, AiKnowledgeDocumentStatus status, String errorMessage) {
+        final UUID capturedId = documentId;
+        final AiKnowledgeDocumentStatus capturedStatus = status;
+        final String capturedErrorMessage = errorMessage;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        publisher.publishEvent(new DocumentStatusChangedEvent(
+                                capturedId, capturedStatus, capturedErrorMessage));
+                    } catch (RuntimeException ex) {
+                        log.warn("DocumentStatusChangedEvent afterCommit publish failed id={} status={}",
+                                capturedId, capturedStatus, ex);
+                    }
+                }
+            });
+        } else {
+            log.warn("No active synchronization for doc={} status={} — firing inline",
+                    capturedId, capturedStatus);
+            publisher.publishEvent(new DocumentStatusChangedEvent(
+                    capturedId, capturedStatus, capturedErrorMessage));
+        }
     }
 
     private static String truncate(String message) {

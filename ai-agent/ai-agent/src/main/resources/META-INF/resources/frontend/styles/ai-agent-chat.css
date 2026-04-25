@@ -1,0 +1,33 @@
+/*
+ * AI Agent chat styles.
+ *
+ * Packaged on the library classpath under META-INF/resources/frontend/styles/ so
+ * Vaadin's frontend scanner picks them up via @CssImport on MessageBubbleComponent.
+ * Keeps the Java controllers layout-free per the Jmix-first UI guideline
+ * (CLAUDE.md: "Jmix-first UI over raw Vaadin"); programmatic Java style mutations
+ * on these components are forbidden going forward.
+ *
+ * Rule: edit this file — NOT the Java components — when tweaking visuals.
+ */
+
+/* --- Message bubble (MessageBubbleComponent) -------------------------------- */
+
+.ai-agent-bubble {
+    padding: var(--lumo-space-m);
+    border-radius: var(--lumo-border-radius-m);
+    background: var(--lumo-contrast-5pct);
+    max-width: 80%;
+}
+
+.ai-agent-bubble--assistant {
+    border-left: 2px solid var(--lumo-primary-color);
+}
+
+.ai-agent-bubble--user {
+    margin-left: auto;
+    background: var(--lumo-primary-color-10pct);
+}
+
+.ai-agent-bubble--system {
+    border-left: 2px solid var(--lumo-contrast-30pct);
+}

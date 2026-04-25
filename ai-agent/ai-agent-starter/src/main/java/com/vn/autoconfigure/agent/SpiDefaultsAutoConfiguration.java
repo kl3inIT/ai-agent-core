@@ -57,7 +57,7 @@ public class SpiDefaultsAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public AuditListener defaultAuditListener() {
-        return (UUID auditId) -> { /* no-op */ };
+        return (UUID auditId, String kind) -> { /* no-op */ };
     }
 
     @Bean

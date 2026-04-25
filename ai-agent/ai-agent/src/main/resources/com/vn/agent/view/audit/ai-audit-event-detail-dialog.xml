@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///auditList.detail.title">
+    <layout padding="true" spacing="true">
+        <textField id="startedAtField"
+                   label="msg:///auditList.detail.startedAt"
+                   readOnly="true"/>
+        <textField id="userField"
+                   label="msg:///auditList.detail.user"
+                   readOnly="true"/>
+        <textField id="kindField"
+                   label="msg:///auditList.detail.kind"
+                   readOnly="true"/>
+        <textField id="eventNameField"
+                   label="msg:///auditList.detail.eventName"
+                   readOnly="true"/>
+        <textField id="parentField"
+                   label="msg:///auditList.detail.parent"
+                   readOnly="true"/>
+        <textField id="runIdField"
+                   label="msg:///auditList.detail.runId"
+                   readOnly="true"/>
+        <textField id="latencyMsField"
+                   label="msg:///auditList.detail.latencyMs"
+                   readOnly="true"/>
+        <textField id="errorClassField"
+                   label="msg:///auditList.detail.errorClass"
+                   readOnly="true"/>
+        <textField id="denialReasonField"
+                   label="msg:///auditList.detail.denialReason"
+                   readOnly="true"/>
+        <vbox id="outcomeBox" padding="false" spacing="false">
+            <span text="msg:///auditList.detail.outcome"/>
+            <span id="outcomeBadge"/>
+        </vbox>
+        <textArea id="argumentsField"
+                  label="msg:///auditList.detail.argsJson"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="14em"/>
+        <textArea id="resultField"
+                  label="msg:///auditList.detail.resultSummary"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="14em"/>
+        <textArea id="queryTextField"
+                  label="msg:///auditList.detail.queryText"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="6em"/>
+        <textField id="topKField"
+                   label="msg:///auditList.detail.topK"
+                   readOnly="true"/>
+        <textField id="hitCountField"
+                   label="msg:///auditList.detail.hitCount"
+                   readOnly="true"/>
+        <textField id="topScoreField"
+                   label="msg:///auditList.detail.topScore"
+                   readOnly="true"/>
+        <textArea id="retrievalHitsField"
+                  label="msg:///auditList.detail.retrievalHitsJson"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="14em"/>
+        <textArea id="filtersJsonField"
+                  label="msg:///auditList.detail.filtersJson"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="6em"/>
+        <hbox width="100%" justifyContent="END" spacing="true">
+            <button id="closeBtn"
+                    text="msg:///auditList.detail.close"/>
+        </hbox>
+    </layout>
+</view>

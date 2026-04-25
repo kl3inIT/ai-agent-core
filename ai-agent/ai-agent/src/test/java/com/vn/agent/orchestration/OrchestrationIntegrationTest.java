@@ -2,8 +2,9 @@ package com.vn.agent.orchestration;
 
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.ChatService;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
-import com.vn.agent.entity.AiToolCallAudit;
+import com.vn.agent.spi.AuditKind;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
@@ -20,14 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * End-to-end happy path through {@link ChatService} against the deterministic stub ChatModel.
+ * Updated for Phase 7.2 tree-lite: each ask produces ONE root CHAT {@link AiAuditEvent} row
+ * (writeChatStart INSERT + writeChatFinish UPDATE on the same id), not a PRE/POST pair.
  *
  * <p>Asserts:
  * <ul>
  *   <li>Auto-creates an {@link AiConversation} when {@code conversationId == null}, titled with
  *       the first user message (D-08) and owned by the caller via {@code createdBy} (B3).</li>
- *   <li>Two asks on the same conversationId produce exactly 2 chat-level audit rows each
- *       (PRE + POST) keyed by {@code runId}, and all rows carry the conversation FK so
- *       {@code a.conversation.id = :cid} JPQL paths work end to end (Blocker 2 reverse check).</li>
+ *   <li>Two asks on the same conversationId produce exactly 2 CHAT root rows (one per runId)
+ *       carrying the conversation FK so {@code a.conversation.id = :cid} JPQL paths work end
+ *       to end (Blocker 2 reverse check), with finishedAt populated after writeChatFinish.</li>
  * </ul>
  */
 @SpringBootTest(classes = AITestConfiguration.class)
@@ -61,28 +64,38 @@ class OrchestrationIntegrationTest {
     }
 
     @Test
-    void askTwiceSameConversationProducesTwoChatAuditPairs() {
+    void askTwiceSameConversationProducesTwoChatRootRows() {
         systemAuthenticator.runWithSystem(() -> {
             var first = chatService.ask("user-A", null, "msg1");
             var second = chatService.ask("user-A", first.conversationId(), "msg2");
 
-            // Count by runId (W11: locked at planning time, one runId per ask -> 2 rows PRE+POST).
-            List<AiToolCallAudit> firstAskRows = dataManager.load(AiToolCallAudit.class)
-                    .query("select a from ai_AiToolCallAudit a where a.kind = 'CHAT' and a.runId = :rid order by a.startedAt")
+            // Phase 7.2: one CHAT root per runId (writeChatStart + writeChatFinish UPDATE same row).
+            List<AiAuditEvent> firstAskRows = dataManager.load(AiAuditEvent.class)
+                    .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.runId = :rid order by a.startedAt")
+                    .parameter("kind", AuditKind.CHAT)
                     .parameter("rid", first.runId())
                     .list();
-            List<AiToolCallAudit> secondAskRows = dataManager.load(AiToolCallAudit.class)
-                    .query("select a from ai_AiToolCallAudit a where a.kind = 'CHAT' and a.runId = :rid order by a.startedAt")
+            List<AiAuditEvent> secondAskRows = dataManager.load(AiAuditEvent.class)
+                    .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.runId = :rid order by a.startedAt")
+                    .parameter("kind", AuditKind.CHAT)
                     .parameter("rid", second.runId())
                     .list();
 
-            assertThat(firstAskRows).hasSize(2);
-            assertThat(secondAskRows).hasSize(2);
+            assertThat(firstAskRows).hasSize(1);
+            assertThat(secondAskRows).hasSize(1);
 
-            assertThat(firstAskRows).extracting(AiToolCallAudit::getPhase).containsExactly("PRE", "POST");
-            assertThat(secondAskRows).extracting(AiToolCallAudit::getPhase).containsExactly("PRE", "POST");
+            // Post-finish: each root has finishedAt + outcome populated, parent is null.
+            assertThat(firstAskRows).allSatisfy(r -> {
+                assertThat(r.getParent()).isNull();
+                assertThat(r.getFinishedAt()).isNotNull();
+                assertThat(r.getOutcomeRaw()).isNotNull();
+            });
+            assertThat(secondAskRows).allSatisfy(r -> {
+                assertThat(r.getParent()).isNull();
+                assertThat(r.getFinishedAt()).isNotNull();
+            });
 
-            // Blocker 2 reverse check: BOTH PRE and POST chat rows carry the conversation FK.
+            // Blocker 2 reverse check: CHAT root rows carry the conversation FK.
             assertThat(firstAskRows).allSatisfy(r ->
                     assertThat(r.getConversation())
                             .isNotNull()
@@ -90,11 +103,12 @@ class OrchestrationIntegrationTest {
                             .isEqualTo(first.conversationId()));
 
             // Conversation-scoped JPQL path a.conversation.id works (NOT a.conversationId).
-            List<AiToolCallAudit> byConv = dataManager.load(AiToolCallAudit.class)
-                    .query("select a from ai_AiToolCallAudit a where a.kind = 'CHAT' and a.conversation.id = :cid order by a.startedAt")
+            List<AiAuditEvent> byConv = dataManager.load(AiAuditEvent.class)
+                    .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.conversation.id = :cid order by a.startedAt")
+                    .parameter("kind", AuditKind.CHAT)
                     .parameter("cid", first.conversationId())
                     .list();
-            assertThat(byConv).hasSize(4);
+            assertThat(byConv).hasSize(2);
         });
     }
 }

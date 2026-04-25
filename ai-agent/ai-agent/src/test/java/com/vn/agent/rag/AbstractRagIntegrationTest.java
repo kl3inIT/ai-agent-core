@@ -97,11 +97,17 @@ public abstract class AbstractRagIntegrationTest {
         registry.add("spring.datasource.username", PG::getUsername);
         registry.add("spring.datasource.password", PG::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // Liquibase on the real pgvector container will run the add-on changelogs including the
-        // 070 vector store DDL that creates the AI_AGENT_KB_VECTOR_STORE table + HNSW index.
+        registry.add("main.datasource.url", PG::getJdbcUrl);
+        registry.add("main.datasource.username", PG::getUsername);
+        registry.add("main.datasource.password", PG::getPassword);
+        registry.add("main.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("agentstore.datasource.url", PG::getJdbcUrl);
+        registry.add("agentstore.datasource.username", PG::getUsername);
+        registry.add("agentstore.datasource.password", PG::getPassword);
+        registry.add("agentstore.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        // Liquibase runs entity-owned add-on changelogs; PgVectorStore creates its own table + HNSW index.
         registry.add("spring.liquibase.enabled", () -> "true");
-        // PgVectorStore.initializeSchema(false) honoured; the vector(1536) + HNSW creation is
-        // owned by Liquibase (RESEARCH Pitfall #2).
+        registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
     }
 
     @Autowired protected KnowledgeDocumentUploadService uploadService;
@@ -167,14 +173,32 @@ public abstract class AbstractRagIntegrationTest {
      * tests can chain role-scoped retrieval / delete assertions.
      */
     protected UUID uploadAndAwaitReady(String sourceUri, Collection<String> allowedRoles) {
-        AiKnowledgeDocument saved = uploadService.upload(sourceUri, "text/markdown", allowedRoles);
+        AiKnowledgeDocument saved = uploadService.upload(sourceUri, sourceKindFor(sourceUri), allowedRoles);
         // With SyncTaskExecutor, ingestion has already completed by the time this returns.
         AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class)
                 .id(saved.getId()).one();
         assertThat(reloaded.getStatus())
-                .as("Upload of %s should drive document to READY under SyncTaskExecutor", sourceUri)
+                .as("Upload of %s should drive document to READY under SyncTaskExecutor. errorMessage=%s",
+                        sourceUri, reloaded.getErrorMessage())
                 .isEqualTo(AiKnowledgeDocumentStatus.READY);
         return saved.getId();
+    }
+
+    private static String sourceKindFor(String sourceUri) {
+        String lower = sourceUri == null ? "" : sourceUri.toLowerCase();
+        if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
+            return "text/markdown";
+        }
+        if (lower.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (lower.endsWith(".html") || lower.endsWith(".htm")) {
+            return "text/html";
+        }
+        if (lower.endsWith(".txt")) {
+            return "text/plain";
+        }
+        return null;
     }
 
     /**

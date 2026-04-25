@@ -5,6 +5,7 @@ import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
+import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -23,7 +24,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -47,6 +47,7 @@ class AsyncIngestionWorkerTest {
     private AiAgentRagProperties ragProps;
     private AiAgentEmbeddingProperties embeddingProps;
     private DefaultResourceLoader resourceLoader;
+    private SystemAuthenticator systemAuthenticator;
 
     private AsyncIngestionWorker worker;
 
@@ -61,11 +62,17 @@ class AsyncIngestionWorkerTest {
                 new AiAgentRagProperties.Splitter(200, null, 10),
                 null, null, null, null, null);
         embeddingProps = new AiAgentEmbeddingProperties(
-                "openai/text-embedding-3-small", 1536, null);
+                "qwen/qwen3-embedding-4b", 2000, null);
         resourceLoader = new DefaultResourceLoader();
+        systemAuthenticator = mock(SystemAuthenticator.class);
+        // Stub runWithSystem(Runnable) to invoke the action inline on the test thread.
+        org.mockito.Mockito.doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(systemAuthenticator).runWithSystem(any(Runnable.class));
 
         worker = new AsyncIngestionWorker(statusWriter, cancellationRegistry, dataManager,
-                vectorStore, ragProps, embeddingProps, resourceLoader);
+                vectorStore, ragProps, embeddingProps, resourceLoader, systemAuthenticator);
     }
 
     // --- Helpers -------------------------------------------------------------
@@ -125,9 +132,9 @@ class AsyncIngestionWorkerTest {
             assertThat(md).containsEntry(ChunkMetadata.SOURCE, "classpath:ai-kb/fixture-alpha.md");
             assertThat(md).containsEntry(ChunkMetadata.DOCUMENT_ID, id.toString());
             assertThat(md).containsEntry(ChunkMetadata.EMBEDDING_MODEL,
-                    "openai/text-embedding-3-small");
+                    "qwen/qwen3-embedding-4b");
             assertThat(md).containsKey(ChunkMetadata.ALLOWED_ROLES);
-            assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user", true);
+            assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("ai-agent-user"), true);
         }
         verify(statusWriter).markReady(eq(id), anyInt());
         verify(statusWriter, never()).markFailed(any(), any());
@@ -144,10 +151,12 @@ class AsyncIngestionWorkerTest {
 
         Document anyChunk = captureAddedChunks().get(0);
         Map<String, Object> md = anyChunk.getMetadata();
-        assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user", true);
-        assertThat(md).containsEntry(ChunkMetadata.ROLE_FLAG_PREFIX + "editor", true);
+        assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("ai-agent-user"), true);
+        assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("Editor"), true);
         // Original-case key MUST NOT appear — filter lookup side is always lowercase.
         assertThat(md).doesNotContainKey(ChunkMetadata.ROLE_FLAG_PREFIX + "Editor");
+        // Hyphenated role codes must be normalized for JSONPath-safe filter keys.
+        assertThat(md).doesNotContainKey(ChunkMetadata.ROLE_FLAG_PREFIX + "ai-agent-user");
     }
 
     @Test
@@ -233,7 +242,7 @@ class AsyncIngestionWorkerTest {
                 new AiAgentRagProperties.Ingest(1),
                 null);
         AsyncIngestionWorker cappedWorker = new AsyncIngestionWorker(statusWriter, cancellationRegistry,
-                dataManager, vectorStore, capped, embeddingProps, resourceLoader);
+                dataManager, vectorStore, capped, embeddingProps, resourceLoader, systemAuthenticator);
 
         cappedWorker.ingest(id);
 

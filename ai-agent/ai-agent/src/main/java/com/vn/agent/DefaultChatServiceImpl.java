@@ -18,8 +18,14 @@ import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ChatResponseDto;
 import com.vn.agent.orchestration.ConversationGateway;
+import com.vn.agent.orchestration.RunContext;
+import com.vn.agent.orchestration.StreamingEvent;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.parameters.Overrides;
+import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.rag.RetrievalFilterBuilder;
+import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
+import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
@@ -29,13 +35,20 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
+
+import com.vn.agent.orchestration.ConversationNotFoundException;
 
 import java.util.Map;
 import java.util.UUID;
@@ -102,11 +115,15 @@ public class DefaultChatServiceImpl implements ChatService {
     private final AiParametersResolver parametersResolver;
     private final BaselineContextProvider baselineContextProvider;
     private final RetrievalFilterBuilder retrievalFilterBuilder;
+    private final AiAgentRagProperties ragProperties;
     private final CurrentAuthentication currentAuthentication;
     private final RateLimitGuard rateLimitGuard;
     private final TokenBudgetGuard tokenBudgetGuard;
     private final AuditWriter auditWriter;
     private final jakarta.validation.Validator validator;
+    private final Scheduler chatStreamingScheduler;
+    private final CancellationRegistry cancellationRegistry;
+    private final StreamingSinkHolder streamingSinkHolder;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -114,22 +131,30 @@ public class DefaultChatServiceImpl implements ChatService {
                                   AiParametersResolver parametersResolver,
                                   BaselineContextProvider baselineContextProvider,
                                   RetrievalFilterBuilder retrievalFilterBuilder,
+                                  AiAgentRagProperties ragProperties,
                                   CurrentAuthentication currentAuthentication,
                                   RateLimitGuard rateLimitGuard,
                                   TokenBudgetGuard tokenBudgetGuard,
                                   AuditWriter auditWriter,
-                                  jakarta.validation.Validator validator) {
+                                  jakarta.validation.Validator validator,
+                                  @Qualifier("chatStreamingScheduler") Scheduler chatStreamingScheduler,
+                                  CancellationRegistry cancellationRegistry,
+                                  StreamingSinkHolder streamingSinkHolder) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
         this.parametersResolver = parametersResolver;
         this.baselineContextProvider = baselineContextProvider;
         this.retrievalFilterBuilder = retrievalFilterBuilder;
+        this.ragProperties = ragProperties;
         this.currentAuthentication = currentAuthentication;
         this.rateLimitGuard = rateLimitGuard;
         this.tokenBudgetGuard = tokenBudgetGuard;
         this.auditWriter = auditWriter;
         this.validator = validator;
+        this.chatStreamingScheduler = chatStreamingScheduler;
+        this.cancellationRegistry = cancellationRegistry;
+        this.streamingSinkHolder = streamingSinkHolder;
     }
 
     @Override
@@ -186,14 +211,31 @@ public class DefaultChatServiceImpl implements ChatService {
             Authentication runtimeAuth = safeGetAuthentication();
             Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
+            // 7.2 D-09/D-10: keep retrieval params in RunContext for audit fallback and pass
+            // them through advisor context below so the RAG retriever uses the per-request values.
+            // Cleared by AuditAdvisor.finally via RunContext.clear() (and defensively again by this
+            // method's outer finally).
+            // null filter overwrite is intentional defense-in-depth against stale ThreadLocal state
+            // on pooled Vaadin request threads (T-07.2-05).
+            int retrievalTopK = parametersResolver.effectiveRagTopK(active, ragProperties.resolvedTopK());
+            double retrievalSimilarityThreshold = parametersResolver.effectiveRagSimilarityThreshold(
+                    active, ragProperties.resolvedSimilarityThreshold());
+            RunContext.setRetrievalTopK(retrievalTopK);
+            RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
+            RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
+
             ChatClientResponse clientResp = chatClient.prompt()
                     .system(composedSystemPrompt)
                     .user(message)
                     .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                    .toolContext(auditToolContext(runId, convId))
                     .advisors(advisorSpec -> {
                         advisorSpec
                                 .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                .param("audit.runId", runId);
+                                .param("audit.runId", runId)
+                                .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                                .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                        retrievalSimilarityThreshold);
                         if (ragFilter != null) {
                             advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
                         }
@@ -256,6 +298,136 @@ public class DefaultChatServiceImpl implements ChatService {
             IterationCounter.reset();
             com.vn.agent.orchestration.RunContext.clear();
         }
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides) {
+        final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
+        final UUID runId = UUID.randomUUID();
+        final long startNanos = System.nanoTime();
+
+        return Flux.defer(() -> {
+                    RunContext.set(runId);
+                    // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
+                    Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
+                    streamingSinkHolder.register(runId, toolSink);
+
+                    final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
+                    final UUID convId = conversation.getId();
+
+                    AiParameters active = parametersResolver.resolveActive();
+                    String model = parametersResolver.effectiveModel(active, effectiveOverrides);
+                    String profileSystemPrompt = parametersResolver.effectiveSystemPrompt(active, userId, convId, runId);
+                    String baselineText = baselineContextProvider.renderAsText(convId);
+                    String composedSystemPrompt = baselineText
+                            + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
+                                    ? "\n\n" + profileSystemPrompt
+                                    : "");
+                    Authentication runtimeAuth = safeGetAuthentication();
+                    Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
+
+                    // 7.2 D-09/D-10: keep retrieval params in RunContext for audit fallback and
+                    // pass them through advisor context below so the RAG retriever uses the
+                    // per-request values.
+                    int retrievalTopK = parametersResolver.effectiveRagTopK(active, ragProperties.resolvedTopK());
+                    double retrievalSimilarityThreshold = parametersResolver.effectiveRagSimilarityThreshold(
+                            active, ragProperties.resolvedSimilarityThreshold());
+                    RunContext.setRetrievalTopK(retrievalTopK);
+                    RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
+                    RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
+
+                    Flux<StreamingEvent> content;
+                    try {
+                        content = chatClient.prompt()
+                                .system(composedSystemPrompt)
+                                .user(message)
+                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                                .toolContext(auditToolContext(runId, convId))
+                                .advisors(advisorSpec -> {
+                                    advisorSpec
+                                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
+                                            .param("audit.runId", runId)
+                                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                                    retrievalSimilarityThreshold);
+                                    if (ragFilter != null) {
+                                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
+                                    }
+                                })
+                                .options(ChatOptions.builder()
+                                        .model(model)
+                                        .temperature(parametersResolver.effectiveTemperature(active))
+                                        .topP(parametersResolver.effectiveTopP(active))
+                                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
+                                        .build())
+                                .stream()
+                                .chatResponse()
+                                .<StreamingEvent>concatMap(chunk -> {
+                                    AssistantMessage am = chunk != null && chunk.getResult() != null
+                                            ? chunk.getResult().getOutput() : null;
+                                    String text = am != null ? am.getText() : null;
+                                    return (text != null && !text.isEmpty())
+                                            ? Flux.just(new StreamingEvent.Content(text))
+                                            : Flux.empty();
+                                })
+                                .doOnComplete(toolSink::tryEmitComplete)
+                                .doOnError(ex -> toolSink.tryEmitComplete());
+                    } catch (UnsupportedOperationException nonStreaming) {
+                        // D-04 graceful fallback: provider does not support streaming. Fall through to
+                        // blocking ask(...) wrapped as a single Content chunk + Final.
+                        ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
+                        toolSink.tryEmitComplete();
+                        content = Flux.just(
+                                new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
+                    }
+
+                    Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
+                    return merged
+                    .concatWith(Flux.defer(() -> {
+                        long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0));
+                    }));
+                })
+        .subscribeOn(chatStreamingScheduler)
+        // Capture caller ThreadLocals (including SecurityContext) before subscribeOn moves
+        // subscription to the streaming scheduler, then restore them on downstream hops.
+        .contextCapture()
+        // D-03: register the subscription-cancel callback BEFORE tokens flow. Disposable is a
+        // @FunctionalInterface, so a () -> subscription.cancel() lambda satisfies the registry
+        // contract. cancellationRegistry.cancel(runId) disposes -> cancels the upstream -> tears
+        // down the whole pipeline (tool sink + content Flux).
+        .doOnSubscribe(subscription ->
+                cancellationRegistry.register(runId, subscription::cancel))
+        .onErrorResume(ex -> Flux.just(mapToStreamingError(ex)))
+        .doFinally(signalType -> {
+            RunContext.clear();
+            streamingSinkHolder.unregister(runId);
+            cancellationRegistry.clearDisposable(runId);
+        });
+    }
+
+    /**
+     * Maps an exception thrown during streaming into a terminal {@link StreamingEvent.Error}
+     * with a stable i18n message key — NEVER the raw provider text (T-07-05 opacity, D-10).
+     */
+    private StreamingEvent mapToStreamingError(Throwable ex) {
+        String key;
+        if (ex instanceof RateLimitExceededException) {
+            key = "ai-agent.guard.rate-limit-exceeded";
+        } else if (ex instanceof TokenBudgetExhaustedException) {
+            key = "ai-agent.guard.token-budget-exhausted";
+        } else if (ex instanceof IterationCapExceededException) {
+            key = "ai-agent.guard.iteration-cap-exceeded";
+        } else if (ex instanceof ToolVetoedException) {
+            key = "ai-agent.guard.tool-vetoed";
+        } else if (ex instanceof ConversationNotFoundException) {
+            key = "chatView.error.conversationNotFound";
+        } else {
+            log.debug("stream() failure — mapping to chatView.error.generic", ex);
+            key = "chatView.error.generic";
+        }
+        return new StreamingEvent.Error(key, Map.of());
     }
 
     @Override
@@ -354,10 +526,10 @@ public class DefaultChatServiceImpl implements ChatService {
      */
     private void auditDenial(UUID runId, String userUsername, UUID convId, String denialKey) {
         try {
-            auditWriter.writeToolCall(runId, userUsername, convId,
+            auditWriter.writeToolCall(RunContext.getRootAuditId(), runId, userUsername, convId,
                     GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME,
                     /* argumentsJson */ null, /* resultSummary */ null, 0L,
-                    AiToolCallOutcome.BLOCKED, denialKey, /* errorClass */ null, "REQUEST");
+                    AiToolCallOutcome.BLOCKED, denialKey, /* errorClass */ null);
         } catch (Throwable t) {
             log.warn("Denial audit failed runId={} key={}", runId, denialKey, t);
         }
@@ -370,14 +542,20 @@ public class DefaultChatServiceImpl implements ChatService {
      */
     private void auditFlagged(UUID runId, String userUsername, UUID convId, String patternKey) {
         try {
-            auditWriter.writeToolCall(runId, userUsername, convId,
+            auditWriter.writeToolCall(RunContext.getRootAuditId(), runId, userUsername, convId,
                     GuardedToolCallingManager.CHAT_SENTINEL_TOOL_NAME,
                     /* argumentsJson */ null, /* resultSummary */ null, 0L,
                     AiToolCallOutcome.FLAGGED, "flagged:" + patternKey,
-                    /* errorClass */ null, "POST");
+                    /* errorClass */ null);
         } catch (Throwable t) {
             log.warn("Flagged audit failed runId={} key={}", runId, patternKey, t);
         }
+    }
+
+    private static Map<String, Object> auditToolContext(UUID runId, UUID conversationId) {
+        return Map.of(
+                RunContext.TOOL_CONTEXT_RUN_ID_KEY, runId,
+                RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY, conversationId);
     }
 
     /**

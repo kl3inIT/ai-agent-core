@@ -32,7 +32,7 @@ import java.util.UUID;
  * {@code guardDenial} null.</p>
  *
  * @param conversationId    id of the conversation this turn was committed to (never null)
- * @param runId             pre-allocated run id; matches {@code AiToolCallAudit.runId} for this chat
+ * @param runId             pre-allocated run id; matches {@code AiAuditEvent.runId} for this chat
  * @param content           assistant's text response (may be empty on denial or edge-case LLM responses)
  * @param model             OpenRouter {@code provider/model} slug actually used this turn (null on denial)
  * @param latencyMs         wall-clock time across {@code chatClient.prompt().call()} (0 on denial)

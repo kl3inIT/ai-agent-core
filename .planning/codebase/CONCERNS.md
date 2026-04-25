@@ -1,226 +1,206 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-04-18
+**Analysis Date:** 2026-04-24
 
 ## Tech Debt
 
-**AI-Agent module is an empty skeleton:**
-- Issue: The `ai-agent` add-on, which is the apparent purpose of this repository (name: `ai-agent-core`), contains no business logic, no AI-related classes, no services, no entities. Only boilerplate Jmix module scaffolding (`AIConfiguration`, `AIAutoConfiguration`).
-- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/AIConfiguration.java`, `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AIAutoConfiguration.java`
-- Impact: The project name/intent and the implementation are mismatched. Feature is unimplemented.
-- Fix approach: Build out AI integration (LLM client, prompt templates, tools, services) under `com.vn.agent`, register view controllers, actions, and add entities/menu entries.
+**Composite build and nested wrapper sprawl:**
+- Issue: The repository root composes `jmix-app` and `ai-agent`, while both child projects keep their own Gradle wrappers and independent settings. Use the root composite for cross-module work and child wrappers only when explicitly validating a published/standalone consumer path.
+- Files: `settings.gradle`, `ai-agent/settings.gradle`, `jmix-app/settings.gradle`, `ai-agent/gradlew`, `jmix-app/gradlew`
+- Impact: Developers can run different entry points and accidentally validate a different dependency graph than the one used by the root workspace.
+- Fix approach: Document the intended command surface, keep wrapper versions aligned, and avoid adding new build logic to only one entry point.
 
-**Stub menu with no actionable items:**
-- Issue: `menu.xml` in the `ai-agent` add-on declares a top-level menu `AI` with no child items or views.
-- Files: `ai-agent/ai-agent/src/main/resources/com/vn/agent/menu.xml`
-- Impact: Menu appears in host apps but leads nowhere.
-- Fix approach: Add view entries tied to real agent features, or remove until features exist.
+**Publishing configuration still carries release-time assumptions:**
+- Issue: Maven publishing is configured directly in Gradle with Nexus coordinates and credential properties. Do not rely on checked-in defaults or local credentials during release readiness work.
+- Files: `ai-agent/build.gradle`
+- Impact: Publishing tasks can fail late or publish to the wrong repository if `nexusUsername` / `nexusPassword` and target repository are not validated in CI.
+- Fix approach: Move release configuration into documented CI properties, fail fast when required publish properties are absent, and remove insecure protocol allowance before release.
 
-**Duplicate/placeholder publishing repository configuration:**
-- Issue: `ai-agent/build.gradle` publishes to a hard-coded placeholder URL `https://myrepo/releases/` with default credentials `admin/admin` and `allowInsecureProtocol = true`.
-- Files: `ai-agent/build.gradle` (lines 48-55)
-- Impact: Any `publish` task will fail or leak artifacts to a non-existent/insecure endpoint. Defaults represent leakable credentials.
-- Fix approach: Replace with the real Maven repo URL; require `uploadUser`/`uploadPassword` Gradle properties (no defaults); remove `allowInsecureProtocol`.
+**Chat service is a high-complexity orchestration hotspot:**
+- Issue: `DefaultChatServiceImpl` owns chat creation, guard handling, parameter resolution, memory, RAG advisor parameters, tool callback wiring, streaming fallback, audit rows, typed-output retries, token accounting, and cancellation cleanup in one class.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java`
+- Impact: Small changes to streaming, guardrails, or audit behavior can regress unrelated paths because lifecycle state is spread across one large method chain.
+- Fix approach: Keep changes surgical; add focused regression tests for every lifecycle branch touched; consider extracting stream assembly, audit outcome mapping, and typed-output retry policy after Phase 8 hardening.
 
-**Nested git projects / composite build coupling:**
-- Issue: Root `settings.gradle` uses `includeBuild 'jmix-app'` and `includeBuild 'ai-agent'`, while each subproject also contains its own Gradle wrapper, `.gradle`, and `.idea` directories. Duplicated wrappers and build state.
-- Files: `settings.gradle`, `jmix-app/settings.gradle`, `ai-agent/settings.gradle`, `jmix-app/gradlew*`, `ai-agent/gradlew*`
-- Impact: Inconsistency risk between wrapper versions; larger repo size; confusion about which `gradlew` to invoke.
-- Fix approach: Standardize on the root wrapper; remove duplicated wrappers and `.idea` copies; document the composite build model in README.
+**Cancellation registry has mixed responsibilities:**
+- Issue: `CancellationRegistry` handles document ingestion generation counters and chat stream `Disposable` cancellation. The same `cancel(UUID)` API means either “cancel document work” or “cancel chat run” depending on the UUID passed.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/CancellationRegistry.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java`
+- Impact: Future code can confuse document ids and run ids, especially because the class package is `rag` but the UI chat path also depends on it.
+- Fix approach: Split chat stream cancellation into a dedicated `ChatStreamCancellationRegistry` or introduce typed wrapper methods that make document id vs run id explicit.
 
-**Default test Jmix module id collision risk:**
-- Issue: `AITestConfiguration` uses id `com.vn.agent.test` with `dependsOn = AIConfiguration.class`. Fine for now but there is no actual test coverage of agent behavior.
-- Files: `ai-agent/ai-agent/src/test/java/com/vn/agent/AITest.java` (only `contextLoads()`), `ai-agent/ai-agent/src/test/java/com/vn/agent/AITestConfiguration.java`
-- Impact: Test suite signals nothing meaningful about correctness.
-- Fix approach: Add real tests once agent features land.
+**Flow UI chat uses raw Vaadin listeners inside a Jmix fragment:**
+- Issue: `ChatPanelFragment` creates `MessageInput` programmatically and wires `messageInput.addSubmitListener(...)`. This is justified by the Vaadin `MessageInput` API, but it bypasses the preferred XML + `@Subscribe` pattern used for Jmix components.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/view/chat/fragment/chat-panel-fragment.xml`
+- Impact: Lifecycle and test assumptions differ from normal Jmix XML-bound components; future UI changes should not blindly copy this pattern to standard Jmix controls.
+- Fix approach: Keep raw listeners limited to Vaadin message primitives; continue using `@Subscribe` for Jmix buttons, loaders, containers, and standard components.
 
-**Missing Vietnamese locale in ai-agent add-on:**
-- Issue: Add-on declares only `en` locale (`jmix.core.available-locales=en` in `module.properties`) and ships `messages.properties` only. The host app declares both `vi,en`.
-- Files: `ai-agent/ai-agent/src/main/resources/com/vn/agent/module.properties`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages.properties`
-- Impact: Mixed UI languages when add-on menu is shown in Vietnamese locale.
-- Fix approach: Add `messages_vi.properties` with translations; align `available-locales` with host expectations (or rely on host).
-
-**Hard-coded add-on version pin:**
-- Issue: `jmix-app/build.gradle` depends on `com.vn:ai-agent-starter:0.0.1-SNAPSHOT` while both projects carry version `0.0.1-SNAPSHOT` (root `ai-agent/build.gradle`, `build.gradle`).
-- Files: `jmix-app/build.gradle` (line 25), `ai-agent/build.gradle` (line 11)
-- Impact: No version catalog/BOM; upgrades must be done by string search.
-- Fix approach: Extract versions to `gradle.properties` or a Gradle version catalog.
+**Agent store recovery depends on Liquibase history correctness:**
+- Issue: Runtime disables Spring AI schema auto-initialization and expects add-on Liquibase changelogs to create chat memory and pgvector structures. If a table is dropped while Liquibase history remains applied, the app fails at runtime rather than self-healing.
+- Files: `jmix-app/src/main/resources/application.properties`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog/060-ai-chat-memory.xml`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog/070-ai-kb-vector-store.xml`
+- Impact: UAT can fail with generic chat errors even though the code and changelog files are present.
+- Fix approach: Add idempotent recovery changesets for critical agentstore tables/indexes or provide an operational repair script with clear verification steps.
 
 ## Known Bugs
 
-**Missing `@EditedEntityContainer` value vs descriptor mismatch risk:**
-- Symptoms: `UserDetailView` uses `@EditedEntityContainer("userDc")`; any rename of the data container in `user-detail-view.xml` silently breaks the view at runtime.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java`
-- Trigger: Renaming the data container in XML without updating the annotation.
-- Workaround: None; keep names in sync.
+**Chat cancellation does not persist a cancellation audit outcome:**
+- Symptoms: Stopping an in-progress stream disposes the Reactor subscription, but the audit model and write path do not persist a chat-level `CANCELLED` tool-call outcome.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/CancellationRegistry.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/entity/AiToolCallOutcome.java`, `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`
+- Trigger: User clicks Stop before the stream reaches the normal final event path.
+- Workaround: None in the UI; inspect partial chat/audit rows by `runId` when debugging.
 
-**`HasTimeZone.isAutoTimeZone()` always returns true:**
-- Symptoms: Setting `timeZoneId` on a `User` has no effect because `isAutoTimeZone()` is unconditionally `true`, which typically overrides the explicit zone.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/entity/User.java` (lines 168-171)
-- Trigger: Any user persisting a non-null `timeZoneId` and expecting it to be honored.
-- Workaround: Fix the method to return a field-backed flag, or remove the `timeZoneId` column from the UI.
+**Tool-call streaming events can be dropped across scheduler boundaries:**
+- Symptoms: Tool calls may audit in the backend but fail to render inline markdown in the chat stream when `RunContext` / stream sink state is not visible on the tool execution thread.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/ToolCallbackAuditDecorator.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/StreamingSinkHolder.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/ChatStreamingSchedulerConfig.java`, `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`
+- Trigger: Tool-using response where Spring AI invokes tool callbacks outside the original chat stream thread context.
+- Workaround: Audit records can still be used to inspect tool execution; UI streaming needs explicit context propagation or explicit sink/run id passing.
+
+**Chat URL query parameter synchronization remains fragile:**
+- Symptoms: The route can read a `conversationId` query parameter, but current conversation state is owned inside the fragment and must be pushed back to the URL after first send.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`, `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`
+- Trigger: Start a new chat from `/ai-agent/chat`, send the first message, then refresh/share the URL before query-param sync is implemented or verified.
+- Workaround: Use the conversation list to reopen saved conversations.
+
+**Upload staging depends on host configuration:**
+- Symptoms: Knowledge-base upload submits staged `file:` URIs, and validation rejects them unless `jmix.ai-agent.rag.upload.file-staging-root` matches the staging directory.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/view/knowledge/KnowledgeBaseView.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/KnowledgeDocumentUploadService.java`, `jmix-app/src/main/resources/application.properties`, `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`
+- Trigger: Upload a source in a host app without a compatible `jmix.ai-agent.rag.upload.file-staging-root` setting.
+- Workaround: Configure the property to the same local staging directory used by the upload UI before testing uploads.
 
 ## Security Considerations
 
-**Admin seed user with plaintext `{noop}admin` password:**
-- Risk: Initial admin account is seeded with `{noop}admin`, meaning no password hashing. On any deployment that doesn't rotate the admin password immediately, credentials are effectively `admin/admin` in the clear.
-- Files: `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog/010-init-user.xml` (lines 41-55)
-- Current mitigation: None. Also, `application.properties` auto-fills login form with `admin/admin` in the UI.
-- Recommendations: Replace seed with a bcrypt hash, force password change on first login, remove `ui.login.defaultUsername` / `ui.login.defaultPassword` outside dev profile, gate auto-fill behind a `dev` Spring profile.
+**Application properties contain environment-specific credentials/configuration:**
+- Risk: The sample app stores datasource username/password properties and AI endpoint configuration in checked-in `application.properties`. Do not copy these values into documentation, logs, or future code.
+- Files: `jmix-app/src/main/resources/application.properties`, `.env`
+- Current mitigation: `.env` exists for externalized secrets and is not read by the mapper; Spring imports optional `.env` configuration.
+- Recommendations: Move sample secrets to local-only files or environment variables, keep committed files to placeholders, and add CI checks that prevent real credentials from being committed.
 
-**Default dev login credentials exposed in production config:**
-- Risk: `ui.login.defaultUsername=admin` and `ui.login.defaultPassword=admin` live in `application.properties`, which is loaded in all environments. `LoginView` pre-fills them into the form.
-- Files: `jmix-app/src/main/resources/application.properties` (lines 12-13), `jmix-app/src/main/java/com/vn/jmixapp/view/login/LoginView.java` (lines 55-85)
-- Current mitigation: None.
-- Recommendations: Move defaults to `application-dev.properties`, leave production blank.
+**LLM tool surface exposes readable data by design:**
+- Risk: Built-in tools let the LLM list entities, describe metadata, count, find, read, and traverse related records. Any Jmix security misconfiguration becomes an AI data exposure issue.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/metadata/CurrentUserSchemaAccess.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/CurrentUserSchemaAccessTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/tools/BuiltInDataToolsReadOnlyTest.java`
+- Current mitigation: Tools use `DataManager`, `CurrentUserSchemaAccess`, whitelisted `MetaClass` resolution, read-only operations, result limits, and tests that block direct `EntityManager` usage.
+- Recommendations: Add multi-role integration coverage for every host role added by consumers; treat role policy changes as AI-exposure changes.
 
-**`/public/**` endpoints permit all with no CSRF / rate limit strategy documented:**
-- Risk: `JmixAppSecurityConfiguration` opens `/public/**` to `permitAll()`. No handlers currently exist there, but the pattern is permanent.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/security/JmixAppSecurityConfiguration.java`
-- Current mitigation: No endpoints are mapped under `/public/**` yet.
-- Recommendations: Document intended use; require explicit controllers under `/public/**` to enforce their own auth (e.g., signed tokens) and disable CSRF deliberately only for those specific matchers.
+**Prompt-injection-safe output formatting is central but easy to bypass:**
+- Risk: Tool outputs and RAG snippets are model inputs. Any new formatter that emits raw user-controlled content without bounding, escaping, or source labeling can increase prompt-injection exposure.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolResultFormatter.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/tools/PromptInjectionHarnessTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/MarkdownRendererXssTest.java`
+- Current mitigation: Existing formatter and tests cover prompt-injection and markdown/XSS paths for current renderers.
+- Recommendations: Route all new tool/RAG output through existing formatter patterns and extend the harness before adding new content types.
 
-**HSQLDB file-based storage with embedded credentials:**
-- Risk: Production-profile `main.datasource.url` defaults to a local HSQLDB file (`.jmix/hsqldb/jmixapp`) with username `sa` and empty password. Not suitable for production.
-- Files: `jmix-app/src/main/resources/application.properties` (lines 1-3)
-- Current mitigation: None.
-- Recommendations: Externalize via env vars / `application-prod.properties`; require secure DB in non-dev profiles; add a startup check that refuses to boot with `sa`/empty password outside dev.
-
-**Insecure artifact publishing (HTTP allowed):**
-- Risk: `allowInsecureProtocol = true` with default credentials `admin/admin`.
-- Files: `ai-agent/build.gradle` (lines 48-55)
-- Current mitigation: None.
-- Recommendations: Remove `allowInsecureProtocol`, require HTTPS, forbid default credentials.
-
-**`@Secret` on password field but stored unsalted if seeded:**
-- Risk: Seeded passwords bypass `PasswordEncoder`. Programmatic creation in `UserDetailView.onBeforeSave` does encode, but any direct insert (scripts/seed) bypasses this.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java` (line 77), `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog/010-init-user.xml`
-- Recommendations: Provide a utility for generating encoded seeds; add integration test that no `{noop}` prefixes exist in non-test profiles.
+**Audit schema currently encodes chat-level events as tool-like rows:**
+- Risk: Chat-level denials and flagged outputs use sentinel tool names/outcomes, which can obscure whether a row represents a real tool call or a request-level event.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/guard/GuardedToolCallingManager.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/AuditWriter.java`, `.planning/ROADMAP.md`
+- Current mitigation: Sentinel naming and outcome fields distinguish request-level guard events in current queries.
+- Recommendations: Complete the planned tree-lite audit schema redesign before adding retrieval audit or additional request-level event kinds.
 
 ## Performance Bottlenecks
 
-**`UserDetailView.onInit` loads all TimeZone IDs synchronously on every view open:**
-- Problem: `TimeZone.getAvailableIDs()` returns ~600 entries; the combobox is populated in-memory each init.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java` (lines 47-50)
-- Cause: No caching, no lazy loading, no filtering in the combo.
-- Improvement path: Cache the list in a static field or service bean, or switch to a lazy-loaded/searchable combo.
+**RAG ingestion is single-node and local-state coordinated:**
+- Problem: Async ingestion cancellation uses in-memory maps and a local executor; there is no cluster-wide cancellation, queue, or backpressure story.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/AsyncIngestionWorker.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/CancellationRegistry.java`, `ai-agent/ai-agent-starter/src/main/java/com/vn/autoconfigure/agent/AiToolsAutoConfiguration.java`
+- Cause: v1 intentionally targets a single JVM; generation counters and `Disposable` state are process-local.
+- Improvement path: Move cancellation state to database/Redis and add queue metrics before supporting horizontally scaled deployments.
 
-**UI test tearDown deletes with `LIKE` query without transaction control:**
-- Problem: `UserUiTest.tearDown()` scans `USER_` with `username like 'test-user-%'` after every test. Cheap now but scales linearly with accumulated orphan rows if tests crash mid-run.
-- Files: `jmix-app/src/test/java/com/vn/jmixapp/user/UserUiTest.java` (lines 85-90)
-- Improvement path: Use `@Transactional` rollback test harness, or capture created IDs and remove by ID.
+**Tool result size limits protect context but hide pagination needs:**
+- Problem: `find_records` clamps result size and returns truncation hints rather than cursor-based pagination.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/ToolLimits.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/tools/ToolLimitsTest.java`
+- Cause: LLM context budget is prioritized over exhaustive data transfer.
+- Improvement path: Keep default limits conservative; add explicit cursor/page tools only when there is a concrete user story requiring multi-page analysis.
+
+**Vector store dimensionality is fixed to current embedding defaults:**
+- Problem: pgvector DDL defines a fixed vector size for the configured embedding model family.
+- Files: `ai-agent/ai-agent/src/main/resources/com/vn/agent/liquibase/agentstore-changelog/070-ai-kb-vector-store.xml`, `jmix-app/src/main/resources/application.properties`
+- Cause: pgvector columns require a fixed dimension; model/provider changes can require schema migration or re-embedding.
+- Improvement path: Treat embedding-model changes as data migrations with reindexing, not simple configuration flips.
 
 ## Fragile Areas
 
-**`ai-agent` add-on configuration is split across two modules with minimal code:**
-- Files: `ai-agent/ai-agent/**`, `ai-agent/ai-agent-starter/**`
-- Why fragile: Refactoring package `com.vn.agent` requires coordinated changes in `AIConfiguration`, `AIAutoConfiguration`, `module.properties`, `menu.xml`, and the `.imports` file. No tests guard this.
-- Safe modification: Add integration tests that verify the starter auto-configures the module before refactoring.
-- Test coverage: Only a `contextLoads()` test.
+**Streaming chat lifecycle:**
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/StreamingSinkHolder.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/ToolCallbackAuditDecorator.java`
+- Why fragile: State crosses Reactor streams, Vaadin `UI.access`, Spring Security context, `RunContext`, audit writers, and cancellation registry cleanup.
+- Safe modification: Add tests around stream success, provider error, guard denial, tool event emission, Stop, detach, and URL replay for every lifecycle change.
+- Test coverage: Unit and UI-fragment tests exist, but UAT still documents gaps around tool markdown, cancellation audit, URL sync, and generic runtime errors.
 
-**Seed data embedded in changelog with per-DBMS `dbms=` duplication:**
-- Files: `jmix-app/src/main/resources/com/vn/jmixapp/liquibase/changelog/010-init-user.xml` (lines 41-77)
-- Why fragile: Two parallel `<insert>` blocks (UUID with/without dashes) must stay in sync for all seeded rows.
-- Safe modification: Use Liquibase preconditions / parameters, or a Java migration, or seed via a `CommandLineRunner` gated by profile.
+**Knowledge ingestion lifecycle:**
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/KnowledgeDocumentUploadService.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/AsyncIngestionWorker.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/IngestionStatusWriter.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/knowledge/KnowledgeBaseView.java`
+- Why fragile: Upload staging, source URI validation, async worker retries, cancellation state, status events, vector-store writes, and document rows must remain consistent.
+- Safe modification: Preserve fail-closed source validation; add integration tests for every new status transition and upload source type.
+- Test coverage: RAG integration tests cover core upload/retry/delete paths, but UI upload configuration errors still need clearer user-facing coverage.
 
-**`MainView.isSubstituted` dereferences authenticated user without null check:**
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/main/MainView.java` (lines 114-117)
-- Why fragile: `currentUserSubstitution.getAuthenticatedUser()` is assumed non-null. If called during a window where auth is not yet set up (edge case rendering), NPE could occur.
-- Safe modification: Guard with null check; return `false` when no authenticated user.
-
-**`JmixAppApplication` defines `@Primary` `DataSource` bean manually:**
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/JmixAppApplication.java` (lines 35-47)
-- Why fragile: Overriding Spring Boot's auto-configured DataSource with a manually assembled one tied to `main.datasource.*` properties bypasses standard `spring.datasource.*` conventions. Changes to Spring Boot autoconfig may conflict.
-- Safe modification: Prefer `spring.datasource.*` and let Jmix wire via its conventions; if custom prefix needed, add a validation test.
+**i18n and locale parity:**
+- Files: `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages.properties`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages_en.properties`, `ai-agent/ai-agent/src/main/resources/com/vn/agent/messages_vi.properties`, `ai-agent/ai-agent/src/test/java/com/vn/agent/i18n/I18nParityTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/i18n/LocaleParityTest.java`
+- Why fragile: UI UAT already surfaced raw message keys when runtime resources or migrations are out of sync.
+- Safe modification: Add every new key to all locale files and run parity tests before UI verification.
+- Test coverage: Parity tests exist; deployed runtime still needs smoke verification after resource changes.
 
 ## Scaling Limits
 
-**HSQLDB file-based datasource:**
-- Current capacity: Single-process, file-locked HSQLDB (`jdbc:hsqldb:file:.jmix/hsqldb/jmixapp`).
-- Limit: No concurrent application instances; limited by HSQLDB memory/disk; not ACID-robust under crashes.
-- Scaling path: Switch to PostgreSQL (or another server DB) via profile-specific properties; add Flyway-compatible seed tasks.
+**Single JVM runtime assumptions:**
+- Current capacity: One running application instance owns chat stream cancellation state, ingestion cancellation state, and Vaadin push sessions.
+- Limit: Multiple app nodes can disagree about active streams, cancelled ingestions, and in-flight upload state.
+- Scaling path: Externalize cancellation/run state, use a shared task queue for ingestion, and document sticky-session requirements for Vaadin push before clustering.
 
-**Single HSQLDB file shared dev/prod by default:**
-- Current capacity: One dev-style DB.
-- Limit: No separation of test/prod data; HSQLDB file path is under `.jmix/` at runtime working directory.
-- Scaling path: Profile-based datasource selection; ephemeral DB for CI.
+**Read-only tool model:**
+- Current capacity: Six read-only data tools plus host-provided contributors.
+- Limit: No first-class mutation workflow, approval flow, or transaction preview exists for create/update/delete actions.
+- Scaling path: Keep mutation tools deferred until explicit product requirements exist; design them around Jmix transactions, policy checks, audit, confirmation, and rollback semantics.
 
 ## Dependencies at Risk
 
-**Jmix 2.8.0 and Gradle plugin 2.8.0 hard-pinned in multiple places:**
-- Risk: Version appears in `build.gradle` (buildscript classpath), `jmix-app/build.gradle` (plugin and BOM), `ai-agent/build.gradle` (BOM).
-- Impact: Upgrade requires touching 3+ files; drift possible.
-- Migration plan: Centralize via `gradle.properties` (`jmixVersion=2.8.0`) or Gradle version catalog.
+**Spring AI 1.1.4 milestone/snapshot API surface:**
+- Risk: The code pins Spring AI 1.1.4 and uses APIs around `ChatClient`, memory advisors, pgvector, RAG advisors, tool callbacks, and structured output that may shift across Spring AI releases.
+- Impact: Upgrade can break compile-time APIs and runtime behavior for streaming/tool interleaving.
+- Migration plan: Keep version upgrades as dedicated phases with Context7/official-doc verification, focused compile fixes, and regression tests around chat, tools, RAG, and structured output.
 
-**Vaadin Hilla / copilot forcibly excluded:**
-- Files: `jmix-app/build.gradle` (lines 49-53), `ai-agent/ai-agent/ai-agent.gradle` (lines 18-22)
-- Impact: Any dependency that transitively requires Hilla will silently lose functionality. If Jmix/Vaadin upgrades make Hilla mandatory, build will break unexpectedly.
-- Migration plan: Track Jmix release notes; re-evaluate exclusions per upgrade.
+**Vaadin MessageList / MessageInput integration:**
+- Risk: Phase 07.1 intentionally replaced custom chat UI with Vaadin message primitives; current behavior depends on Vaadin component APIs and Jmix fragment lifecycle working together.
+- Impact: Vaadin upgrades can change message rendering, markdown handling, or input listener behavior.
+- Migration plan: Keep chat UI tests tied to observable behavior, not implementation internals; re-verify markdown, sources, Stop, and input state after Vaadin/Jmix upgrades.
 
-**HSQLDB runtime-only:**
-- Risk: HSQLDB is explicitly `runtimeOnly` in `jmix-app/build.gradle` (line 41) and `testRuntimeOnly` in the add-on; acceptable only for dev/test. Production deployment configuration is absent.
-- Migration plan: Add PostgreSQL (or similar) as an optional profile-backed dependency.
+**PostgreSQL pgvector availability:**
+- Risk: RAG requires PostgreSQL with pgvector support for production-like vector retrieval.
+- Impact: Hosts without pgvector cannot use document retrieval even if base chat/data tools work.
+- Migration plan: Fail clearly when vector store beans or schema are unavailable; keep HSQLDB test paths limited to non-vector scenarios.
 
 ## Missing Critical Features
 
-**No AI functionality despite repository name:**
-- Problem: `com.vn.agent` package contains zero AI/LLM logic — no `ChatClient`, no prompt management, no tool/function calling, no vector store.
-- Blocks: The entire value proposition of an "AI agent" addon.
+**Phase 8 release readiness is not complete:**
+- Problem: Planning state marks all implementation plans complete but the project is awaiting human UAT for Phase 07.1 and Phase 8 hardening/release readiness is not started.
+- Blocks: Shipping a stable v1 add-on release with documented install, configuration, migration, and support posture.
 
-**No production profile / environment separation:**
-- Problem: Only `application.properties` and `application-test.properties`. No `application-dev.properties` or `application-prod.properties`; default credentials and file-DB are always on.
-- Blocks: Safe deployment outside a local developer workstation.
+**Operational repair and diagnostics are thin:**
+- Problem: Runtime failures such as missing chat-memory tables or upload staging mismatch surface as generic UI errors unless logs are inspected.
+- Blocks: Non-developer operators cannot self-diagnose common environment/configuration drift.
 
-**No CI configuration:**
-- Problem: No `.github/workflows`, `.gitlab-ci.yml`, or similar.
-- Blocks: Automated tests, build validation, artifact publication.
-
-**No logging of AI operations:**
-- Problem: No structured logging/metrics scaffolding in `ai-agent` module.
-- Blocks: Auditability, cost tracking, debugging of future LLM calls.
-
-**No `.gitignore` discipline on generated artifacts in add-on:**
-- Problem: The `ai-agent/.gradle/` directory is tracked in git status (see repo root git status showing `ai-agent/.gradle/buildOutputCleanup/cache.properties`).
-- Blocks: Repo cleanliness; may leak local build state.
+**Cluster support is intentionally absent:**
+- Problem: Cancellation, ingestion, and streaming state are local-process concerns.
+- Blocks: Horizontal scaling and stateless deployment topologies.
 
 ## Test Coverage Gaps
 
-**`ai-agent` add-on has only a context-loads smoke test:**
-- What's not tested: Any agent behavior, bean wiring beyond `contextLoads()`, auto-configuration activation from the starter.
-- Files: `ai-agent/ai-agent/src/test/java/com/vn/agent/AITest.java`
-- Risk: Silent regressions in auto-configuration; no regression net for future AI features.
-- Priority: High (once AI features exist).
+**Human UAT failures need automated regression coverage:**
+- What's not tested: Tool markdown emission across streaming threads, Stop-to-cancelled-audit persistence, post-send URL sync, and upload staging misconfiguration messaging.
+- Files: `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStreamTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStopTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/knowledge/KnowledgeBaseUploadTest.java`
+- Risk: Fixes can regress before final release because the failures were found manually.
+- Priority: High
 
-**`UserListView` has no dedicated controller tests:**
-- What's not tested: Data grid population, navigation, filters.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserListView.java`
-- Risk: Grid column/action regressions go unnoticed.
-- Priority: Medium.
+**Release/consumer smoke tests are partly manual:**
+- What's not tested: Published artifact consumption, clean host installation, required environment variables, and production-like PostgreSQL/pgvector setup in CI.
+- Files: `docs/consumer-smoke.md`, `jmix-app/build.gradle`, `ai-agent/build.gradle`, `.planning/STATE.md`
+- Risk: The add-on can pass module tests but fail for a fresh consumer app.
+- Priority: High
 
-**`UserDetailView` business logic (password confirmation, encoding, new-entity flag) is only covered by a happy-path UI test:**
-- What's not tested: `onValidation` mismatch path, `onAfterSave` notification branch when editing existing user, unicode/long passwords.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/user/UserDetailView.java`, `jmix-app/src/test/java/com/vn/jmixapp/user/UserUiTest.java`
-- Risk: Password confirmation errors may regress silently; no test for editing existing users.
-- Priority: High (security-sensitive code path).
+**Multi-role AI data exposure needs continuous integration coverage:**
+- What's not tested: Every future host role and row-level policy combination against LLM-facing tools and RAG retrieval filters.
+- Files: `ai-agent/ai-agent/src/test/java/com/vn/agent/metadata/CurrentUserSchemaAccessTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/rag/RoleScopedRetrievalIntegrationTest.java`, `jmix-app/src/main/java/com/vn/jmixapp/security/`
+- Risk: A security role change can silently expose metadata, records, or documents to the LLM.
+- Priority: High
 
-**No security role tests:**
-- What's not tested: `FullAccessRole`, `UiMinimalRole` policy enforcement.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/security/FullAccessRole.java`, `jmix-app/src/main/java/com/vn/jmixapp/security/UiMinimalRole.java`
-- Risk: Accidental policy widening/narrowing not caught.
-- Priority: High.
-
-**No tests for `JmixAppSecurityConfiguration` `/public/**` matcher:**
-- What's not tested: That `permitAll()` truly applies and no private endpoints leak through.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/security/JmixAppSecurityConfiguration.java`
-- Risk: Future endpoints placed under `/public/**` could unintentionally skip auth without a guardrail test.
-- Priority: Medium.
-
-**`MainView` rendering helpers (`userMenuButtonRenderer`, `userMenuHeaderRenderer`, `isSubstituted`) are untested:**
-- What's not tested: Null user handling, substitution display, avatar/name composition.
-- Files: `jmix-app/src/main/java/com/vn/jmixapp/view/main/MainView.java`
-- Risk: NPEs on edge auth states (see Fragile Areas).
-- Priority: Medium.
+**No automated cluster/concurrency stress suite:**
+- What's not tested: Multi-node cancellation, concurrent uploads at production volume, large RAG corpora, long-running streams, and browser detach/reconnect under load.
+- Files: `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/AsyncIngestionWorker.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/rag/CancellationRegistry.java`, `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java`
+- Risk: Race conditions and resource leaks appear only under production deployment shapes.
+- Priority: Medium
 
 ---
 
-*Concerns audit: 2026-04-18*
+*Concerns audit: 2026-04-24*

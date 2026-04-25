@@ -1,6 +1,7 @@
 package com.vn.agent.rag.config;
 
 import com.vn.agent.AITestConfiguration;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,11 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p><b>Why the pgvector auto-config is excluded</b>: its {@code VectorStore} bean
  * would try to construct a real {@link org.springframework.ai.vectorstore.pgvector.PgVectorStore}
- * against HSQLDB. The add-on's own {@code aiAgentVectorStore} bean (in
- * {@code AIAutoConfiguration}) still fires under {@code @ConditionalOnMissingBean};
- * it builds cleanly against HSQLDB because {@code initializeSchema(false)} plus
- * Spring AI's default {@code vectorTableValidationsEnabled=false} short-circuit
- * {@code PgVectorStore#afterPropertiesSet()} before any DB call.</p>
+ * against HSQLDB. The test imports {@link StubVectorStoreConfiguration}, so the
+ * add-on's own {@code aiAgentVectorStore} backs off under {@code @ConditionalOnMissingBean}.</p>
  */
 @SpringBootTest(
         classes = AITestConfiguration.class,
@@ -60,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(StubEmbeddingModelConfiguration.class)
+@Import({StubEmbeddingModelConfiguration.class, StubVectorStoreConfiguration.class})
 class EmbeddingModelBeanCollisionTest {
 
     @Autowired ApplicationContext ctx;

@@ -15,7 +15,7 @@ import org.springframework.core.task.TaskExecutor;
  * completed ingest on the test thread — no polling loops, no {@link Thread#sleep}, no flakes.
  *
  * <p>Also imports {@link StubEmbeddingModelConfiguration} so Phase 5 integration tests never
- * reach OpenRouter — deterministic 1536-dim vectors derived from {@link String#hashCode} are
+ * reach OpenRouter — deterministic 2000-dim vectors derived from {@link String#hashCode} are
  * sufficient for role-scoping, atomicity, and fail-closed posture assertions.</p>
  *
  * <p>This is a {@code @TestConfiguration} (test-only classpath), so it cannot leak into

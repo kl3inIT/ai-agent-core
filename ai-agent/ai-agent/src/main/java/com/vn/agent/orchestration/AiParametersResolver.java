@@ -69,10 +69,17 @@ public class AiParametersResolver {
     }
 
     public AiParameters resolveActive() {
-        return dataManager.load(AiParameters.class)
-                .query("select e from ai_AiParameters e where e.active = true")
-                .optional()
-                .orElseGet(this::buildFallback);
+        try {
+            return dataManager.load(AiParameters.class)
+                    .query("select e from ai_AiParameters e where e.active = true")
+                    .optional()
+                    .orElseGet(this::buildFallback);
+        } catch (RuntimeException persistenceFailure) {
+            log.warn("Unable to resolve active AiParameters from persistence; using defaults fallback: {}",
+                    persistenceFailure.getMessage());
+            log.debug("AiParameters resolveActive persistence failure details", persistenceFailure);
+            return buildFallback();
+        }
     }
 
     private AiParameters buildFallback() {
@@ -159,6 +166,24 @@ public class AiParametersResolver {
         return defaults.maxTokens();
     }
 
+    public Integer effectiveRagTopK(AiParameters params, int defaultValue) {
+        Number value = numberFromBody(params, "ragTopK");
+        if (value == null) {
+            return defaultValue;
+        }
+        int topK = value.intValue();
+        return topK > 0 ? topK : defaultValue;
+    }
+
+    public Double effectiveRagSimilarityThreshold(AiParameters params, double defaultValue) {
+        Number value = numberFromBody(params, "ragSimilarityThreshold");
+        if (value == null) {
+            return defaultValue;
+        }
+        double threshold = value.doubleValue();
+        return threshold >= 0.0 && threshold <= 1.0 ? threshold : defaultValue;
+    }
+
     public String effectiveSystemPrompt(AiParameters params) {
         String body = params.getBodyYaml();
         if (body != null && !body.isBlank()) {
@@ -204,5 +229,16 @@ public class AiParametersResolver {
             }
         }
         return out.toString();
+    }
+
+    private Number numberFromBody(AiParameters params, String key) {
+        String body = params.getBodyYaml();
+        if (body != null && !body.isBlank()) {
+            Object value = parseBody(params).get(key);
+            if (value instanceof Number number) {
+                return number;
+            }
+        }
+        return null;
     }
 }

@@ -5,18 +5,20 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiParameters;
-import com.vn.agent.entity.AiToolCallAudit;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.security.AiAgentAdminRole;
 import com.vn.agent.security.AiAgentUserRole;
 import com.vn.agent.security.AiAgentUserRowLevelRole;
+import com.vn.agent.spi.AuditKind;
 import com.vn.agent.spi.AuditListener;
 import com.vn.agent.spi.ContextContributor;
 import com.vn.agent.spi.CustomIngester;
 import com.vn.agent.spi.PromptContextContributor;
 import com.vn.agent.spi.ToolContributor;
 import com.vn.agent.spi.ToolGuard;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
 import io.jmix.core.security.InMemoryUserRepository;
@@ -32,6 +34,7 @@ import io.jmix.security.role.RowLevelRoleRepository;
 import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -81,12 +84,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import(FoundationsBootSmokeTest.TestUsers.class)
+@Import(StubVectorStoreConfiguration.class)
 class FoundationsBootSmokeTest {
 
     @Autowired DataManager dataManager;
     @Autowired Metadata metadata;
-    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired
+    @Qualifier("pgvectorJdbcTemplate")
+    JdbcTemplate agentstoreJdbcTemplate;
     @Autowired SystemAuthenticator systemAuthenticator;
     @Autowired ResourceRoleRepository resourceRoleRepository;
     @Autowired RowLevelRoleRepository rowLevelRoleRepository;
@@ -100,13 +105,14 @@ class FoundationsBootSmokeTest {
 
     // ---------------------------------------------------------------------
     // 1. Liquibase applied the add-on master changelog on HSQLDB.
-    //    pgvector (changeset 070) must be MARK_RAN, not executed.
+    //    PgVectorStore is stubbed in this HSQLDB path, so no pgvector table is created.
     // ---------------------------------------------------------------------
     @Test
     void liquibase_applies_on_hsqldb() {
         assertTableExists("AI_AGENT_CONVERSATION");
         assertTableExists("AI_AGENT_MESSAGE");
-        assertTableExists("AI_AGENT_TOOL_CALL_AUDIT");
+        assertTableExists("AI_AGENT_AUDIT_EVENT");
+        assertTableAbsent("AI_AGENT_TOOL_CALL_AUDIT");
         assertTableExists("AI_AGENT_PARAMETERS");
         assertTableExists("AI_AGENT_KNOWLEDGE_DOCUMENT");
         assertTableExists("SPRING_AI_CHAT_MEMORY");
@@ -150,16 +156,17 @@ class FoundationsBootSmokeTest {
             assertEquals(savedConv.getId(), loadedMsg.getConversation().getId());
             assertEquals("hello", loadedMsg.getContent());
 
-            // --- AiToolCallAudit ---
-            AiToolCallAudit audit = metadata.create(AiToolCallAudit.class);
-            audit.setToolName("sampleTool");
+            // --- AiAuditEvent (tree-lite; Phase 7.2 rewrite of former AiToolCallAudit) ---
+            AiAuditEvent audit = metadata.create(AiAuditEvent.class);
+            audit.setKind(AuditKind.TOOL);
+            audit.setEventName("sampleTool");
             audit.setOutcome(AiToolCallOutcome.SUCCESS);
             audit.setStartedAt(OffsetDateTime.now());
-            AiToolCallAudit savedAudit = dataManager.save(audit);
-            AiToolCallAudit loadedAudit = dataManager.load(AiToolCallAudit.class)
+            AiAuditEvent savedAudit = dataManager.save(audit);
+            AiAuditEvent loadedAudit = dataManager.load(AiAuditEvent.class)
                     .id(savedAudit.getId()).one();
             assertEquals(savedAudit.getId(), loadedAudit.getId());
-            assertEquals("sampleTool", loadedAudit.getToolName());
+            assertEquals("sampleTool", loadedAudit.getEventName());
 
             // --- AiParameters ---
             AiParameters params = metadata.create(AiParameters.class);
@@ -262,7 +269,7 @@ class FoundationsBootSmokeTest {
         assertDoesNotThrow(() -> toolGuard.check("any-tool", Map.of("k", "v")));
 
         // AuditListener: no-op (does not throw).
-        assertDoesNotThrow(() -> auditListener.onToolCallAudited(UUID.randomUUID()));
+        assertDoesNotThrow(() -> auditListener.onEventAudited(UUID.randomUUID(), AuditKind.TOOL));
 
         // CustomIngester: "noop" / "No-op" / empty.
         assertEquals("noop", customIngester.getId());
@@ -283,7 +290,7 @@ class FoundationsBootSmokeTest {
     // ------------------------------- helpers -------------------------------
 
     private void assertTableExists(String upperCaseName) {
-        Integer count = jdbcTemplate.queryForObject(
+        Integer count = agentstoreJdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where upper(table_name) = ?",
                 Integer.class, upperCaseName);
         assertNotNull(count);
@@ -291,95 +298,16 @@ class FoundationsBootSmokeTest {
     }
 
     private void assertTableAbsent(String upperCaseName) {
-        Integer count = jdbcTemplate.queryForObject(
+        Integer count = agentstoreJdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where upper(table_name) = ?",
                 Integer.class, upperCaseName);
         assertNotNull(count);
         assertEquals(0, count.intValue(), "Expected table absent: " + upperCaseName);
     }
 
-    /**
-     * Provisions alice / bob / admin in an {@link InMemoryUserRepository}. jmix-app's
-     * {@code DatabaseUserRepository} is not on the add-on's test classpath, so the
-     * add-on test context has no real user store by default — this nested
-     * {@code @TestConfiguration} fills that gap. Authorities are built via
-     * {@link RoleGrantedAuthorityUtils}, which is the documented Jmix 2.8 way to
-     * construct role-backed {@link GrantedAuthority} instances (verified against
-     * {@code io.jmix.security.role.RoleGrantedAuthorityUtils} sources).
-     */
-    @TestConfiguration
-    static class TestUsers {
-
-        /**
-         * Provides the {@code core_UserRepository} bean that Jmix's
-         * {@link io.jmix.core.security.CoreSecurityConfiguration} declares for full
-         * applications but that is NOT auto-configured — per the javadoc on
-         * {@code CoreSecurityConfiguration}, users are expected to extend it (or
-         * declare an equivalent bean) themselves. The add-on's test context has no
-         * application-level security configuration, so we supply the bean here using
-         * the same {@link InMemoryUserRepository} that Jmix's own default uses.
-         */
-        @Bean(name = "core_UserRepository")
-        UserRepository userRepository() {
-            return new InMemoryUserRepository();
-        }
-
-        @Bean
-        TestUserInitializer testUserInitializer(UserRepository userRepository,
-                                                RoleGrantedAuthorityUtils authorityUtils) {
-            return new TestUserInitializer(userRepository, authorityUtils);
-        }
-    }
-
-    /**
-     * Deferred-initialization helper — runs after the {@link UserRepository} bean is
-     * created so that {@link RoleGrantedAuthorityUtils} (which depends on Jmix's
-     * {@code SecurityProperties}) is fully wired before we build authorities.
-     */
-    static class TestUserInitializer {
-        private final UserRepository userRepository;
-        private final RoleGrantedAuthorityUtils authorityUtils;
-
-        TestUserInitializer(UserRepository userRepository, RoleGrantedAuthorityUtils authorityUtils) {
-            this.userRepository = userRepository;
-            this.authorityUtils = authorityUtils;
-        }
-
-        @PostConstruct
-        void init() {
-            if (!(userRepository instanceof InMemoryUserRepository repo)) {
-                throw new IllegalStateException(
-                        "Expected InMemoryUserRepository from Jmix core_UserRepository, got "
-                                + userRepository.getClass());
-            }
-            repo.addUser(buildUser("alice",
-                    AiAgentUserRole.CODE, AiAgentUserRowLevelRole.CODE));
-            repo.addUser(buildUser("bob",
-                    AiAgentUserRole.CODE, AiAgentUserRowLevelRole.CODE));
-            repo.addUser(buildAdmin("admin", AiAgentAdminRole.CODE));
-        }
-
-        private UserDetails buildUser(String username,
-                                      String resourceRoleCode,
-                                      String rowLevelRoleCode) {
-            List<GrantedAuthority> auths = new ArrayList<>();
-            auths.add(authorityUtils.createResourceRoleGrantedAuthority(resourceRoleCode));
-            auths.add(authorityUtils.createRowLevelRoleGrantedAuthority(rowLevelRoleCode));
-            return User.builder()
-                    .username(username)
-                    .password("{noop}password")
-                    .authorities(auths)
-                    .build();
-        }
-
-        private UserDetails buildAdmin(String username, String resourceRoleCode) {
-            List<GrantedAuthority> auths = new ArrayList<>();
-            auths.add(authorityUtils.createResourceRoleGrantedAuthority(resourceRoleCode));
-            return User.builder()
-                    .username(username)
-                    .password("{noop}password")
-                    .authorities(auths)
-                    .build();
-        }
-    }
+    // alice / bob / admin are provisioned by the ambient
+    // com.vn.agent.test_support.TestUsersConfiguration (inside AIConfiguration's
+    // component-scan root; loaded for every add-on @SpringBootTest). The inner
+    // @TestConfiguration that used to live here was removed in plan 07-07b Task 1
+    // to avoid double-provisioning once the ambient fixture was introduced.
 }

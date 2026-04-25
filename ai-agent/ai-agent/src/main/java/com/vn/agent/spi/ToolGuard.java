@@ -5,7 +5,7 @@ import java.util.Map;
 /**
  * Host extension point that can veto a tool invocation before it runs.
  * <p>Multiple guards compose by short-circuit AND: any guard throwing {@link ToolVetoedException}
- * blocks the call and produces an {@code AiToolCallAudit} row with
+ * blocks the call and produces an {@code AiAuditEvent} row with
  * {@code outcome = BLOCKED} and the thrown message captured as {@code denialReason}.</p>
  *
  * <p><b>Example:</b>

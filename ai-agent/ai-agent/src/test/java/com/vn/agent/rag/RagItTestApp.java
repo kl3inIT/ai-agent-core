@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
  *       {@code @DynamicPropertySource} registered in {@link AbstractRagIntegrationTest} points
  *       Spring Boot's {@code DataSourceAutoConfiguration} at the Testcontainers pgvector
  *       container. Supplying a competing {@code @Primary DataSource} bean would silently win
- *       and our pgvector-specific assertions (role-scoped retrieval, HNSW index, vector(1536))
+ *       and our pgvector-specific assertions (role-scoped retrieval, HNSW index, vector(2000))
  *       would collapse onto HSQL which has none of those features.</li>
  *   <li><b>Mock {@link ChatClient.Builder} is still provided</b> because the RAG tests don't
  *       exercise a real LLM — role-scoping / atomicity assertions only touch the vector store
@@ -58,6 +58,7 @@ public class RagItTestApp {
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.toolCallbacks(any(java.util.List.class))).thenReturn(requestSpec);
+        when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.options(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);

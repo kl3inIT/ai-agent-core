@@ -2,6 +2,7 @@ package com.vn.agent.tools;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.spi.ToolContributor;
 import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.tool.ToolCallback;
@@ -32,15 +33,18 @@ public class AgentToolCallbacks {
     private final List<ToolContributor> contributors;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
+    private final StreamingSinkHolder streamingSinkHolder;
 
     public AgentToolCallbacks(BuiltInDataTools builtIns,
                               List<ToolContributor> contributors,
                               AuditWriter auditWriter,
-                              CurrentAuthentication currentAuthentication) {
+                              CurrentAuthentication currentAuthentication,
+                              StreamingSinkHolder streamingSinkHolder) {
         this.builtIns = builtIns;
         this.contributors = contributors;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.streamingSinkHolder = streamingSinkHolder;
     }
 
     /**
@@ -64,7 +68,7 @@ public class AgentToolCallbacks {
         }
         ToolCallback[] out = new ToolCallback[all.size()];
         for (int i = 0; i < all.size(); i++) {
-            out[i] = new ToolCallbackAuditDecorator(all.get(i), auditWriter, currentAuthentication);
+            out[i] = new ToolCallbackAuditDecorator(all.get(i), auditWriter, currentAuthentication, streamingSinkHolder);
         }
         return out;
     }

@@ -3,7 +3,7 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath "io.jmix.gradle:jmix-gradle-plugin:2.8.0"
+        classpath 'io.jmix.gradle:jmix-gradle-plugin:2.8.1'
         classpath "io.spring.gradle:dependency-management-plugin:1.1.6"
     }
 }
@@ -27,7 +27,7 @@ subprojects {
     }
 
     jmix {
-        bomVersion = '2.8.0'
+        bomVersion = '2.8.1'
         projectId = 'AI'
     }
 
@@ -50,6 +50,9 @@ subprojects {
     def archName = subArchivesBaseName.substring(1, subArchivesBaseName.length() - 1)
 
     java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
         withSourcesJar()
     }
 
@@ -60,10 +63,11 @@ subprojects {
     publishing {
         repositories {
             maven {
-                url = 'https://myrepo/releases/'
+                name = 'CustomNexus'
+                url = 'https://nexus.x2h.com.vn/repository/jmix-internal-snapshots/' // Replace with your Nexus repo URL
                 credentials {
-                    username rootProject.hasProperty('uploadUser') ? rootProject['uploadUser'] : 'admin'
-                    password rootProject.hasProperty('uploadPassword') ? rootProject['uploadPassword'] : 'admin'
+                    username = project.findProperty('nexusUsername')
+                    password = project.findProperty('nexusPassword')
                 }
                 allowInsecureProtocol = true
             }
@@ -83,5 +87,6 @@ subprojects {
 
     project.tasks.withType(JavaCompile).configureEach {
         options.compilerArgs.add("-parameters")
+        options.release = 21
     }
 }

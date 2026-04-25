@@ -6,6 +6,7 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
+import io.jmix.core.security.SystemAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -18,10 +19,11 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,9 +43,9 @@ import java.util.UUID;
  *   <li>{@link ChunkMetadata#DOCUMENT_ID} — {@code document.id.toString()} (used by D-21 delete)</li>
  *   <li>{@link ChunkMetadata#EMBEDDING_MODEL} — current configured model (D-03 drift filter)</li>
  *   <li>{@link ChunkMetadata#ALLOWED_ROLES} — JSON-parsed list of role codes from the entity</li>
- *   <li>{@link ChunkMetadata#ROLE_FLAG_PREFIX}{@code <lowercase-code>} = {@code true} — Option A
- *       flattened role flags, lowercased via {@link Locale#ROOT} so the filter keys match
- *       regardless of role-code casing (threat T-05-03-08 mitigation).</li>
+ *   <li>{@code role_<normalized-code>} = {@code true} — Option A flattened role flags,
+ *       normalized via {@link ChunkMetadata#normalizeRoleCode(String)} so filter keys are valid
+ *       JSONPath member names (threat T-05-03-08 mitigation).</li>
  * </ul>
  *
  * <p><b>RAG-03 atomicity</b>: on any failure, the catch block deletes all chunks already written
@@ -85,6 +87,7 @@ public class AsyncIngestionWorker {
     private final AiAgentRagProperties ragProperties;
     private final AiAgentEmbeddingProperties embeddingProperties;
     private final ResourceLoader resourceLoader;
+    private final SystemAuthenticator systemAuthenticator;
 
     public AsyncIngestionWorker(IngestionStatusWriter ingestionStatusWriter,
                                 CancellationRegistry cancellationRegistry,
@@ -92,7 +95,8 @@ public class AsyncIngestionWorker {
                                 VectorStore vectorStore,
                                 AiAgentRagProperties ragProperties,
                                 AiAgentEmbeddingProperties embeddingProperties,
-                                ResourceLoader resourceLoader) {
+                                ResourceLoader resourceLoader,
+                                SystemAuthenticator systemAuthenticator) {
         this.ingestionStatusWriter = ingestionStatusWriter;
         this.cancellationRegistry = cancellationRegistry;
         this.dataManager = dataManager;
@@ -100,10 +104,19 @@ public class AsyncIngestionWorker {
         this.ragProperties = ragProperties;
         this.embeddingProperties = embeddingProperties;
         this.resourceLoader = resourceLoader;
+        this.systemAuthenticator = systemAuthenticator;
     }
 
     @Async("aiAgentIngestExecutor")
     public void ingest(UUID documentId) {
+        // Async thread has no SecurityContext — DataManager/VectorStore require an
+        // authenticated principal for policy checks. Run under Jmix system auth; the
+        // document was already role-validated by KnowledgeDocumentUploadService at upload
+        // time, and retrieval-time visibility is still enforced via per-chunk allowedRoles.
+        systemAuthenticator.runWithSystem(() -> ingestInternal(documentId));
+    }
+
+    private void ingestInternal(UUID documentId) {
         // WR-01: capture the generation at entry so later reingest() bumps mark THIS
         // worker as cancelled even if the legacy boolean flag is cleared between
         // scheduling and polling. Generation captured BEFORE markProcessing so a
@@ -131,7 +144,7 @@ public class AsyncIngestionWorker {
 
         try {
             Resource resource = resolveResource(document.getFileName());
-            List<Document> raw = new TikaDocumentReader(resource).get();
+            List<Document> raw = readResource(resource, document);
 
             // WR-02: enforce jmix.ai-agent.rag.ingest.max-document-chars BEFORE splitting /
             // embedding. Tika has already materialised the text so we can size it accurately;
@@ -236,20 +249,40 @@ public class AsyncIngestionWorker {
         return b.build();
     }
 
+    private List<Document> readResource(Resource resource, AiKnowledgeDocument document) {
+        if (isMarkdown(document)) {
+            try {
+                String text = new String(resource.getContentAsByteArray(), StandardCharsets.UTF_8);
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put(ChunkMetadata.SOURCE, document.getFileName());
+                return List.of(new Document(text, metadata));
+            } catch (IOException e) {
+                throw new IllegalStateException("Unable to read markdown resource as UTF-8: "
+                        + document.getFileName(), e);
+            }
+        }
+        return new TikaDocumentReader(resource).get();
+    }
+
+    private boolean isMarkdown(AiKnowledgeDocument document) {
+        String fileName = document.getFileName();
+        String mimeType = document.getMimeType();
+        return (mimeType != null && mimeType.toLowerCase().contains("markdown"))
+                || (fileName != null && fileName.toLowerCase().endsWith(".md"));
+    }
+
     private Document enrich(Document chunk, AiKnowledgeDocument doc,
                             List<String> allowedRoles, String embeddingModel) {
         // Copy into a fresh mutable map — splitter-produced Documents may have unmodifiable metadata.
         Map<String, Object> merged = new HashMap<>();
-        if (chunk.getMetadata() != null) {
-            merged.putAll(chunk.getMetadata());
-        }
+        merged.putAll(chunk.getMetadata());
         merged.put(ChunkMetadata.SOURCE, doc.getFileName());
         merged.put(ChunkMetadata.DOCUMENT_ID, doc.getId().toString());
         merged.put(ChunkMetadata.EMBEDDING_MODEL, embeddingModel);
         merged.put(ChunkMetadata.ALLOWED_ROLES, List.copyOf(allowedRoles));
         for (String role : allowedRoles) {
             if (role == null || role.isBlank()) continue;
-            merged.put(ChunkMetadata.ROLE_FLAG_PREFIX + role.toLowerCase(Locale.ROOT), true);
+            merged.put(ChunkMetadata.roleFlagKey(role), true);
         }
         return chunk.mutate().metadata(merged).build();
     }

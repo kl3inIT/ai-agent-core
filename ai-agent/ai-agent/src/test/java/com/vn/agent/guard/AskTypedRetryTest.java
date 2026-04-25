@@ -29,7 +29,6 @@ import org.springframework.ai.tool.ToolCallback;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -114,15 +113,22 @@ class AskTypedRetryTest {
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.toolCallbacks(any(ToolCallback[].class))).thenReturn(requestSpec);
+        when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.options(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);
         when(callSpec.chatClientResponse()).thenReturn(chatClientResponse);
         when(chatClientResponse.context()).thenReturn(new HashMap<>());
 
+        com.vn.agent.rag.config.AiAgentRagProperties ragProperties =
+                mock(com.vn.agent.rag.config.AiAgentRagProperties.class);
+        when(ragProperties.resolvedTopK()).thenReturn(5);
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
-                parametersResolver, baselineContextProvider, retrievalFilterBuilder,
-                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator);
+                parametersResolver, baselineContextProvider, retrievalFilterBuilder, ragProperties,
+                currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
+                /* chatStreamingScheduler */ null,
+                /* cancellationRegistry */ null,
+                /* streamingSinkHolder */ null);
     }
 
     /**

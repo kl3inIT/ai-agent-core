@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///auditList.title"
+      focusComponent="auditsDataGrid">
+    <data>
+        <collection id="auditsDc" class="com.vn.agent.entity.AiAuditEvent">
+            <fetchPlan extends="_base">
+                <property name="parent" fetchPlan="_base"/>
+            </fetchPlan>
+            <loader id="auditsDl" readOnly="true">
+                <query>
+                    <![CDATA[select e from ai_AiAuditEvent e order by e.startedAt desc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+    </facets>
+    <layout padding="true" spacing="true">
+        <genericFilter id="auditsFilter" dataLoader="auditsDl">
+            <properties include=".*"/>
+        </genericFilter>
+        <hbox id="exportBar" spacing="true">
+            <button id="excelExportBtn"
+                    text="msg:///auditList.action.exportExcel"
+                    themeNames="primary"
+                    action="auditsDataGrid.excelExport"/>
+            <button id="jsonExportBtn"
+                    text="msg:///auditList.action.exportJson"
+                    action="auditsDataGrid.jsonExport"/>
+        </hbox>
+        <treeDataGrid id="auditsDataGrid"
+                      dataContainer="auditsDc"
+                      hierarchyProperty="parent"
+                      width="100%"
+                      minHeight="20em"
+                      themeNames="compact">
+            <actions>
+                <action id="excelExport" type="grdexp_excelExport"/>
+                <action id="jsonExport" type="grdexp_jsonExport"/>
+            </actions>
+            <columns resizable="true">
+                <column property="startedAt" header="msg:///auditList.column.createdDate"/>
+                <column property="userUsername" header="msg:///auditList.column.user"/>
+                <column property="kind" header="msg:///auditList.column.kind"/>
+                <column property="eventName" header="msg:///auditList.column.eventName"/>
+                <column key="outcome" header="msg:///auditList.column.outcome"/>
+                <column property="latencyMs" header="msg:///auditList.column.latencyMs"/>
+                <column key="actions" header="msg:///common.column.actions"/>
+            </columns>
+        </treeDataGrid>
+    </layout>
+</view>

@@ -93,18 +93,18 @@
 
 ### Built-in Flow UI
 
-- [ ] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
-- [ ] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
-- [ ] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
-- [ ] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
-- [ ] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
-- [ ] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
+- [x] **UI-01**: `ChatView` — end-user chat; shows tool calls transparently (collapsible cards with name + args + summary); streams responses when supported; citations link to KB documents
+- [x] **UI-02**: `ChatView` includes `New chat` and (when streaming) `Stop` controls
+- [x] **UI-03**: `ConversationListView` + `ConversationDetailView` — user sees their own conversations; admin sees all; replay renders original messages + tool calls
+- [x] **UI-04**: `ParametersListView` + `ParametersDetailView` — admin CRUD over profiles; YAML editor with validation; `Set active` action
+- [x] **UI-05**: `KnowledgeBaseView` — upload, list, delete, status indicator, reingest action
+- [x] **UI-06**: `ToolCallAuditListView` — searchable/filterable table (user, tool, outcome, date); Excel + JSON export via Jmix `gridexport` add-on (`grdexp_excelExport`, `grdexp_jsonExport`)
 
 > Note: UI-07 (`ExposureRuleListView`) dropped per D-10 (`AiExposureRule` entity removed). UI-08..UI-10 numbering preserved for cross-doc reference stability.
 
-- [ ] **UI-08**: Menu entries namespaced `aiAgent.*` in add-on `menu.xml`; labels in both `messages_en.properties` and `messages_vi.properties`
-- [ ] **UI-09**: All user-facing strings use `msg://` keys — zero hardcoded UI text
-- [ ] **UI-10**: Admin views visibility gated to `AiAgentAdminRole`
+- [x] **UI-08**: Menu entries namespaced `aiAgent.*` in add-on `menu.xml`; labels in both `messages_en.properties` and `messages_vi.properties`
+- [x] **UI-09**: All user-facing strings use `msg://` keys — zero hardcoded UI text
+- [x] **UI-10**: Admin views visibility gated to `AiAgentAdminRole`
 
 ### Testing
 

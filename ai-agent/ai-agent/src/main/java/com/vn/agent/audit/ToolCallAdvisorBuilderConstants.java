@@ -16,8 +16,8 @@ public final class ToolCallAdvisorBuilderConstants {
     public static final String TOOL_CALL_ADVISOR_FQN =
             "org.springframework.ai.chat.client.advisor.ToolCallAdvisor";
 
-    /** Verified Builder method that disables the advisor's internal conversation history. */
-    public static final String RESOLVED_BUILDER_METHOD = "disableMemory";
+    /** Verified Builder method that controls internal conversation history. */
+    public static final String RESOLVED_BUILDER_METHOD = "conversationHistoryEnabled";
 
     /** Verified internal field name (used by AdvisorOrderStructuralTest reflection). */
     public static final String INTERNAL_FLAG_FIELD = "conversationHistoryEnabled";
@@ -26,8 +26,8 @@ public final class ToolCallAdvisorBuilderConstants {
     public static final String ORDER_SETTER_METHOD = "advisorOrder";
 
     // VERIFIED 2026-04-20 javap output (org/springframework/ai/chat/client/advisor/ToolCallAdvisor$Builder.class):
-    //   public T disableMemory();
     //   public T conversationHistoryEnabled(boolean);
+    //   public T disableMemory();
     //   public T advisorOrder(int);
     //   public org.springframework.ai.chat.client.advisor.ToolCallAdvisor build();
 

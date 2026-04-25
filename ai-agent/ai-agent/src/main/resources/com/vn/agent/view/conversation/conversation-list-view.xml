@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///conversationList.title"
+      focusComponent="conversationsDataGrid">
+    <data>
+        <collection id="conversationsDc" class="com.vn.agent.entity.AiConversation">
+            <fetchPlan extends="_base"/>
+            <loader id="conversationsDl" readOnly="true">
+                <query>
+                    <![CDATA[select e from ai_AiConversation e order by e.createdDate desc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+        <urlQueryParameters>
+            <pagination component="pagination"/>
+        </urlQueryParameters>
+    </facets>
+    <layout>
+        <hbox id="filterBar" classNames="buttons-panel">
+            <textField id="titleFilter" placeholder="msg:///conversationList.column.title"
+                       clearButtonVisible="true" valueChangeMode="LAZY"/>
+            <textField id="userFilter" placeholder="msg:///conversationList.column.user"
+                       clearButtonVisible="true" valueChangeMode="LAZY" visible="false"/>
+        </hbox>
+        <dataGrid id="conversationsDataGrid"
+                  width="100%"
+                  minHeight="20em"
+                  dataContainer="conversationsDc">
+            <columns resizable="true">
+                <column property="title" header="msg:///conversationList.column.title"/>
+                <column property="createdDate" header="msg:///conversationList.column.createdDate"/>
+                <column key="messageCount" header="msg:///conversationList.column.messageCount"/>
+                <column property="createdBy" header="msg:///conversationList.column.user" visible="false"/>
+                <column key="actions" header="msg:///common.column.actions"/>
+            </columns>
+        </dataGrid>
+        <simplePagination id="pagination" dataLoader="conversationsDl"/>
+    </layout>
+</view>

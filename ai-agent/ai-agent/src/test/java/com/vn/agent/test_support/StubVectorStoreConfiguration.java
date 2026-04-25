@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Test-only {@code @TestConfiguration} that supplies an in-memory {@link SimpleVectorStore} as the
@@ -15,7 +16,7 @@ import org.springframework.context.annotation.Primary;
  * PgVectorStore against HSQLDB (which has no pgvector extension and fails the JDBC path).
  *
  * <p>Imported by Phase-4 integration tests that boot {@code AIAutoConfiguration} (which now
- * registers a {@code PgVectorStore} unconditionally under {@code @ConditionalOnMissingBean}).
+ * registers a {@code PgVectorStore} under {@code @ConditionalOnMissingBean(VectorStore.class)}).
  * With this stub declared {@code @Primary}, the in-memory store wins bean selection; the
  * {@code RetrievalAugmentationAdvisor} inserted at {@code HIGHEST_PRECEDENCE + 250} in Phase 5
  * runs against an empty-but-functional store and returns zero documents — the stub ChatModel's
@@ -25,6 +26,7 @@ import org.springframework.context.annotation.Primary;
  * requires an {@link EmbeddingModel}. The stub embedding model is deterministic and offline.</p>
  */
 @TestConfiguration
+@Profile("!rag-it")
 @Import(StubEmbeddingModelConfiguration.class)
 public class StubVectorStoreConfiguration {
 

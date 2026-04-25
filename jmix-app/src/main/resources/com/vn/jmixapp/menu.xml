@@ -7,5 +7,25 @@
         <item view="Product.list" title="msg://com.vn.jmixapp.view.product/ProductListView.title"/>
         <item view="Order.list" title="msg://com.vn.jmixapp.view.order/OrderListView.title"/>
     </menu>
+    <menu opened="true" id="AI" title="msg://com.vn.agent/menu.addon">
+        <item view="AiAgent_Chat" id="aiAgent.chat" title="msg://com.vn.agent/menu.chat"/>
+        <item view="AiAgent_Conversation.list" id="aiAgent.conversations"
+              title="msg://com.vn.agent/menu.conversations"/>
+        <item view="AiAgent_Parameters.list" id="aiAgent.parameters.list" title="msg://com.vn.agent/menu.parameters"/>
+        <item view="AiAgent_KnowledgeBase.list" id="aiAgent.knowledge.list" title="msg://com.vn.agent/menu.knowledge"/>
+        <item view="AiAgent_AiAuditEvent.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
+    </menu>
+    <menu id="security" title="msg://com.vn.agent/menu.security.title">
+        <item view="sec_ResourceRoleModel.list"
+              title="msg://io.jmix.securityflowui.view.resourcerole/resourceRoleModelListView.menu"/>
+        <item view="sec_RowLevelRoleModel.list"
+              title="msg://io.jmix.securityflowui.view.rowlevelrole/rowLevelRoleModelListView.menu"/>
+    </menu>
+    <menu id="datatools" title="msg://com.vn.jmixapp/menu.datatools.title">
+        <item view="datatl_entityInspectorListView"
+              title="msg://io.jmix.datatoolsflowui.view.entityinspector/listTitle"/>
+        <item view="datatl_dataModelListView"
+              title="msg://io.jmix.datatoolsflowui.view.datamodel/entityModelListView.title"/>
+    </menu>
 
 </menu-config>

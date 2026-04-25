@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///parametersList.title"
+      focusComponent="parametersDataGrid">
+    <data>
+        <collection id="parametersDc" class="com.vn.agent.entity.AiParameters">
+            <fetchPlan extends="_base"/>
+            <loader id="parametersDl" readOnly="true">
+                <query>
+                    <![CDATA[select e from ai_AiParameters e order by e.active desc, e.profileName asc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+    </facets>
+    <layout>
+        <hbox id="buttonsPanel" classNames="buttons-panel">
+            <button id="createBtn" action="parametersDataGrid.createAction"/>
+            <button id="editBtn" action="parametersDataGrid.editAction"/>
+            <button id="removeBtn" action="parametersDataGrid.removeAction"/>
+            <button id="setActiveBtn"
+                    action="parametersDataGrid.setActive"
+                    themeNames="primary success"/>
+        </hbox>
+        <dataGrid id="parametersDataGrid"
+                  width="100%"
+                  minHeight="20em"
+                  dataContainer="parametersDc">
+            <actions>
+                <action id="createAction" type="list_create"/>
+                <action id="editAction" type="list_edit"/>
+                <action id="removeAction" type="list_remove"/>
+                <action id="setActive"
+                        type="list_itemTracking"
+                        text="msg:///parametersList.action.setActive"/>
+            </actions>
+            <columns resizable="true">
+                <column property="profileName" header="msg:///parametersList.column.name"/>
+                <column key="model" header="msg:///parametersList.column.model"/>
+                <column key="status" header="msg:///parametersList.column.active"/>
+                <column property="createdDate"/>
+                <column key="actions" header="msg:///common.column.actions"/>
+            </columns>
+        </dataGrid>
+    </layout>
+</view>

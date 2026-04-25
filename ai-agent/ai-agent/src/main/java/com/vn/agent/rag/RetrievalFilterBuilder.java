@@ -10,7 +10,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,22 +18,32 @@ import java.util.stream.Collectors;
  *
  * <ul>
  *   <li><b>Admin bypass (D-06)</b> — when {@code admin-bypass=true} (default) AND the caller
- *       holds {@link AiAgentAdminRole#CODE}, returns {@code null}. The caller (DefaultChatServiceImpl)
- *       MUST skip setting the {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param
- *       when this returns {@code null}; the retriever then runs without any filter.</li>
- *   <li><b>Non-admin</b> — returns {@code eq(embeddingModel, current) AND (OR over role_* flags)}
+ *       holds {@link AiAgentAdminRole#CODE} or Jmix's {@code system-full-access}, returns
+ *       {@code null}. The caller (DefaultChatServiceImpl) MUST skip setting the
+ *       {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param when this returns
+ *       {@code null}; the retriever then runs without any filter.</li>
+ *   <li><b>Non-admin</b> — returns {@code OR over (eq(embeddingModel,current) AND role_* flag)}
  *       (D-03 embedding-model drift clause + D-09 ANY role-overlap semantics).</li>
  *   <li><b>Empty roles / null authentication</b> — returns a fail-closed filter that matches
  *       zero chunks via the sentinel {@code documentId == "__none__"} (D-05).</li>
  * </ul>
  *
  * <p>Role flags use Option A flattening per PATTERNS.md — each role code becomes a
- * {@code role_<lowercase-code>} boolean-true metadata key. This is portable across Spring AI
+ * normalized {@code role_<normalized-code>} boolean-true metadata key. This is portable across Spring AI
  * vector-store adapters (RESEARCH Pitfall #1). The ingestion worker (Plan 05-03) MUST mirror this
  * flattening when writing {@code Document.metadata}.</p>
+ *
+ * <p>Jmix exposes role assignments to Spring Security as authorities like
+ * {@code ROLE_AI_AGENT_USER}. Ingestion stores the underlying Jmix role code
+ * ({@code ai-agent-user}), so authorities are normalised back to role codes before filter
+ * construction.</p>
  */
 @Component
 public class RetrievalFilterBuilder {
+
+    static final String JMIX_RESOURCE_ROLE_AUTHORITY_PREFIX = "ROLE_";
+    static final String JMIX_ROW_LEVEL_ROLE_AUTHORITY_PREFIX = "ROW_LEVEL_ROLE_";
+    static final String JMIX_SYSTEM_FULL_ACCESS_ROLE_CODE = "system-full-access";
 
     private final AiAgentRagProperties ragProps;
     private final AiAgentEmbeddingProperties embeddingProps;
@@ -50,10 +59,13 @@ public class RetrievalFilterBuilder {
                 ? Set.of()
                 : auth.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority)
+                        .map(RetrievalFilterBuilder::toRoleCode)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
 
         // D-06: admin bypass returns null so caller omits the FILTER_EXPRESSION param entirely.
-        if (ragProps.isAdminBypass() && roles.contains(AiAgentAdminRole.CODE)) {
+        if (ragProps.isAdminBypass()
+                && (roles.contains(AiAgentAdminRole.CODE)
+                || roles.contains(JMIX_SYSTEM_FULL_ACCESS_ROLE_CODE))) {
             return null;
         }
 
@@ -68,13 +80,35 @@ public class RetrievalFilterBuilder {
         }
 
         // D-09 ANY semantics via Option A flattened role flags.
-        FilterExpressionBuilder.Op roleOverlap = null;
+        // Compose as OR of conjunctions to avoid relying on converter parenthesization:
+        // (model && roleA) || (model && roleB) || ...
+        FilterExpressionBuilder.Op scopedAnyRole = null;
         for (String role : roles) {
-            String key = ChunkMetadata.ROLE_FLAG_PREFIX + role.toLowerCase(Locale.ROOT);
-            FilterExpressionBuilder.Op clause = b.eq(key, true);
-            roleOverlap = (roleOverlap == null) ? clause : b.or(roleOverlap, clause);
+            String key = ChunkMetadata.roleFlagKey(role);
+            FilterExpressionBuilder.Op roleClause = b.eq(key, true);
+            FilterExpressionBuilder.Op modelAndRole = b.and(modelPin, roleClause);
+            scopedAnyRole = (scopedAnyRole == null)
+                    ? modelAndRole
+                    : b.or(scopedAnyRole, modelAndRole);
         }
 
-        return b.and(modelPin, roleOverlap).build();
+        return scopedAnyRole.build();
+    }
+
+    private static String toRoleCode(String authority) {
+        if (authority == null || authority.isBlank()) {
+            return "";
+        }
+        if (authority.startsWith(JMIX_ROW_LEVEL_ROLE_AUTHORITY_PREFIX)) {
+            return authority.substring(JMIX_ROW_LEVEL_ROLE_AUTHORITY_PREFIX.length())
+                    .toLowerCase(java.util.Locale.ROOT)
+                    .replace('_', '-');
+        }
+        if (authority.startsWith(JMIX_RESOURCE_ROLE_AUTHORITY_PREFIX)) {
+            return authority.substring(JMIX_RESOURCE_ROLE_AUTHORITY_PREFIX.length())
+                    .toLowerCase(java.util.Locale.ROOT)
+                    .replace('_', '-');
+        }
+        return authority;
     }
 }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+    <property name="offsetDateTime.type" dbms="postgresql" value="timestamp with time zone"/>
+    <property name="uuid.type" value="uuid" dbms="postgresql"/>
+    <property name="uuid.type" value="varchar(36)" dbms="hsqldb"/>
+    <property name="uuid.type" value="uniqueidentifier" dbms="mssql"/>
+    <property name="offsetDateTime.type" value="timestamp" dbms="hsqldb"/>
+    <property name="offsetDateTime.type" value="datetimeoffset" dbms="mssql"/>
+    <includeAll path="/com/vn/agent/liquibase/agentstore-changelog" errorIfMissingOrEmpty="false"/>
+
+
+</databaseChangeLog>

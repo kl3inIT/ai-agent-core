@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///conversationDetail.title">
+    <data>
+        <instance id="conversationDc" class="com.vn.agent.entity.AiConversation">
+            <fetchPlan extends="_base"/>
+            <loader id="conversationDl"/>
+        </instance>
+        <collection id="messagesDc" class="com.vn.agent.entity.AiMessage">
+            <fetchPlan extends="_base"/>
+            <loader id="messagesDl" readOnly="true">
+                <query>
+                    <![CDATA[select m from ai_AiMessage m where m.conversation = :container_conversationDc order by m.seq asc, m.createdDate asc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+    </facets>
+    <layout>
+        <hbox id="headerBar" width="100%" alignItems="CENTER" justifyContentMode="BETWEEN">
+            <span id="readOnlyBanner" text="msg:///conversationDetail.banner.readOnly"
+                  themeNames="badge contrast"/>
+            <button id="continueInChatButton"
+                    text="msg:///conversationDetail.action.continueInChat"
+                    themeNames="primary"/>
+        </hbox>
+        <scroller id="transcriptScroller" width="100%" minHeight="30em">
+            <vbox id="transcriptList" padding="true" spacing="true" width="100%"/>
+        </scroller>
+    </layout>
+</view>

@@ -4,6 +4,9 @@ dependencies {
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
     implementation 'io.jmix.security:jmix-security-starter'
+    // Plan 07-01: @MenuPolicy + @ViewPolicy annotations live in jmix-security-flowui
+    // (package io.jmix.securityflowui.role.annotation). Required by AiAgentAdminRole.adminViews().
+    implementation 'io.jmix.security:jmix-security-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
@@ -27,11 +30,14 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.4'
 
     // Plan 05-02 (RAG-04): RetrievalAugmentationAdvisor + VectorStoreDocumentRetriever
-    // live in spring-ai-rag (aligned to Spring AI 1.1.4 BOM — version 2.0.0-M2 per
-    // BOM resolution). Declared at `api` scope because RetrievalAugmentationAdvisorFactory
+    // live in spring-ai-rag. Keep the version explicit here because this module is
+    // consumed both via composite build and via mavenLocal, and the Spring AI BOM
+    // imported by the dependency-management plugin is not exported to downstream
+    // consumers as a versioned dependency declaration.
+    // Declared at `api` scope because RetrievalAugmentationAdvisorFactory
     // exposes RetrievalAugmentationAdvisor as a public @Bean and ChatClientFactory accepts
     // it as a parameter — both are visible to the ai-agent-starter module.
-    api 'org.springframework.ai:spring-ai-rag'
+    api 'org.springframework.ai:spring-ai-rag:1.1.4'
 
     // Plan 06-02 (PARAM-02/D-05): YAML ser/de for AiParametersBody (strict-on-write) +
     // Jakarta Bean Validation API for @NotBlank/@DecimalMin/etc. constraints on that record.
@@ -46,6 +52,14 @@ dependencies {
     // ConcurrentMapCacheManager when the host has not declared its own CacheManager.
     // BOM-versioned — no explicit version.
     implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // Plan 07-01 (D-07, D-20): markdown rendering + XSS sanitizer for assistant output;
+    // Jmix gridexport add-on for ToolCallAuditListView Excel+JSON actions (D-20).
+    implementation 'com.vladsch.flexmark:flexmark:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
+    implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20220608.1'
+    implementation 'io.jmix.gridexport:jmix-gridexport-flowui-starter'
 
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
@@ -79,6 +93,7 @@ dependencies {
     testImplementation 'org.testcontainers:postgresql:1.19.8'
     testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
     testImplementation 'org.springframework.ai:spring-ai-test:1.1.4'
+    implementation 'org.postgresql:postgresql'
 }
 
 configurations.implementation {
@@ -88,6 +103,7 @@ configurations.implementation {
 }
 
 tasks.named('test') {
+    maxHeapSize = '2g'
     useJUnitPlatform {
         // Default test task excludes:
         //  - @Tag("live")   — requires OPENROUTER_API_KEY (see liveTest task)
