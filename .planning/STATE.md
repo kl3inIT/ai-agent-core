@@ -179,8 +179,9 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 8
+**Count:** 9
 
+- `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` — Add collapsible tool-detail and ephemeral status to chat UI
 - `2026-04-26-hide-internal-tool-and-entity-names-from-user-facing-chat.md` — Hide internal tool and entity names from user-facing chat
 - `2026-04-26-inject-readable-entity-inventory-into-baseline-context.md` — Inject readable entity inventory into baseline context
 - `2026-04-24-refine-describe-entity-wrapper-around-selected-jmix-metadata.md` — Refine describe_entity wrapper around selected Jmix metadata
