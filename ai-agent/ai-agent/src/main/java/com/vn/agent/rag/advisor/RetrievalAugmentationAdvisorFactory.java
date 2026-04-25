@@ -6,7 +6,6 @@ import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
-import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -43,13 +42,8 @@ public class RetrievalAugmentationAdvisorFactory {
                                                                     AiAgentRagProperties props,
                                                                     AuditWriter auditWriter,
                                                                     CurrentAuthentication currentAuthentication) {
-        VectorStoreDocumentRetriever delegate = VectorStoreDocumentRetriever.builder()
-                .vectorStore(vectorStore)
-                .similarityThreshold(props.resolvedSimilarityThreshold())
-                .topK(props.resolvedTopK())
-                .build();   // NO .filterExpression(...) — Pitfall #3
-
-        DocumentRetriever retriever = new AuditingDocumentRetriever(delegate, auditWriter, currentAuthentication);
+        DocumentRetriever retriever = new AuditingDocumentRetriever(vectorStore,
+                props.resolvedTopK(), props.resolvedSimilarityThreshold(), auditWriter, currentAuthentication);
 
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(retriever)

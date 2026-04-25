@@ -104,7 +104,8 @@ class AuditListenerDispatcherTest {
             UUID rootId = auditWriter.writeChatStart(runId, "user-A", null, "h");
             capturingListener.events.clear();
             UUID retrId = auditWriter.writeRetrieval(rootId, runId, "user-A", null,
-                    "what is foo?", 5, 3, 0.87, "docType == 'faq'", 12L, "SUCCESS", null);
+                    "what is foo?", 5, 3, 0.87, "docType == 'faq'", "{\"hits\":[]}",
+                    12L, "SUCCESS", null);
             assertThat(capturingListener.events).hasSize(1);
             assertThat(capturingListener.events.get(0).kind).isEqualTo(AuditKind.RETRIEVAL);
             assertThat(capturingListener.events.get(0).auditId).isEqualTo(retrId);

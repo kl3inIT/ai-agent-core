@@ -85,6 +85,10 @@ public class AiAuditEvent {
     @Column(name = "FILTERS_JSON")
     private String filtersJson;
 
+    @Lob
+    @Column(name = "RETRIEVAL_HITS_JSON")
+    private String retrievalHitsJson;
+
     @Column(name = "OUTCOME", length = 16)
     private String outcome;
 
@@ -163,6 +167,8 @@ public class AiAuditEvent {
     public void setTopScore(Double topScore) { this.topScore = topScore; }
     public String getFiltersJson() { return filtersJson; }
     public void setFiltersJson(String filtersJson) { this.filtersJson = filtersJson; }
+    public String getRetrievalHitsJson() { return retrievalHitsJson; }
+    public void setRetrievalHitsJson(String retrievalHitsJson) { this.retrievalHitsJson = retrievalHitsJson; }
     public String getDenialReason() { return denialReason; }
     public void setDenialReason(String denialReason) { this.denialReason = denialReason; }
     public String getErrorClass() { return errorClass; }

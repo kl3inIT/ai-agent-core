@@ -18,6 +18,7 @@ import com.vn.agent.spi.CustomIngester;
 import com.vn.agent.spi.PromptContextContributor;
 import com.vn.agent.spi.ToolContributor;
 import com.vn.agent.spi.ToolGuard;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
 import io.jmix.core.security.InMemoryUserRepository;
@@ -33,6 +34,7 @@ import io.jmix.security.role.RowLevelRoleRepository;
 import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -82,11 +84,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
+@Import(StubVectorStoreConfiguration.class)
 class FoundationsBootSmokeTest {
 
     @Autowired DataManager dataManager;
     @Autowired Metadata metadata;
-    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired
+    @Qualifier("pgvectorJdbcTemplate")
+    JdbcTemplate agentstoreJdbcTemplate;
     @Autowired SystemAuthenticator systemAuthenticator;
     @Autowired ResourceRoleRepository resourceRoleRepository;
     @Autowired RowLevelRoleRepository rowLevelRoleRepository;
@@ -100,7 +105,7 @@ class FoundationsBootSmokeTest {
 
     // ---------------------------------------------------------------------
     // 1. Liquibase applied the add-on master changelog on HSQLDB.
-    //    pgvector (changeset 070) must be MARK_RAN, not executed.
+    //    PgVectorStore is stubbed in this HSQLDB path, so no pgvector table is created.
     // ---------------------------------------------------------------------
     @Test
     void liquibase_applies_on_hsqldb() {
@@ -285,7 +290,7 @@ class FoundationsBootSmokeTest {
     // ------------------------------- helpers -------------------------------
 
     private void assertTableExists(String upperCaseName) {
-        Integer count = jdbcTemplate.queryForObject(
+        Integer count = agentstoreJdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where upper(table_name) = ?",
                 Integer.class, upperCaseName);
         assertNotNull(count);
@@ -293,7 +298,7 @@ class FoundationsBootSmokeTest {
     }
 
     private void assertTableAbsent(String upperCaseName) {
-        Integer count = jdbcTemplate.queryForObject(
+        Integer count = agentstoreJdbcTemplate.queryForObject(
                 "select count(*) from information_schema.tables where upper(table_name) = ?",
                 Integer.class, upperCaseName);
         assertNotNull(count);

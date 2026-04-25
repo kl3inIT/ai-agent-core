@@ -22,6 +22,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Decorates Spring AI's {@link ToolCallingManager} with two guard responsibilities:
@@ -93,13 +94,17 @@ public class GuardedToolCallingManager implements ToolCallingManager {
 
     @Override
     public ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse chatResponse) {
+        Map<String, Object> toolContext = extractToolContext(prompt);
+        UUID runId = resolveRunId(toolContext);
+        UUID conversationId = resolveConversationId(toolContext);
+        UUID parentId = RunContext.getRootAuditId();
         int next = IterationCounter.increment();
         int cap = props.resolvedMaxIterations();
         if (next > cap) {
             final String username = resolveUsername();
             safeAudit(() -> auditWriter.writeToolCall(
-                    RunContext.getRootAuditId(),
-                    RunContext.get(), username, /* conversationId */ null,
+                    parentId,
+                    runId, username, conversationId,
                     CHAT_SENTINEL_TOOL_NAME, /* argumentsJson */ null, /* resultSummary */ null,
                     0L, AiToolCallOutcome.BLOCKED, "iteration-cap-exceeded",
                     /* errorClass */ null));
@@ -120,8 +125,8 @@ public class GuardedToolCallingManager implements ToolCallingManager {
                 final String denialReason = "tool-vetoed:"
                         + (veto.getMessage() == null ? "" : veto.getMessage());
                 safeAudit(() -> auditWriter.writeToolCall(
-                        RunContext.getRootAuditId(),
-                        RunContext.get(), username, /* conversationId */ null,
+                        parentId,
+                        runId, username, conversationId,
                         toolName, argumentsJson, /* resultSummary */ null, 0L,
                         AiToolCallOutcome.BLOCKED, denialReason,
                         /* errorClass */ null));
@@ -129,6 +134,38 @@ public class GuardedToolCallingManager implements ToolCallingManager {
             }
         }
         return delegate.executeToolCalls(prompt, chatResponse);
+    }
+
+    private static Map<String, Object> extractToolContext(Prompt prompt) {
+        if (prompt == null || !(prompt.getOptions() instanceof ToolCallingChatOptions toolCallingChatOptions)) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> context = toolCallingChatOptions.getToolContext();
+        return context == null ? Collections.emptyMap() : context;
+    }
+
+    private static UUID resolveRunId(Map<String, Object> toolContext) {
+        UUID runId = uuidFrom(toolContext.get(RunContext.TOOL_CONTEXT_RUN_ID_KEY));
+        return runId != null ? runId : RunContext.get();
+    }
+
+    private static UUID resolveConversationId(Map<String, Object> toolContext) {
+        UUID conversationId = uuidFrom(toolContext.get(RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY));
+        return conversationId != null ? conversationId : RunContext.getConversationId();
+    }
+
+    private static UUID uuidFrom(Object raw) {
+        if (raw instanceof UUID uuid) {
+            return uuid;
+        }
+        if (raw instanceof String text && !text.isBlank()) {
+            try {
+                return UUID.fromString(text);
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static List<AssistantMessage.ToolCall> extractToolCalls(ChatResponse chatResponse) {

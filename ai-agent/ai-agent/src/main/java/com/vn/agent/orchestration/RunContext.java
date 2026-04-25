@@ -21,10 +21,14 @@ import java.util.UUID;
  */
 public final class RunContext {
 
+    public static final String TOOL_CONTEXT_RUN_ID_KEY = "ai-agent.audit.run-id";
+    public static final String TOOL_CONTEXT_CONVERSATION_ID_KEY = "ai-agent.audit.conversation-id";
+
     private static final ThreadLocal<UUID> CURRENT = new ThreadLocal<>();
     private static final ThreadLocal<UUID> ROOT_AUDIT_ID = new ThreadLocal<>();
     private static final ThreadLocal<UUID> CONVERSATION_ID = new ThreadLocal<>();
     private static final ThreadLocal<Integer> RETRIEVAL_TOPK = new ThreadLocal<>();
+    private static final ThreadLocal<Double> RETRIEVAL_SIMILARITY_THRESHOLD = new ThreadLocal<>();
     private static final ThreadLocal<String> RETRIEVAL_FILTERS_JSON = new ThreadLocal<>();
 
     private RunContext() { }
@@ -53,6 +57,14 @@ public final class RunContext {
     /** Current retrieval {@code topK} or {@code null} when no retrieval is in flight. */
     public static Integer getRetrievalTopK() { return RETRIEVAL_TOPK.get(); }
 
+    /** Per-run retrieval similarity threshold carrier. */
+    public static void setRetrievalSimilarityThreshold(Double threshold) {
+        RETRIEVAL_SIMILARITY_THRESHOLD.set(threshold);
+    }
+
+    /** Current retrieval similarity threshold or {@code null} when no retrieval is in flight. */
+    public static Double getRetrievalSimilarityThreshold() { return RETRIEVAL_SIMILARITY_THRESHOLD.get(); }
+
     /** Per-run retrieval filters-JSON carrier (Filter.Expression#toString only — T-07.2-03). */
     public static void setRetrievalFiltersJson(String s) { RETRIEVAL_FILTERS_JSON.set(s); }
 
@@ -70,6 +82,7 @@ public final class RunContext {
         ROOT_AUDIT_ID.remove();
         CONVERSATION_ID.remove();
         RETRIEVAL_TOPK.remove();
+        RETRIEVAL_SIMILARITY_THRESHOLD.remove();
         RETRIEVAL_FILTERS_JSON.remove();
     }
 }

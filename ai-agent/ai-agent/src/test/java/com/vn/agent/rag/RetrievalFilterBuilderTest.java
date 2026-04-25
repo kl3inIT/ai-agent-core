@@ -27,10 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class RetrievalFilterBuilderTest {
 
-    private static final String EMBEDDING_MODEL = "openai/text-embedding-3-small";
+    private static final String EMBEDDING_MODEL = "qwen/qwen3-embedding-4b";
 
     private static AiAgentEmbeddingProperties embeddingProps() {
-        return new AiAgentEmbeddingProperties(EMBEDDING_MODEL, 1536, null);
+        return new AiAgentEmbeddingProperties(EMBEDDING_MODEL, 2000, null);
     }
 
     private static AiAgentRagProperties ragProps(boolean adminBypass) {
@@ -66,6 +66,22 @@ class RetrievalFilterBuilderTest {
         assertThat(builder.buildFor(auth)).isNull();
     }
 
+    @Test
+    void jmix_prefixed_admin_authority_with_bypass_on_returns_null() {
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        Authentication auth = authWith("ROLE_AI_AGENT_ADMIN");
+
+        assertThat(builder.buildFor(auth)).isNull();
+    }
+
+    @Test
+    void jmix_system_full_access_with_bypass_on_returns_null() {
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        Authentication auth = authWith("ROLE_SYSTEM_FULL_ACCESS");
+
+        assertThat(builder.buildFor(auth)).isNull();
+    }
+
     // Test B — D-06 admin bypass OFF forces admin through role-overlap filter
     @Test
     void admin_with_bypass_off_gets_role_overlap_filter() {
@@ -96,6 +112,19 @@ class RetrievalFilterBuilderTest {
         assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
         // Non-admin path must NOT contain the fail-closed sentinel.
         assertThat(rendered).doesNotContain("__none__");
+    }
+
+    @Test
+    void jmix_prefixed_non_admin_authority_maps_back_to_role_code_flag() {
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        Authentication auth = authWith("ROLE_AI_AGENT_USER");
+
+        Filter.Expression exp = builder.buildFor(auth);
+
+        assertThat(exp).isNotNull();
+        String rendered = exp.toString();
+        assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
+        assertThat(rendered).doesNotContain(ChunkMetadata.ROLE_FLAG_PREFIX + "role_ai_agent_user");
     }
 
     // Test D — D-05 empty roles fail-closed

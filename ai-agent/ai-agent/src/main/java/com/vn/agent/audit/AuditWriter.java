@@ -157,16 +157,17 @@ public class AuditWriter {
                 row.setConversation(conv);
             }
         }
-        if (parentId != null) {
+        UUID effectiveParentId = parentId != null ? parentId : findChatRootId(runId);
+        if (effectiveParentId != null) {
             AiAuditEvent parent = dataManager.load(AiAuditEvent.class)
-                    .id(parentId)
+                    .id(effectiveParentId)
                     .fetchPlan(fp -> fp.add("id"))   // no children fetch — Pitfall #1
                     .optional().orElse(null);
             if (parent != null) {
                 row.setParent(parent);
             } else {
                 log.warn("writeToolCall: parent {} not found; tool row will be orphan (runId={}, tool={})",
-                        parentId, runId, toolName);
+                        effectiveParentId, runId, toolName);
             }
         }
         OffsetDateTime now = OffsetDateTime.now();
@@ -188,7 +189,8 @@ public class AuditWriter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public UUID writeRetrieval(UUID parentId, UUID runId, String userUsername, UUID conversationId,
                                String queryText, Integer topK, Integer hitCount, Double topScore,
-                               String filtersJson, long latencyMs, String outcome, String errorClass) {
+                               String filtersJson, String retrievalHitsJson,
+                               long latencyMs, String outcome, String errorClass) {
         AiAuditEvent row = metadata.create(AiAuditEvent.class);
         row.setRunId(runId);
         row.setKind(AuditKind.RETRIEVAL);
@@ -198,6 +200,7 @@ public class AuditWriter {
         row.setHitCount(hitCount);
         row.setTopScore(topScore);
         row.setFiltersJson(filtersJson);
+        row.setRetrievalHitsJson(retrievalHitsJson);
         row.setLatencyMs(latencyMs);
         row.setOutcomeRaw(outcome);
         row.setErrorClass(errorClass);
@@ -207,16 +210,17 @@ public class AuditWriter {
                 row.setConversation(conv);
             }
         }
-        if (parentId != null) {
+        UUID effectiveParentId = parentId != null ? parentId : findChatRootId(runId);
+        if (effectiveParentId != null) {
             AiAuditEvent parent = dataManager.load(AiAuditEvent.class)
-                    .id(parentId)
+                    .id(effectiveParentId)
                     .fetchPlan(fp -> fp.add("id"))
                     .optional().orElse(null);
             if (parent != null) {
                 row.setParent(parent);
             } else {
                 log.warn("writeRetrieval: parent {} not found; retrieval row will be orphan (runId={})",
-                        parentId, runId);
+                        effectiveParentId, runId);
             }
         }
         OffsetDateTime now = OffsetDateTime.now();
@@ -228,6 +232,21 @@ public class AuditWriter {
         return auditId;
     }
 
+    private UUID findChatRootId(UUID runId) {
+        if (runId == null) {
+            return null;
+        }
+        return dataManager.loadValue(
+                        "select e.id from ai_AiAuditEvent e "
+                                + "where e.runId = :runId and e.kind = :kind and e.parent is null",
+                        UUID.class)
+                .store("agentstore")
+                .parameter("runId", runId)
+                .parameter("kind", AuditKind.CHAT)
+                .optional()
+                .orElse(null);
+    }
+
     /**
      * Register a Spring afterCommit synchronization that fans the event out to
      * {@link AuditListener} beans once the REQUIRES_NEW transaction commits. If no
@@ -236,15 +255,29 @@ public class AuditWriter {
      */
     private void registerAfterCommit(UUID auditId, String kind) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    dispatcher.dispatchEventAudited(auditId, kind);
-                }
-            });
+            TransactionSynchronizationManager.registerSynchronization(
+                    new AuditAfterCommitSynchronization(dispatcher, auditId, kind));
         } else {
             log.warn("No active synchronization for auditId={} kind={}; firing inline", auditId, kind);
             dispatcher.dispatchEventAudited(auditId, kind);
         }
+    }
+}
+
+final class AuditAfterCommitSynchronization implements TransactionSynchronization {
+
+    private final AuditListenerDispatcher dispatcher;
+    private final UUID auditId;
+    private final String kind;
+
+    AuditAfterCommitSynchronization(AuditListenerDispatcher dispatcher, UUID auditId, String kind) {
+        this.dispatcher = dispatcher;
+        this.auditId = auditId;
+        this.kind = kind;
+    }
+
+    @Override
+    public void afterCommit() {
+        dispatcher.dispatchEventAudited(auditId, kind);
     }
 }

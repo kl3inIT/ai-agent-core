@@ -57,6 +57,11 @@
         <textField id="topScoreField"
                    label="msg:///auditList.detail.topScore"
                    readOnly="true"/>
+        <textArea id="retrievalHitsField"
+                  label="msg:///auditList.detail.retrievalHitsJson"
+                  readOnly="true"
+                  width="100%"
+                  minHeight="14em"/>
         <textArea id="filtersJsonField"
                   label="msg:///auditList.detail.filtersJson"
                   readOnly="true"

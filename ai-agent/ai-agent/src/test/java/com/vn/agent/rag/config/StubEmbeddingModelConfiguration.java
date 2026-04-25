@@ -17,7 +17,7 @@ import java.util.List;
  * (Phase 4 test_support). Marked {@code @Primary} to win if any transitively-configured
  * embedding starter accidentally registers a second bean.
  *
- * <p>The stub emits a 1536-dim vector whose values are a deterministic function of the
+ * <p>The stub emits a 2000-dim vector whose values are a deterministic function of the
  * input text's {@link String#hashCode()} — keeps tests reproducible and avoids the
  * cost/latency/key-dependency of a real embedding call.</p>
  *
@@ -29,7 +29,7 @@ import java.util.List;
 @TestConfiguration
 public class StubEmbeddingModelConfiguration {
 
-    private static final int DIMENSIONS = 1536;
+    private static final int DIMENSIONS = 2000;
 
     @Bean
     @Primary

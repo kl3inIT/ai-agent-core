@@ -102,9 +102,9 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     }
 
     private String callInternal(String toolInput, ToolContext toolContext, boolean useContextOverload) {
-        UUID runId = RunContext.get();          // may be null if invoked outside a chat call (defensive)
+        UUID runId = resolveRunId(toolContext);          // may be null if invoked outside a chat call (defensive)
         String userUsername = resolveUserUsername();
-        UUID conversationId = null;             // chat-level row carries it; tool row correlates by runId
+        UUID conversationId = resolveConversationId(toolContext);
         String toolName = delegate.getToolDefinition().name();
         long startNanos = System.nanoTime();
 
@@ -150,6 +150,34 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             final String emittedSummary = resultSummary;
             emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
         }
+    }
+
+    private static UUID resolveRunId(ToolContext toolContext) {
+        UUID runId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_RUN_ID_KEY);
+        return runId != null ? runId : RunContext.get();
+    }
+
+    private static UUID resolveConversationId(ToolContext toolContext) {
+        UUID conversationId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY);
+        return conversationId != null ? conversationId : RunContext.getConversationId();
+    }
+
+    private static UUID uuidFromToolContext(ToolContext toolContext, String key) {
+        if (toolContext == null || toolContext.getContext() == null) {
+            return null;
+        }
+        Object raw = toolContext.getContext().get(key);
+        if (raw instanceof UUID uuid) {
+            return uuid;
+        }
+        if (raw instanceof String text && !text.isBlank()) {
+            try {
+                return UUID.fromString(text);
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**

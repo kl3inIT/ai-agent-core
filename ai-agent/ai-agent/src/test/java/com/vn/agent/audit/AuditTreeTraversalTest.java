@@ -48,7 +48,7 @@ class AuditTreeTraversalTest {
                     "{}", "{}", 4L, AiToolCallOutcome.SUCCESS, null, null);
             auditWriter.writeRetrieval(rootId, runId, "user-A", null,
                     "what is foo?", 5, 3, 0.87, "docType == 'faq'",
-                    8L, "SUCCESS", null);
+                    "{\"hits\":[]}", 8L, "SUCCESS", null);
             auditWriter.writeChatFinish(rootId, 20L, "SUCCESS", null);
 
             AiAuditEvent root = dataManager.load(AiAuditEvent.class)

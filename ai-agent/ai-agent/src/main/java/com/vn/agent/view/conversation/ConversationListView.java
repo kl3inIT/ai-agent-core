@@ -106,6 +106,7 @@ public class ConversationListView extends StandardListView<AiConversation> {
             List<KeyValueEntity> rows = dataManager.loadValues(
                             "select m.conversation.id, count(m) from ai_AiMessage m "
                                     + "where m.conversation.id in :ids group by m.conversation.id")
+                    .store("agentstore")
                     .properties("cid", "cnt")
                     .parameter("ids", ids)
                     .list();

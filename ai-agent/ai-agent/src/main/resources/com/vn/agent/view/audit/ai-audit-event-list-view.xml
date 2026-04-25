@@ -5,11 +5,11 @@
     <data>
         <collection id="auditsDc" class="com.vn.agent.entity.AiAuditEvent">
             <fetchPlan extends="_base">
-                <property name="children" fetchPlan="_base"/>
+                <property name="parent" fetchPlan="_base"/>
             </fetchPlan>
             <loader id="auditsDl" readOnly="true">
                 <query>
-                    <![CDATA[select e from ai_AiAuditEvent e where e.parent is null order by e.startedAt desc]]>
+                    <![CDATA[select e from ai_AiAuditEvent e order by e.startedAt desc]]>
                 </query>
             </loader>
         </collection>
@@ -18,22 +18,7 @@
         <dataLoadCoordinator auto="true"/>
     </facets>
     <layout padding="true" spacing="true">
-        <hbox id="filterBar" spacing="true" padding="false" alignItems="BASELINE">
-            <textField id="userFilter"
-                       placeholder="msg:///auditList.filter.user"
-                       clearButtonVisible="true"/>
-            <comboBox id="toolFilter"
-                      placeholder="msg:///auditList.filter.eventName"
-                      clearButtonVisible="true"/>
-            <comboBox id="outcomeFilter"
-                      placeholder="msg:///auditList.filter.outcome"
-                      clearButtonVisible="true"/>
-            <dateTimePicker id="dateFromFilter"
-                            placeholder="msg:///auditList.filter.dateRange"/>
-            <dateTimePicker id="dateToFilter"/>
-        </hbox>
-        <genericFilter id="auditsGenericFilter"
-                       dataLoader="auditsDl">
+        <genericFilter id="auditsFilter" dataLoader="auditsDl">
             <properties include=".*"/>
         </genericFilter>
         <hbox id="exportBar" spacing="true">
@@ -47,7 +32,7 @@
         </hbox>
         <treeDataGrid id="auditsDataGrid"
                       dataContainer="auditsDc"
-                      hierarchyProperty="children"
+                      hierarchyProperty="parent"
                       width="100%"
                       minHeight="20em"
                       themeNames="compact">

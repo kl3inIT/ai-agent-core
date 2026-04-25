@@ -10,6 +10,7 @@ import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.guard.RateLimitGuard;
 import com.vn.agent.guard.TokenBudgetGuard;
+import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
 import jakarta.validation.Validator;
@@ -27,6 +28,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -102,6 +105,8 @@ class ChatServiceFilterParamContractTest {
         when(parametersResolver.effectiveTemperature(any())).thenReturn(0.7);
         when(parametersResolver.effectiveTopP(any())).thenReturn(0.9);
         when(parametersResolver.effectiveMaxTokens(any())).thenReturn(2048);
+        when(parametersResolver.effectiveRagTopK(any(), anyInt())).thenReturn(10);
+        when(parametersResolver.effectiveRagSimilarityThreshold(any(), anyDouble())).thenReturn(0.1);
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.*");
         when(toolCallbacks.callbacksFor(anyString(), any())).thenReturn(new org.springframework.ai.tool.ToolCallback[]{});
 
@@ -110,6 +115,7 @@ class ChatServiceFilterParamContractTest {
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.toolCallbacks(any(org.springframework.ai.tool.ToolCallback[].class))).thenReturn(requestSpec);
+        when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.options(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);
@@ -136,7 +142,7 @@ class ChatServiceFilterParamContractTest {
     void test_filter_expression_param_always_set_on_every_non_admin_request() {
         // Non-admin path: builder returns a concrete filter expression.
         Filter.Expression ragFilter = new FilterExpressionBuilder()
-                .eq("embeddingModel", "openai/text-embedding-3-small").build();
+                .eq("embeddingModel", "qwen/qwen3-embedding-4b").build();
         when(retrievalFilterBuilder.buildFor(any())).thenReturn(ragFilter);
 
         service.ask("alice", null, "hello");
@@ -155,6 +161,8 @@ class ChatServiceFilterParamContractTest {
         // Conversation id + runId are always set.
         verify(advisorSpec).param(ChatMemory.CONVERSATION_ID, convId.toString());
         verify(advisorSpec).param(org.mockito.ArgumentMatchers.eq("audit.runId"), any());
+        verify(advisorSpec).param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, 10);
+        verify(advisorSpec).param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY, 0.1);
     }
 
     @Test
@@ -179,6 +187,8 @@ class ChatServiceFilterParamContractTest {
 
         // Memory + audit params still present.
         verify(advisorSpec).param(ChatMemory.CONVERSATION_ID, convId.toString());
+        verify(advisorSpec).param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, 10);
+        verify(advisorSpec).param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY, 0.1);
     }
 
     @Test

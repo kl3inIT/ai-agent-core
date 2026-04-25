@@ -114,6 +114,25 @@ class AuditWriterFieldMappingTest {
     }
 
     @Test
+    void writeToolCall_fallsBackToChatRootByRunId_whenParentIdMissing() {
+        systemAuthenticator.runWithSystem(() -> {
+            UUID runId = UUID.randomUUID();
+            UUID convId = createTestConversation("user-A");
+            UUID rootId = auditWriter.writeChatStart(runId, "user-A", convId, "abc123hash");
+
+            UUID auditId = auditWriter.writeToolCall(/*parentId*/ null, runId, "user-A", convId,
+                    "echo", "{\"in\":1}", "{\"out\":1}", 12L,
+                    AiToolCallOutcome.SUCCESS, /*denialReason*/ null, /*errorClass*/ null);
+
+            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            assertThat(row.getParent())
+                    .isNotNull()
+                    .extracting("id")
+                    .isEqualTo(rootId);
+        });
+    }
+
+    @Test
     void writeToolCall_with_BLOCKED_outcome_persists_denialReason() {
         systemAuthenticator.runWithSystem(() -> {
             UUID convId = createTestConversation("user-A");

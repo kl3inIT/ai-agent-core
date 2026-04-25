@@ -24,6 +24,7 @@ import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.parameters.Overrides;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.rag.RetrievalFilterBuilder;
+import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.ToolVetoedException;
 import com.vn.agent.tools.AgentToolCallbacks;
@@ -210,22 +211,31 @@ public class DefaultChatServiceImpl implements ChatService {
             Authentication runtimeAuth = safeGetAuthentication();
             Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
-            // 7.2 D-09/D-10: stash retrieval params on RunContext so AuditingDocumentRetriever
-            // can record topK + filtersJson on the RETRIEVAL audit row. Cleared by AuditAdvisor.finally
-            // via RunContext.clear() (and defensively again by this method's outer finally).
+            // 7.2 D-09/D-10: keep retrieval params in RunContext for audit fallback and pass
+            // them through advisor context below so the RAG retriever uses the per-request values.
+            // Cleared by AuditAdvisor.finally via RunContext.clear() (and defensively again by this
+            // method's outer finally).
             // null filter overwrite is intentional defense-in-depth against stale ThreadLocal state
             // on pooled Vaadin request threads (T-07.2-05).
-            RunContext.setRetrievalTopK(ragProperties.resolvedTopK());
+            int retrievalTopK = parametersResolver.effectiveRagTopK(active, ragProperties.resolvedTopK());
+            double retrievalSimilarityThreshold = parametersResolver.effectiveRagSimilarityThreshold(
+                    active, ragProperties.resolvedSimilarityThreshold());
+            RunContext.setRetrievalTopK(retrievalTopK);
+            RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
             RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
             ChatClientResponse clientResp = chatClient.prompt()
                     .system(composedSystemPrompt)
                     .user(message)
                     .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                    .toolContext(auditToolContext(runId, convId))
                     .advisors(advisorSpec -> {
                         advisorSpec
                                 .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                .param("audit.runId", runId);
+                                .param("audit.runId", runId)
+                                .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                                .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                        retrievalSimilarityThreshold);
                         if (ragFilter != null) {
                             advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
                         }
@@ -316,9 +326,14 @@ public class DefaultChatServiceImpl implements ChatService {
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
-                    // 7.2 D-09/D-10: stash retrieval params so AuditingDocumentRetriever can
-                    // record topK + filtersJson on the streamed-turn RETRIEVAL audit row.
-                    RunContext.setRetrievalTopK(ragProperties.resolvedTopK());
+                    // 7.2 D-09/D-10: keep retrieval params in RunContext for audit fallback and
+                    // pass them through advisor context below so the RAG retriever uses the
+                    // per-request values.
+                    int retrievalTopK = parametersResolver.effectiveRagTopK(active, ragProperties.resolvedTopK());
+                    double retrievalSimilarityThreshold = parametersResolver.effectiveRagSimilarityThreshold(
+                            active, ragProperties.resolvedSimilarityThreshold());
+                    RunContext.setRetrievalTopK(retrievalTopK);
+                    RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
                     RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
                     Flux<StreamingEvent> content;
@@ -327,10 +342,14 @@ public class DefaultChatServiceImpl implements ChatService {
                                 .system(composedSystemPrompt)
                                 .user(message)
                                 .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                                .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
                                     advisorSpec
                                             .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                            .param("audit.runId", runId);
+                                            .param("audit.runId", runId)
+                                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                                    retrievalSimilarityThreshold);
                                     if (ragFilter != null) {
                                         advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
                                     }
@@ -531,6 +550,12 @@ public class DefaultChatServiceImpl implements ChatService {
         } catch (Throwable t) {
             log.warn("Flagged audit failed runId={} key={}", runId, patternKey, t);
         }
+    }
+
+    private static Map<String, Object> auditToolContext(UUID runId, UUID conversationId) {
+        return Map.of(
+                RunContext.TOOL_CONTEXT_RUN_ID_KEY, runId,
+                RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY, conversationId);
     }
 
     /**

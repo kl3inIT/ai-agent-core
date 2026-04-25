@@ -5,6 +5,7 @@ import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.orchestration.RunContext;
+import com.vn.agent.rag.ChunkMetadata;
 import com.vn.agent.spi.AuditKind;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
@@ -93,6 +94,12 @@ class RetrievalAuditRoundTripTest {
             assertThat(retrievalRow.getHitCount()).isEqualTo(3);
             assertThat(retrievalRow.getTopScore()).isEqualTo(0.91);
             assertThat(retrievalRow.getFiltersJson()).isEqualTo("docType == 'faq'");
+            assertThat(retrievalRow.getRetrievalHitsJson())
+                    .contains("\"rank\":1")
+                    .contains("\"score\":0.91")
+                    .contains("\"documentId\":\"doc-1\"")
+                    .contains("\"source\":\"sample-sales-policy-vi.md\"")
+                    .contains("\"textPreview\":\"content-doc-1\"");
             assertThat(retrievalRow.getOutcomeRaw()).isEqualTo("SUCCESS");
             assertThat(retrievalRow.getErrorClass()).isNull();
             assertThat(retrievalRow.getRunId()).isEqualTo(runId);
@@ -115,7 +122,10 @@ class RetrievalAuditRoundTripTest {
         return Document.builder()
                 .id(id)
                 .text("content-" + id)
-                .metadata(Map.of())
+                .metadata(Map.of(
+                        ChunkMetadata.DOCUMENT_ID, id,
+                        ChunkMetadata.SOURCE, "sample-sales-policy-vi.md",
+                        ChunkMetadata.EMBEDDING_MODEL, "qwen/qwen3-embedding-4b"))
                 .score(score)
                 .build();
     }

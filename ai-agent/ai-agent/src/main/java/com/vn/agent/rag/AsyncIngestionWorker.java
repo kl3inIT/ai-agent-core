@@ -19,6 +19,8 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -142,7 +144,7 @@ public class AsyncIngestionWorker {
 
         try {
             Resource resource = resolveResource(document.getFileName());
-            List<Document> raw = new TikaDocumentReader(resource).get();
+            List<Document> raw = readResource(resource, document);
 
             // WR-02: enforce jmix.ai-agent.rag.ingest.max-document-chars BEFORE splitting /
             // embedding. Tika has already materialised the text so we can size it accurately;
@@ -245,6 +247,28 @@ public class AsyncIngestionWorker {
             b.withMinChunkSizeChars(cfg.minChunkSizeChars());
         }
         return b.build();
+    }
+
+    private List<Document> readResource(Resource resource, AiKnowledgeDocument document) {
+        if (isMarkdown(document)) {
+            try {
+                String text = new String(resource.getContentAsByteArray(), StandardCharsets.UTF_8);
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put(ChunkMetadata.SOURCE, document.getFileName());
+                return List.of(new Document(text, metadata));
+            } catch (IOException e) {
+                throw new IllegalStateException("Unable to read markdown resource as UTF-8: "
+                        + document.getFileName(), e);
+            }
+        }
+        return new TikaDocumentReader(resource).get();
+    }
+
+    private boolean isMarkdown(AiKnowledgeDocument document) {
+        String fileName = document.getFileName();
+        String mimeType = document.getMimeType();
+        return (mimeType != null && mimeType.toLowerCase().contains("markdown"))
+                || (fileName != null && fileName.toLowerCase().endsWith(".md"));
     }
 
     private Document enrich(Document chunk, AiKnowledgeDocument doc,

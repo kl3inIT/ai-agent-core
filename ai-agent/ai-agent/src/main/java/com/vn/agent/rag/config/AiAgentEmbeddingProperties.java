@@ -7,9 +7,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * {@code jmix.ai-agent.embedding.*} (D-22). Picked up by the
  * {@code @ConfigurationPropertiesScan} on {@code AIConfiguration}.
  *
- * <p>Default model is OpenAI {@code text-embedding-3-small} at 1536 dimensions —
- * contractually pinned by the Phase 2 pgvector DDL ({@code vector(1536)}). A
- * dimension change requires a Liquibase changeset AND a full reingest (D-01);
+ * <p>Default model is Qwen3 Embedding 4B at 2000 dimensions — pinned to the
+ * PgVectorStore schema Spring AI creates ({@code vector(2000)}). A dimension
+ * change requires recreating the vector store table and a full reingest (D-01);
  * this record does not defend against mismatch by itself but captures the
  * pinning as constants so downstream beans can assert.</p>
  *
@@ -25,10 +25,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AiAgentEmbeddingProperties(String model, Integer dimensions, String providerBaseUrl) {
 
     /** D-01 default model slug (OpenRouter-compatible). */
-    public static final String DEFAULT_MODEL = "openai/text-embedding-3-small";
+    public static final String DEFAULT_MODEL = "qwen/qwen3-embedding-4b";
 
-    /** D-01 pinned dimension — must match Phase 2 changelog {@code 070-ai-kb-vector-store.xml}. */
-    public static final int DEFAULT_DIMENSIONS = 1536;
+    /** D-01 pinned dimension — must match the pgvector {@code vector(2000)} schema. */
+    public static final int DEFAULT_DIMENSIONS = 2000;
 
     public String resolvedModel() {
         return model == null || model.isBlank() ? DEFAULT_MODEL : model;

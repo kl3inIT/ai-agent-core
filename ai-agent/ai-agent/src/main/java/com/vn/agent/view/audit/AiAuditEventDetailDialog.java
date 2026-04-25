@@ -1,10 +1,13 @@
 package com.vn.agent.view.audit;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Span;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.spi.AuditKind;
 import io.jmix.flowui.component.textarea.JmixTextArea;
 import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.view.DialogMode;
@@ -26,14 +29,15 @@ import java.util.UUID;
  * {@link AiAuditEvent} row. Opened by a row-click listener in
  * {@link AiAuditEventListView}.
  *
- * <p>Fields for all three kinds (CHAT / TOOL / RETRIEVAL) are always rendered;
- * unpopulated fields display empty strings — simpler than conditional visibility
- * and visually inoffensive given the low-complexity schema.</p>
+ * <p>Kind-specific fields are rendered only for the matching row kind so RETRIEVAL rows do not
+ * show empty TOOL argument/result boxes and vice versa.</p>
  */
 @ViewController("AiAgent_AiAuditEvent.detailDialog")
 @ViewDescriptor("ai-audit-event-detail-dialog.xml")
 @DialogMode(width = "var(--lumo-size-xl-plus, 960px)", draggable = true, resizable = true, closeOnEsc = true)
 public class AiAuditEventDetailDialog extends StandardView {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     @ViewComponent
     private MessageBundle messageBundle;
@@ -70,6 +74,8 @@ public class AiAuditEventDetailDialog extends StandardView {
     @ViewComponent
     private JmixTextArea queryTextField;
     @ViewComponent
+    private JmixTextArea retrievalHitsField;
+    @ViewComponent
     private JmixTextArea filtersJsonField;
 
     public void setAudit(AiAuditEvent audit) {
@@ -89,7 +95,9 @@ public class AiAuditEventDetailDialog extends StandardView {
         topKField.setValue(audit.getTopK() == null ? "" : audit.getTopK().toString());
         hitCountField.setValue(audit.getHitCount() == null ? "" : audit.getHitCount().toString());
         topScoreField.setValue(audit.getTopScore() == null ? "" : audit.getTopScore().toString());
+        retrievalHitsField.setValue(prettyJson(audit.getRetrievalHitsJson()));
         filtersJsonField.setValue(Objects.toString(audit.getFiltersJson(), ""));
+        applyKindVisibility(audit.getKind());
         applyOutcomeBadge(audit.getOutcome());
     }
 
@@ -116,6 +124,30 @@ public class AiAuditEventDetailDialog extends StandardView {
             case BLOCKED -> "warning";
             case FLAGGED -> "contrast";
         };
+    }
+
+    private void applyKindVisibility(String kind) {
+        boolean tool = AuditKind.TOOL.equals(kind);
+        boolean retrieval = AuditKind.RETRIEVAL.equals(kind);
+        argumentsField.setVisible(tool);
+        resultField.setVisible(tool);
+        queryTextField.setVisible(retrieval);
+        topKField.setVisible(retrieval);
+        hitCountField.setVisible(retrieval);
+        topScoreField.setVisible(retrieval);
+        retrievalHitsField.setVisible(retrieval);
+        filtersJsonField.setVisible(retrieval);
+    }
+
+    private static String prettyJson(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(JSON.readTree(value));
+        } catch (JsonProcessingException e) {
+            return value;
+        }
     }
 
     private static String uuidStr(UUID id) {

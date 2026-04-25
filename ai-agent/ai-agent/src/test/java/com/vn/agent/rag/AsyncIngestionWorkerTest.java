@@ -62,7 +62,7 @@ class AsyncIngestionWorkerTest {
                 new AiAgentRagProperties.Splitter(200, null, 10),
                 null, null, null, null, null);
         embeddingProps = new AiAgentEmbeddingProperties(
-                "openai/text-embedding-3-small", 1536, null);
+                "qwen/qwen3-embedding-4b", 2000, null);
         resourceLoader = new DefaultResourceLoader();
         systemAuthenticator = mock(SystemAuthenticator.class);
         // Stub runWithSystem(Runnable) to invoke the action inline on the test thread.
@@ -132,7 +132,7 @@ class AsyncIngestionWorkerTest {
             assertThat(md).containsEntry(ChunkMetadata.SOURCE, "classpath:ai-kb/fixture-alpha.md");
             assertThat(md).containsEntry(ChunkMetadata.DOCUMENT_ID, id.toString());
             assertThat(md).containsEntry(ChunkMetadata.EMBEDDING_MODEL,
-                    "openai/text-embedding-3-small");
+                    "qwen/qwen3-embedding-4b");
             assertThat(md).containsKey(ChunkMetadata.ALLOWED_ROLES);
             assertThat(md).containsEntry(ChunkMetadata.roleFlagKey("ai-agent-user"), true);
         }

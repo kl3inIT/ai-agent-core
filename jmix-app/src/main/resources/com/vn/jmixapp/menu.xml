@@ -13,7 +13,7 @@
               title="msg://com.vn.agent/menu.conversations"/>
         <item view="AiAgent_Parameters.list" id="aiAgent.parameters.list" title="msg://com.vn.agent/menu.parameters"/>
         <item view="AiAgent_KnowledgeBase.list" id="aiAgent.knowledge.list" title="msg://com.vn.agent/menu.knowledge"/>
-        <item view="AiAgent_ToolCallAudit.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
+        <item view="AiAgent_AiAuditEvent.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
     </menu>
     <menu id="security" title="msg://com.vn.agent/menu.security.title">
         <item view="sec_ResourceRoleModel.list"

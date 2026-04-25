@@ -113,6 +113,7 @@ class AskTypedRetryTest {
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
         when(requestSpec.toolCallbacks(any(ToolCallback[].class))).thenReturn(requestSpec);
+        when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.options(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);
