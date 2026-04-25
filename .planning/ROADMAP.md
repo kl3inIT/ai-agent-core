@@ -308,7 +308,9 @@ Plans:
 
 **Needs research phase:** Minimal — reference implementation at `D:\Study materials spring 2026\EXE101\ai\jmix-ai-backend\src\main\java\io\jmix\ai\backend\view\chat\ChatView.java` is the spec. Verify Vaadin `MessageList.setMarkdown(true)` and `MessageListItem.appendText(...)` API surface via Context7 before planning.
 
-**Plans:** not planned yet — run `/gsd-plan-phase 7.1`
+**Plans:** 7/7 executed (07.1-01..07.1-07).
+
+**Status:** ✅ Closed accept-as-is 2026-04-25. UAT marked `accepted` with 5 deferred issues — 1 blocker (streaming returns `error: chatView.error.generic`; raw i18n keys `chatView.title` / `chatView.action.newChat` leak through), 2 major (tool-call inline markdown format off, knowledge upload broken), 2 other. **Streaming blocker MUST be fixed in Phase 08 before master merge.**
 
 ---
 

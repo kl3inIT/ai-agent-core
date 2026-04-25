@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: "Phase 07.2 complete (5/5 plans, test-green, verification PASS 26/26 must-haves)"
-last_updated: "2026-04-24T18:00:00.000Z"
-last_activity: 2026-04-24
+status: "Phase 07.1 closed accept-as-is (UAT accepted with 5 deferred issues incl. streaming blocker); Phase 07.2 complete; ready for Phase 08"
+last_updated: "2026-04-25T00:00:00+07:00"
+last_activity: 2026-04-25
 progress:
   total_phases: 9
-  completed_phases: 8
-  total_plans: 58
+  completed_phases: 9
+  total_plans: 55
   completed_plans: 55
-  percent: 95
+  percent: 100
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — Integration Hardening & Release Readiness (7.1 awaiting UAT; 7.2 complete)
+**Current focus:** Phase 08 — Integration Hardening & Release Readiness (7.1 closed accept-as-is with 5 deferred issues; 7.2 complete; deferred 7.1 issues must be picked up in Phase 08 before master merge)
 
 ## Phase Status
 
@@ -36,7 +36,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
-| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (awaiting human UAT on Plan 07.1-07) |
+| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT accepted as-is 2026-04-25; 5 issues incl. streaming blocker deferred to Phase 08) |
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
@@ -179,13 +179,12 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 8
+**Count:** 7
 
+- `2026-04-26-inject-readable-entity-inventory-into-baseline-context.md` — Inject readable entity inventory into baseline context
 - `2026-04-24-refine-describe-entity-wrapper-around-selected-jmix-metadata.md` — Refine describe_entity wrapper around selected Jmix metadata
 - `2026-04-24-add-dedicated-chat-speech-and-file-task-input.md` — Add dedicated chat speech and file task input
 - `2026-04-24-add-intent-driven-extraction-to-prefilled-jmix-forms.md` — Add intent-driven extraction to prefilled Jmix forms
-- `2026-04-24-redesign-audit-schema-as-tree-lite-before-adding-retrieval-k.md` — Redesign audit schema as tree-lite (PARENT_ID) before adding retrieval kind
-- `2026-04-24-audit-vector-store-retrieval-and-full-flow-like-jmix-ai-back.md` — Audit vector-store retrieval path and full RAG flow vs jmix-ai-backend
 - `2026-04-24-enforce-unknown-entity-retry-contract.md` — Enforce unknown_entity retry contract
 - `2026-04-24-add-llm-permission-inventory.md` — Add LLM permission inventory
 - `2026-04-24-add-explicit-host-override-for-tool-fetch-plans.md` — Add explicit host override for tool fetch plans
