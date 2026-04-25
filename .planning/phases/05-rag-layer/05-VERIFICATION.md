@@ -4,7 +4,7 @@ verified: 2026-04-20T22:15:58.6687800+07:00
 status: verified
 score: 4/4 success criteria verified with executed default and Docker-backed integration tests
 re_verification:
-  previous_status: human_needed
+  previous_status: closed_obsolete
   previous_score: 4/4 success criteria verified (code-level); 2 flagged for live-Docker / live-LLM confirmation
   gaps_closed:
     - "Executed `./gradlew :ai-agent:ai-agent:integrationTest` successfully on a Docker-enabled host."

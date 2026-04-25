@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: "Phase 07.2 shipped — PR #2 opened against origin/main"
-last_updated: "2026-04-26T02:30:00+07:00"
+status: "Phase 08 ready for fresh scope — prior 7.1 UAT issues closed obsolete"
+last_updated: "2026-04-26T00:00:00+07:00"
 last_activity: 2026-04-26
 progress:
   total_phases: 9
@@ -23,20 +23,20 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — Integration Hardening & Release Readiness (7.1 closed accept-as-is with 5 deferred issues; 7.2 complete; deferred 7.1 issues must be picked up in Phase 08 before master merge)
+**Current focus:** Phase 08 — Integration Hardening & Release Readiness. Prior Phase 7.1 UAT issues were closed as obsolete on 2026-04-26 after heavy refactor; Phase 8 should be scoped fresh from the current codebase.
 
 ## Phase Status
 
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
-| 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
-| 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
+| 2 | Foundations | ✅ Complete (11/11 plans; old dynamic verification debt closed obsolete 2026-04-26) |
+| 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans; old human verification debt closed obsolete 2026-04-26) |
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
-| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT accepted as-is 2026-04-25; 5 issues incl. streaming blocker deferred to Phase 08) |
+| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT closed obsolete/superseded 2026-04-26; no deferred Phase 8 blockers carried forward) |
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
 | 8 | Integration Hardening & Release Readiness | Not started |
 
@@ -122,7 +122,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
 - 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
 - 2026-04-19 19:30 +07:00 — Plan 03-04 complete (8 test files + TOOL-08 ASM enforcement). Next: 03-05 (final phase plan — integration test in jmix-app).
-- 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS — pending human Gradle verify + merge to master.
+- 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS; old human Gradle verification debt closed obsolete on 2026-04-26 so Phase 8 can be scoped fresh.
 - 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings to `.planning/phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
 - 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
 - 2026-04-20 11:55 +07:00 — Plan 04-01 complete (Liquibase 080 + AiToolCallAudit entity fields + EN/VI i18n; compileJava green). Commits 8181ff4, 1789b7e. Next: 04-02.

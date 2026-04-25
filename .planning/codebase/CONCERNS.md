@@ -164,7 +164,7 @@
 ## Missing Critical Features
 
 **Phase 8 release readiness is not complete:**
-- Problem: Planning state marks all implementation plans complete but the project is awaiting human UAT for Phase 07.1 and Phase 8 hardening/release readiness is not started.
+- Problem: Planning state marks implementation phases complete and Phase 8 hardening/release readiness is not started. Prior Phase 07.1 human UAT findings were closed as obsolete on 2026-04-26 after heavy refactor.
 - Blocks: Shipping a stable v1 add-on release with documented install, configuration, migration, and support posture.
 
 **Operational repair and diagnostics are thin:**
@@ -177,10 +177,10 @@
 
 ## Test Coverage Gaps
 
-**Human UAT failures need automated regression coverage:**
-- What's not tested: Tool markdown emission across streaming threads, Stop-to-cancelled-audit persistence, post-send URL sync, and upload staging misconfiguration messaging.
+**Fresh Phase 8 UAT/regression coverage is needed:**
+- What's not tested: Current end-to-end chat, knowledge, audit, security, and release-readiness flows after the post-Phase-7 refactors.
 - Files: `.planning/phases/07.1-adopt-vaadin-messagelist-messageinput-for-chat-view/07.1-UAT.md`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStreamTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/chat/ChatViewStopTest.java`, `ai-agent/ai-agent/src/test/java/com/vn/agent/view/knowledge/KnowledgeBaseUploadTest.java`
-- Risk: Fixes can regress before final release because the failures were found manually.
+- Risk: Final release confidence depends on a new acceptance suite derived from the current codebase rather than stale UAT findings.
 - Priority: High
 
 **Release/consumer smoke tests are partly manual:**
