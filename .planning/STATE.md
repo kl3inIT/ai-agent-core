@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: "Phase 07.1 closed accept-as-is (UAT accepted with 5 deferred issues incl. streaming blocker); Phase 07.2 complete; ready for Phase 08"
-last_updated: "2026-04-25T00:00:00+07:00"
-last_activity: 2026-04-25
+status: "Phase 07.2 shipped — PR #2 opened against origin/main"
+last_updated: "2026-04-26T02:30:00+07:00"
+last_activity: 2026-04-26
 progress:
   total_phases: 9
   completed_phases: 9
