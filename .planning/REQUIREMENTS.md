@@ -171,20 +171,41 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ## Traceability
 
-Phase mapping is filled in by the roadmapper step.
+Phase mapping filled in by the roadmapper. v1.1 phases continue numbering from v1.0 close (Phase 8 + inserted 7.1, 7.2). v1.1 starts at Phase 9.
 
 | REQ-ID range | Category | Target phase |
 |--------------|----------|--------------|
-| PROMPT-01 .. PROMPT-06 | Prompt-contract hardening | TBD |
-| TOOL-09 .. TOOL-12 | Tool-layer refinements | TBD |
-| EXP-01 .. EXP-10 | AI-specific exposure policy | TBD |
-| MUT-01 .. MUT-12 | Mutation-capable tools | TBD |
-| SURF-01 .. SURF-10 | Configurable chat surfaces | TBD |
-| STT-01 .. STT-06 | Speech-to-text input | TBD |
-| TASK-01 .. TASK-05 | Task-scoped file attachment | TBD |
-| EXTRACT-01 .. EXTRACT-10 | Intent-driven extraction | TBD |
-| ENT-05 .. ENT-09 | New entities | TBD (per consumer phase) |
-| SPI-09 .. SPI-12 | New SPIs | TBD (per consumer phase) |
-| AUD-06, AUD-07 | Audit extensions | TBD (per consumer phase) |
-| SEC-05 .. SEC-07 | Security extensions | TBD (per consumer phase) |
-| TEST-08 .. TEST-17 | New tests | TBD (per consumer phase) |
+| PROMPT-01 .. PROMPT-06 | Prompt-contract hardening | Phase 9 |
+| TOOL-09 .. TOOL-12 | Tool-layer refinements | Phase 9 |
+| EXP-01 .. EXP-10 | AI-specific exposure policy | Phase 10 |
+| MUT-01 .. MUT-12 | Mutation-capable tools | Phase 11 |
+| SURF-01 .. SURF-10 | Configurable chat surfaces | Phase 12 |
+| STT-01 .. STT-06 | Speech-to-text input | Phase 13 |
+| TASK-01 .. TASK-05 | Task-scoped file attachment | Phase 13 |
+| EXTRACT-01 .. EXTRACT-10 | Intent-driven extraction | Phase 14 |
+| ENT-05 | New entity (AiExposureRule) | Phase 10 |
+| ENT-06 | New entity (AiUiSettings) | Phase 12 |
+| ENT-07 | New entity (AiTaskFile) | Phase 13 |
+| ENT-08 | New entity (AiExtractionDraft) | Phase 14 |
+| ENT-09 | New entity (AiMutationIntent) | Phase 11 |
+| SPI-09 | ToolFetchPlanCustomizer | Phase 9 |
+| SPI-10 | MutationGuard | Phase 11 |
+| SPI-11 | TranscriptionPostProcessor | Phase 13 |
+| SPI-12 | IntentExtractor<T> | Phase 14 |
+| AUD-06 | Audit eventName + outcome extensions | Phase 11 |
+| AUD-07 | Pre/post-image diff + PII hashing | Phase 11 (plumbing prepared in Phase 9) |
+| SEC-05 | AiAgentAdminRole extension (AiExposureRule, AiUiSettings) | Phase 10 (AiExposureRule) + Phase 12 (AiUiSettings) |
+| SEC-06 | AiAgentUserRole extension (AiTaskFile, AiExtractionDraft) | Phase 13 (AiTaskFile) + Phase 14 (AiExtractionDraft) |
+| SEC-07 | AiAgentMutationRole | Phase 11 |
+| TEST-08 | Prompt-contract suite | Phase 9 |
+| TEST-09 | Exposure policy uniform-opacity | Phase 10 |
+| TEST-10 | Mutation gating | Phase 11 |
+| TEST-11 | Mutation idempotency | Phase 11 |
+| TEST-12 | Mutation audit-vs-transaction | Phase 11 |
+| TEST-13 | Default-config boot test | Phase 11 |
+| TEST-14 | Cross-surface continuity | Phase 12 |
+| TEST-15 | Intent-extraction navigation | Phase 14 |
+| TEST-16 | Task file isolation | Phase 13 |
+| TEST-17 | STT audit privacy | Phase 13 |
+
+**Coverage:** 100% of v1.1 active REQ-IDs above are mapped to exactly one phase (split-mapped categories — SEC-05, SEC-06 — note both phases for the entity-specific sub-policies, but each individual sub-policy lands in exactly one phase). Future Requirements and Out of Scope items intentionally not mapped.
