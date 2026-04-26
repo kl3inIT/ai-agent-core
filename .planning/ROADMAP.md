@@ -46,7 +46,7 @@
 - [x] 09-03-PLAN.md — BaselineContextProvider extension: agent.entities + agent.permissions (locale-free cache key) + AiAgentPromptProperties
 - [x] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints
 - [x] 09-05-PLAN.md — Output scanner pattern packs (HostPrefixPatternProvider + ToolNamePatternProvider) + AgentSystemPromptRules + DefaultChatServiceImpl rule wiring
-- [ ] 09-06-PLAN.md — TEST-08 prompt-contract regression: PromptContractMockTest (EN+VI parameterized) + PromptContractLiveTest (@Tag("live"))
+- [x] 09-06-PLAN.md — TEST-08 prompt-contract regression: PromptContractMockTest (EN+VI parameterized) + PromptContractLiveTest (@Tag("live"))
 
 ### Phase 10: AI-Specific LLM Exposure Policy
 **Goal**: Admin can narrow the LLM-visible surface (entities and attributes) below the user's Jmix permissions through a single denylist-only governance layer; the policy is uniformly enforced across schema discovery, tool calls, baseline prompt, and RAG.

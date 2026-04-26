@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Roadmap defined
-stopped_at: Plan 09-05 complete; ready to plan/execute Plan 09-06 (TEST-08 prompt-contract regression).
-last_updated: "2026-04-26T22:01:08.531Z"
+stopped_at: Completed 09-06-PLAN.md
+last_updated: "2026-04-26T22:38:53.413Z"
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -119,6 +119,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 2026-04-27 (Plan 09-04): FetchPlanResolver + FetchPlanIntersector landed in com.vn.agent.tools.fetchplan; verbatim TOOL-11 phrase exposed as public constant FetchPlanIntersector.PROJECTION_NOT_SECURITY_COMMENT and referenced from class Javadoc via {@value}. PLAN_NARROWED: greppable audit-prefix with AiToolCallOutcome.FLAGGED — no new outcome enum value. describe_entity widened via MetadataTools (no raw reflection); ToolResultFormatter.records emits literal PROMPT-04 envelope <data entity><label></data> with label first via MessageTools.getEntityCaption. UNKNOWN_ENTITY_HINTS verbatim D-14 with em dash preserved on hint #3. Phase 3 D-08 access_denied opacity preserved (Phase 10 will unify, not Phase 9).
 - [Phase ?]: 2026-04-27 (Plan 09-05): Output-scanner Phase 9 pattern packs (HOST_PREFIX_LEAK / TOOL_NAME_LEAK) shipped as @Component providers with startup snapshot at ApplicationReadyEvent + lazy-fallback build in asPattern() (eager-singleton ordering safety). OutputScannerAdvisor widened to implement CallAdvisor + StreamAdvisor; streaming uses ChatClientMessageAggregator. Pattern.quote per token (T-09-22 ReDoS). Default-on toggles in module.properties.
 - [Phase ?]: 2026-04-27 (Plan 09-05): AgentSystemPromptRules.PROMPT_RULES carries verbatim PROMPT-03 vocabulary rules + D-15 retry contract whose three hint substrings match BuiltInDataTools.UNKNOWN_ENTITY_HINTS BYTE-FOR-BYTE (em dash U+2014 preserved). Lowercase 'if' bullets sacrificed sentence-case to keep the cross-assertion green for TEST-08 in Plan 09-06. Constant lives in com.vn.agent.guard alongside OutputScannerAdvisor (both leak-prevention). DefaultChatServiceImpl wires PROMPT_RULES at BOTH composition sites (blocking ask + streaming stream) so rules apply on every turn regardless of transport mode and even when profile prompt is blank. Hardcoded English (no i18n) per RESEARCH Pitfall 7 — model-directed instructions, not user-facing UI.
+- [Phase ?]: Plan 09-06 (TEST-08): cross-locale prompt-contract regression suite landed; Phase 9 feature-complete
 
 ### Performance Metrics
 
@@ -129,11 +130,12 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 09 P03 | 25min | 2 tasks | 5 files |
 | Phase 09 P04 | 28min | 3 tasks | 10 files |
 | Phase 09 P05 | 22min | 2 tasks | 14 files |
+| Phase 09 P06 | 30min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-**Last session:** 2026-04-26T22:01:08.508Z
-**Stopped at:** Plan 09-05 complete; ready to plan/execute Plan 09-06 (TEST-08 prompt-contract regression).
+**Last session:** 2026-04-26T22:38:53.398Z
+**Stopped at:** Completed 09-06-PLAN.md
 **Resume file:** None
 **Blockers:** None.
 **Next action:** `/gsd-execute-phase 9` to continue Phase 9 (Plan 02 next), or `/gsd-plan-phase 9` if Plan 02 PLAN.md is not yet drafted.
