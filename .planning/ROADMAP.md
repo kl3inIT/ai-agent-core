@@ -40,7 +40,13 @@
   3. A user-facing chat reply to a question about host data does not contain internal entity-name prefixes (e.g. `<host_prefix>_<name>`) or raw built-in tool names; `OutputScannerAdvisor` flags such leaks (audit, no hard block) and the prompt-contract test (TEST-08) asserts the absence in Vietnamese and English locales.
   4. When the LLM calls a tool with an unknown entity name, the tool returns a structured `unknown_entity` error carrying an `expected` action hint; the LLM is instructed (and observably) calls `list_entities` exactly once and either retries with the corrected name or tells the user no such entity exists.
   5. Hosts can register a `ToolFetchPlanCustomizer` SPI bean that overrides `_base` / `_instance_name` per `(toolName, MetaClass)` at runtime; the resolved plan is intersected with `AccessManager`-allowed attributes (host plan cannot widen the projection beyond user attribute permissions); the comment in code states "fetch plan is projection, not security."
-**Plans**: TBD
+**Plans:** 6 plans
+- [ ] 09-01-PLAN.md — AUD-07 plumbing: AuditFieldHasher static utility + AiAgentAuditProperties (no callers wired in Phase 9)
+- [ ] 09-02-PLAN.md — ToolFetchPlanCustomizer SPI + FetchPlanContext record + no-op default in SpiDefaultsAutoConfiguration
+- [ ] 09-03-PLAN.md — BaselineContextProvider extension: agent.entities + agent.permissions (locale-free cache key) + AiAgentPromptProperties
+- [ ] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints
+- [ ] 09-05-PLAN.md — Output scanner pattern packs (HostPrefixPatternProvider + ToolNamePatternProvider) + AgentSystemPromptRules + DefaultChatServiceImpl rule wiring
+- [ ] 09-06-PLAN.md — TEST-08 prompt-contract regression: PromptContractMockTest (EN+VI parameterized) + PromptContractLiveTest (@Tag("live"))
 
 ### Phase 10: AI-Specific LLM Exposure Policy
 **Goal**: Admin can narrow the LLM-visible surface (entities and attributes) below the user's Jmix permissions through a single denylist-only governance layer; the policy is uniformly enforced across schema discovery, tool calls, baseline prompt, and RAG.
@@ -120,7 +126,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Tool-Layer Foundations & Prompt-Contract Hardening | 0/0 | Not started | - |
+| 9. Tool-Layer Foundations & Prompt-Contract Hardening | 0/6 | Not started | - |
 | 10. AI-Specific LLM Exposure Policy | 0/0 | Not started | - |
 | 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
