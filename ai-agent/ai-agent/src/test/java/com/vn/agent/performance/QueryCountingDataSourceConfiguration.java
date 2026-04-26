@@ -1,6 +1,5 @@
 package com.vn.agent.performance;
 
-import net.ttddyy.dsproxy.listener.SingleQueryCountHolder;
 import net.ttddyy.dsproxy.support.ProxyDataSourceBuilder;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -46,9 +45,13 @@ public class QueryCountingDataSourceConfiguration {
             @Override
             public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
                 if (TARGET_BEAN_NAME.equals(beanName) && bean instanceof DataSource delegate) {
+                    // WR-001: use datasource-proxy's default thread-local QueryCountHolder so
+                    // that QueryCountHolder.clear() called from tests actually resets the same
+                    // holder the proxy writes into. The previous SingleQueryCountHolder kept its
+                    // own per-instance holder that QueryCountHolder.clear() could not reach.
                     return ProxyDataSourceBuilder.create(delegate)
                             .name(DATASOURCE_NAME)
-                            .countQuery(new SingleQueryCountHolder())
+                            .countQuery()
                             .build();
                 }
                 return bean;
