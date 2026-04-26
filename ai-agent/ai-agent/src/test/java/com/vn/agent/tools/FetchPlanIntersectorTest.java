@@ -269,6 +269,39 @@ class FetchPlanIntersectorTest {
                 .contains("acme_Order.c");
     }
 
+    @Test
+    void planNarrowedAudit_capsDroppedPathsAndTrimsLongNames() {
+        MetaClass rootMetaClass = newMetaClass("acme_Order");
+        String longSuffix = "X".repeat(80);
+        List<FetchPlanProperty> properties = new ArrayList<>();
+        for (int i = 0; i < 22; i++) {
+            properties.add(terminalProperty(String.format("attr%02d_%s", i, longSuffix), FetchMode.AUTO));
+        }
+        FetchPlan inputPlan = mock(FetchPlan.class);
+        when(inputPlan.loadPartialEntities()).thenReturn(false);
+        when(inputPlan.getProperties()).thenReturn(properties);
+        when(schemaAccess.canReadAttribute(eq(rootMetaClass), anyString())).thenReturn(false);
+
+        wireBuilder(rootMetaClass);
+
+        intersector.intersectWithAcl(inputPlan, rootMetaClass, "find_records");
+
+        ArgumentCaptor<String> denialReasonCaptor = ArgumentCaptor.forClass(String.class);
+        verify(auditWriter, times(1)).writeToolCall(
+                any(), any(), any(), any(),
+                eq("find_records"),
+                isNull(), anyString(), anyLong(),
+                eq(AiToolCallOutcome.FLAGGED),
+                denialReasonCaptor.capture(),
+                isNull());
+        assertThat(denialReasonCaptor.getValue())
+                .contains("attr00_")
+                .contains("...")
+                .contains("(+2 more)")
+                .doesNotContain("attr20_")
+                .doesNotContain(longSuffix);
+    }
+
     // ---- Test 6: Preservation of partial-entity flag when input plan is partial ----
 
     @Test

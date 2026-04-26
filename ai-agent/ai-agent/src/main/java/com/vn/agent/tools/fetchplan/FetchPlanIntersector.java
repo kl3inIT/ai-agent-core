@@ -50,6 +50,9 @@ public class FetchPlanIntersector {
     /** Audit denialReason prefix used for narrowing events; greppable. */
     public static final String PLAN_NARROWED_PREFIX = "PLAN_NARROWED:";
 
+    private static final int MAX_DROPPED_ATTRS_IN_AUDIT = 20;
+    private static final int MAX_ATTR_PATH_LENGTH_IN_AUDIT = 64;
+
     /**
      * Verbatim TOOL-11 contract phrase. Referenced from the class-level Javadoc via
      * {@value} and asserted by FetchPlanIntersectorTest. Externalising the phrase as a
@@ -128,7 +131,7 @@ public class FetchPlanIntersector {
         try {
             String username = currentUsernameOrNull();
             String denialReason = PLAN_NARROWED_PREFIX + " entity=" + rootMetaClass.getName()
-                    + " dropped=" + droppedAttributePaths;
+                    + " dropped=" + formatDroppedAttributePaths(droppedAttributePaths);
             auditWriter.writeToolCall(
                     RunContext.getRootAuditId(),
                     RunContext.get(),
@@ -146,6 +149,23 @@ public class FetchPlanIntersector {
             log.warn("Failed to emit PLAN_NARROWED audit row for tool={}, entity={}: {}",
                     toolName, rootMetaClass.getName(), auditFailure.getMessage());
         }
+    }
+
+    private static String formatDroppedAttributePaths(List<String> droppedAttributePaths) {
+        String dropped = droppedAttributePaths.stream()
+                .limit(MAX_DROPPED_ATTRS_IN_AUDIT)
+                .map(FetchPlanIntersector::trimAuditPath)
+                .toList()
+                .toString();
+        int hiddenCount = droppedAttributePaths.size() - MAX_DROPPED_ATTRS_IN_AUDIT;
+        return hiddenCount > 0 ? dropped + " (+" + hiddenCount + " more)" : dropped;
+    }
+
+    private static String trimAuditPath(String path) {
+        if (path == null || path.length() <= MAX_ATTR_PATH_LENGTH_IN_AUDIT) {
+            return path;
+        }
+        return path.substring(0, MAX_ATTR_PATH_LENGTH_IN_AUDIT) + "...";
     }
 
     private String currentUsernameOrNull() {
