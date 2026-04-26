@@ -1,5 +1,7 @@
 package com.vn.agent.guard;
 
+import com.vn.agent.tools.UnknownEntityHints;
+
 /**
  * Hardcoded English system-prompt rule paragraphs prepended to every chat turn, in addition to
  * the per-profile system prompt resolved from {@code AiParameters} (PROMPT-03 + D-15).
@@ -23,11 +25,8 @@ package com.vn.agent.guard;
  *
  * <p>TEST-08 (Plan 09-06) asserts the literal substring presence of these rules in the composed
  * system prompt; tests treat this constant as the ground truth. The three D-14 procedural-hint
- * substrings ({@code "call list_entities exactly once"}, the retry-on-match wording, and
- * {@code "if no entity in list_entities matches, tell the user no such entity exists — do not guess"})
- * match {@code BuiltInDataTools.UNKNOWN_ENTITY_HINTS} byte-for-byte (em dash U+2014 preserved on
- * the give-up clause) so the same wording is present in both the prompt and the tool error
- * envelope.
+ * substrings are sourced from {@link UnknownEntityHints} so the same wording is present in both
+ * the prompt and the tool error envelope.
  */
 public final class AgentSystemPromptRules {
 
@@ -51,12 +50,9 @@ public final class AgentSystemPromptRules {
                     + " canonical entity and tool names.",
             "",
             "Unknown-entity recovery (mandatory):",
-            "- When a tool returns an 'unknown_entity' error, call list_entities exactly once.",
-            // The next two bullets MUST start with lowercase 'if' so they match the BuiltInDataTools
-            // UNKNOWN_ENTITY_HINTS strings byte-for-byte (D-14 contract; TEST-08 cross-asserts).
-            // Sentence-case is sacrificed to keep the constants reconciled.
-            "- if a name in list_entities matches your intent, retry the original tool with that exact name.",
-            "- if no entity in list_entities matches, tell the user no such entity exists — do not guess.",
+            "- When a tool returns an 'unknown_entity' error, " + UnknownEntityHints.CALL_ONCE + ".",
+            "- " + UnknownEntityHints.RETRY_ON_MATCH + ".",
+            "- " + UnknownEntityHints.GIVE_UP_ON_NO_MATCH + ".",
             ""
     );
 

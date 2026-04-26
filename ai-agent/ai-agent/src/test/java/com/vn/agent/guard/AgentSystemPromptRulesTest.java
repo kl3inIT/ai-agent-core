@@ -1,5 +1,6 @@
 package com.vn.agent.guard;
 
+import com.vn.agent.tools.UnknownEntityHints;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
@@ -10,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Phase 9 PROMPT-03 + D-15 contract: the hardcoded English vocabulary + unknown-entity-retry
  * rules carried by {@link AgentSystemPromptRules#PROMPT_RULES} must include the verbatim
- * substrings TEST-08 (Plan 09-06) cross-asserts against {@code BuiltInDataTools.UNKNOWN_ENTITY_HINTS}.
+ * substrings TEST-08 (Plan 09-06) cross-asserts against {@link UnknownEntityHints}.
  *
  * <p>The test treats {@link AgentSystemPromptRules#PROMPT_RULES} as the single ground-truth
  * for both the system-prompt and tool-error-envelope wording — mismatched substrings here
@@ -35,17 +36,13 @@ class AgentSystemPromptRulesTest {
 
     @Test
     void promptRules_carriesUnknownEntityRetryContract_verbatim() {
-        // These exact substrings must match BuiltInDataTools.UNKNOWN_ENTITY_HINTS — TEST-08 bar
-        // that both the system prompt AND ToolErrorDto.expected[] carry the same wording.
-        assertThat(AgentSystemPromptRules.PROMPT_RULES)
-                .as("D-15 hint #1 verbatim")
-                .contains("call list_entities exactly once");
-        assertThat(AgentSystemPromptRules.PROMPT_RULES)
-                .as("D-15 hint #2 verbatim — retry-on-match clause")
-                .contains("if a name in list_entities matches your intent, retry the original tool with that exact name");
-        assertThat(AgentSystemPromptRules.PROMPT_RULES)
-                .as("D-15 hint #3 verbatim — em dash U+2014 preserved on the give-up clause")
-                .contains("if no entity in list_entities matches, tell the user no such entity exists — do not guess");
+        // These exact substrings must match UnknownEntityHints, the shared D-14 source,
+        // so both the system prompt AND ToolErrorDto.expected[] carry the same wording.
+        for (String hint : UnknownEntityHints.AS_LIST) {
+            assertThat(AgentSystemPromptRules.PROMPT_RULES)
+                    .as("D-15 hint verbatim: %s", hint)
+                    .contains(hint);
+        }
         assertThat(AgentSystemPromptRules.PROMPT_RULES)
                 .as("'do not guess' substring sanity check (matches D-14 hint #3 partial verbatim)")
                 .contains("do not guess");

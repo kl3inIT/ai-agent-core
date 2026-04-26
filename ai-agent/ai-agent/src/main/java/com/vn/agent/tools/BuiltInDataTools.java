@@ -47,21 +47,6 @@ import java.util.Set;
 @Component
 public class BuiltInDataTools {
 
-    /**
-     * D-14 procedural retry hints for {@code unknown_entity} tool errors. NOT translated; these
-     * are LLM-protocol English strings (RESEARCH Pitfall 7 — tool-protocol strings live in Java
-     * constants, not {@code messages.properties}, because they are model-directed instructions).
-     *
-     * <p>Order is locked: list once, retry on match, give up on no match — no guessing. The
-     * exact-once + no-guess wording is PROMPT-05's whole point and survives translation into
-     * the procedural shape. The em dash in the third hint is intentional and preserved.
-     */
-    private static final List<String> UNKNOWN_ENTITY_HINTS = List.of(
-            "call list_entities exactly once",
-            "if a name in list_entities matches your intent, retry the original tool with that exact name",
-            "if no entity in list_entities matches, tell the user no such entity exists — do not guess"
-    );
-
     private final DataManager dataManager;
     private final Metadata metadata;
     private final MetadataTools metadataTools;
@@ -331,18 +316,18 @@ public class BuiltInDataTools {
      */
     private MetaClass resolveReadableEntityOrThrow(String entityName) {
         if (entityName == null || entityName.isBlank()) {
-            throw new ToolUserError("unknown_entity", "entity name must not be blank", UNKNOWN_ENTITY_HINTS);
+            throw new ToolUserError("unknown_entity", "entity name must not be blank", UnknownEntityHints.AS_LIST);
         }
 
         MetaClass metaClass;
         try {
             metaClass = metadata.getClass(entityName);
         } catch (RuntimeException runtimeException) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UNKNOWN_ENTITY_HINTS);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
 
         if (metaClass == null) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UNKNOWN_ENTITY_HINTS);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
         if (!currentUserSchemaAccess.canReadEntity(metaClass)) {
             // Phase 3 D-08 opacity preserved: existing access_denied code stays. Phase 10
