@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Phase 08 complete (Gap 1 closed via 08-08)
+status: Phase 08 shipped - PR #3
 last_updated: "2026-04-26T13:00:00.000Z"
 last_activity: 2026-04-26
 progress:
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — integration-hardening-release-readiness
+**Current focus:** Phase 08 — integration-hardening-release-readiness shipped for review in PR #3
 
 ## Phase Status
 
