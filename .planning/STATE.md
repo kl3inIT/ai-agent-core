@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1.0
-milestone_name: milestone
-status: Phase 08 shipped - PR #3
-last_updated: "2026-04-26T13:00:00.000Z"
+milestone: v1.0.0
+milestone_name: MVP
+status: Milestone v1.0.0 shipped and archived
+last_updated: "2026-04-26T14:30:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 10
@@ -19,11 +19,11 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-04-18)
+See: `.planning/PROJECT.md` (updated 2026-04-26)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — integration-hardening-release-readiness shipped for review in PR #3
+**Current focus:** v1.0.0 shipped; planning next milestone.
 
 ## Phase Status
 
@@ -40,9 +40,9 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
 | 8 | Integration Hardening & Release Readiness | ✅ Complete (8/8 plans — 08-01..08-04, 08-06, 08-07 baseline + 08-08 gap closure replan-2 wiring jmix-security-data-starter and switching AuditWriter / ProjectingChatMemoryRepository / ConversationGateway / IngestionStatusWriter to UnconstrainedDataManager; 12/12 in com.vn.agent.security.* and 236/236 broad broom GREEN; 08-05 consumer-smoke DEFERRED — 6-layer starter-consumability gap chain documented in `08-05-SUMMARY.md`) |
 
-## Active Milestone
+## Archived Milestone
 
-**MVP v1** — 8 phases, 69 requirements. 2/8 phases complete.
+**MVP v1.0.0** — shipped 2026-04-26. Archive: `.planning/milestones/v1.0.0-ROADMAP.md`; requirements archive: `.planning/milestones/v1.0.0-REQUIREMENTS.md`.
 
 ## Phase 01 Outcome
 
@@ -88,8 +88,9 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | Artifact | Path |
 |---|---|
 | Product context | `.planning/PROJECT.md` |
-| Requirements | `.planning/REQUIREMENTS.md` |
+| Requirements archive | `.planning/milestones/v1.0.0-REQUIREMENTS.md` |
 | Roadmap | `.planning/ROADMAP.md` |
+| Roadmap archive | `.planning/milestones/v1.0.0-ROADMAP.md` |
 | Research summary | `.planning/research/SUMMARY.md` |
 | Phase 1 plans/summaries | `.planning/phases/01-walking-skeleton/` |
 | Codebase map | `.planning/codebase/` |
@@ -177,6 +178,33 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 - 07-04: ✅ Wave 4 ConversationListView + ConversationDetailView (UI-03) — ConversationListView @Route("ai-agent/conversations") @ViewController("AiAgent_Conversation.list") extends StandardListView<AiConversation>; currentUserIsAdmin() probe via CurrentAuthentication.getUser().getAuthorities() against AiAgentAdminRole.CODE drives UI-only affordances (admin sees createdBy column + userFilter TextField; non-admin sees only title + createdDate + messageCount); dynamic JPQL rebuild on titleFilter/userFilter valueChange via CollectionLoader.setQuery+setParameter; messageCount column via TextRenderer → dataManager.loadValue("select count(m) from ai_AiMessage m where m.conversation.id = :cid", Long.class) (plan path b — per-row count, trade-off documented; acceptable for v1 because row-level security already narrows non-admin sets); row double-click → viewNavigators.detailView(this, AiConversation.class).editEntity(row).navigate(). ConversationDetailView @Route("ai-agent/conversations/:id") @ViewController("AiAgent_Conversation.detail") extends StandardDetailView<AiConversation>; reuses MessageBubbleComponent from 07-03 for role-styled read-only replay (T-07-13 mitigated via shared MarkdownRenderer OWASP pipeline); messagesDl JPQL ordered by createdDate asc, seq asc bound via :conv parameter in onReady; Continue-in-chat button → UI.navigate(ChatView.class, QueryParameters.simple(Map.of("conversationId", uuid))). Layout lives entirely in XML (focusComponent + filterBar hbox + dataGrid + columns + header hbox + scroller + transcriptList vbox); controllers only orchestrate filter/admin/navigation glue. 4 files added, zero i18n changes (all 10 conversationList.*/conversationDetail.* keys pre-seeded by 07-01 at bundle lines 145-154 EN+VI). compileJava + processResources + compileTestJava green; done-criteria greps all satisfied (AiAgent_Conversation.list=1, AiAgentAdminRole.CODE=1, currentAuthentication=2, messageCount XML=2, MessageBubbleComponent=8, conversationId|ChatView=5, all text/header/placeholder/title via msg://). Commits 3818edc, 87fa46c. Deviations: (Rule 1) CurrentAuthentication has no getAuthorities() directly — went through getUser().getAuthorities() matching BaselineContextProvider.rolesOf pattern; (Rule 1) @JmixEntity names are ai_AiConversation / ai_AiMessage not AiAgent_* prefix (plan <interfaces> block stale); (Rule 1) AiMessage has no toolCallsJson field in Phase 2 — ToolCallCardComponent NOT imported in DetailView, TOOL-role messages quietly skipped during replay; bubble-only replay covers the must-have (read-only transcript), tool-call fidelity gated on a future plan adding toolCallsJson. Next: 07-07b (fill RED test stubs incl. ConversationListRoleFilterTest which was unblocked by this plan) — final Phase 7 plan.
 
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-04-26:
+
+| Category | Item | Status |
+|----------|------|--------|
+| debug | 07-1-uat3-cant-upload-source | diagnosed |
+| debug | audit-page-not-loading-data | unknown |
+| debug | cancel-stream-no-audit | diagnosed |
+| debug | issue1-chat-error-generic | diagnosed |
+| debug | phase-07-1-uat2-tool-markdown | diagnosed |
+| debug | uat6-chat-url-missing-convid | diagnosed |
+| quick_task | 260420-09p-sync-phase-3-docs-and-artifacts-with-the | missing |
+| quick_task | 260420-se6-fix-jetbrains-file-problems-project-wide | missing |
+| todo | 2026-04-24-add-dedicated-chat-speech-and-file-task-input.md | pending |
+| todo | 2026-04-24-add-explicit-host-override-for-tool-fetch-plans.md | pending |
+| todo | 2026-04-24-add-intent-driven-extraction-to-prefilled-jmix-forms.md | pending |
+| todo | 2026-04-24-add-llm-permission-inventory.md | pending |
+| todo | 2026-04-24-enforce-unknown-entity-retry-contract.md | pending |
+| todo | additional pending todos from audit-open | pending |
+| seeds | SEED-001-reviewed-learning-loop-for-agent-failures-evaluation-cases-and-routing-rules | dormant |
+| seeds | SEED-002-pre-deploy-answer-quality-regression-gate | dormant |
+| seeds | SEED-003-open-an-outputscanner-spi-only-if-the-config-driven-regex-scanner-proves-insufficient | dormant |
+| seeds | SEED-004-add-a-replay-and-diff-runner-for-chat-cases | dormant |
+| seeds | SEED-005-floating-user-chat-launcher-and-admin-chat-surface-toggle | dormant |
+| seeds | SEED-006-introduce-a-strict-file-backed-knowledge-path-for-authoritative-docs | dormant |
+| seeds | SEED-007-add-ai-specific-llm-exposure-policy | dormant |
 ## Accumulated Context
 
 ### Pending Todos
