@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vn.agent.guard.AgentSystemPromptRules;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
 import com.vn.agent.guard.IterationCounter;
@@ -200,8 +201,14 @@ public class DefaultChatServiceImpl implements ChatService {
                     active, userId, convId, runId);
 
             // B5 + B-NEW-1: baseline as deterministic TEXT (D-15) prepended to profile prompt.
+            // Phase 9 PROMPT-03 + D-15: AgentSystemPromptRules.PROMPT_RULES is inserted between
+            // the deterministic baseline (agent.entities + agent.permissions) and the host's
+            // profile prompt so the vocabulary + unknown_entity-retry rules apply on every
+            // turn — even when the host has not configured a profile prompt and even when the
+            // LLM has not yet seen any tool error in the current conversation.
             String baselineText = baselineContextProvider.renderAsText(convId);
             String composedSystemPrompt = baselineText
+                    + AgentSystemPromptRules.PROMPT_RULES
                     + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
                             ? "\n\n" + profileSystemPrompt
                             : "");
@@ -319,7 +326,11 @@ public class DefaultChatServiceImpl implements ChatService {
                     String model = parametersResolver.effectiveModel(active, effectiveOverrides);
                     String profileSystemPrompt = parametersResolver.effectiveSystemPrompt(active, userId, convId, runId);
                     String baselineText = baselineContextProvider.renderAsText(convId);
+                    // Phase 9 PROMPT-03 + D-15: same composition seam as the blocking ask(...)
+                    // path; rules apply on every streaming turn so the vocabulary + retry
+                    // contract is enforced regardless of transport mode.
                     String composedSystemPrompt = baselineText
+                            + AgentSystemPromptRules.PROMPT_RULES
                             + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
                                     ? "\n\n" + profileSystemPrompt
                                     : "");
