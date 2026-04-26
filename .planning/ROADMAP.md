@@ -44,7 +44,7 @@
 - [x] 09-01-PLAN.md — AUD-07 plumbing: AuditFieldHasher static utility + AiAgentAuditProperties (no callers wired in Phase 9)
 - [x] 09-02-PLAN.md — ToolFetchPlanCustomizer SPI + FetchPlanContext record + no-op default in SpiDefaultsAutoConfiguration
 - [x] 09-03-PLAN.md — BaselineContextProvider extension: agent.entities + agent.permissions (locale-free cache key) + AiAgentPromptProperties
-- [ ] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints
+- [x] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints
 - [ ] 09-05-PLAN.md — Output scanner pattern packs (HostPrefixPatternProvider + ToolNamePatternProvider) + AgentSystemPromptRules + DefaultChatServiceImpl rule wiring
 - [ ] 09-06-PLAN.md — TEST-08 prompt-contract regression: PromptContractMockTest (EN+VI parameterized) + PromptContractLiveTest (@Tag("live"))
 
