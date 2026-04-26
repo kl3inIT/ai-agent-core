@@ -76,12 +76,21 @@ subprojects {
                         ?: 'https://nexus.x2h.com.vn/repository/jmix-internal-snapshots/'
                 def nexusReleaseUrl = project.findProperty('nexusReleaseUrl')
                         ?: 'https://nexus.x2h.com.vn/repository/jmix-internal-releases/'
-                url = version.toString().endsWith('-SNAPSHOT') ? nexusSnapshotUrl : nexusReleaseUrl
+                def targetUrl = version.toString().endsWith('-SNAPSHOT') ? nexusSnapshotUrl : nexusReleaseUrl
+                // WR-005: refuse to publish credentials over plain HTTP. The default URLs
+                // are HTTPS, so the previous `allowInsecureProtocol = true` only weakened
+                // the release path for an overridden Nexus URL — and silently allowed an
+                // override to leak nexusUsername / nexusPassword over the wire. Fail fast
+                // if any override drops the protocol below HTTPS.
+                if (!targetUrl.toString().startsWith('https://')) {
+                    throw new GradleException(
+                            "Nexus publish URL must use HTTPS to protect credentials in transit: ${targetUrl}")
+                }
+                url = targetUrl
                 credentials {
                     username = project.findProperty('nexusUsername')
                     password = project.findProperty('nexusPassword')
                 }
-                allowInsecureProtocol = true
             }
         }
         publications {
