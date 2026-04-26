@@ -4,7 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.ChatService;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.orchestration.ChatResponseDto;
+import com.vn.agent.spi.AuditKind;
+import io.jmix.core.DataManager;
+import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -46,6 +50,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ChatServiceLiveSemanticGoldenSuiteTest {
 
     @Autowired ChatService chatService;
+    @Autowired DataManager dataManager;
+    @Autowired SystemAuthenticator systemAuthenticator;
 
     /**
      * R-04e visible-skip indicator. JUnit's {@link EnabledIfEnvironmentVariable} produces a
@@ -55,10 +61,15 @@ class ChatServiceLiveSemanticGoldenSuiteTest {
      */
     @BeforeAll
     static void announceLiveSuiteState() {
+        // WR-009: do NOT print prefix/suffix fragments of the API key — GitHub Actions
+        // log masking covers the full secret value but is not reliable for partial
+        // fragments, which can leak a stable credential fingerprint. Match the workflow
+        // preflight (`OPENROUTER_API_KEY length: ${#OPENROUTER_API_KEY}`) and emit only a
+        // boolean enable signal plus the key length.
         String key = System.getenv("OPENROUTER_API_KEY");
         boolean enabled = key != null && !key.isBlank();
         String suffix = enabled
-                ? "ENABLED — " + (key.length() > 8 ? key.substring(0, 4) + "..." + key.substring(key.length() - 4) : "redacted")
+                ? "ENABLED — key present, length=" + key.length()
                 : "SKIPPED — no OPENROUTER_API_KEY in environment";
         System.out.println("Live suite: " + suffix);
     }
@@ -93,6 +104,36 @@ class ChatServiceLiveSemanticGoldenSuiteTest {
                         .as("question %s — response must NOT contain forbidden token '%s'", question.id(), forbidden)
                         .doesNotContain(forbidden.toLowerCase(Locale.ROOT));
             }
+        }
+
+        // WR-007: assert expectedTools were actually invoked. Without this, a model
+        // could produce the right anchor words by hallucination without exercising
+        // the production tool path (list_entities / find_records / count_records).
+        // Load AiAuditEvent rows for this run with kind = TOOL and verify the
+        // captured eventName values include every name in question.expectedTools().
+        // Wrapped in SystemAuthenticator.withSystem so the audit-store load is not
+        // blocked by the runtime user context (the live test_user role does not
+        // necessarily grant ai_AiAuditEvent read).
+        if (question.expectedTools() != null && !question.expectedTools().isEmpty()) {
+            UUID runId = response.runId();
+            assertThat(runId)
+                    .as("question %s — ChatResponseDto.runId() must be present to verify tool invocations",
+                            question.id())
+                    .isNotNull();
+            List<String> invokedToolNames = systemAuthenticator.withSystem(() ->
+                    dataManager.load(AiAuditEvent.class)
+                            .query("select a from ai_AiAuditEvent a where a.runId = :rid and a.kind = :k")
+                            .parameter("rid", runId)
+                            .parameter("k", AuditKind.TOOL)
+                            .list()
+                            .stream()
+                            .map(AiAuditEvent::getEventName)
+                            .toList());
+            assertThat(invokedToolNames)
+                    .as("question %s — expected tools %s must all appear in TOOL audit rows for run %s "
+                            + "(observed: %s)",
+                            question.id(), question.expectedTools(), runId, invokedToolNames)
+                    .containsAll(question.expectedTools());
         }
     }
 
