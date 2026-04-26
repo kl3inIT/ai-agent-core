@@ -15,10 +15,10 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 - [x] **PROMPT-01**: `BaselineContextProvider.compose(...)` injects `agent.entities` — sorted alphabetical lines `name (label)`, sourced from `LlmExposurePolicy.getReadableSchema()` (post-narrowed). Truncation hint when entity count exceeds configurable threshold (default 50). Skipped when schema empty.
 - [x] **PROMPT-02**: `BaselineContextProvider.compose(...)` injects `agent.permissions` — compact map keyed by entity name with CRUD bits (`read`, `create`, `update`, `delete`) plus per-attribute `modifiable` set. Sourced from `LlmExposurePolicy + AccessManager`. Locale-sensitive labels NOT in the cache key (P-8 mitigation).
-- [ ] **PROMPT-03**: System prompt rule explicitly forbids the LLM from using internal entity names (host-prefixed identifiers) and tool names (`find_records`, `RETRIEVAL`, …) in user-facing reply text. Prompt rule paired with the `agent.entities` inventory so the LLM has a label to use instead.
+- [x] **PROMPT-03**: System prompt rule explicitly forbids the LLM from using internal entity names (host-prefixed identifiers) and tool names (`find_records`, `RETRIEVAL`, …) in user-facing reply text. Prompt rule paired with the `agent.entities` inventory so the LLM has a label to use instead.
 - [x] **PROMPT-04**: `ToolResultFormatter.records(...)` wraps payloads as `<data entity="<label>" type="<internalName>">…` (label first). Row-level rendering puts `_instance_name` (Jmix human-friendly identifier) before raw key fields.
 - [x] **PROMPT-05**: `unknown_entity` retry contract: on `unknown_entity` tool error, the LLM must call `list_entities` exactly once and either retry with the corrected name or tell the user no such entity exists. No semantic guessing. `ToolErrorDto.expected` carries the next valid action hint.
-- [ ] **PROMPT-06**: `OutputScannerAdvisor` configuration extended with patterns matching internal entity-name prefix (e.g. `\b<host_prefix>_\w+\b`) and tool-name leakage. Flag-and-audit posture preserved (no hard block on flag).
+- [x] **PROMPT-06**: `OutputScannerAdvisor` configuration extended with patterns matching internal entity-name prefix (e.g. `\b<host_prefix>_\w+\b`) and tool-name leakage. Flag-and-audit posture preserved (no hard block on flag).
 
 ### Tool-Layer Refinements
 
