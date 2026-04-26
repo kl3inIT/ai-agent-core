@@ -201,11 +201,11 @@ public class DefaultChatServiceImpl implements ChatService {
                     active, userId, convId, runId);
 
             // B5 + B-NEW-1: baseline as deterministic TEXT (D-15) prepended to profile prompt.
-            // Phase 9 PROMPT-03 + D-15: AgentSystemPromptRules.PROMPT_RULES is inserted between
-            // the deterministic baseline (agent.entities + agent.permissions) and the host's
-            // profile prompt so the vocabulary + unknown_entity-retry rules apply on every
-            // turn — even when the host has not configured a profile prompt and even when the
-            // LLM has not yet seen any tool error in the current conversation.
+            // Phase 9 PROMPT-03 + D-15: vocabulary + unknown_entity-retry rules are inserted
+            // between the deterministic baseline (agent.entities + agent.permissions) and the
+            // host's profile prompt so they apply on every turn — even when the host has not
+            // configured a profile prompt and even when the LLM has not yet seen any tool error
+            // in the current conversation.
             String baselineText = baselineContextProvider.renderAsText(convId);
             String composedSystemPrompt = baselineText
                     + AgentSystemPromptRules.PROMPT_RULES
