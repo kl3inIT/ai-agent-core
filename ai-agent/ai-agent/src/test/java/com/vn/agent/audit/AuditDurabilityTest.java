@@ -3,17 +3,24 @@ package com.vn.agent.audit;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.spi.AuditKind;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
+import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.core.security.SystemAuthenticator;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.model.ToolContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.lang.NonNull;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -47,6 +54,7 @@ class AuditDurabilityTest {
     @Autowired DataManager dataManager;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired SystemAuthenticator systemAuthenticator;
+    @Autowired CurrentAuthentication currentAuthentication;
 
     @Test
     void toolAuditRowSurvivesOuterRollback() {
@@ -129,6 +137,111 @@ class AuditDurabilityTest {
             AiAuditEvent reloadedChild = dataManager.load(AiAuditEvent.class).id(childId).one();
             assertThat(reloadedChild.getKind()).isEqualTo(AuditKind.TOOL);
             assertThat(reloadedChild.getEventName()).isEqualTo("echo");
+        });
+    }
+
+    /**
+     * R-02b/c: ERROR-path durability through the production decorator.
+     *
+     * <p>Existing {@link #toolAuditRowSurvivesOuterRollback()} asserts SUCCESS-outcome audit
+     * survives outer rollback via a DIRECT {@link AuditWriter#writeToolCall} call. This test
+     * exercises the ERROR-outcome path through {@link ToolCallbackAuditDecorator} — the
+     * production wiring — to prove that the decorator's {@code finally}-block audit write is
+     * also routed through the REQUIRES_NEW writer and survives outer rollback (R-02b).</p>
+     *
+     * <p>R-02d: also verifies that the surviving child row carries the correct
+     * {@code parent_id} linkage (to the CHAT root) and {@code runId} consistency.</p>
+     */
+    @Test
+    @DisplayName("R-02b/c: ERROR-path tool audit (via ToolCallbackAuditDecorator) also survives outer rollback")
+    void errorPathToolAuditAlsoSurvivesOuterRollback_viaDecorator() {
+        UUID runId = UUID.randomUUID();
+        String stubErrorMessage = "boom-from-throwing-tool-stub";
+
+        systemAuthenticator.runWithSystem(() -> {
+            // Arrange: write a CHAT root in its own REQUIRES_NEW so the child has a parent_id
+            // (R-02d). This commit is independent of the outer-tx-that-rolls-back below.
+            UUID rootId = auditWriter.writeChatStart(runId, "user-A", /*conversationId*/ null, "hash");
+
+            // Set RunContext so the decorator picks up runId + parentId, mirroring the
+            // production AuditAdvisor → ToolCallbackAuditDecorator handshake (D-10).
+            RunContext.set(runId);
+            RunContext.setRootAuditId(rootId);
+            try {
+                // Stub callback whose call(...) always throws — drives the decorator's
+                // catch + finally audit-then-rethrow path (ERROR outcome).
+                ToolCallback throwingCallback = new ToolCallback() {
+                    @Override @NonNull
+                    public ToolDefinition getToolDefinition() {
+                        return ToolDefinition.builder()
+                                .name("throwing-stub")
+                                .description("Always throws — used to exercise decorator ERROR path")
+                                .inputSchema("{}")
+                                .build();
+                    }
+                    @Override @NonNull
+                    public String call(@NonNull String toolInput) {
+                        throw new IllegalStateException(stubErrorMessage);
+                    }
+                    @Override @NonNull
+                    public String call(@NonNull String toolInput, ToolContext toolContext) {
+                        throw new IllegalStateException(stubErrorMessage);
+                    }
+                };
+
+                // Production decorator wired with the real REQUIRES_NEW AuditWriter proxy.
+                ToolCallbackAuditDecorator decorator = new ToolCallbackAuditDecorator(
+                        throwingCallback, auditWriter, currentAuthentication);
+
+                // Act: invoke the decorator inside an outer tx that rolls back. The stub throw
+                // propagates out of the decorator (after the finally writes the audit), Spring
+                // marks the outer tx as rollback-only, and TransactionTemplate rethrows.
+                TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+                try {
+                    txTemplate.executeWithoutResult(status -> decorator.call("{}"));
+                } catch (IllegalStateException expected) {
+                    assertThat(expected).hasMessage(stubErrorMessage);
+                }
+            } finally {
+                RunContext.clear();
+            }
+
+            // Assert: AUD-02 — REQUIRES_NEW commit independent of outer rollback (R-02b).
+            // Filter to TOOL kind because writeChatStart already wrote a CHAT row under runId.
+            List<AiAuditEvent> rows = dataManager.load(AiAuditEvent.class)
+                    .query("select a from ai_AiAuditEvent a where a.runId = :rid and a.kind = :k")
+                    .parameter("rid", runId)
+                    .parameter("k", AuditKind.TOOL)
+                    .list();
+
+            assertThat(rows)
+                    .as("R-02b: TOOL audit row written via ToolCallbackAuditDecorator MUST survive outer rollback")
+                    .hasSize(1);
+
+            AiAuditEvent surviving = rows.get(0);
+
+            // Outcome + errorClass: ERROR path produces a populated errorClass (FQN of the throw).
+            assertThat(surviving.getOutcome()).isEqualTo(AiToolCallOutcome.ERROR);
+            assertThat(surviving.getErrorClass())
+                    .as("errorClass populated on ERROR-path audit (decorator captures exception class FQN)")
+                    .isEqualTo(IllegalStateException.class.getName());
+            assertThat(surviving.getEventName()).isEqualTo("throwing-stub");
+
+            // R-02d: parent linkage + runId consistency on the surviving child.
+            // Reload with a parent fetch plan so the lazy ManyToOne is materialized safely.
+            AiAuditEvent reloaded = dataManager.load(AiAuditEvent.class)
+                    .id(surviving.getId())
+                    .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("parent", FetchPlan.BASE))
+                    .one();
+            assertThat(reloaded.getParent())
+                    .as("R-02d: surviving child must reference the CHAT root parent")
+                    .isNotNull();
+            assertThat(reloaded.getParent().getId())
+                    .as("R-02d: parent_id must equal the writeChatStart-returned root id")
+                    .isEqualTo(rootId);
+            assertThat(reloaded.getRunId())
+                    .as("R-02d: child runId must equal the chat-start runId")
+                    .isEqualTo(runId);
         });
     }
 }
