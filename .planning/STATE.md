@@ -3,13 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Roadmap defined
-last_updated: "2026-04-26T20:09:42.711Z"
+stopped_at: Plan 09-01 complete; ready to plan/execute Plan 09-02.
+last_updated: "2026-04-26T20:22:03.799Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
-  percent: 17
+  completed_plans: 2
+  percent: 33
 ---
 
 # Project State
@@ -27,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 09 (tool-layer-foundations-prompt-contract-hardening) — EXECUTING
-Plan: 2 of 6 (Plan 01 complete)
+Plan: 3 of 6 (Plan 01 complete)
 | Field | Value |
 |-------|-------|
 | Phase | Phase 9 (executing) |
@@ -113,17 +114,19 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 - 2026-04-27 (Plan 09-01): AUD-07 plumbing (`AuditFieldHasher` + `AiAgentAuditProperties`) shipped with intentional zero callers per CONTEXT D-18. Phase 11 `MutationErrorTranslator` is the planned consumer. SHA-256 over UTF-8 byte encoding (locale-independent), lowercase 64-char hex via `java.util.HexFormat`. No SPI extraction — deferred until a host requests non-SHA-256 hashing.
 - 2026-04-27 (Plan 09-01): Spring config defaults landed in `module.properties`, NOT in `default-params.yaml` (which is strict `AiParameters` seed YAML). Planner-review carve-out honored.
+- [Phase ?]: Plan 09-02: Locked the Phase-9 SPI contract surface — ToolFetchPlanCustomizer (D-09 signature) + FetchPlanContext concrete request snapshot + SpiDefaultsAutoConfiguration no-op default. FetchPlanContext does NOT carry RunContext (per D-10 review correction: RunContext is final + private constructor + static accessors). Verbatim TOOL-11 phrase 'fetch plan is projection, not security.' authored at the SPI seam; Plan 09-04 will repeat the phrase at the FetchPlanIntersector consumer seam.
 
 ### Performance Metrics
 
 | Phase-Plan | Duration | Tasks | Files | Date |
 |------------|----------|-------|-------|------|
 | 09-01 | ~6 min | 2 | 4 | 2026-04-27 |
+| Phase 09 P02 | 6min | 3 tasks | 3 files |
 
 ## Session Continuity
 
-**Last session:** 2026-04-27 — Completed Plan 09-01 (AUD-07 plumbing — `AuditFieldHasher` + `AiAgentAuditProperties`). 3 task commits + plan-metadata commit.
+**Last session:** 2026-04-26T20:21:53.238Z
 **Stopped at:** Plan 09-01 complete; ready to plan/execute Plan 09-02.
-**Resume file:** `.planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-01-SUMMARY.md`
+**Resume file:** None
 **Blockers:** None.
 **Next action:** `/gsd-execute-phase 9` to continue Phase 9 (Plan 02 next), or `/gsd-plan-phase 9` if Plan 02 PLAN.md is not yet drafted.

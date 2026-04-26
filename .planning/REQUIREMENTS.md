@@ -23,7 +23,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 ### Tool-Layer Refinements
 
 - [ ] **TOOL-09**: `describe_entity` payload extended with selected Jmix metadata fields, sourced via `MetadataTools` (NOT raw reflection): entity-level `comment` (via `@Comment`), optional `ancestor`; attribute-level `comment`, `attributeType`, `cardinality`, `mandatory` (replaces inverted `nullable`), `readOnly`, `persistent`, `transient`, `isPrimaryKey`, `enumValues`, `relationshipTarget`, `maxLength`. Excluded fields documented inline.
-- [ ] **TOOL-10**: `ToolFetchPlanCustomizer` SPI defined: `Optional<FetchPlan> overrideFor(String toolName, MetaClass metaClass, FetchPlanContext ctx)`. Default impl returns `Optional.empty()` (current `_base` / `_instance_name` behavior preserved). Resolved by runtime `toolName + MetaClass`, NOT compile-time entity types. Add-on does NOT auto-discover from host `fetch-plans.xml`.
+- [x] **TOOL-10**: `ToolFetchPlanCustomizer` SPI defined: `Optional<FetchPlan> overrideFor(String toolName, MetaClass metaClass, FetchPlanContext ctx)`. Default impl returns `Optional.empty()` (current `_base` / `_instance_name` behavior preserved). Resolved by runtime `toolName + MetaClass`, NOT compile-time entity types. Add-on does NOT auto-discover from host `fetch-plans.xml`.
 - [ ] **TOOL-11**: Override fetch plans pass an attribute-policy intersection — host plan cannot widen the projection beyond `AccessManager`-allowed attributes. Comment in code states: "fetch plan is projection, not security."
 - [ ] **TOOL-12**: LLM permission inventory exposed at entity granularity in baseline (PROMPT-02) plus `describe_entity` per-attribute readability. Denied entity names are NOT revealed to the LLM (consistent with v1 "if access is denied, the model behaves as if the entity does not exist"); the inventory only lists entities the user is allowed to see.
 
@@ -114,7 +114,7 @@ All five entities follow CLAUDE.md conventions: `@JmixEntity` + UUID + `@JmixGen
 
 ### New SPIs
 
-- [ ] **SPI-09**: `ToolFetchPlanCustomizer` (per TOOL-10)
+- [x] **SPI-09**: `ToolFetchPlanCustomizer` (per TOOL-10)
 - [ ] **SPI-10**: `MutationGuard` (per MUT-05)
 - [ ] **SPI-11**: `TranscriptionPostProcessor` (per STT-04)
 - [ ] **SPI-12**: `IntentExtractor<T>` (per EXTRACT-02)
