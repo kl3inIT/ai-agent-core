@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
 import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
 import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
 import io.jmix.core.EntityStates;
@@ -55,6 +56,7 @@ class UnknownEntityRetryHintTest {
     private FilterLiteralValueConverter literalConverter;
     private ToolResultFormatter formatter;
     private FetchPlanResolver fetchPlanResolver;
+    private FetchPlanIntersector fetchPlanIntersector;
     private BuiltInDataTools tools;
 
     @BeforeEach
@@ -70,9 +72,11 @@ class UnknownEntityRetryHintTest {
         formatter = new ToolResultFormatter(
                 OBJECT_MAPPER, mock(EntityStates.class), metadataTools, messageTools, mock(Messages.class));
         fetchPlanResolver = mock(FetchPlanResolver.class);
+        fetchPlanIntersector = mock(FetchPlanIntersector.class);
         tools = new BuiltInDataTools(
                 dataManager, metadata, metadataTools, messageTools, fetchPlans,
-                schemaAccess, filterMapper, literalConverter, formatter, fetchPlanResolver);
+                schemaAccess, filterMapper, literalConverter, formatter, fetchPlanResolver,
+                fetchPlanIntersector);
     }
 
     // ---- Test 1: Unknown entity name → three D-14 hints in locked order ----
@@ -198,11 +202,14 @@ class UnknownEntityRetryHintTest {
         // FetchPlans builder for composing data plan + INSTANCE_NAME relationship
         io.jmix.core.FetchPlanBuilder composedBuilder = mock(io.jmix.core.FetchPlanBuilder.class);
         FetchPlan composedPlan = mock(FetchPlan.class);
+        FetchPlan narrowedPlan = mock(FetchPlan.class);
         when(fetchPlans.builder(any(Class.class))).thenReturn(composedBuilder);
         lenient().when(composedBuilder.addFetchPlan(any(FetchPlan.class))).thenReturn(composedBuilder);
         lenient().when(composedBuilder.addFetchPlan(any(String.class))).thenReturn(composedBuilder);
         lenient().when(composedBuilder.add(any(String.class), any(java.util.function.Consumer.class))).thenReturn(composedBuilder);
         when(composedBuilder.build()).thenReturn(composedPlan);
+        when(fetchPlanIntersector.intersectWithAcl(composedPlan, rootMetaClass, "get_related_records"))
+                .thenReturn(narrowedPlan);
 
         UUID parsedId = UUID.randomUUID();
         MetaProperty primaryKey = mock(MetaProperty.class);
@@ -222,6 +229,8 @@ class UnknownEntityRetryHintTest {
 
         verify(fetchPlanResolver).resolve("get_related_records", rootMetaClass);
         verify(composedBuilder).addFetchPlan(resolvedDataPlan);
+        verify(fetchPlanIntersector).intersectWithAcl(composedPlan, rootMetaClass, "get_related_records");
+        verify(byId).fetchPlan(narrowedPlan);
     }
 
     // ---- helpers ----

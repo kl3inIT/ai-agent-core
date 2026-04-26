@@ -4,6 +4,7 @@ import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
 import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
 import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
@@ -71,6 +72,7 @@ public class BuiltInDataTools {
     private final FilterLiteralValueConverter filterLiteralValueConverter;
     private final ToolResultFormatter toolResultFormatter;
     private final FetchPlanResolver fetchPlanResolver;
+    private final FetchPlanIntersector fetchPlanIntersector;
 
     public BuiltInDataTools(DataManager dataManager,
                             Metadata metadata,
@@ -81,7 +83,8 @@ public class BuiltInDataTools {
                             StructuredFilterConditionMapper structuredFilterConditionMapper,
                             FilterLiteralValueConverter filterLiteralValueConverter,
                             ToolResultFormatter toolResultFormatter,
-                            FetchPlanResolver fetchPlanResolver) {
+                            FetchPlanResolver fetchPlanResolver,
+                            FetchPlanIntersector fetchPlanIntersector) {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
@@ -92,6 +95,7 @@ public class BuiltInDataTools {
         this.filterLiteralValueConverter = filterLiteralValueConverter;
         this.toolResultFormatter = toolResultFormatter;
         this.fetchPlanResolver = fetchPlanResolver;
+        this.fetchPlanIntersector = fetchPlanIntersector;
     }
 
     // -------- Tool 1: list_entities (D-01) --------
@@ -285,14 +289,15 @@ public class BuiltInDataTools {
 
             // D-13: SPI overrides the data fetch plan only; INSTANCE_NAME on the relationship
             // is a separate label-projection concern outside the SPI surface in v1.1. The
-            // intersector has already pruned dataPlan's properties; INSTANCE_NAME below
-            // bypasses intersection because it only fetches what @InstanceName declared,
-            // which is by definition readable to anyone who can read the entity.
+            // composed plan is intersected again because Jmix instance-name attributes are
+            // normal attributes and can still be denied by the current user's policies.
             FetchPlan dataPlan = fetchPlanResolver.resolve("get_related_records", rootMetaClass);
-            FetchPlan fetchPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
+            FetchPlan composedPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
                     .addFetchPlan(dataPlan)
                     .add(relationship, fetchPlanBuilder -> fetchPlanBuilder.addFetchPlan(FetchPlan.INSTANCE_NAME))
                     .build();
+            FetchPlan fetchPlan = fetchPlanIntersector.intersectWithAcl(
+                    composedPlan, rootMetaClass, "get_related_records");
             Object rootEntity = dataManager.load(rootMetaClass.getJavaClass())
                     .id(parseEntityId(id, rootMetaClass))
                     .fetchPlan(fetchPlan)
