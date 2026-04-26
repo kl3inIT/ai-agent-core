@@ -11,9 +11,12 @@ import io.jmix.core.metamodel.model.MetaPropertyPath;
 import io.jmix.core.security.CurrentAuthentication;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -60,6 +63,18 @@ class BaselineContextProviderTest {
         assertThat(ctx.get("agent.roles")).isEqualTo(Set.of());
         assertThat(ctx.get("agent.locale")).isEqualTo(Locale.ROOT.toString());
         assertThat(ctx.get("agent.conversationId")).isNull();
+    }
+
+    @Test
+    void compose_fallsBackToUsernameWhenReflectiveUserKeyFails() {
+        BaselineContextProvider provider = newProvider(b -> b
+                .userDetails(new ThrowingKeyUser("alice"))
+                .locale(Locale.US)
+                .schema(emptySchema()));
+
+        Map<String, Object> ctx = provider.compose(null);
+
+        assertThat(ctx.get("agent.userId")).isEqualTo("alice");
     }
 
     @Test
@@ -392,10 +407,13 @@ class BaselineContextProviderTest {
             when(ca.getUser()).thenReturn(null);
             when(ca.getLocale()).thenReturn(null);
         } else {
-            when(ca.getUser()).thenReturn(new User(cfg.username, "x",
-                    cfg.roles.stream()
-                            .map(SimpleGrantedAuthority::new)
-                            .toList()));
+            UserDetails userDetails = cfg.userDetails != null
+                    ? cfg.userDetails
+                    : new User(cfg.username, "x",
+                            cfg.roles.stream()
+                                    .map(SimpleGrantedAuthority::new)
+                                    .toList());
+            when(ca.getUser()).thenReturn(userDetails);
             when(ca.getLocale()).thenReturn(cfg.locale);
         }
 
@@ -448,6 +466,7 @@ class BaselineContextProviderTest {
     private static final class BuilderConfig {
         boolean anonymous = false;
         String username = "alice";
+        UserDetails userDetails;
         List<String> roles = List.of("ROLE_USER");
         Locale locale = Locale.ENGLISH;
         Map<MetaClass, Set<String>> schema = Map.of();
@@ -465,6 +484,11 @@ class BaselineContextProviderTest {
         BuilderConfig user(String username, String... roles) {
             this.username = username;
             this.roles = List.of(roles);
+            return this;
+        }
+
+        BuilderConfig userDetails(UserDetails userDetails) {
+            this.userDetails = userDetails;
             return this;
         }
 
@@ -501,6 +525,33 @@ class BaselineContextProviderTest {
         BuilderConfig modifiableAttributes(MetaClass mc, String... attrs) {
             modifiableByEntity.put(mc, Set.of(attrs));
             return this;
+        }
+    }
+
+    private static final class ThrowingKeyUser implements UserDetails {
+        private final String username;
+
+        private ThrowingKeyUser(String username) {
+            this.username = username;
+        }
+
+        public Object getKey() {
+            throw new IllegalStateException("broken key provider");
+        }
+
+        @Override
+        public Collection<? extends GrantedAuthority> getAuthorities() {
+            return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        }
+
+        @Override
+        public String getPassword() {
+            return "x";
+        }
+
+        @Override
+        public String getUsername() {
+            return username;
         }
     }
 

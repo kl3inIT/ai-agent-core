@@ -9,6 +9,8 @@ import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.accesscontext.EntityAttributeContext;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.security.CurrentAuthentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -64,6 +66,8 @@ import java.util.stream.Collectors;
  */
 @Component
 public class BaselineContextProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(BaselineContextProvider.class);
 
     private final CurrentAuthentication currentAuthentication;
     private final CurrentUserSchemaAccess currentUserSchemaAccess;
@@ -169,8 +173,14 @@ public class BaselineContextProvider {
             if (result instanceof UUID || result instanceof String) {
                 return result;
             }
-        } catch (Exception ignore) {
-            // Fall through to username fallback.
+            log.debug("getKey() returned non-UUID/non-String type {} on user class {}; falling back to username",
+                    result == null ? "null" : result.getClass().getName(),
+                    user.getClass().getName());
+        } catch (NoSuchMethodException noKeyMethod) {
+            // Expected for non-Jmix UserDetails implementations.
+        } catch (ReflectiveOperationException | RuntimeException keyFailure) {
+            log.debug("getKey() invocation failed on {}; falling back to username",
+                    user.getClass().getName(), keyFailure);
         }
         return user.getUsername();
     }
