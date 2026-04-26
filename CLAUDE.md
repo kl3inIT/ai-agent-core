@@ -11,7 +11,7 @@ This file provides guidance to AI coding agents when working with code in this r
 ## Project
 
 Technology Stack:
-- Java 17
+- Java 21
 - Jmix 2.8 (Spring Boot 3, Vaadin Flow UI)
 - Relational database
 - Gradle build system
