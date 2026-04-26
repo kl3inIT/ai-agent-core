@@ -87,6 +87,12 @@ dependencies {
     // 03-04-SUMMARY.md).
     testImplementation 'org.ow2.asm:asm:9.9'
 
+    // Plan 08-03 (perf smoke): EclipseLink has no Statistics API; datasource-proxy
+    // counts JDBC SELECTs at the connection layer. CONTEXT D-07 named Hibernate API
+    // (drift). Plan named 1.10.0 (does not exist on Maven Central); using current
+    // 1.11.0 release — Rule 3 deviation recorded in 08-03-SUMMARY.md.
+    testImplementation 'net.ttddyy:datasource-proxy:1.11.0'
+
     // Plan 05-01 — downstream RAG plan integration tests (Plan 05-05) will need
     // Testcontainers Postgres + spring-ai-test. Pulled onto the classpath now so
     // Plan 05-01's bean-collision test compiles against a complete test tier.
