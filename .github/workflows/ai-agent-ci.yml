@@ -1,0 +1,71 @@
+# Plan 08-07 — PR-blocking CI for the ai-agent add-on.
+#
+# Runs on every push to main + every PR. Default ./gradlew test excludes @Tag('live')
+# and @Tag('rag-it'); both stay opt-in (live via ai-agent-live.yml; integration test
+# requires Docker on the runner — gated by isDockerAvailable() in ai-agent.gradle).
+name: ai-agent CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# R-07f: explicit minimal permissions; PR-blocking workflow only needs read.
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# R-07f: cancel superseded runs on the same branch / PR.
+concurrency:
+  group: ai-agent-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle setup
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Resolve aiAgentVersion (R-07b — dynamic, NOT hardcoded)
+        id: version
+        run: |
+          VERSION=$(grep -E '^version=' ai-agent/gradle.properties | cut -d= -f2 | tr -d ' ')
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: could not resolve version from ai-agent/gradle.properties" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved aiAgentVersion: $VERSION"
+
+      - name: Compile + test (default tier — excludes @Tag(live) and @Tag(rag-it))
+        run: ./gradlew :ai-agent:ai-agent:test --no-daemon
+
+      - name: Publish ai-agent + ai-agent-starter to local maven (for downstream smoke)
+        run: ./gradlew :ai-agent:ai-agent:publishToMavenLocal :ai-agent:ai-agent-starter:publishToMavenLocal --no-daemon
+
+      # consumer-smoke is deferred per Plan 08-05. When the subproject lands, this step
+      # invokes the smoke against the just-published artifact:
+      # - name: Boot consumer-smoke against the just-published artifact
+      #   run: ./gradlew :consumer-smoke:bootRunSmoke -PaiAgentVersion=${{ steps.version.outputs.VERSION }} --no-daemon
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-agent-test-reports
+          path: ai-agent/ai-agent/build/reports/tests/

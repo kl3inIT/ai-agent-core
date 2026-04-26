@@ -21,3 +21,10 @@ out/
 
 .env
 .claude/
+
+# Plan 08-07 (R-07a): local nexus credentials must NEVER be committed.
+# Use ~/.gradle/gradle.properties (user-global, untracked by definition) OR
+# a project-local file matching one of these patterns (explicitly ignored).
+nexus-credentials*
+gradle-local.properties
+**/nexus.properties

@@ -9,7 +9,9 @@ buildscript {
 }
 
 group = 'com.vn'
-version = '0.0.1-SNAPSHOT'
+// Plan 08-07: version sourced from gradle.properties so CI can override via -Pversion=...
+// without editing build files. Default falls back to 1.0.0 if the property is unset.
+version = project.findProperty('version') ?: '1.0.0'
 
 subprojects {
     apply plugin: 'java-library'
@@ -64,7 +66,17 @@ subprojects {
         repositories {
             maven {
                 name = 'CustomNexus'
-                url = 'https://nexus.x2h.com.vn/repository/jmix-internal-snapshots/' // Replace with your Nexus repo URL
+                // [W-03 GATING] — snapshot-vs-release URL conditional. The
+                // jmix-internal-snapshots repo only accepts -SNAPSHOT versions; uploading
+                // 1.0.0 against it is rejected. Switch to a release-class repo for non-
+                // snapshot versions. Configure both URLs via -PnexusReleaseUrl /
+                // -PnexusSnapshotUrl in CI; defaults below mirror current snapshot
+                // convention so dev publishToMavenLocal (which uses neither) is unaffected.
+                def nexusSnapshotUrl = project.findProperty('nexusSnapshotUrl')
+                        ?: 'https://nexus.x2h.com.vn/repository/jmix-internal-snapshots/'
+                def nexusReleaseUrl = project.findProperty('nexusReleaseUrl')
+                        ?: 'https://nexus.x2h.com.vn/repository/jmix-internal-releases/'
+                url = version.toString().endsWith('-SNAPSHOT') ? nexusSnapshotUrl : nexusReleaseUrl
                 credentials {
                     username = project.findProperty('nexusUsername')
                     password = project.findProperty('nexusPassword')
