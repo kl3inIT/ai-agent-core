@@ -114,7 +114,7 @@ public class KnowledgeDocumentUploadService {
 
         // D-07 fail-closed role validation — every code MUST resolve, unknown codes abort.
         for (String code : roles) {
-            ResourceRole role = roleRepository.findRoleByCode(code);
+            ResourceRole role = resolveRole(code);
             if (role == null) {
                 throw new UnknownRoleCodeException(code);
             }
@@ -152,6 +152,17 @@ public class KnowledgeDocumentUploadService {
         }
 
         return saved;
+    }
+
+    private ResourceRole resolveRole(String code) {
+        try {
+            return roleRepository.findRoleByCode(code);
+        } catch (RuntimeException e) {
+            // Jmix may consult the runtime role store after design-time role lookup misses.
+            // If that store is unavailable or not present in a lightweight test/host schema,
+            // keep the public contract fail-closed: the caller supplied an unusable role code.
+            throw new UnknownRoleCodeException(code, e);
+        }
     }
 
     /**

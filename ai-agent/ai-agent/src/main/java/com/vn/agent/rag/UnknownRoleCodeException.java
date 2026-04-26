@@ -18,6 +18,11 @@ public class UnknownRoleCodeException extends RuntimeException {
         this.code = code;
     }
 
+    public UnknownRoleCodeException(String code, Throwable cause) {
+        super("Unknown role code: " + code, cause);
+        this.code = code;
+    }
+
     public String getCode() {
         return code;
     }

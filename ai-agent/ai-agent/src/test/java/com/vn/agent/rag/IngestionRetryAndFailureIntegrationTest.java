@@ -62,7 +62,7 @@ class IngestionRetryAndFailureIntegrationTest extends AbstractRagIntegrationTest
 
     @Test
     void test_transient_vectorstore_failure_does_not_leave_partial_vectors() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             AtomicInteger calls = new AtomicInteger(0);
 
             // First 2 calls throw (transient), subsequent calls delegate to the real bean.
@@ -107,7 +107,7 @@ class IngestionRetryAndFailureIntegrationTest extends AbstractRagIntegrationTest
 
     @Test
     void test_permanent_failure_marks_failed_with_message_and_no_vectors() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             doAnswer(inv -> {
                 throw new RuntimeException("induced permanent embed/add failure");
             }).when(vectorStoreSpy).add(anyList());
@@ -141,7 +141,7 @@ class IngestionRetryAndFailureIntegrationTest extends AbstractRagIntegrationTest
 
     @Test
     void test_failure_after_partial_add_cleans_up_all_partial_chunks() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             AtomicInteger calls = new AtomicInteger(0);
 
             // Write the batch for real (partial state), then throw — models a mid-stream

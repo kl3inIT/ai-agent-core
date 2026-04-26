@@ -40,7 +40,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_document_with_empty_allowed_roles_invisible_to_non_admin() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md", List.of());
 
             Authentication user = authWith(AiAgentUserRole.CODE);
@@ -63,7 +63,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_non_admin_with_no_matching_role_sees_nothing() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             // Document gated on the row-level role; user holds the plain user role only.
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-beta.md",
                     List.of(AiAgentTestBetaRole.CODE));
@@ -88,7 +88,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_null_authentication_sees_nothing() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md", List.of(AiAgentUserRole.CODE));
 
             // D-05 fail-closed: null auth collapses to the empty-roles sentinel branch, not null.
@@ -122,7 +122,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
         @Test
         void test_admin_bypass_off_still_sees_same_docs_when_role_matches() {
-            systemAuthenticator.runWithSystem(() -> {
+            runAsAdmin(() -> {
                 UUID alphaId = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                         List.of(AiAgentUserRole.CODE));
                 UUID gammaId = uploadAndAwaitReady("classpath:ai-kb/fixture-gamma.md",

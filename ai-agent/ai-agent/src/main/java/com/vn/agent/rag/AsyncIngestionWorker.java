@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
-import io.jmix.core.DataManager;
+import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +82,7 @@ public class AsyncIngestionWorker {
 
     private final IngestionStatusWriter ingestionStatusWriter;
     private final CancellationRegistry cancellationRegistry;
-    private final DataManager dataManager;
+    private final UnconstrainedDataManager dataManager;
     private final VectorStore vectorStore;
     private final AiAgentRagProperties ragProperties;
     private final AiAgentEmbeddingProperties embeddingProperties;
@@ -91,7 +91,7 @@ public class AsyncIngestionWorker {
 
     public AsyncIngestionWorker(IngestionStatusWriter ingestionStatusWriter,
                                 CancellationRegistry cancellationRegistry,
-                                DataManager dataManager,
+                                UnconstrainedDataManager dataManager,
                                 VectorStore vectorStore,
                                 AiAgentRagProperties ragProperties,
                                 AiAgentEmbeddingProperties embeddingProperties,
@@ -109,10 +109,10 @@ public class AsyncIngestionWorker {
 
     @Async("aiAgentIngestExecutor")
     public void ingest(UUID documentId) {
-        // Async thread has no SecurityContext — DataManager/VectorStore require an
-        // authenticated principal for policy checks. Run under Jmix system auth; the
-        // document was already role-validated by KnowledgeDocumentUploadService at upload
-        // time, and retrieval-time visibility is still enforced via per-chunk allowedRoles.
+        // Async thread has no SecurityContext. Run under Jmix system auth; the document was
+        // already role-validated by KnowledgeDocumentUploadService at upload time, and the
+        // internal entity read uses UnconstrainedDataManager because ingestion is system
+        // bookkeeping. Retrieval-time visibility is still enforced via per-chunk allowedRoles.
         systemAuthenticator.runWithSystem(() -> ingestInternal(documentId));
     }
 

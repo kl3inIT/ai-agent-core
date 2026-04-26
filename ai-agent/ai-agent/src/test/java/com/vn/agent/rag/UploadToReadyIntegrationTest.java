@@ -43,7 +43,7 @@ class UploadToReadyIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_upload_transitions_pending_to_ready_with_chunks() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                     List.of(AiAgentUserRole.CODE));
 
@@ -69,7 +69,7 @@ class UploadToReadyIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_upload_with_unknown_role_rejects_and_persists_nothing() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             assertThatThrownBy(() ->
                     uploadService.upload("classpath:ai-kb/fixture-alpha.md", "text/markdown",
                             List.of("phantom-role-does-not-exist")))
@@ -85,7 +85,7 @@ class UploadToReadyIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_upload_with_empty_roles_still_reaches_ready() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md", List.of());
             AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.READY);
@@ -107,7 +107,7 @@ class UploadToReadyIntegrationTest extends AbstractRagIntegrationTest {
             "classpath:ai-kb/fixture-zeta.html"
     })
     void test_format_matrix_all_rag01_formats_reach_ready(String sourceUri) {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady(sourceUri, List.of(AiAgentUserRole.CODE));
 
             Optional<AiKnowledgeDocument> reloaded = dataManager.load(AiKnowledgeDocument.class)

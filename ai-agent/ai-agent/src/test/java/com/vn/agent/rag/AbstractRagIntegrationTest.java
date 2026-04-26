@@ -22,13 +22,12 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -64,7 +63,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @Import(RagTestConfiguration.class)
 @ActiveProfiles("rag-it")
-@Testcontainers
 @EnabledIf("com.vn.agent.rag.AbstractRagIntegrationTest#isDockerAvailable")
 public abstract class AbstractRagIntegrationTest {
 
@@ -73,17 +71,28 @@ public abstract class AbstractRagIntegrationTest {
             DockerImageName.parse("pgvector/pgvector:pg16")
                     .asCompatibleSubstituteFor("postgres");
 
-    @Container
+    private static final boolean DOCKER_AVAILABLE = detectDockerAvailable();
+
     protected static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>(PGVECTOR_IMAGE)
             .withDatabaseName("ai_agent_test")
             .withUsername("test")
             .withPassword("test");
+
+    static {
+        if (DOCKER_AVAILABLE) {
+            PG.start();
+        }
+    }
 
     /**
      * Condition for {@link EnabledIf}: only run this test class when a Docker daemon is reachable.
      * Called by JUnit reflectively — MUST be public static with no args and boolean return.
      */
     public static boolean isDockerAvailable() {
+        return DOCKER_AVAILABLE;
+    }
+
+    private static boolean detectDockerAvailable() {
         try {
             return DockerClientFactory.instance().isDockerAvailable();
         } catch (Throwable t) {
@@ -117,6 +126,14 @@ public abstract class AbstractRagIntegrationTest {
     @Autowired protected Metadata metadata;
     @Autowired protected SystemAuthenticator systemAuthenticator;
 
+    protected void runAsAdmin(Runnable action) {
+        systemAuthenticator.runWithUser("admin", action);
+    }
+
+    protected <T> T withAdmin(Supplier<T> action) {
+        return systemAuthenticator.withUser("admin", action::get);
+    }
+
     /**
      * WR-04: centralised hermetic cleanup. Every test class that extends this base runs
      * {@link #purgeAllVectorsAndDocuments()} in {@code @BeforeEach} AND {@code @AfterEach}
@@ -126,13 +143,15 @@ public abstract class AbstractRagIntegrationTest {
      */
     @BeforeEach
     void purgeBeforeTest() {
-        systemAuthenticator.runWithSystem(this::purgeAllVectorsAndDocuments);
-        assertEmptyStateOrFail();
+        runAsAdmin(() -> {
+            purgeAllVectorsAndDocuments();
+            assertEmptyStateOrFail();
+        });
     }
 
     @AfterEach
     void purgeAfterTest() {
-        systemAuthenticator.runWithSystem(this::purgeAllVectorsAndDocuments);
+        runAsAdmin(this::purgeAllVectorsAndDocuments);
     }
 
     /**
@@ -173,10 +192,11 @@ public abstract class AbstractRagIntegrationTest {
      * tests can chain role-scoped retrieval / delete assertions.
      */
     protected UUID uploadAndAwaitReady(String sourceUri, Collection<String> allowedRoles) {
-        AiKnowledgeDocument saved = uploadService.upload(sourceUri, sourceKindFor(sourceUri), allowedRoles);
+        AiKnowledgeDocument saved = withAdmin(() ->
+                uploadService.upload(sourceUri, sourceKindFor(sourceUri), allowedRoles));
         // With SyncTaskExecutor, ingestion has already completed by the time this returns.
-        AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class)
-                .id(saved.getId()).one();
+        AiKnowledgeDocument reloaded = withAdmin(() -> dataManager.load(AiKnowledgeDocument.class)
+                .id(saved.getId()).one());
         assertThat(reloaded.getStatus())
                 .as("Upload of %s should drive document to READY under SyncTaskExecutor. errorMessage=%s",
                         sourceUri, reloaded.getErrorMessage())
