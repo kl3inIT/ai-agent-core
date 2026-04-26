@@ -149,7 +149,7 @@ public class BaselineContextProvider {
     private static Set<String> rolesOf(UserDetails user) {
         return user.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     /**

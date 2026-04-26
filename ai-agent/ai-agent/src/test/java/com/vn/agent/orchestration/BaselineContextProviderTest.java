@@ -88,6 +88,23 @@ class BaselineContextProviderTest {
         assertThat(text).contains("agent.conversationId=00000000-0000-0000-0000-000000000001");
     }
 
+    @Test
+    void renderAsText_rolesAreSortedRegardlessOfAuthorityOrder() {
+        BaselineContextProvider first = newProvider(b -> b
+                .user("bob", "ROLE_B", "ROLE_A")
+                .locale(Locale.US)
+                .schema(emptySchema()));
+        BaselineContextProvider second = newProvider(b -> b
+                .user("bob", "ROLE_A", "ROLE_B")
+                .locale(Locale.US)
+                .schema(emptySchema()));
+
+        UUID convId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+        assertThat(first.renderAsText(convId)).isEqualTo(second.renderAsText(convId));
+        assertThat(first.renderAsText(convId)).contains("agent.roles=[ROLE_A, ROLE_B]");
+    }
+
     // --- Plan 09-03: agent.entities + agent.permissions tests --- //
 
     @Test
@@ -376,7 +393,9 @@ class BaselineContextProviderTest {
             when(ca.getLocale()).thenReturn(null);
         } else {
             when(ca.getUser()).thenReturn(new User(cfg.username, "x",
-                    List.of(new SimpleGrantedAuthority(cfg.role))));
+                    cfg.roles.stream()
+                            .map(SimpleGrantedAuthority::new)
+                            .toList()));
             when(ca.getLocale()).thenReturn(cfg.locale);
         }
 
@@ -429,7 +448,7 @@ class BaselineContextProviderTest {
     private static final class BuilderConfig {
         boolean anonymous = false;
         String username = "alice";
-        String role = "ROLE_USER";
+        List<String> roles = List.of("ROLE_USER");
         Locale locale = Locale.ENGLISH;
         Map<MetaClass, Set<String>> schema = Map.of();
         Map<MetaClass, String> captionsByEntity = new LinkedHashMap<>();
@@ -443,9 +462,9 @@ class BaselineContextProviderTest {
             return this;
         }
 
-        BuilderConfig user(String username, String role) {
+        BuilderConfig user(String username, String... roles) {
             this.username = username;
-            this.role = role;
+            this.roles = List.of(roles);
             return this;
         }
 
