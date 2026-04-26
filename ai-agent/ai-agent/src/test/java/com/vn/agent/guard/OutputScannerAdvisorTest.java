@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -81,6 +82,22 @@ class OutputScannerAdvisorTest {
 
         advisor.adviseCall(req, chain);
         assertThat(contextMap).doesNotContainKey(OutputScannerAdvisor.CONTEXT_KEY_FLAGGED_PATTERN);
+    }
+
+    @org.junit.jupiter.api.Test
+    void nullCallResponseThrowsInsteadOfReturningNull() {
+        AiAgentGuardProperties props = new AiAgentGuardProperties(
+                null, null, null,
+                new AiAgentGuardProperties.OutputScanner(true, null, null, null));
+        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props, null, null);
+
+        ChatClientRequest req = mock(ChatClientRequest.class);
+        CallAdvisorChain chain = mock(CallAdvisorChain.class);
+        when(chain.nextCall(req)).thenReturn(null);
+
+        assertThatThrownBy(() -> advisor.adviseCall(req, chain))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("CallAdvisorChain returned null ChatClientResponse");
     }
 
     @org.junit.jupiter.api.Test

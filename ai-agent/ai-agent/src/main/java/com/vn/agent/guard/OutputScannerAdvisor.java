@@ -157,7 +157,10 @@ public class OutputScannerAdvisor implements CallAdvisor, StreamAdvisor {
     public @NonNull ChatClientResponse adviseCall(@NonNull ChatClientRequest request,
                                                    @NonNull CallAdvisorChain chain) {
         ChatClientResponse response = chain.nextCall(request);
-        if (!props.outputScannerEnabled() || response == null) {
+        if (response == null) {
+            throw new IllegalStateException("CallAdvisorChain returned null ChatClientResponse");
+        }
+        if (!props.outputScannerEnabled()) {
             return response;
         }
         scanAndFlag(response);
