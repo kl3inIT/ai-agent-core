@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///baselineContext.title">
+    <layout padding="true" spacing="true">
+        <hbox id="toolbar"
+              width="100%"
+              alignItems="END"
+              justifyContent="BETWEEN"
+              padding="false"
+              spacing="true">
+            <textField id="generatedAtField"
+                       label="msg:///baselineContext.generatedAt"
+                       readOnly="true"/>
+            <button id="refreshButton"
+                    text="msg:///baselineContext.action.refresh"
+                    themeNames="primary"/>
+        </hbox>
+        <codeEditor id="baselinePreviewField"
+                    label="msg:///baselineContext.preview"
+                    readOnly="true"
+                    width="100%"
+                    minHeight="36em"/>
+    </layout>
+</view>

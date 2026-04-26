@@ -61,11 +61,18 @@ class AdminViewAccessTest {
     }
 
     @Test
+    void deniesBaselineContextForNonAdmin() {
+        assertThat(permittedFor("alice", "AiAgent_BaselineContext"))
+                .as("Non-admin must NOT see baseline context diagnostics").isFalse();
+    }
+
+    @Test
     void allowsAdminViewsForAdmin() {
         assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.detailDialog")).isTrue();
+        assertThat(permittedFor("admin", "AiAgent_BaselineContext")).isTrue();
     }
 
     @Test
