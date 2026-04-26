@@ -48,7 +48,7 @@ class IngestionStatusWriterTest {
 
             writer.markPending(id);
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PENDING);
             assertThat(reloaded.getErrorMessage()).isNull();
             assertThat(reloaded.getIngestedAt()).isNull();
@@ -62,7 +62,7 @@ class IngestionStatusWriterTest {
 
             writer.markProcessing(id);
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PROCESSING);
             assertThat(reloaded.getErrorMessage()).isNull();
         });
@@ -75,7 +75,7 @@ class IngestionStatusWriterTest {
 
             writer.markReady(id, 42);
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.READY);
             assertThat(reloaded.getErrorMessage()).isNull();
             assertThat(reloaded.getIngestedAt()).isNotNull();
@@ -90,7 +90,7 @@ class IngestionStatusWriterTest {
 
             writer.markFailed(id, huge);
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.FAILED);
             // Column is VARCHAR(1024); writer truncates to that limit.
             assertThat(reloaded.getErrorMessage()).hasSize(1024);
@@ -104,7 +104,7 @@ class IngestionStatusWriterTest {
 
             writer.markFailed(id, "boom");
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getErrorMessage()).isEqualTo("boom");
         });
     }
@@ -116,7 +116,7 @@ class IngestionStatusWriterTest {
 
             writer.markCancelled(id);
 
-            AiKnowledgeDocument reloaded = dataManager.load(AiKnowledgeDocument.class).id(id).one();
+            AiKnowledgeDocument reloaded = dataManager.unconstrained().load(AiKnowledgeDocument.class).id(id).one();
             assertThat(reloaded.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.CANCELLED);
             assertThat(reloaded.getErrorMessage()).isNull();
         });
@@ -141,6 +141,8 @@ class IngestionStatusWriterTest {
         doc.setStatus(status);
         doc.setErrorMessage(errorMessage);
         doc.setIngestedAt(ingestedAt);
-        return dataManager.save(doc).getId();
+        // jmix-security-data: fixture seeding under runWithSystem uses .unconstrained() —
+        // see feedback_jmix_unconstrained_for_system_writes.
+        return dataManager.unconstrained().save(doc).getId();
     }
 }

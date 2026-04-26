@@ -143,15 +143,25 @@ class FoundationsBootSmokeTest {
             msgs.add(msg);
             conv.setMessages(msgs);
 
-            AiConversation savedConv = dataManager.save(conv, msg).get(conv);
+            // jmix-security-data: under this starter, the system user is itself policy-gated
+            // (runWithSystem does NOT auto-grant CRUD). All 4 entity saves below are
+            // system-internal persistence sanity checks; route through dataManager.unconstrained()
+            // per the project standard (see project memory feedback_jmix_unconstrained_for_system_writes,
+            // 08-08-INVESTIGATION-2.md, and AuditWriter.java's Javadoc on the unconstrained DM field).
+            AiConversation savedConv = dataManager.unconstrained().save(conv, msg).get(conv);
             assertNotNull(savedConv.getId());
 
-            AiConversation loadedConv = dataManager.load(AiConversation.class)
+            // Verification reads use .unconstrained() symmetrically: under jmix-security-data,
+            // ReadEntityQueryConstraint applies the row-level @JpqlRowLevelPolicy predicate
+            // (createdBy = :current_user_username) to constrained loads even under runWithSystem.
+            // The system user is policy-gated; orthogonal coverage of read-policy correctness
+            // lives in FilteredSchemaAndExecutionDenialTest.* (which uses constrained DM by design).
+            AiConversation loadedConv = dataManager.unconstrained().load(AiConversation.class)
                     .id(savedConv.getId()).one();
             assertEquals(savedConv.getId(), loadedConv.getId());
             assertEquals("round-trip conv", loadedConv.getTitle());
 
-            AiMessage loadedMsg = dataManager.load(AiMessage.class).id(msg.getId()).one();
+            AiMessage loadedMsg = dataManager.unconstrained().load(AiMessage.class).id(msg.getId()).one();
             assertEquals(msg.getId(), loadedMsg.getId());
             assertEquals(savedConv.getId(), loadedMsg.getConversation().getId());
             assertEquals("hello", loadedMsg.getContent());
@@ -162,8 +172,8 @@ class FoundationsBootSmokeTest {
             audit.setEventName("sampleTool");
             audit.setOutcome(AiToolCallOutcome.SUCCESS);
             audit.setStartedAt(OffsetDateTime.now());
-            AiAuditEvent savedAudit = dataManager.save(audit);
-            AiAuditEvent loadedAudit = dataManager.load(AiAuditEvent.class)
+            AiAuditEvent savedAudit = dataManager.unconstrained().save(audit);
+            AiAuditEvent loadedAudit = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(savedAudit.getId()).one();
             assertEquals(savedAudit.getId(), loadedAudit.getId());
             assertEquals("sampleTool", loadedAudit.getEventName());
@@ -173,8 +183,8 @@ class FoundationsBootSmokeTest {
             params.setProfileName("default-" + UUID.randomUUID());
             params.setActive(Boolean.TRUE);
             params.setBodyYaml("temperature: 0.2");
-            AiParameters savedParams = dataManager.save(params);
-            AiParameters loadedParams = dataManager.load(AiParameters.class)
+            AiParameters savedParams = dataManager.unconstrained().save(params);
+            AiParameters loadedParams = dataManager.unconstrained().load(AiParameters.class)
                     .id(savedParams.getId()).one();
             assertEquals(savedParams.getId(), loadedParams.getId());
             assertEquals("temperature: 0.2", loadedParams.getBodyYaml());
@@ -185,8 +195,8 @@ class FoundationsBootSmokeTest {
             doc.setMimeType("text/markdown");
             doc.setSizeBytes(42L);
             doc.setStatus(AiKnowledgeDocumentStatus.PENDING);
-            AiKnowledgeDocument savedDoc = dataManager.save(doc);
-            AiKnowledgeDocument loadedDoc = dataManager.load(AiKnowledgeDocument.class)
+            AiKnowledgeDocument savedDoc = dataManager.unconstrained().save(doc);
+            AiKnowledgeDocument loadedDoc = dataManager.unconstrained().load(AiKnowledgeDocument.class)
                     .id(savedDoc.getId()).one();
             assertEquals(savedDoc.getId(), loadedDoc.getId());
             assertEquals("notes.md", loadedDoc.getFileName());

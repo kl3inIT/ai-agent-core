@@ -54,7 +54,7 @@ class AtomicDeleteIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_delete_removes_entity_and_vectors() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                     List.of(AiAgentUserRole.CODE));
 
@@ -85,7 +85,7 @@ class AtomicDeleteIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_delete_missing_document_throws_not_found() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID random = UUID.randomUUID();
             assertThatThrownBy(() -> documentService.delete(random))
                     .isInstanceOf(DocumentNotFoundException.class);
@@ -94,7 +94,7 @@ class AtomicDeleteIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_delete_with_vectorstore_failure_rolls_back_entity_removal() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                     List.of(AiAgentUserRole.CODE));
 
@@ -120,7 +120,7 @@ class AtomicDeleteIntegrationTest extends AbstractRagIntegrationTest {
 
     @Test
     void test_reingest_cancels_and_reschedules() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md",
                     List.of(AiAgentUserRole.CODE));
 

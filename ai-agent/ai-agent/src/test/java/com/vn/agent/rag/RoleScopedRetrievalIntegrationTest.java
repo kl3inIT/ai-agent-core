@@ -41,7 +41,7 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
 
     @BeforeEach
     void seed() {
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             // Beta uses AiAgentTestBetaRole, a test-scoped @ResourceRole registered under the
             // test classpath — a real resolvable role code that AiAgentUserRole holders do NOT
             // hold, so user→beta visibility must fail-closed.
@@ -118,7 +118,7 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
     void test_embedding_model_mismatch_filters_out() {
         // Add a synthetic document with a DIFFERENT embeddingModel slug directly to the
         // vector store. It must be invisible to any retrieval that pins the current model.
-        systemAuthenticator.runWithSystem(() -> {
+        runAsAdmin(() -> {
             UUID otherId = UUID.randomUUID();
             Document outOfModel = Document.builder()
                     .text("Out-of-model drift chunk content for mismatch test.")

@@ -7,6 +7,21 @@ dependencies {
     // Plan 07-01: @MenuPolicy + @ViewPolicy annotations live in jmix-security-flowui
     // (package io.jmix.securityflowui.role.annotation). Required by AiAgentAdminRole.adminViews().
     implementation 'io.jmix.security:jmix-security-flowui-starter'
+    // Plan 08-08 (gap-closure for VERIFICATION.md Gap 1 / R-XP-2-FIX-1/2/3):
+    // SecurityDataConstraintsRegistration (in jmix-security-data) registers
+    // CrudEntityConstraint + ReadEntityQueryConstraint into AccessConstraintsRegistry at
+    // @PostConstruct. Without this starter, AccessManager.applyRegisteredConstraints(CrudEntityContext)
+    // is a no-op (defaults to PERMIT-ALL) AND DataManager.load(...).all().list() does not apply
+    // @JpqlRowLevelPolicy predicates. jmix-app already ships this dep at build.gradle:52 — this
+    // dependency makes the ai-agent module's security posture self-contained for any consumer.
+    // Co-fix: AuditWriter (Task 2) and ProjectingChatMemoryRepository (Task 3) switch to
+    // UnconstrainedDataManager so end-user roles do NOT need CRUD grants on system-internal
+    // entities (ai_AiAuditEvent, ai_AiMessage). FoundationsBootSmokeTest (Task 4) and
+    // AuditDurabilityTest (Task 5) propagate the .unconstrained() idiom to runWithSystem
+    // verification paths because the system user is itself policy-gated under jmix-security-data.
+    // See 08-08-INVESTIGATION.md, 08-08-INVESTIGATION-2.md, and project memory
+    // feedback_jmix_unconstrained_for_system_writes for the architectural rationale.
+    implementation 'io.jmix.security:jmix-security-data-starter'
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
@@ -86,6 +101,12 @@ dependencies {
     // backward-compatible and adds major-version 69 support (Rule 3 deviation recorded in
     // 03-04-SUMMARY.md).
     testImplementation 'org.ow2.asm:asm:9.9'
+
+    // Plan 08-03 (perf smoke): EclipseLink has no Statistics API; datasource-proxy
+    // counts JDBC SELECTs at the connection layer. CONTEXT D-07 named Hibernate API
+    // (drift). Plan named 1.10.0 (does not exist on Maven Central); using current
+    // 1.11.0 release — Rule 3 deviation recorded in 08-03-SUMMARY.md.
+    testImplementation 'net.ttddyy:datasource-proxy:1.11.0'
 
     // Plan 05-01 — downstream RAG plan integration tests (Plan 05-05) will need
     // Testcontainers Postgres + spring-ai-test. Pulled onto the classpath now so

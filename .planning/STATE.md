@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v1.1.0
 milestone_name: milestone
-status: "Phase 07.2 shipped — PR #2 opened against origin/main"
-last_updated: "2026-04-26T02:30:00+07:00"
+status: Phase 08 shipped - PR #3
+last_updated: "2026-04-26T13:00:00.000Z"
 last_activity: 2026-04-26
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 55
-  completed_plans: 55
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 63
+  completed_plans: 63
   percent: 100
 ---
 
@@ -23,22 +23,22 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — Integration Hardening & Release Readiness (7.1 closed accept-as-is with 5 deferred issues; 7.2 complete; deferred 7.1 issues must be picked up in Phase 08 before master merge)
+**Current focus:** Phase 08 — integration-hardening-release-readiness shipped for review in PR #3
 
 ## Phase Status
 
 | # | Phase | Status |
 |---|-------|--------|
 | 1 | Walking Skeleton & Packaging De-risk | ✅ Complete (merged to master) |
-| 2 | Foundations | ✅ Complete (11/11 plans, static verification PASS — pending human Gradle verify) |
-| 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans — static verification PASS, pending human Gradle verify) |
+| 2 | Foundations | ✅ Complete (11/11 plans; old dynamic verification debt closed obsolete 2026-04-26) |
+| 3 | Metadata-First Runtime & Six Tools | ✅ Complete (5/5 plans; old human verification debt closed obsolete 2026-04-26) |
 | 4 | Orchestration Core | ✅ Complete (5/5 plans — static verification PASS: ./gradlew :ai-agent:ai-agent:test green) |
 | 5 | RAG Layer | ✅ Complete (5/5 plans — 05-01/05-02/05-03/05-04/05-05; integrationTest task gated on Docker, default test unblocked) |
 | 6 | Parameters, Structured Output & Guardrails | ✅ Complete (5/5 plans — 06-01..06-05; 12 eval rubrics E-01..E-12 green under evalTest task, 50 tests across 9 classes) |
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
-| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT accepted as-is 2026-04-25; 5 issues incl. streaming blocker deferred to Phase 08) |
+| 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT closed obsolete/superseded 2026-04-26; no deferred Phase 8 blockers carried forward) |
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
-| 8 | Integration Hardening & Release Readiness | Not started |
+| 8 | Integration Hardening & Release Readiness | ✅ Complete (8/8 plans — 08-01..08-04, 08-06, 08-07 baseline + 08-08 gap closure replan-2 wiring jmix-security-data-starter and switching AuditWriter / ProjectingChatMemoryRepository / ConversationGateway / IngestionStatusWriter to UnconstrainedDataManager; 12/12 in com.vn.agent.security.* and 236/236 broad broom GREEN; 08-05 consumer-smoke DEFERRED — 6-layer starter-consumability gap chain documented in `08-05-SUMMARY.md`) |
 
 ## Active Milestone
 
@@ -122,7 +122,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
 - 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
 - 2026-04-19 19:30 +07:00 — Plan 03-04 complete (8 test files + TOOL-08 ASM enforcement). Next: 03-05 (final phase plan — integration test in jmix-app).
-- 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS — pending human Gradle verify + merge to master.
+- 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS; old human Gradle verification debt closed obsolete on 2026-04-26 so Phase 8 can be scoped fresh.
 - 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings to `.planning/phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
 - 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
 - 2026-04-20 11:55 +07:00 — Plan 04-01 complete (Liquibase 080 + AiToolCallAudit entity fields + EN/VI i18n; compileJava green). Commits 8181ff4, 1789b7e. Next: 04-02.
@@ -154,6 +154,8 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 - 2026-04-21 13:30 +07:00 — Plan 07-04 complete (ConversationListView + ConversationDetailView role-aware replay: ConversationListView @Route("ai-agent/conversations") with CurrentAuthentication.getUser().getAuthorities() admin probe, role-gated userFilter + createdBy column, dynamic JPQL rebuild on filter valueChange, per-row DataManager count(m) for messageCount column (plan path b), double-click → viewNavigators.detailView; ConversationDetailView @Route("ai-agent/conversations/:id") reuses MessageBubbleComponent from 07-03 for read-only transcript replay, Continue-in-chat → UI.navigate(ChatView.class, QueryParameters conversationId=<uuid>); 4 files added, zero i18n changes (all keys pre-seeded by 07-01); compileJava + compileTestJava green). Requirement UI-03 delivered. Commits 3818edc, 87fa46c. Deviations: (Rule 1) CurrentAuthentication has no getAuthorities() — went through getUser(); (Rule 1) JPQL entity names are ai_AiConversation / ai_AiMessage, not AiAgent_* prefix; (Rule 1) AiMessage has no toolCallsJson field in Phase 2 — ToolCallCardComponent not imported, TOOL-role messages skipped. Next: 07-07b (fill RED test stubs) — final Phase 7 plan.
 
+- 2026-04-26 +07:00 — Plan 08-01 complete (TEST-04 negative-case integration suite: NoCustomerReadRoleConfiguration test fixture declaring restricted persona `carol` with READ+CREATE only on AiConversation/AiMessage; FilteredSchemaAndExecutionDenialTest with 2 @Test methods (R-01a access_denied JSON pin; R-01f attribute-granularity exclusion); CrossUserConversationAccessTest with 2 methods (R-01e exception-type opacity; R-01c agentstore @Store inference + DataManager-level row opacity); RagRoleFilterNegativeTest with 2 methods (R-01b real buildFor(Authentication) signature; RAG-06 fail-closed sentinel `__none__`). 6 new @Test methods, 3 PASS / 3 RED. Compile green; runtime negative greps clean (0 EffectiveSchemaComputer / 0 buildForCurrentUser); 0 @Disabled. Commits 8985d82 (Task 1), 502c785 (Task 2), 61910c2 (Task 3), bac0860 (Rule-1 normalized role-flag-key fix), 5d828b7 (forbidden-symbol Javadoc cleanup). Deviations: (Rule 3) denial target pivoted from off-classpath demo Customer to on-classpath ai_AiAuditEvent — jmix-app entities are NOT on ai-agent test classpath; class name preserved for plan-trace fidelity; (Rule 1) RAG assertion used hyphenated role codes — actual filter uses ChunkMetadata-normalized form `role_ai_agent_user`; (Rule 1) Store annotation import is io.jmix.core.metamodel.annotation, not io.jmix.core.annotation. **R-XP-2 trigger fires:** 3 RED tests reveal real security gaps — carol observes denied entities (ai_AiAuditEvent + ai_AiParameters) in CurrentUserSchemaAccess.getReadableSchema(); BuiltInDataTools.findRecords returns rows instead of access_denied; bob observes alice's conversation row in DataManager listing (RowLevelRole gap on .all().list() path). Cross-user replay opacity (ConversationGateway path) PASSES. Recommend orchestrator run `/gsd-plan-phase 8 --gaps` before Wave 2 (Plan 07) per 08-01-PLAN.md `<notes>` section. Next: remaining Phase 8 plans (Wave 1 still has 08-02..08-04; --gaps replan should also scope SUT fixes for the 3 REDs).
+
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
@@ -161,7 +163,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | 260420-09p | sync phase 3 docs and artifacts with the current code after a large refactor, then verify consistency | 2026-04-19 | pending | Verified | [260420-09p-sync-phase-3-docs-and-artifacts-with-the](./quick/260420-09p-sync-phase-3-docs-and-artifacts-with-the/) |
 | 260420-se6 | fix JetBrains file problems project-wide (diamond, @NonNull on @NonNullApi overrides, javadoc, getLast, Objects::nonNull, boolean XOR) | 2026-04-20 | pending | Verified — `:ai-agent:ai-agent:test` green | [260420-se6-fix-jetbrains-file-problems-project-wide](./quick/260420-se6-fix-jetbrains-file-problems-project-wide/) |
 
-**Last activity:** 2026-04-24
+**Last activity:** 2026-04-26
 
 ## Phase 07 Progress
 
@@ -179,8 +181,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ### Pending Todos
 
-**Count:** 7
+**Count:** 9
 
+- `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` — Add collapsible tool-detail and ephemeral status to chat UI
+- `2026-04-26-hide-internal-tool-and-entity-names-from-user-facing-chat.md` — Hide internal tool and entity names from user-facing chat
 - `2026-04-26-inject-readable-entity-inventory-into-baseline-context.md` — Inject readable entity inventory into baseline context
 - `2026-04-24-refine-describe-entity-wrapper-around-selected-jmix-metadata.md` — Refine describe_entity wrapper around selected Jmix metadata
 - `2026-04-24-add-dedicated-chat-speech-and-file-task-input.md` — Add dedicated chat speech and file task input
@@ -192,3 +196,10 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 ### Roadmap Evolution
 
 - Phase 7.2 inserted after Phase 7.1: Redesign audit schema as tree-lite (PARENT_ID) — unblocks retrieval audit (URGENT)
+- 2026-04-26: Prompt-contract hardening bundle deferred to Milestone 2. Bundle = 3 todos:
+  `inject-readable-entity-inventory-into-baseline-context`,
+  `enforce-unknown-entity-retry-contract`,
+  `hide-internal-tool-and-entity-names-from-user-facing-chat`.
+  Originally proposed for M1 P8 alongside TEST-02/05 prompt-contract suite. Decision: keep M1 P8
+  scope tight to release polish (security negative tests, clean-consumer smoke, operator docs);
+  do the prompt bundle in M2 as a dedicated phase. Todos stay in pending — no phase inserted yet.

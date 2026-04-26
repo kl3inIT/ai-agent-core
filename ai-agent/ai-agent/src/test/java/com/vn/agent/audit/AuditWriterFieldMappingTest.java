@@ -56,7 +56,7 @@ class AuditWriterFieldMappingTest {
 
             // --- Phase 1: writeChatStart — start-time invariants (D-01 mutable root) ---
             UUID auditId = auditWriter.writeChatStart(runId, "user-A", convId, "abc123hash");
-            AiAuditEvent started = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            AiAuditEvent started = dataManager.unconstrained().load(AiAuditEvent.class).id(auditId).one();
             assertThat(started.getRunId()).isEqualTo(runId);
             assertThat(started.getKind()).isEqualTo(AuditKind.CHAT);
             assertThat(started.getEventName()).isNull();                 // no <chat> sentinel
@@ -74,7 +74,7 @@ class AuditWriterFieldMappingTest {
 
             // --- Phase 2: writeChatFinish — UPDATE in place, same id, now populated ---
             auditWriter.writeChatFinish(auditId, 42L, "SUCCESS", null);
-            AiAuditEvent finished = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            AiAuditEvent finished = dataManager.unconstrained().load(AiAuditEvent.class).id(auditId).one();
             assertThat(finished.getId()).isEqualTo(auditId);              // same row
             assertThat(finished.getOutcomeRaw()).isEqualTo("SUCCESS");
             assertThat(finished.getFinishedAt()).isNotNull();
@@ -97,7 +97,7 @@ class AuditWriterFieldMappingTest {
                     "echo", "{\"in\":1}", "{\"out\":1}", 12L,
                     AiToolCallOutcome.SUCCESS, /*denialReason*/ null, /*errorClass*/ null);
 
-            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            AiAuditEvent row = dataManager.unconstrained().load(AiAuditEvent.class).id(auditId).one();
             assertThat(row.getRunId()).isEqualTo(runId);
             assertThat(row.getKind()).isEqualTo(AuditKind.TOOL);
             assertThat(row.getEventName()).isEqualTo("echo");             // D-01: tool name goes to eventName
@@ -124,7 +124,7 @@ class AuditWriterFieldMappingTest {
                     "echo", "{\"in\":1}", "{\"out\":1}", 12L,
                     AiToolCallOutcome.SUCCESS, /*denialReason*/ null, /*errorClass*/ null);
 
-            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            AiAuditEvent row = dataManager.unconstrained().load(AiAuditEvent.class).id(auditId).one();
             assertThat(row.getParent())
                     .isNotNull()
                     .extracting("id")
@@ -140,7 +140,7 @@ class AuditWriterFieldMappingTest {
                     "user-A", convId, "createOrder", "{}", null, 3L,
                     AiToolCallOutcome.BLOCKED, "Insufficient role: ADMIN required", null);
 
-            AiAuditEvent row = dataManager.load(AiAuditEvent.class).id(auditId).one();
+            AiAuditEvent row = dataManager.unconstrained().load(AiAuditEvent.class).id(auditId).one();
             assertThat(row.getOutcome()).isEqualTo(AiToolCallOutcome.BLOCKED);
             assertThat(row.getDenialReason()).isEqualTo("Insufficient role: ADMIN required");
         });
@@ -151,6 +151,8 @@ class AuditWriterFieldMappingTest {
         conv.setCreatedBy(owner);
         conv.setCreatedDate(OffsetDateTime.now());
         conv.setTitle("test");
-        return dataManager.save(conv).getId();
+        // jmix-security-data: fixture seeding under runWithSystem uses .unconstrained() —
+        // see feedback_jmix_unconstrained_for_system_writes (system user is policy-gated).
+        return dataManager.unconstrained().save(conv).getId();
     }
 }

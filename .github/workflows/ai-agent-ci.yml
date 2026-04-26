@@ -1,0 +1,81 @@
+# Plan 08-07 — PR-blocking CI for the ai-agent add-on.
+#
+# Runs on every push to main + every PR. We invoke `./gradlew check`, which executes the
+# default `test` task (excludes @Tag('live') and @Tag('rag-it')) PLUS — when Docker is
+# detected on the runner — the `integrationTest` task wired into `check` by
+# ai-agent/ai-agent.gradle. GitHub-hosted ubuntu-latest runners ship with Docker, so the
+# Phase-5 pgvector/RAG @Tag('rag-it') integration contracts are gated on every PR.
+# @Tag('live') stays opt-in (manual dispatch only — see ai-agent-live.yml).
+name: ai-agent CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# R-07f: explicit minimal permissions; PR-blocking workflow only needs read.
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+# R-07f: cancel superseded runs on the same branch / PR.
+concurrency:
+  group: ai-agent-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle setup
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: false
+
+      - name: Resolve aiAgentVersion (R-07b — dynamic, NOT hardcoded)
+        id: version
+        run: |
+          VERSION=$(grep -E '^version=' ai-agent/gradle.properties | cut -d= -f2 | tr -d ' ')
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: could not resolve version from ai-agent/gradle.properties" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved aiAgentVersion: $VERSION"
+
+      # WR-002: invoke `check` (not just `test`) so the Docker-gated `integrationTest`
+      # task — wired into `check` by ai-agent/ai-agent.gradle when Docker is detected on
+      # the runner — runs as part of the PR gate. GitHub ubuntu-latest runners ship with
+      # Docker, so the @Tag('rag-it') pgvector/RAG integration suite executes here.
+      # Default `test` still runs first via task dependency and excludes @Tag('live') +
+      # @Tag('rag-it'); the integration tier is added on top, not in place of, the
+      # default tier.
+      - name: Compile + check (default + Docker-gated integration tier)
+        run: ./gradlew :ai-agent:ai-agent:check --no-daemon
+
+      - name: Publish ai-agent + ai-agent-starter to local maven (for downstream smoke)
+        run: ./gradlew :ai-agent:ai-agent:publishToMavenLocal :ai-agent:ai-agent-starter:publishToMavenLocal --no-daemon
+
+      # consumer-smoke is deferred per Plan 08-05. When the subproject lands, this step
+      # invokes the smoke against the just-published artifact:
+      # - name: Boot consumer-smoke against the just-published artifact
+      #   run: ./gradlew :consumer-smoke:bootRunSmoke -PaiAgentVersion=${{ steps.version.outputs.VERSION }} --no-daemon
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-agent-test-reports
+          path: ai-agent/ai-agent/build/reports/tests/

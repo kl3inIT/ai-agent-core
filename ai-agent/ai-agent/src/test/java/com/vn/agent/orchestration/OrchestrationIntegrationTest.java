@@ -54,7 +54,7 @@ class OrchestrationIntegrationTest {
             assertThat(resp.content()).startsWith("STUB:");
             assertThat(resp.runId()).isNotNull();
 
-            AiConversation conv = dataManager.load(AiConversation.class)
+            AiConversation conv = dataManager.unconstrained().load(AiConversation.class)
                     .id(resp.conversationId()).one();
             // B3: ownership is createdBy, NOT userId.
             assertThat(conv.getCreatedBy()).isEqualTo("user-A");
@@ -70,12 +70,12 @@ class OrchestrationIntegrationTest {
             var second = chatService.ask("user-A", first.conversationId(), "msg2");
 
             // Phase 7.2: one CHAT root per runId (writeChatStart + writeChatFinish UPDATE same row).
-            List<AiAuditEvent> firstAskRows = dataManager.load(AiAuditEvent.class)
+            List<AiAuditEvent> firstAskRows = dataManager.unconstrained().load(AiAuditEvent.class)
                     .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.runId = :rid order by a.startedAt")
                     .parameter("kind", AuditKind.CHAT)
                     .parameter("rid", first.runId())
                     .list();
-            List<AiAuditEvent> secondAskRows = dataManager.load(AiAuditEvent.class)
+            List<AiAuditEvent> secondAskRows = dataManager.unconstrained().load(AiAuditEvent.class)
                     .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.runId = :rid order by a.startedAt")
                     .parameter("kind", AuditKind.CHAT)
                     .parameter("rid", second.runId())
@@ -103,7 +103,7 @@ class OrchestrationIntegrationTest {
                             .isEqualTo(first.conversationId()));
 
             // Conversation-scoped JPQL path a.conversation.id works (NOT a.conversationId).
-            List<AiAuditEvent> byConv = dataManager.load(AiAuditEvent.class)
+            List<AiAuditEvent> byConv = dataManager.unconstrained().load(AiAuditEvent.class)
                     .query("select a from ai_AiAuditEvent a where a.kind = :kind and a.conversation.id = :cid order by a.startedAt")
                     .parameter("kind", AuditKind.CHAT)
                     .parameter("cid", first.conversationId())

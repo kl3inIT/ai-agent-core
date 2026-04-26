@@ -2,8 +2,8 @@ package com.vn.agent.orchestration;
 
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
-import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.UnconstrainedDataManager;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.repository.jdbc.JdbcChatMemoryRepository;
 import org.springframework.ai.chat.messages.Message;
@@ -34,11 +34,30 @@ import java.util.UUID;
 public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
 
     private final JdbcChatMemoryRepository delegate;
-    private final DataManager dataManager;
+    /**
+     * Unconstrained: chat-memory pruning is system-internal bookkeeping that must succeed
+     * regardless of caller authentication. {@link #saveAll} and {@link #deleteByConversationId}
+     * mirror {@link JdbcChatMemoryRepository}'s delete-then-insert semantics on the projected
+     * {@code ai_AiMessage} rows; end-user roles (e.g. AiAgentUserRole) intentionally do NOT grant
+     * UPDATE/DELETE on {@code ai_AiMessage} (memory pruning is invisible to users).
+     *
+     * <p><b>Cross-user safety:</b> the unconstrained scope does NOT enable cross-user row access.
+     * Every JPQL query in this class is scoped to a {@code conversationId} UUID parameter
+     * supplied by Spring AI's {@code MessageWindowChatMemory} (which receives it from the
+     * {@link org.springframework.ai.chat.client.ChatClient} call in {@code DefaultChatServiceImpl},
+     * which derives it from the authenticated principal). The UUID is opaque and unguessable, so
+     * pruning a conversation requires already possessing its id — which is bounded by the
+     * conversation listing path (covered by {@code ReadEntityQueryConstraint} via
+     * {@code AiAgentUserRowLevelRole}'s row-level policy). T-08-08-07 disposition: accept.
+     *
+     * <p>See /jmix-framework/jmix-context7 data-manager.html, project memory
+     * feedback_jmix_unconstrained_for_system_writes, and 08-08-INVESTIGATION-2.md.
+     */
+    private final UnconstrainedDataManager dataManager;
     private final Metadata metadata;
 
     public ProjectingChatMemoryRepository(JdbcChatMemoryRepository delegate,
-                                          DataManager dataManager,
+                                          UnconstrainedDataManager dataManager,
                                           Metadata metadata) {
         this.delegate = delegate;
         this.dataManager = dataManager;

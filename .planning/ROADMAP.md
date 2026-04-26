@@ -310,7 +310,7 @@ Plans:
 
 **Plans:** 7/7 executed (07.1-01..07.1-07).
 
-**Status:** ✅ Closed accept-as-is 2026-04-25. UAT marked `accepted` with 5 deferred issues — 1 blocker (streaming returns `error: chatView.error.generic`; raw i18n keys `chatView.title` / `chatView.action.newChat` leak through), 2 major (tool-call inline markdown format off, knowledge upload broken), 2 other. **Streaming blocker MUST be fixed in Phase 08 before master merge.**
+**Status:** ✅ Complete. UAT was accepted as-is on 2026-04-25, then the old user-reported issues were closed as obsolete/superseded on 2026-04-26 after substantial refactor. No Phase 7.1 UAT blocker is carried forward into Phase 08; Phase 8 should be scoped fresh from the current codebase.
 
 ---
 
@@ -387,6 +387,18 @@ Plans:
 4. Live-tier suite (opt-in) passes against OpenRouter with documented model + params
 
 **Needs research phase:** No.
+
+**Plans:** 8 plans (08-08 appended via /gsd-plan-phase 8 --gaps for VERIFICATION.md Gap 1 closure)
+
+Plans:
+- [x] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config (delivered 2026-04-26; 6 new @Test methods, 3 PASS / 3 RED — REDs trigger R-XP-2 `--gaps` replan, see `08-01-SUMMARY.md`)
+- [x] 08-02-PLAN.md — TEST-02 + TEST-03 extensions: PromptInjectionHarnessTest +2 poisoned-payload @Tests, AuditDurabilityTest +1 ERROR-path decorator-routed @Test (5/5 + 3/3 green)
+- [x] 08-03-PLAN.md — Performance smoke: datasource-proxy 1.11.0 + per-tool baselines on `ai_AiAuditEvent` + R-03h slope-based N+1 detector + find_records limit-cap test (9/9 green; R-03e calibration ceilings adopted)
+- [x] 08-04-PLAN.md — TEST-05 live-tier semantic golden suite (7-entry golden-questions.yaml — RAG split into positive + empty-kb; ChatServiceLiveSemanticGoldenSuiteTest dual-gated + R-04e visible-skip; compile-only verified)
+- [~] 08-05-PLAN.md — DEFERRED. Investigated end-to-end pipeline; surfaced 6-layer starter-consumability gap chain (changelog path, primary DataSource, UserRepository, WebApplicationContext, LoginView, pgvector CREATE EXTENSION). All consumer-smoke/ files reverted; recommendations recorded in `08-05-SUMMARY.md`. Recommend follow-up phase to add stub VectorStore bean OR reframe as Testcontainers integration test.
+- [x] 08-06-PLAN.md — Operator README (270 lines, 9 sections, Configuration Matrix derived from real `@ConfigurationProperties` source) + CLAUDE.md `Java 17` → `Java 21` (R-06c)
+- [x] 08-07-PLAN.md — Release polish: version 1.0.0 sourced from gradle.properties, snapshot-vs-release URL conditional, leaked Nexus credentials removed (FOREVER BURNT comment + CHANGELOG Security entry per R-07a), CHANGELOG.md (Keep-a-Changelog v1.1.0 with [Unreleased] discipline + per-phase 1.0.0 backfill), 3 GitHub Actions workflows (ci/live/publish) with explicit permissions + concurrency + preflight secrets check
+- [x] 08-08-PLAN.md — GAP CLOSURE for VERIFICATION.md Gap 1 (R-XP-2 trigger) ✅ 2026-04-26 (replan-2): added jmix-security-data-starter dep + switched AuditWriter, ProjectingChatMemoryRepository, ConversationGateway, IngestionStatusWriter to UnconstrainedDataManager (system-internal-infrastructure pattern per `feedback_jmix_unconstrained_for_system_writes`); flipped all 3 RED tests in com.vn.agent.security to GREEN. **Final scope: 13 files (vs 5 planned)** — 2 additional production switches + 6 additional test fixture/read updates surfaced during broad-broom regression; full rationale in 08-08-SUMMARY.md "Deviations from Plan". Closure target: 12/12 com.vn.agent.security.* GREEN; 236/236 broad broom BUILD SUCCESSFUL.
 
 ---
 

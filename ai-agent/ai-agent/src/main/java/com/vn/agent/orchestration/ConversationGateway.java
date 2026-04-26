@@ -1,8 +1,8 @@
 package com.vn.agent.orchestration;
 
 import com.vn.agent.entity.AiConversation;
-import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.UnconstrainedDataManager;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -33,10 +33,22 @@ public class ConversationGateway {
     /** Maximum character length of an auto-generated conversation title (D-08). */
     public static final int TITLE_MAX_LENGTH = 80;
 
-    private final DataManager dataManager;
+    /**
+     * Unconstrained: ConversationGateway is the sole gatekeeper that enforces D-09 ownership opacity
+     * via JPQL ({@code where c.createdBy = :owner}); the entity-level CrudEntityConstraint is
+     * redundant on top of that and would block legitimate same-user CRUD when the end-user role
+     * lacks entity-CRUD grants on {@code ai_AiConversation}. Routing through
+     * {@link UnconstrainedDataManager} keeps the manual ownership filter as the single source of
+     * authorization truth — same architectural pattern as
+     * {@link com.vn.agent.audit.AuditWriter} and
+     * {@link ProjectingChatMemoryRepository}. See project memory
+     * {@code feedback_jmix_unconstrained_for_system_writes} and
+     * {@code 08-08-INVESTIGATION-2.md}.
+     */
+    private final UnconstrainedDataManager dataManager;
     private final Metadata metadata;
 
-    public ConversationGateway(DataManager dataManager, Metadata metadata) {
+    public ConversationGateway(UnconstrainedDataManager dataManager, Metadata metadata) {
         this.dataManager = dataManager;
         this.metadata = metadata;
     }

@@ -47,7 +47,9 @@ class DualLayerParityTest {
 
             List<Message> springRows = jdbcChatMemoryRepository.findByConversationId(
                     resp.conversationId().toString());
-            List<AiMessage> jmixRows = dataManager.load(AiMessage.class)
+            // jmix-security-data: AiMessage projection reads use .unconstrained() (system user
+            // is policy-gated; mirrors AuditDurabilityTest pattern). See feedback_jmix_unconstrained_for_system_writes.
+            List<AiMessage> jmixRows = dataManager.unconstrained().load(AiMessage.class)
                     .query("select m from ai_AiMessage m where m.conversation.id = :cid order by m.createdDate")
                     .parameter("cid", resp.conversationId())
                     .list();

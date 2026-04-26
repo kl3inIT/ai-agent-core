@@ -1,26 +1,18 @@
 ---
 phase: 02-foundations
 verified: 2026-04-19T00:00:00Z
-status: human_needed
+status: passed
 score: 14/14 must-haves verified (automated)
 overrides_applied: 0
-human_verification:
-  - test: "Run ./gradlew test (or ./gradlew :ai-agent:test) on HSQLDB"
-    expected: "FoundationsBootSmokeTest green — 5 @Test methods pass"
-    why_human: "Node not on PATH; Gradle execution is slow on Windows and out-of-scope per verifier constraints"
-  - test: "Run ./gradlew :jmix-app:bootRun with fresh HSQLDB DB"
-    expected: "All 5 AI_AGENT_* tables + SPRING_AI_CHAT_MEMORY created via Liquibase; pgvector changeset MARK_RAN (not executed); no bean-wiring errors"
-    why_human: "Requires Gradle boot run, explicitly out of scope for this verifier invocation (ROADMAP SC #2)"
-  - test: "Log in as admin in Jmix UI → Security → Resource Roles"
-    expected: "AiAgentAdminRole (code: ai-agent-admin) is visible and assignable; AiAgentUserRole + AiAgentUserRowLevelRole also visible"
-    why_human: "UI-level assignability, ROADMAP SC #3"
+human_verification: []
+closure_reason: "old dynamic verification debt closed obsolete on 2026-04-26 so Phase 8 can be scoped fresh from the current codebase"
 ---
 
 # Phase 2: Foundations Verification Report
 
 **Phase Goal:** Land all persistent entities, Liquibase changelogs, security roles, and SPI interface contracts that downstream phases depend on.
 **Verified:** 2026-04-19
-**Status:** human_needed (all static checks PASS — 3 dynamic checks require developer to run Gradle)
+**Status:** passed (old dynamic verification debt closed obsolete on 2026-04-26; Phase 8 will define fresh release checks from the current codebase)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
@@ -101,19 +93,17 @@ None of significance. Entity classes use plain accessors (no Lombok); no TODO/FI
 
 ### Human Verification Required
 
-Three items require developer execution of Gradle (explicitly out of scope for this verifier per prompt constraints):
-
-1. **`./gradlew test`** — confirm `FoundationsBootSmokeTest` passes green. All 5 assertions are written and reference real infrastructure; static analysis suggests it will pass, but Liquibase/HSQLDB/Jmix wiring only proves out on execution.
-2. **`./gradlew :jmix-app:bootRun`** — confirm host app boots with add-on tables created on fresh HSQLDB (ROADMAP SC #2). The `<include>` line is present; DDL files are well-formed; only runtime execution can confirm no wiring conflict.
-3. **Role admin UI assignability** — log in as admin, confirm `AiAgentAdminRole` (code `ai-agent-admin`) is visible/assignable in the Jmix role admin view (ROADMAP SC #3). Static analysis confirms the `@ResourceRole` annotation is well-formed.
+None active. The previously listed Phase 2 runtime checks were closed as obsolete on
+2026-04-26 by user direction because Phase 8 will be scoped from the current codebase and
+fresh release-readiness criteria.
 
 ### Gaps Summary
 
-**No static gaps.** Every must-have surfaced from PLAN frontmatter, ROADMAP Success Criteria, and CONTEXT decisions has been verified against concrete artifacts in the codebase. The remaining three checks are all dynamic (Gradle execution) and correctly flagged for human execution.
+**No active gaps.** Every must-have surfaced from PLAN frontmatter, ROADMAP Success Criteria, and CONTEXT decisions has been verified against concrete artifacts in the codebase. The old dynamic checks were closed as obsolete on 2026-04-26 and are not carried into Phase 8.
 
-## Overall Verdict: **PASS (pending 3 human-executed runtime checks)**
+## Overall Verdict: **PASS**
 
-The static / goal-backward verification confirms Phase 2 achieved its goal: all entities, DDL, security roles, SPI contracts, auto-config wiring, boot smoke test, and doc sync are in place and correctly wired. Scope reductions (D-05, D-09, D-10) are faithfully reflected in REQUIREMENTS.md. The phase is ready to be declared complete once the developer runs `./gradlew test` and confirms the smoke test is green.
+The static / goal-backward verification confirms Phase 2 achieved its goal: all entities, DDL, security roles, SPI contracts, auto-config wiring, boot smoke test, and doc sync are in place and correctly wired. Scope reductions (D-05, D-09, D-10) are faithfully reflected in REQUIREMENTS.md.
 
 ---
 
