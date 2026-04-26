@@ -1,15 +1,19 @@
 # Plan 08-07 — manual-dispatch + tag-triggered publish to the configured Nexus.
 #
-# Tag pattern `v[0-9]+.[0-9]+.[0-9]+*` triggers a release publish; manual dispatch lets
-# you also publish ad-hoc snapshots without cutting a tag. Snapshot-vs-release URL
-# selection happens in ai-agent/build.gradle based on whether the version ends with
-# `-SNAPSHOT`.
+# Tag pattern `v*.*.*` is a broad GitHub Actions glob (NOT a regex). The previous
+# pattern `v[0-9]+.[0-9]+.[0-9]+*` was regex-shaped — Actions tag filters do not
+# support `+` quantifiers and the literal `.` only matches itself in glob syntax,
+# so normal SemVer tags like `v1.0.0` could fail to trigger. We accept any
+# `v*.*.*` here and reject malformed versions inside the workflow with a strict
+# SemVer regex (see "Resolve effective version" + the validation block).
+# Snapshot-vs-release URL selection happens in ai-agent/build.gradle based on
+# whether the resolved version ends with `-SNAPSHOT`.
 name: ai-agent publish
 
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version_override:
@@ -61,10 +65,18 @@ jobs:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
 
+      # WR-003 + WR-004: pass the manual override via env (not inline interpolation) so
+      # the value is never spliced into the shell command string. Validate the resolved
+      # version against a strict SemVer regex BEFORE writing it to $GITHUB_OUTPUT, so a
+      # malformed tag or input cannot corrupt the output file or downstream Gradle
+      # invocations. Accepts MAJOR.MINOR.PATCH plus an optional pre-release suffix
+      # (e.g. 1.0.0, 1.0.0-SNAPSHOT, 1.2.3-rc.1).
       - name: Resolve effective version
         id: version
+        env:
+          VERSION_OVERRIDE: ${{ github.event.inputs.version_override }}
         run: |
-          OVERRIDE="${{ github.event.inputs.version_override }}"
+          OVERRIDE="$VERSION_OVERRIDE"
           if [ -n "$OVERRIDE" ]; then
             VERSION="$OVERRIDE"
           elif [ "${GITHUB_REF}" != "${GITHUB_REF#refs/tags/v}" ]; then
@@ -77,25 +89,36 @@ jobs:
             echo "ERROR: could not resolve version" >&2
             exit 1
           fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "ERROR: resolved version is not strict SemVer: $VERSION" >&2
+            echo "Expected MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-PRERELEASE" >&2
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Effective version for this publish: $VERSION"
 
+      # WR-004: quote -Pversion so the validated value (already SemVer-clean) is passed
+      # as a single shell token even if a future change introduces a value with shell
+      # metacharacters.
       - name: Test (default tier — excludes @Tag(live) and @Tag(rag-it))
-        run: ./gradlew :ai-agent:ai-agent:test --no-daemon -Pversion=${{ steps.version.outputs.VERSION }}
+        env:
+          PUBLISH_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: ./gradlew :ai-agent:ai-agent:test --no-daemon "-Pversion=${PUBLISH_VERSION}"
 
       - name: Publish to Nexus (snapshot-vs-release URL chosen automatically by build.gradle)
-        run: |
-          ./gradlew \
-            :ai-agent:ai-agent:publish \
-            :ai-agent:ai-agent-starter:publish \
-            --no-daemon \
-            -Pversion=${{ steps.version.outputs.VERSION }} \
-            -PnexusUsername="${NEXUS_USERNAME}" \
-            -PnexusPassword="${NEXUS_PASSWORD}" \
-            ${NEXUS_RELEASE_URL:+-PnexusReleaseUrl="${NEXUS_RELEASE_URL}"} \
-            ${NEXUS_SNAPSHOT_URL:+-PnexusSnapshotUrl="${NEXUS_SNAPSHOT_URL}"}
         env:
           NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
           NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
           NEXUS_RELEASE_URL: ${{ secrets.NEXUS_RELEASE_URL }}
           NEXUS_SNAPSHOT_URL: ${{ secrets.NEXUS_SNAPSHOT_URL }}
+          PUBLISH_VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          ./gradlew \
+            :ai-agent:ai-agent:publish \
+            :ai-agent:ai-agent-starter:publish \
+            --no-daemon \
+            "-Pversion=${PUBLISH_VERSION}" \
+            -PnexusUsername="${NEXUS_USERNAME}" \
+            -PnexusPassword="${NEXUS_PASSWORD}" \
+            ${NEXUS_RELEASE_URL:+-PnexusReleaseUrl="${NEXUS_RELEASE_URL}"} \
+            ${NEXUS_SNAPSHOT_URL:+-PnexusSnapshotUrl="${NEXUS_SNAPSHOT_URL}"}
