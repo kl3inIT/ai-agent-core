@@ -162,7 +162,7 @@ Phase 9 modification: switch the three `unknown_entity` `ToolUserError(...)` con
 private static final List<String> UNKNOWN_ENTITY_HINTS = List.of(
         "call list_entities exactly once",
         "if a name in list_entities matches your intent, retry the original tool with that exact name",
-        "if no entity in list_entities matches, tell the user no such entity exists - do not guess"
+        "if no entity in list_entities matches, tell the user no such entity exists — do not guess"
 );
 ```
 **Strings are NOT translated** (RESEARCH Pitfall 7). They are tool-protocol English, hardcoded in the class. Do NOT route through `Messages.getMessage(...)`.

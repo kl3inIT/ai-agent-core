@@ -448,7 +448,7 @@ When entity resolution fails, return `unknown_entity` with the fixed `expected` 
 private static final List<String> UNKNOWN_ENTITY_EXPECTED = List.of(
         "call list_entities exactly once",
         "if a name in list_entities matches your intent, retry the original tool with that exact name",
-        "if no entity in list_entities matches, tell the user no such entity exists - do not guess"
+        "if no entity in list_entities matches, tell the user no such entity exists — do not guess"
 );
 
 private MetaClass resolveReadableEntityOrThrow(String entityName) {
