@@ -45,11 +45,22 @@ public record AiAgentGuardProperties(
     public record IterationCap(Integer maxIterations) {
     }
 
-    /** Output-side injection-pattern scanner config (D-17/D-18, GUARD-05). */
-    public record OutputScanner(Boolean enabled, List<Pattern> patterns) {
+    /** Output-side injection-pattern scanner config (D-17/D-18, GUARD-05; Phase 9 PROMPT-06). */
+    public record OutputScanner(Boolean enabled,
+                                List<Pattern> patterns,
+                                HostPrefixLeak hostPrefixLeak,
+                                ToolNameLeak toolNameLeak) {
 
         /** One scanner pattern: a stable {@code key} for audit rows + the regex {@code source}. */
         public record Pattern(String key, String regex) {
+        }
+
+        /** Phase 9 D-08: host-prefix leak pattern toggle (default enabled). */
+        public record HostPrefixLeak(Boolean enabled) {
+        }
+
+        /** Phase 9 D-08: tool-name leak pattern toggle (default enabled). */
+        public record ToolNameLeak(Boolean enabled) {
         }
     }
 
@@ -100,5 +111,28 @@ public record AiAgentGuardProperties(
             );
         }
         return outputScanner.patterns();
+    }
+
+    /**
+     * Phase 9 D-08: host-prefix-leak pattern pack defaults to enabled when the nested block is
+     * absent. Operator opts out via {@code jmix.ai-agent.guard.output-scanner.host-prefix-leak.enabled=false}
+     * without disabling the parent {@code outputScanner} or affecting the bundled defaults.
+     */
+    public boolean hostPrefixLeakEnabled() {
+        if (outputScanner == null || outputScanner.hostPrefixLeak() == null) {
+            return true;
+        }
+        return !Boolean.FALSE.equals(outputScanner.hostPrefixLeak().enabled());
+    }
+
+    /**
+     * Phase 9 D-08: tool-name-leak pattern pack defaults to enabled when the nested block is
+     * absent. Operator opts out via {@code jmix.ai-agent.guard.output-scanner.tool-name-leak.enabled=false}.
+     */
+    public boolean toolNameLeakEnabled() {
+        if (outputScanner == null || outputScanner.toolNameLeak() == null) {
+            return true;
+        }
+        return !Boolean.FALSE.equals(outputScanner.toolNameLeak().enabled());
     }
 }
