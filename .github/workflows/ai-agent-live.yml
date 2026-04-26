@@ -45,12 +45,18 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
+      # WR-006: provide explicit fallback defaults for the optional secrets so an unset
+      # secret does not export an EMPTY env var that would override the
+      # test-app.properties defaults with a blank value (Spring placeholder resolution
+      # treats empty as "set to empty string", not "fall back to default"). Using `||`
+      # keeps the secret value when present and substitutes the documented default
+      # otherwise — matching the live OpenRouter base URL and free-tier model.
       - name: Run live-tier suite (@Tag('live'))
         run: ./gradlew :ai-agent:ai-agent:liveTest --no-daemon
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
-          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1' }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-4o-mini' }}
 
       - name: Upload live-test reports
         if: always()
