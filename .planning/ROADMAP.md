@@ -41,7 +41,7 @@
   4. When the LLM calls a tool with an unknown entity name, the tool returns a structured `unknown_entity` error carrying an `expected` action hint; the LLM is instructed (and observably) calls `list_entities` exactly once and either retries with the corrected name or tells the user no such entity exists.
   5. Hosts can register a `ToolFetchPlanCustomizer` SPI bean that overrides `_base` / `_instance_name` per `(toolName, MetaClass)` at runtime; the resolved plan is intersected with `AccessManager`-allowed attributes (host plan cannot widen the projection beyond user attribute permissions); the comment in code states "fetch plan is projection, not security."
 **Plans:** 6 plans
-- [ ] 09-01-PLAN.md — AUD-07 plumbing: AuditFieldHasher static utility + AiAgentAuditProperties (no callers wired in Phase 9)
+- [x] 09-01-PLAN.md — AUD-07 plumbing: AuditFieldHasher static utility + AiAgentAuditProperties (no callers wired in Phase 9)
 - [ ] 09-02-PLAN.md — ToolFetchPlanCustomizer SPI + FetchPlanContext record + no-op default in SpiDefaultsAutoConfiguration
 - [ ] 09-03-PLAN.md — BaselineContextProvider extension: agent.entities + agent.permissions (locale-free cache key) + AiAgentPromptProperties
 - [ ] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints

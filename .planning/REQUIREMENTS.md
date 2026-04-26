@@ -124,7 +124,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 ### Audit Extensions
 
 - [ ] **AUD-06**: `AuditWriter.writeToolCall` `outcome` enum extended: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`. New `eventName` strings: `create_record`, `update_record`, `add_related_record`, `remove_related_record`, `prepare_form_draft`, `STT_TRANSCRIPTION`. No new audit kind.
-- [ ] **AUD-07**: Mutation audit row carries pre-image + post-image diff summary in `resultSummary`; PII-bearing fields hashed if `ai-agent.audit.hashSensitiveFields=true` (default true). Field-set configurable.
+- [x] **AUD-07**: Mutation audit row carries pre-image + post-image diff summary in `resultSummary`; PII-bearing fields hashed if `ai-agent.audit.hashSensitiveFields=true` (default true). Field-set configurable.
 
 ### Security Extensions
 

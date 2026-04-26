@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Roadmap defined
-last_updated: "2026-04-26T18:51:28.667Z"
+last_updated: "2026-04-26T20:09:42.711Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 17
 ---
 
 # Project State
 
-**Last updated:** 2026-04-26
+**Last updated:** 2026-04-27
 
 ## Project Reference
 
@@ -22,22 +22,24 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** v1.1.0 — roadmap defined (Phases 9-14); ready for `/gsd-plan-phase 9`.
+**Current focus:** Phase 09 — tool-layer-foundations-prompt-contract-hardening
 
 ## Current Position
 
+Phase: 09 (tool-layer-foundations-prompt-contract-hardening) — EXECUTING
+Plan: 2 of 6 (Plan 01 complete)
 | Field | Value |
 |-------|-------|
-| Phase | Phase 9 (not started) |
-| Plan | — |
-| Status | Roadmap defined; awaiting Phase 9 planning |
-| Last activity | 2026-04-26 — ROADMAP.md written; six phases (9-14) mapped to all v1.1 active REQ-IDs |
+| Phase | Phase 9 (executing) |
+| Plan | 02 (next) — Plan 01 complete |
+| Status | Phase 9 executing; Plan 01 (AUD-07 plumbing) done |
+| Last activity | 2026-04-27 — Plan 09-01 shipped: AuditFieldHasher + AiAgentAuditProperties (AUD-07 plumbing) |
 
 ## Phase Status
 
 | Phase | Status | Plans Complete | Started | Completed |
 |-------|--------|----------------|---------|-----------|
-| 9. Tool-Layer Foundations & Prompt-Contract Hardening | Not started | 0/0 | - | - |
+| 9. Tool-Layer Foundations & Prompt-Contract Hardening | Executing | 1/6 | 2026-04-27 | - |
 | 10. AI-Specific LLM Exposure Policy | Not started | 0/0 | - | - |
 | 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
@@ -107,6 +109,21 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - 2026-04-26 (v1.1 scope decision): prompt-contract hardening bundle promoted into v1.1 first phase. Activates SEED-005 (refined to three configurable chat surfaces) and SEED-007 (AI exposure policy). Adds new mutation-tools scope on top of pending todos.
 - 2026-04-26 (v1.1 roadmap): six phases (9-14) defined; numbering continues from v1.0.0 close (Phase 8 + 7.1 + 7.2). All active REQ-IDs mapped; no orphans.
 
+### Decisions
+
+- 2026-04-27 (Plan 09-01): AUD-07 plumbing (`AuditFieldHasher` + `AiAgentAuditProperties`) shipped with intentional zero callers per CONTEXT D-18. Phase 11 `MutationErrorTranslator` is the planned consumer. SHA-256 over UTF-8 byte encoding (locale-independent), lowercase 64-char hex via `java.util.HexFormat`. No SPI extraction — deferred until a host requests non-SHA-256 hashing.
+- 2026-04-27 (Plan 09-01): Spring config defaults landed in `module.properties`, NOT in `default-params.yaml` (which is strict `AiParameters` seed YAML). Planner-review carve-out honored.
+
+### Performance Metrics
+
+| Phase-Plan | Duration | Tasks | Files | Date |
+|------------|----------|-------|-------|------|
+| 09-01 | ~6 min | 2 | 4 | 2026-04-27 |
+
 ## Session Continuity
 
-**Next action:** `/gsd-plan-phase 9` (Tool-Layer Foundations & Prompt-Contract Hardening).
+**Last session:** 2026-04-27 — Completed Plan 09-01 (AUD-07 plumbing — `AuditFieldHasher` + `AiAgentAuditProperties`). 3 task commits + plan-metadata commit.
+**Stopped at:** Plan 09-01 complete; ready to plan/execute Plan 09-02.
+**Resume file:** `.planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-01-SUMMARY.md`
+**Blockers:** None.
+**Next action:** `/gsd-execute-phase 9` to continue Phase 9 (Plan 02 next), or `/gsd-plan-phase 9` if Plan 02 PLAN.md is not yet drafted.
