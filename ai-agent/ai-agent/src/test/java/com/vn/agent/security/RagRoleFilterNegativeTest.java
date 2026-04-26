@@ -24,10 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * by construction (RAG-06).
  *
  * <p><b>R-01b correction:</b> the actual SUT method is
- * {@link RetrievalFilterBuilder#buildFor(Authentication)}, NOT
- * {@code buildForCurrentUser()}. The filter takes the {@link Authentication} as an
- * explicit parameter; the test extracts it from {@link SecurityContextHolder} inside
- * the {@link SystemAuthenticator#withUser} block.
+ * {@link RetrievalFilterBuilder#buildFor(Authentication)} — it takes the
+ * {@link Authentication} as an explicit parameter (no implicit-thread-context variant).
+ * The test extracts the authentication from {@link SecurityContextHolder} inside the
+ * {@link SystemAuthenticator#withUser} block and passes it explicitly.
  */
 @SpringBootTest(classes = AITestConfiguration.class)
 @ImportAutoConfiguration({
@@ -43,9 +43,10 @@ class RagRoleFilterNegativeTest {
     @Test
     void aliceUserRoleOnly_buildFor_excludesAdminTaggedChunks() {
         systemAuthenticator.withUser("alice", () -> {
-            // R-01b: actual SUT method is buildFor(Authentication), not buildForCurrentUser().
-            // Pull the current authentication from SecurityContextHolder, which
-            // SystemAuthenticator.withUser populates with alice's authorities.
+            // R-01b: actual SUT method is buildFor(Authentication) — explicit parameter,
+            // no implicit-thread-context variant. Pull the current authentication from
+            // SecurityContextHolder, which SystemAuthenticator.withUser populates with
+            // alice's authorities, and pass it through.
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             assertThat(auth)
                     .as("withUser must populate SecurityContextHolder with alice's authentication")

@@ -28,9 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link NoCustomerReadRoleConfiguration}:
  * <ol>
  *   <li>{@code carol_filteredSchema_excludesDenied_andDeniedAttributes} — direct
- *       {@link CurrentUserSchemaAccess#getReadableSchema()} call (CONTEXT D-05 intent;
- *       the symbol named in CONTEXT.md, {@code EffectiveSchemaComputer.compute}, does not
- *       exist — the real API on main is {@code getReadableSchema()}). Asserts both
+ *       {@link CurrentUserSchemaAccess#getReadableSchema()} call (CONTEXT D-05 intent
+ *       preserved; the planning-doc symbol referenced an earlier API name that was
+ *       superseded — the real API on main is {@code getReadableSchema()}). Asserts both
  *       entity-level absence (R-01f base) AND attribute-level absence (R-01f tightening:
  *       even if a denied entity is reachable through a relation from a permitted entity,
  *       its protected attributes must not appear in the readable-attribute set).</li>
