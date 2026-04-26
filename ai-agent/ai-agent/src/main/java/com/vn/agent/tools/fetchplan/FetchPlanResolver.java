@@ -7,12 +7,16 @@ import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.security.CurrentAuthentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * Resolves the effective {@link FetchPlan} for a tool invocation by chaining host
@@ -27,8 +31,8 @@ import java.util.Optional;
  * returns {@link Optional#empty()} so it never short-circuits the chain.
  *
  * <p>Per D-10 review correction: {@link FetchPlanContext} is a concrete snapshot of static
- * {@link RunContext} accessors plus locale and {@link UserDetails}. The resolver reads those
- * accessors at the tool boundary and stores them in the record before host code runs;
+ * {@link RunContext} accessors plus locale and a minimal user snapshot. The resolver reads
+ * those accessors at the tool boundary and stores them in the record before host code runs;
  * {@code RunContext} itself is never embedded in the SPI parameter object.
  */
 @Component
@@ -66,7 +70,7 @@ public class FetchPlanResolver {
                 RunContext.getRetrievalSimilarityThreshold(),
                 RunContext.getRetrievalFiltersJson(),
                 currentLocaleOrRoot(),
-                currentUserOrNull());
+                currentUserSnapshot());
         FetchPlan candidatePlan = null;
         for (ToolFetchPlanCustomizer customizer : customizers) {
             Optional<FetchPlan> overridden = customizer.overrideFor(toolName, metaClass, context);
@@ -87,12 +91,22 @@ public class FetchPlanResolver {
         return intersector.intersectWithAcl(plan, metaClass, toolName);
     }
 
-    private UserDetails currentUserOrNull() {
+    private FetchPlanContext.UserSnapshot currentUserSnapshot() {
         try {
-            return currentAuthentication.getUser();
+            UserDetails user = currentAuthentication.getUser();
+            if (user == null) {
+                return new FetchPlanContext.UserSnapshot("", Set.of());
+            }
+            return new FetchPlanContext.UserSnapshot(user.getUsername(), rolesOf(user));
         } catch (RuntimeException anonymous) {
-            return null;
+            return new FetchPlanContext.UserSnapshot("", Set.of());
         }
+    }
+
+    private static Set<String> rolesOf(UserDetails user) {
+        return user.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     private Locale currentLocaleOrRoot() {

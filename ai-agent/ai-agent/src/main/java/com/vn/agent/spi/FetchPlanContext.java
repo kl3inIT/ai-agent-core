@@ -1,15 +1,16 @@
 package com.vn.agent.spi;
 
-import org.springframework.security.core.userdetails.UserDetails;
-
+import java.util.Collections;
 import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 /**
  * Per-request context passed to {@link ToolFetchPlanCustomizer#overrideFor}. This is a concrete
- * immutable snapshot of the static {@code RunContext} values plus the authenticated user and
- * locale. It is intentionally narrow: SPIs are for app-specific projection behavior, not a
- * parallel runtime-context layer.
+ * immutable snapshot of the static {@code RunContext} values plus the authenticated user's
+ * minimum safe projection and locale. It is intentionally narrow: SPIs are for app-specific
+ * projection behavior, not a parallel runtime-context layer.
  *
  * <p>Do not carry {@code RunContext} itself here: in this codebase it is a final class with a
  * private constructor and static ThreadLocal accessors. {@code FetchPlanResolver} reads those
@@ -25,7 +26,7 @@ import java.util.UUID;
  * @param retrievalSimilarityThreshold  current retrieval similarity threshold, if present
  * @param retrievalFiltersJson          current retrieval filters JSON, if present
  * @param locale                        current Jmix locale; may be {@code Locale.ROOT} defensively
- * @param user                          authenticated user; never {@code null} when Phase 9 calls {@code overrideFor}
+ * @param user                          authenticated user snapshot; never {@code null} when Phase 9 calls {@code overrideFor}
  */
 public record FetchPlanContext(UUID runId,
                                UUID conversationId,
@@ -33,5 +34,20 @@ public record FetchPlanContext(UUID runId,
                                Double retrievalSimilarityThreshold,
                                String retrievalFiltersJson,
                                Locale locale,
-                               UserDetails user) {
+                               UserSnapshot user) {
+
+    public FetchPlanContext {
+        locale = locale == null ? Locale.ROOT : locale;
+        user = user == null ? new UserSnapshot("", Set.of()) : user;
+    }
+
+    public record UserSnapshot(String username, Set<String> roles) {
+
+        public UserSnapshot {
+            username = username == null ? "" : username;
+            roles = roles == null || roles.isEmpty()
+                    ? Set.of()
+                    : Collections.unmodifiableSet(new TreeSet<>(roles));
+        }
+    }
 }
