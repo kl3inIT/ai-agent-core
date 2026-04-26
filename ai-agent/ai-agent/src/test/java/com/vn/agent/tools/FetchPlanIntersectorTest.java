@@ -162,6 +162,7 @@ class FetchPlanIntersectorTest {
         when(inputPlan.getProperties()).thenReturn(List.of(customerFetchProperty));
 
         when(schemaAccess.canReadAttribute(rootMetaClass, "customer")).thenReturn(true);
+        when(schemaAccess.canReadEntity(customerMetaClass)).thenReturn(true);
         when(schemaAccess.canReadAttribute(customerMetaClass, "name")).thenReturn(true);
         when(schemaAccess.canReadAttribute(customerMetaClass, "secret")).thenReturn(false);
 
@@ -190,6 +191,49 @@ class FetchPlanIntersectorTest {
                 denialReasonCaptor.capture(),
                 isNull());
         assertThat(denialReasonCaptor.getValue()).contains("acme_Customer.secret");
+    }
+
+    @Test
+    void nestedPlan_targetEntityDenied_dropsRelationshipBeforeWalkingNestedAttributes() {
+        MetaClass rootMetaClass = newMetaClass("acme_Order");
+        MetaClass customerMetaClass = newMetaClass("acme_Customer");
+
+        MetaProperty customerProperty = referenceProperty("customer", customerMetaClass);
+        when(rootMetaClass.findProperty("customer")).thenReturn(customerProperty);
+
+        FetchPlanProperty nameProp = terminalProperty("name", FetchMode.AUTO);
+        FetchPlan nestedPlan = mock(FetchPlan.class);
+        when(nestedPlan.loadPartialEntities()).thenReturn(true);
+        when(nestedPlan.getProperties()).thenReturn(List.of(nameProp));
+
+        FetchPlanProperty customerFetchProperty = mock(FetchPlanProperty.class);
+        when(customerFetchProperty.getName()).thenReturn("customer");
+        when(customerFetchProperty.getFetchMode()).thenReturn(FetchMode.JOIN);
+        when(customerFetchProperty.getFetchPlan()).thenReturn(nestedPlan);
+        FetchPlan inputPlan = mock(FetchPlan.class);
+        when(inputPlan.loadPartialEntities()).thenReturn(false);
+        when(inputPlan.getProperties()).thenReturn(List.of(customerFetchProperty));
+
+        when(schemaAccess.canReadAttribute(rootMetaClass, "customer")).thenReturn(true);
+        when(schemaAccess.canReadEntity(customerMetaClass)).thenReturn(false);
+
+        BuilderRecorder rootRecorder = wireBuilder(rootMetaClass);
+
+        intersector.intersectWithAcl(inputPlan, rootMetaClass, "get_related_records");
+
+        assertThat(rootRecorder.mergedPropertyNames).isEmpty();
+        verify(schemaAccess, never()).canReadAttribute(customerMetaClass, "name");
+
+        ArgumentCaptor<String> denialReasonCaptor = ArgumentCaptor.forClass(String.class);
+        verify(auditWriter, times(1)).writeToolCall(
+                any(), any(), any(), any(),
+                eq("get_related_records"),
+                isNull(), anyString(), anyLong(),
+                eq(AiToolCallOutcome.FLAGGED),
+                denialReasonCaptor.capture(),
+                isNull());
+        assertThat(denialReasonCaptor.getValue())
+                .contains("acme_Order.customer (target denied)");
     }
 
     // ---- Test 4: Empty result when ALL properties denied ----

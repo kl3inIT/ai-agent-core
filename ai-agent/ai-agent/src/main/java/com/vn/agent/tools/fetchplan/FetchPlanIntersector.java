@@ -107,6 +107,10 @@ public class FetchPlanIntersector {
                 MetaProperty metaProperty = metaClass.findProperty(propertyName);
                 if (metaProperty != null && metaProperty.getRange().isClass()) {
                     MetaClass nestedMetaClass = metaProperty.getRange().asClass();
+                    if (!schemaAccess.canReadEntity(nestedMetaClass)) {
+                        droppedAttributePaths.add(metaClass.getName() + "." + propertyName + " (target denied)");
+                        continue;
+                    }
                     FetchPlan narrowedNestedPlan = walk(nestedPlan, nestedMetaClass, droppedAttributePaths);
                     builder.mergeProperty(propertyName, narrowedNestedPlan, fetchMode);
                 } else {
