@@ -75,7 +75,7 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 02-10: ✅ FoundationsBootSmokeTest @SpringBootTest (5 assertions: Liquibase, entity round-trip, row-level isolation, SPI defaults, role catalog)
 - 02-11: ✅ D-10 scope reductions + D-02 include correction synced to REQUIREMENTS/ROADMAP/PROJECT/STACK docs
 
-**Static verification:** PASS (16/16 must-haves — see `.planning/phases/02-foundations/VERIFICATION.md`)
+**Static verification:** PASS (16/16 must-haves — see `.planning/milestones/v1.0.0-phases/02-foundations/VERIFICATION.md`)
 
 ## Next Steps
 
@@ -91,9 +91,9 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 | Requirements archive | `.planning/milestones/v1.0.0-REQUIREMENTS.md` |
 | Roadmap | `.planning/ROADMAP.md` |
 | Roadmap archive | `.planning/milestones/v1.0.0-ROADMAP.md` |
-| Research summary | `.planning/research/SUMMARY.md` |
-| Phase 1 plans/summaries | `.planning/phases/01-walking-skeleton/` |
-| Codebase map | `.planning/codebase/` |
+| Research summary archive | `.planning/milestones/v1.0.0-research/SUMMARY.md` |
+| Phase 1 plans/summaries archive | `.planning/milestones/v1.0.0-phases/01-walking-skeleton/` |
+| Codebase map archive | `.planning/milestones/v1.0.0-codebase/` |
 | Config | `.planning/config.json` |
 
 ## Phase 03 Progress
@@ -117,14 +117,14 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 
 ## Session Tracking
 
-- 2026-04-19 13:28 +07:00 — Forensic investigation complete. Resume from `.planning/forensics/report-20260419-132820.md`.
-- 2026-04-24 17:52 +07:00 — Forensic investigation complete for Phase 07 / 07.1 closure readiness. Resume from `.planning/forensics/report-20260424-175230.md`.
+- 2026-04-19 13:28 +07:00 — Forensic investigation complete. Archived at `.planning/milestones/v1.0.0-forensics/report-20260419-132820.md`.
+- 2026-04-24 17:52 +07:00 — Forensic investigation complete for Phase 07 / 07.1 closure readiness. Archived at `.planning/milestones/v1.0.0-forensics/report-20260424-175230.md`.
 - 2026-04-19 16:24 +07:00 — Plan 03-01 complete (metadata core). Next: 03-02 (FilterNode DSL / LiteralCoercer / FilterDslMapper).
 - 2026-04-19 17:35 +07:00 — Plan 03-02 complete (Filter DSL + tool primitives). Next: 03-03 (ToolResultFormatter + BuiltInDataTools six @Tool methods).
 - 2026-04-19 18:30 +07:00 — Plan 03-03 complete (LLM-facing tool surface). Next: 03-04 (unit tests + PromptInjectionHarnessTest + ASM BuiltInDataToolsReadOnlyTest).
 - 2026-04-19 19:30 +07:00 — Plan 03-04 complete (8 test files + TOOL-08 ASM enforcement). Next: 03-05 (final phase plan — integration test in jmix-app).
 - 2026-04-19 20:15 +07:00 — Plan 03-05 complete (OrderSummaryToolContributor + ChatServiceToolIntegrationTest). Phase 3 static verification PASS; old human Gradle verification debt closed obsolete on 2026-04-26 so Phase 8 can be scoped fresh.
-- 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings to `.planning/phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
+- 2026-04-20 00:32 +07:00 — Extracted Phase 03 learnings, now archived at `.planning/milestones/v1.0.0-phases/03-metadata-first-runtime-six-tools/03-LEARNINGS.md`.
 - 2026-04-20 00:45 +07:00 — Quick task 260420-09p complete: Phase 3 docs resynced after post-execute refactor (metadata collapse 6→1, filter renames, new `ToolResultPayloads`/`ChatServiceSmokeRunner` surfaced, 2026-04-20 audit entry appended to DISCUSSION-LOG). Phase 03 Progress bullets above retain original execution-time prose by design — the phase-folder SUMMARYs are the resynced source of truth.
 - 2026-04-20 11:55 +07:00 — Plan 04-01 complete (Liquibase 080 + AiToolCallAudit entity fields + EN/VI i18n; compileJava green). Commits 8181ff4, 1789b7e. Next: 04-02.
 - 2026-04-20 12:40 +07:00 — Plan 04-02 complete (orchestration foundations: 5 orchestration classes + 2 unit test classes; 6 tests green; 8 new application.properties keys for defaults + OpenRouter; EN/VI ConversationNotFound i18n key). Commits 586ef7a, 5a0e4be. Next: 04-03.

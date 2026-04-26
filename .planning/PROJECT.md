@@ -100,11 +100,11 @@ The MVP is now a working Jmix add-on spanning packaging, secured metadata tools,
 
 ### Deferred Decisions
 
-- **Split add-on into 4 modules** (`ai-agent-flowui` + `ai-agent-flowui-starter` alongside existing `ai-agent` + `ai-agent-starter`) — was Key Decision #2. **Deferred** per [D-01 in Phase 1 CONTEXT](phases/01-walking-skeleton/01-CONTEXT.md). Trigger: a named REST-only consumer use case that cannot accept Vaadin deps. Until then, `ai-agent-starter` ships with UI and PKG-04 (zero-Vaadin functional module posture) remains open.
+- **Split add-on into 4 modules** (`ai-agent-flowui` + `ai-agent-flowui-starter` alongside existing `ai-agent` + `ai-agent-starter`) — was Key Decision #2. **Deferred** per [D-01 in Phase 1 CONTEXT](milestones/v1.0.0-phases/01-walking-skeleton/01-CONTEXT.md). Trigger: a named REST-only consumer use case that cannot accept Vaadin deps. Until then, `ai-agent-starter` ships with UI and PKG-04 (zero-Vaadin functional module posture) remains open.
 
-- **Ship `AiExposureRule` entity + `EntityExposurePolicy` SPI + `ExposureRuleListView`** — was part of v1 scope. **Deferred** per [D-10 in Phase 2 CONTEXT](phases/02-foundations/02-CONTEXT.md). Trigger: a concrete consumer case where Jmix `AccessManager` + `DataManager` row-/attribute-level policies are insufficient to constrain what the agent sees. Until then, authorization is the host's existing Jmix security stack (per MEMORY note "AI is just another Jmix client").
+- **Ship `AiExposureRule` entity + `EntityExposurePolicy` SPI + `ExposureRuleListView`** — was part of v1 scope. **Deferred** per [D-10 in Phase 2 CONTEXT](milestones/v1.0.0-phases/02-foundations/02-CONTEXT.md). Trigger: a concrete consumer case where Jmix `AccessManager` + `DataManager` row-/attribute-level policies are insufficient to constrain what the agent sees. Until then, authorization is the host's existing Jmix security stack (per MEMORY note "AI is just another Jmix client").
 
-- **ArchUnit enforcement of layering / `.impl.` imports / `no DataManager.save in @Tool`** (TEST-06, parts of TOOL-08) — was part of v1 scope. **Deferred** per [D-10 in Phase 2 CONTEXT](phases/02-foundations/02-CONTEXT.md) per MEMORY note "Avoid ArchUnit until drift". Code review + targeted unit-test conventions remain authoritative until rule drift justifies ArchUnit.
+- **ArchUnit enforcement of layering / `.impl.` imports / `no DataManager.save in @Tool`** (TEST-06, parts of TOOL-08) — was part of v1 scope. **Deferred** per [D-10 in Phase 2 CONTEXT](milestones/v1.0.0-phases/02-foundations/02-CONTEXT.md) per MEMORY note "Avoid ArchUnit until drift". Code review + targeted unit-test conventions remain authoritative until rule drift justifies ArchUnit.
 
 ## Evolution
 

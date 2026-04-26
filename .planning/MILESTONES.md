@@ -27,6 +27,19 @@
 
 **Known milestone debt:** PKG-05/TEST-07 clean-consumer smoke remains deferred from Plan 08-05; follow-up should choose either a stub VectorStore boot mode or a Testcontainers-backed consumer smoke.
 
+**Archived artifact sets:**
+- `.planning/milestones/v1.0.0-ROADMAP.md`
+- `.planning/milestones/v1.0.0-REQUIREMENTS.md`
+- `.planning/milestones/v1.0.0-phases/`
+- `.planning/milestones/v1.0.0-adr/`
+- `.planning/milestones/v1.0.0-codebase/`
+- `.planning/milestones/v1.0.0-debug/`
+- `.planning/milestones/v1.0.0-forensics/`
+- `.planning/milestones/v1.0.0-quick/`
+- `.planning/milestones/v1.0.0-research/`
+- `.planning/milestones/v1.0.0-test-fixtures/`
+- `.planning/milestones/v1.0.0-todos-completed/`
+
 **What's next:** Define the next milestone with `$gsd-new-milestone`; likely candidates are consumer-smoke hardening and prompt-contract/UI clarity work.
 
 ---
