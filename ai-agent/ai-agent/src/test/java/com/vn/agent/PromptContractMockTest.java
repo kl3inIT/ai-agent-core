@@ -60,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * prove the OutputScannerAdvisor + ChatResponseDto promotion contract is locale-independent.
  */
 @SpringBootTest(classes = AITestConfiguration.class)
+@org.springframework.test.context.ActiveProfiles("prompt-contract-mock")
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
@@ -225,7 +226,19 @@ class PromptContractMockTest {
 
     // ---------- @TestConfiguration: scripted ChatModel + recorder ----------
 
+    /**
+     * <p><b>Profile-gated to {@code prompt-contract-mock}:</b> the AIConfiguration's
+     * {@code @ComponentScan} over {@code com.vn.agent} also picks this nested
+     * {@code @TestConfiguration} up in OTHER tests' contexts (Spring's plain {@code @ComponentScan}
+     * does not apply Spring Boot's {@code TestComponent}-aware {@code TypeExcludeFilter}). Without
+     * the profile gate the {@link #removeAddOnStubChatModel()} post-processor would deregister
+     * {@code stubChatModel} from EVERY test context, breaking tests like
+     * {@code OrchestrationIntegrationTest} that depend on the {@code "STUB:..."} echo. The
+     * {@code @ActiveProfiles("prompt-contract-mock")} on the test class activates the profile
+     * only here; other tests' contexts skip this configuration entirely.</p>
+     */
     @TestConfiguration
+    @org.springframework.context.annotation.Profile("prompt-contract-mock")
     public static class PromptContractStubChatModelConfiguration {
 
         @Bean
