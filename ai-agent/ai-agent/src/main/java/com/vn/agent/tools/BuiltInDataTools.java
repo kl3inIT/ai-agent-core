@@ -95,8 +95,44 @@ public class BuiltInDataTools {
         }
     }
 
-    // -------- Tool 2: describe_entity (D-02) --------
+    // -------- Tool 2: describe_entity (D-02; widened in Phase 9 TOOL-09 / D-04) --------
 
+    /**
+     * Tool 2: describe_entity (D-02; widened in Phase 9 TOOL-09 / D-04).
+     *
+     * <p>Returns Jmix-{@link MetadataTools}-derived attribute fields: {@code comment},
+     * {@code attributeType}, {@code cardinality}, {@code mandatory}, {@code readOnly},
+     * {@code persistent}, {@code transientProperty}, {@code primaryKey}, {@code enumValues}
+     * (each as {@code [{name, label}]} with locale-resolved labels via {@link io.jmix.core.Messages}),
+     * {@code relationshipTarget} ({@code {name, label}} mirroring the {@code agent.entities}
+     * shape), and {@code maxLength}. Top-level {@code comment} carries any entity-level
+     * {@link io.jmix.core.metamodel.annotation.Comment}.
+     *
+     * <p><b>Excluded fields (D-05 — documented in Javadoc only, NOT echoed into LLM-facing
+     * payload):</b> DDL column names, JPA fetch type, cascade rules, raw annotations, internal
+     * store name, framework-managed audit columns. The exclusion keeps the prompt token-cost
+     * bounded and avoids leaking host-storage details that the LLM cannot act on.
+     *
+     * <p>Implementation rule: every metadata read goes through {@link MetadataTools} (e.g.
+     * {@code getMetaAnnotationValue}, {@code isJpa}, {@code getPrimaryKeyProperty}). Raw reflection
+     * is forbidden in this code path; the only allowed reflection in {@code tools/} is
+     * {@code ToolResultFormatter.columnLength} for {@code @Column.length}, which has no
+     * {@code MetadataTools} accessor.
+     *
+     * <p><b>Future-cache contract (mirrors AiAgentPromptProperties PROMPT-02):</b>
+     * the {@code DescribeEntityResult} payload carries locale-sensitive labels (entity caption,
+     * attribute captions, enum captions) resolved through {@link MessageTools} /
+     * {@link io.jmix.core.Messages}. If a future phase (10/11+) introduces a cache layer in
+     * front of {@code describe_entity}, that cache MUST NOT include {@link java.util.Locale}
+     * in the cache key. Locale-sensitive labels must be resolved AFTER the cache lookup
+     * (post-cache label rendering against the current
+     * {@code CurrentAuthentication.getLocale()}), exactly as
+     * {@code AiAgentPromptProperties.effectiveSystemPrompt(...)} resolves prompt text post-cache.
+     * Including locale in the cache key would create the PROMPT-02 forbidden coupling and force
+     * per-locale cache duplication; it is a known anti-pattern. The structural metadata
+     * (attribute names, types, cardinality) is locale-invariant and is the legitimate cache
+     * target.
+     */
     @Tool(name = "describe_entity",
             description = "Describe an entity's attributes, types, constraints, relationships, and enum values.")
     public String describeEntity(

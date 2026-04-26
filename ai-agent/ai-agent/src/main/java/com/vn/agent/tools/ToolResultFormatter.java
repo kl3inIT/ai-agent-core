@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jmix.core.EntityStates;
 import io.jmix.core.MessageTools;
+import io.jmix.core.Messages;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
+import io.jmix.core.metamodel.annotation.Comment;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
@@ -29,6 +31,10 @@ import java.util.Set;
  * 03-RESEARCH.md) to prevent delimiter-bypass.
  *
  * <p>Plan 04's prompt-injection harness verifies both the wrap AND the escape.
+ *
+ * <p>Phase 9 widens the {@code describe_entity} payload (TOOL-09 / D-04) using {@link
+ * MetadataTools}-derived field reads and emits the literal PROMPT-04 envelope from
+ * {@link #records(List, MetaClass, int, boolean)}.
  */
 @Component
 public class ToolResultFormatter {
@@ -37,15 +43,18 @@ public class ToolResultFormatter {
     private final EntityStates entityStates;
     private final MetadataTools metadataTools;
     private final MessageTools messageTools;
+    private final Messages messages;
 
     public ToolResultFormatter(ObjectMapper objectMapper,
                                EntityStates entityStates,
                                MetadataTools metadataTools,
-                               MessageTools messageTools) {
+                               MessageTools messageTools,
+                               Messages messages) {
         this.objectMapper = objectMapper;
         this.entityStates = entityStates;
         this.metadataTools = metadataTools;
         this.messageTools = messageTools;
+        this.messages = messages;
     }
 
     // ---- public API ----
@@ -68,10 +77,15 @@ public class ToolResultFormatter {
     }
 
     /**
-     * describe_entity response (D-02). Computed live off {@link MetaClass} +
-     * {@link MessageTools} rather than a cached snapshot — captions are locale-sensitive and
-     * the metamodel is already authoritative. {@code readableAttributeNames} is the access-filtered
-     * subset returned by the current-user schema access component.
+     * describe_entity response (D-02; widened in Phase 9 TOOL-09 / D-04). Computed live off
+     * {@link MetaClass} + {@link MetadataTools} + {@link MessageTools} rather than a cached
+     * snapshot — captions are locale-sensitive and the metamodel is already authoritative.
+     * {@code readableAttributeNames} is the access-filtered subset returned by the
+     * current-user schema access component.
+     *
+     * <p>Every metadata read goes through {@link MetadataTools} (no raw reflection) — the
+     * only reflection in this file is the existing {@link #columnLength(MetaProperty)}
+     * helper for {@code @Column.length}, which has no {@code MetadataTools} accessor.
      */
     public String describe(MetaClass metaClass, Set<String> readableAttributeNames) {
         List<AttributeDescription> attributeDescriptions = new ArrayList<>();
@@ -79,11 +93,13 @@ public class ToolResultFormatter {
             if (!readableAttributeNames.contains(metaProperty.getName())) {
                 continue;
             }
-            attributeDescriptions.add(buildAttributeDescription(metaProperty));
+            attributeDescriptions.add(buildAttributeDescription(metaClass, metaProperty));
         }
+        String entityComment = readCommentValue(metadataTools.getMetaAnnotationValue(metaClass, Comment.class));
         return writeJson(new DescribeEntityResult(
                 metaClass.getName(),
                 messageTools.getEntityCaption(metaClass),
+                entityComment,
                 attributeDescriptions
         ));
     }
@@ -113,18 +129,27 @@ public class ToolResultFormatter {
         return writeJson(buildFormattedEntityRow(entity, metaClass));
     }
 
-    /** find_records response — rows + limit + truncated flag + optional hint (D-14). */
+    /**
+     * find_records response (D-14 truncation hint). Phase 9 PROMPT-04 wraps the inner JSON
+     * payload in the literal envelope {@code <data entity="<label>" type="<internalName>">...</data>}
+     * (label first via {@link MessageTools#getEntityCaption}, internal name second via
+     * {@link MetaClass#getName()}). The per-row {@code <data>...</data>} wrap inside row
+     * values is unchanged.
+     */
     public String records(List<?> rows, MetaClass metaClass, int limit, boolean truncated) {
         String hint = truncated
                 ? "result was truncated to the limit; call count_records for the exact total or narrow the filter"
                 : null;
-        return writeJson(new RecordsResult(
-                metaClass.getName(),
+        String payloadJson = writeJson(new RecordsPayload(
                 serializeRows(rows, metaClass),
                 limit,
                 truncated,
                 hint
         ));
+        return "<data entity=\"" + escapeAttribute(messageTools.getEntityCaption(metaClass))
+                + "\" type=\"" + escapeAttribute(metaClass.getName()) + "\">"
+                + payloadJson
+                + "</data>";
     }
 
     /** get_related_records response. */
@@ -145,30 +170,73 @@ public class ToolResultFormatter {
 
     // ---- internals ----
 
-    private AttributeDescription buildAttributeDescription(MetaProperty metaProperty) {
+    private AttributeDescription buildAttributeDescription(MetaClass declaringMetaClass, MetaProperty metaProperty) {
         Range range = metaProperty.getRange();
-        List<String> enumValueNames = range.isEnum() ? enumValueNames(range) : null;
-        String relationshipTarget = range.isClass() ? range.asClass().getName() : null;
+
+        List<EnumValueDescription> enumValues = null;
+        if (range.isEnum()) {
+            enumValues = new ArrayList<>();
+            for (Object enumValue : range.asEnumeration().getValues()) {
+                Enum<?> typedEnum = (Enum<?>) enumValue;
+                enumValues.add(new EnumValueDescription(typedEnum.name(), messages.getMessage(typedEnum)));
+            }
+        }
+
+        EntityRef relationshipTarget = null;
+        if (range.isClass()) {
+            MetaClass targetMetaClass = range.asClass();
+            relationshipTarget = new EntityRef(
+                    targetMetaClass.getName(),
+                    messageTools.getEntityCaption(targetMetaClass));
+        }
+
         Integer maxLength = range.isDatatype() && range.asDatatype().getJavaClass() == String.class
                 ? columnLength(metaProperty)
                 : null;
+
+        String comment = readCommentValue(metadataTools.getMetaAnnotationValue(metaProperty, Comment.class));
+
+        String cardinality = range.getCardinality() != null ? range.getCardinality().name() : "NONE";
+        boolean persistent = metadataTools.isJpa(metaProperty);
+        MetaProperty primaryKeyProperty = metadataTools.getPrimaryKeyProperty(declaringMetaClass);
+        boolean primaryKey = primaryKeyProperty != null
+                && primaryKeyProperty.getName().equals(metaProperty.getName());
+
         return new AttributeDescription(
                 metaProperty.getName(),
-                typeLabel(metaProperty),
-                !metaProperty.isMandatory(),
                 messageTools.getPropertyCaption(metaProperty),
-                enumValueNames,
+                comment,
+                typeLabel(metaProperty),
+                cardinality,
+                metaProperty.isMandatory(),
+                metaProperty.isReadOnly(),
+                persistent,
+                !persistent,
+                primaryKey,
+                enumValues,
                 relationshipTarget,
                 maxLength
         );
     }
 
-    private List<String> enumValueNames(Range range) {
-        List<String> enumValueNames = new ArrayList<>();
-        for (Object enumValue : range.asEnumeration().getValues()) {
-            enumValueNames.add(((Enum<?>) enumValue).name());
+    /**
+     * {@link MetadataTools#getMetaAnnotationValue} returns the raw {@code value()} member of
+     * a meta-annotation directly (not the annotation instance). For {@link Comment} that is
+     * the {@link String} comment text. We accept {@link Object} defensively in case a future
+     * Jmix version changes the return shape.
+     */
+    private static String readCommentValue(Object metaAnnotationValue) {
+        if (metaAnnotationValue == null) {
+            return null;
         }
-        return enumValueNames;
+        if (metaAnnotationValue instanceof String stringValue) {
+            return stringValue.isEmpty() ? null : stringValue;
+        }
+        if (metaAnnotationValue instanceof Comment commentAnnotation) {
+            String value = commentAnnotation.value();
+            return value.isEmpty() ? null : value;
+        }
+        return metaAnnotationValue.toString();
     }
 
     private List<Map<String, Object>> serializeRows(List<?> rows, MetaClass metaClass) {
@@ -243,6 +311,22 @@ public class ToolResultFormatter {
         return value
                 .replace("<data>", "&lt;data&gt;")
                 .replace("</data>", "&lt;/data&gt;");
+    }
+
+    /**
+     * XML attribute-value escape used in the PROMPT-04 outer envelope {@code <data
+     * entity="..." type="...">}. Escapes the five XML-significant characters so a malicious
+     * entity caption cannot terminate the envelope or inject extra attributes.
+     */
+    private static String escapeAttribute(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 
     private String writeJson(Object value) {
