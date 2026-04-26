@@ -32,7 +32,7 @@ public record AiAgentAuditProperties(
 
     /** D-18: hash-sensitive-fields defaults to enabled when key omitted. */
     public boolean resolvedHashSensitiveFields() {
-        return hashSensitiveFields == null || !Boolean.FALSE.equals(hashSensitiveFields);
+        return !Boolean.FALSE.equals(hashSensitiveFields);
     }
 
     /** D-18: sensitive-fields defaults to empty when key omitted; returned set is unmodifiable. */

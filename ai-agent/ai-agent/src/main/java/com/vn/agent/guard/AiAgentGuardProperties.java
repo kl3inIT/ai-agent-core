@@ -66,7 +66,7 @@ public record AiAgentGuardProperties(
 
     /** D-13: rate-limit defaults to enabled when block omitted. */
     public boolean rateLimitEnabled() {
-        return rateLimit == null || !Boolean.FALSE.equals(rateLimit.enabled());
+        return rateLimit == null || enabledByDefault(rateLimit.enabled());
     }
 
     /** D-13: default ceiling 10 requests/min per user. */
@@ -76,7 +76,7 @@ public record AiAgentGuardProperties(
 
     /** D-14: token breaker defaults to enabled when block omitted. */
     public boolean tokenBreakerEnabled() {
-        return tokenBreaker == null || !Boolean.FALSE.equals(tokenBreaker.enabled());
+        return tokenBreaker == null || enabledByDefault(tokenBreaker.enabled());
     }
 
     /** D-14: default ceiling 100_000 tokens per conversation. */
@@ -91,7 +91,7 @@ public record AiAgentGuardProperties(
 
     /** D-17: output scanner defaults to enabled when block omitted. */
     public boolean outputScannerEnabled() {
-        return outputScanner == null || !Boolean.FALSE.equals(outputScanner.enabled());
+        return outputScanner == null || enabledByDefault(outputScanner.enabled());
     }
 
     /**
@@ -122,7 +122,7 @@ public record AiAgentGuardProperties(
         if (outputScanner == null || outputScanner.hostPrefixLeak() == null) {
             return true;
         }
-        return !Boolean.FALSE.equals(outputScanner.hostPrefixLeak().enabled());
+        return enabledByDefault(outputScanner.hostPrefixLeak().enabled());
     }
 
     /**
@@ -133,6 +133,10 @@ public record AiAgentGuardProperties(
         if (outputScanner == null || outputScanner.toolNameLeak() == null) {
             return true;
         }
-        return !Boolean.FALSE.equals(outputScanner.toolNameLeak().enabled());
+        return enabledByDefault(outputScanner.toolNameLeak().enabled());
+    }
+
+    private static boolean enabledByDefault(Boolean value) {
+        return !Boolean.FALSE.equals(value);
     }
 }
