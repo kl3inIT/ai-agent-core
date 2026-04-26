@@ -392,12 +392,12 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config (delivered 2026-04-26; 6 new @Test methods, 3 PASS / 3 RED — REDs trigger R-XP-2 `--gaps` replan, see `08-01-SUMMARY.md`)
-- [ ] 08-02-PLAN.md — TEST-02 + TEST-03 extensions (poisoned tool result, rollback-preserves-audit)
-- [ ] 08-03-PLAN.md — Performance smoke (datasource-proxy + per-tool query-count baseline + limit cap)
-- [ ] 08-04-PLAN.md — TEST-05 live-tier semantic golden suite (6-question YAML fixture)
-- [ ] 08-05-PLAN.md — TEST-07 clean-consumer smoke (consumer-smoke/ Gradle subproject + bootRunSmoke)
-- [ ] 08-06-PLAN.md — Operator README + SPI cookbook
-- [ ] 08-07-PLAN.md — Release polish (version 1.0.0 + secrets rotation + CHANGELOG + 3 GitHub Actions workflows)
+- [x] 08-02-PLAN.md — TEST-02 + TEST-03 extensions: PromptInjectionHarnessTest +2 poisoned-payload @Tests, AuditDurabilityTest +1 ERROR-path decorator-routed @Test (5/5 + 3/3 green)
+- [x] 08-03-PLAN.md — Performance smoke: datasource-proxy 1.11.0 + per-tool baselines on `ai_AiAuditEvent` + R-03h slope-based N+1 detector + find_records limit-cap test (9/9 green; R-03e calibration ceilings adopted)
+- [x] 08-04-PLAN.md — TEST-05 live-tier semantic golden suite (7-entry golden-questions.yaml — RAG split into positive + empty-kb; ChatServiceLiveSemanticGoldenSuiteTest dual-gated + R-04e visible-skip; compile-only verified)
+- [~] 08-05-PLAN.md — DEFERRED. Investigated end-to-end pipeline; surfaced 6-layer starter-consumability gap chain (changelog path, primary DataSource, UserRepository, WebApplicationContext, LoginView, pgvector CREATE EXTENSION). All consumer-smoke/ files reverted; recommendations recorded in `08-05-SUMMARY.md`. Recommend follow-up phase to add stub VectorStore bean OR reframe as Testcontainers integration test.
+- [x] 08-06-PLAN.md — Operator README (270 lines, 9 sections, Configuration Matrix derived from real `@ConfigurationProperties` source) + CLAUDE.md `Java 17` → `Java 21` (R-06c)
+- [x] 08-07-PLAN.md — Release polish: version 1.0.0 sourced from gradle.properties, snapshot-vs-release URL conditional, leaked Nexus credentials removed (FOREVER BURNT comment + CHANGELOG Security entry per R-07a), CHANGELOG.md (Keep-a-Changelog v1.1.0 with [Unreleased] discipline + per-phase 1.0.0 backfill), 3 GitHub Actions workflows (ci/live/publish) with explicit permissions + concurrency + preflight secrets check
 
 ---
 

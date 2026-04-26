@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 08
-last_updated: "2026-04-26T01:10:00.000Z"
+status: Phase 08 Complete (1 plan deferred)
+last_updated: "2026-04-26T09:30:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 62
-  completed_plans: 56
-  percent: 90
+  completed_plans: 61
+  percent: 98
 ---
 
 # Project State
@@ -38,7 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
 | 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT closed obsolete/superseded 2026-04-26; no deferred Phase 8 blockers carried forward) |
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
-| 8 | Integration Hardening & Release Readiness | In progress (1/7 plans — 08-01 TEST-04 negative-case suite delivered; 3 RED tests trigger R-XP-2 `--gaps` replan) |
+| 8 | Integration Hardening & Release Readiness | ✅ Complete (6/7 plans — 08-01 TEST-04 negative suite, 08-02 prompt-injection + audit ERROR-path, 08-03 perf smoke + N+1 detector + limit cap, 08-04 live-tier golden suite, 08-06 operator README + Java 21 fix, 08-07 release wiring + 3 GH workflows + leaked-credential acknowledgement; 08-05 consumer-smoke DEFERRED — 6-layer starter-consumability gap chain documented in `08-05-SUMMARY.md`) |
 
 ## Active Milestone
 
