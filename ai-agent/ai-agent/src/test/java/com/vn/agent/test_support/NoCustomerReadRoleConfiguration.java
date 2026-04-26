@@ -1,11 +1,14 @@
 package com.vn.agent.test_support;
 
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import io.jmix.core.security.InMemoryUserRepository;
 import io.jmix.core.security.UserRepository;
+import io.jmix.security.model.EntityAttributePolicyAction;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.RoleGrantedAuthorityUtils;
+import io.jmix.security.role.annotation.EntityAttributePolicy;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
 import jakarta.annotation.PostConstruct;
@@ -69,6 +72,47 @@ public class NoCustomerReadRoleConfiguration {
         void access();
     }
 
+    /**
+     * WR-008: attribute-denial fixture role. Grants entity-level READ on
+     * {@link AiAuditEvent} (so it appears in {@code CurrentUserSchemaAccess.getReadableSchema()})
+     * but grants VIEW only on a curated subset that EXCLUDES the two protected
+     * attributes {@code userUsername} and {@code argumentsJson}.
+     *
+     * <p>The Jmix attribute-policy model is positive-grant only
+     * ({@link EntityAttributePolicyAction#VIEW} / {@link EntityAttributePolicyAction#MODIFY});
+     * there is no explicit DENY action. To keep an attribute out of
+     * {@code CurrentUserSchemaAccess.collectReadableAttributeNames(...)} we simply omit it
+     * from the granted list — the {@code EntityAttributeContext.canView()} check returns
+     * false in that case.</p>
+     *
+     * <p>The original
+     * {@code FilteredSchemaAndExecutionDenialTest#carol_filteredSchema_excludesDenied_andDeniedAttributes}
+     * flow checked attribute denial only on the entity-denial path, where the MetaClass was
+     * always absent — making the attribute assertion vacuous. Persona {@code dave}
+     * (registered below) drives a non-vacuous attribute-denial assertion.</p>
+     */
+    @ResourceRole(name = "Audit Read No Sensitive Attrs", code = AuditReadNoSensitiveAttrsRole.CODE)
+    public interface AuditReadNoSensitiveAttrsRole {
+
+        String CODE = "audit-read-no-sensitive-attrs";
+
+        @EntityPolicy(entityClass = AiAuditEvent.class,
+                actions = {EntityPolicyAction.READ})
+        // Grant VIEW only on a curated subset — userUsername + argumentsJson are
+        // intentionally absent so canView() returns false for them under this role.
+        // (Jmix attribute policies are positive-grant only; absence == deny.)
+        @EntityAttributePolicy(entityClass = AiAuditEvent.class,
+                attributes = {
+                        "id", "version", "parent", "children", "conversation",
+                        "runId", "kind", "eventName", "resultSummary", "queryText",
+                        "topK", "hitCount", "topScore", "filtersJson", "retrievalHitsJson",
+                        "outcome", "denialReason", "errorClass", "promptHash",
+                        "latencyMs", "startedAt", "finishedAt", "displayName"
+                },
+                action = EntityAttributePolicyAction.VIEW)
+        void access();
+    }
+
     @Bean
     @ConditionalOnMissingBean(name = "noCustomerReadUserInitializer")
     public NoCustomerReadUserInitializer noCustomerReadUserInitializer(
@@ -100,6 +144,8 @@ public class NoCustomerReadRoleConfiguration {
                 return;
             }
             repo.addUser(buildUser("carol", NoCustomerReadRole.CODE));
+            // WR-008: register dave with the attribute-denial role.
+            repo.addUser(buildUser("dave", AuditReadNoSensitiveAttrsRole.CODE));
         }
 
         private UserDetails buildUser(String username, String resourceRoleCode) {

@@ -124,4 +124,39 @@ class FilteredSchemaAndExecutionDenialTest {
             return null;
         });
     }
+
+    /**
+     * WR-008: non-vacuous attribute-denial assertion. The carol-driven test above checks
+     * attribute-denial only on the entity-DENIED path — where the MetaClass is always
+     * absent, so the {@code findFirst()} optional is empty and the {@code .doesNotContain}
+     * assertion never executes. To prove the schema collector actually filters per-
+     * attribute, we use persona {@code dave} who has entity-level READ on
+     * {@code ai_AiAuditEvent} but with VIEW granted only on a curated attribute subset
+     * that EXCLUDES {@code userUsername} + {@code argumentsJson}. The entity must be
+     * present in the readable schema; the protected attributes must be absent from its
+     * readable-attribute set.
+     */
+    @Test
+    void dave_filteredSchema_includesEntity_butExcludesProtectedAttributes() {
+        systemAuthenticator.withUser("dave", () -> {
+            Map<MetaClass, Set<String>> schema = currentUserSchemaAccess.getReadableSchema();
+
+            Optional<Map.Entry<MetaClass, Set<String>>> auditEntry = schema.entrySet().stream()
+                    .filter(e -> CUSTOMER_ENTITY_NAME.equals(e.getKey().getName()))
+                    .findFirst();
+
+            assertThat(auditEntry)
+                    .as("dave has entity-level READ on %s — it MUST appear in the readable schema",
+                            CUSTOMER_ENTITY_NAME)
+                    .isPresent();
+
+            assertThat(auditEntry.get().getValue())
+                    .as("dave's role omits VIEW on %s for %s — the readable-attribute set must "
+                            + "EXCLUDE the protected attributes",
+                            java.util.Arrays.toString(CUSTOMER_PROTECTED_ATTRIBUTES),
+                            CUSTOMER_ENTITY_NAME)
+                    .doesNotContain(CUSTOMER_PROTECTED_ATTRIBUTES);
+            return null;
+        });
+    }
 }
