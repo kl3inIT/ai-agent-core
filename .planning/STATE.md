@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-04-26T00:41:18.933Z"
+status: Executing Phase 08
+last_updated: "2026-04-26T01:10:00.000Z"
 last_activity: 2026-04-26
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 62
-  completed_plans: 55
-  percent: 89
+  completed_plans: 56
+  percent: 90
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 08 — Integration Hardening & Release Readiness. Prior Phase 7.1 UAT issues were closed as obsolete on 2026-04-26 after heavy refactor; Phase 8 should be scoped fresh from the current codebase.
+**Current focus:** Phase 08 — integration-hardening-release-readiness
 
 ## Phase Status
 
@@ -38,7 +38,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-18)
 | 7 | Flow UI | ✅ Complete (8/8 plans — 07-07a Wave 0, 07-01 Wave 1 UI foundation, 07-02 streaming backbone, 07-05 Parameters views, 07-06 Knowledge + Audit views, 07-03 ChatView + streaming UI, 07-04 Conversation list + detail replay, 07-07b GREEN test-suite fill) |
 | 7.1 | Adopt Vaadin MessageList/MessageInput for ChatView (INSERTED) | ✅ Complete (UAT closed obsolete/superseded 2026-04-26; no deferred Phase 8 blockers carried forward) |
 | 7.2 | Redesign Audit Schema (tree-lite) (INSERTED) | ✅ Complete (5/5 plans — 07.2-01..05; test green 211/0; verification PASS 26/26 must-haves + 7/7 roadmap success criteria; branch `gsd/phase-07.2-redesign-audit-schema-tree-lite`) |
-| 8 | Integration Hardening & Release Readiness | Not started |
+| 8 | Integration Hardening & Release Readiness | In progress (1/7 plans — 08-01 TEST-04 negative-case suite delivered; 3 RED tests trigger R-XP-2 `--gaps` replan) |
 
 ## Active Milestone
 
@@ -153,6 +153,8 @@ All 11 plans complete on branch `gsd/phase-02-foundations`:
 - 2026-04-21 17:00 UTC — Plan 07.1-06 complete (ChatViewStreamTest + ChatViewStopTest rewritten for Phase 7.1 architecture: stream test drives ChatService.stream → StreamEventRenderer.renderStreamEvent → markdown accumulation across 2 @Test methods — order-concatenation + citation first-vs-subsequent header gate, A-03 deep-link /ai-agent/knowledge?documentId={uuid} locked; stop test 2 methods — behavioural Mockito.spy(new CancellationRegistry()) with verify(registry).cancel(runId) + verify(disposable).dispose() proving audit-carrying chain, plus source-grep sentinel reading ChatPanelFragment.java enforcing D-04 invariant (activeStream.dispose() ≤ 1 / cancellationRegistry.cancel( ≥ 2); pragmatic-unit per Plan 07-07b Rule-1 tolerance — no @UiTest in addon module; path-resolution uses primary CWD-relative + user.dir fallback, neither needed the classpath-URL contingency; MarkdownRendererXssTest untouched per A-01). 4 @Test methods green; ./gradlew :ai-agent:ai-agent:test --tests "com.vn.agent.view.chat.*" BUILD SUCCESSFUL. Commits eeea613, 7bb055d. No deviations — plan executed exactly as written. Next: 07.1 phase-level verification gate + merge.
 
 - 2026-04-21 13:30 +07:00 — Plan 07-04 complete (ConversationListView + ConversationDetailView role-aware replay: ConversationListView @Route("ai-agent/conversations") with CurrentAuthentication.getUser().getAuthorities() admin probe, role-gated userFilter + createdBy column, dynamic JPQL rebuild on filter valueChange, per-row DataManager count(m) for messageCount column (plan path b), double-click → viewNavigators.detailView; ConversationDetailView @Route("ai-agent/conversations/:id") reuses MessageBubbleComponent from 07-03 for read-only transcript replay, Continue-in-chat → UI.navigate(ChatView.class, QueryParameters conversationId=<uuid>); 4 files added, zero i18n changes (all keys pre-seeded by 07-01); compileJava + compileTestJava green). Requirement UI-03 delivered. Commits 3818edc, 87fa46c. Deviations: (Rule 1) CurrentAuthentication has no getAuthorities() — went through getUser(); (Rule 1) JPQL entity names are ai_AiConversation / ai_AiMessage, not AiAgent_* prefix; (Rule 1) AiMessage has no toolCallsJson field in Phase 2 — ToolCallCardComponent not imported, TOOL-role messages skipped. Next: 07-07b (fill RED test stubs) — final Phase 7 plan.
+
+- 2026-04-26 +07:00 — Plan 08-01 complete (TEST-04 negative-case integration suite: NoCustomerReadRoleConfiguration test fixture declaring restricted persona `carol` with READ+CREATE only on AiConversation/AiMessage; FilteredSchemaAndExecutionDenialTest with 2 @Test methods (R-01a access_denied JSON pin; R-01f attribute-granularity exclusion); CrossUserConversationAccessTest with 2 methods (R-01e exception-type opacity; R-01c agentstore @Store inference + DataManager-level row opacity); RagRoleFilterNegativeTest with 2 methods (R-01b real buildFor(Authentication) signature; RAG-06 fail-closed sentinel `__none__`). 6 new @Test methods, 3 PASS / 3 RED. Compile green; runtime negative greps clean (0 EffectiveSchemaComputer / 0 buildForCurrentUser); 0 @Disabled. Commits 8985d82 (Task 1), 502c785 (Task 2), 61910c2 (Task 3), bac0860 (Rule-1 normalized role-flag-key fix), 5d828b7 (forbidden-symbol Javadoc cleanup). Deviations: (Rule 3) denial target pivoted from off-classpath demo Customer to on-classpath ai_AiAuditEvent — jmix-app entities are NOT on ai-agent test classpath; class name preserved for plan-trace fidelity; (Rule 1) RAG assertion used hyphenated role codes — actual filter uses ChunkMetadata-normalized form `role_ai_agent_user`; (Rule 1) Store annotation import is io.jmix.core.metamodel.annotation, not io.jmix.core.annotation. **R-XP-2 trigger fires:** 3 RED tests reveal real security gaps — carol observes denied entities (ai_AiAuditEvent + ai_AiParameters) in CurrentUserSchemaAccess.getReadableSchema(); BuiltInDataTools.findRecords returns rows instead of access_denied; bob observes alice's conversation row in DataManager listing (RowLevelRole gap on .all().list() path). Cross-user replay opacity (ConversationGateway path) PASSES. Recommend orchestrator run `/gsd-plan-phase 8 --gaps` before Wave 2 (Plan 07) per 08-01-PLAN.md `<notes>` section. Next: remaining Phase 8 plans (Wave 1 still has 08-02..08-04; --gaps replan should also scope SUT fixes for the 3 REDs).
 
 ### Quick Tasks Completed
 

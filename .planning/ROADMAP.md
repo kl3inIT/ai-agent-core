@@ -391,7 +391,7 @@ Plans:
 **Plans:** 7 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config
+- [x] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config (delivered 2026-04-26; 6 new @Test methods, 3 PASS / 3 RED — REDs trigger R-XP-2 `--gaps` replan, see `08-01-SUMMARY.md`)
 - [ ] 08-02-PLAN.md — TEST-02 + TEST-03 extensions (poisoned tool result, rollback-preserves-audit)
 - [ ] 08-03-PLAN.md — Performance smoke (datasource-proxy + per-tool query-count baseline + limit cap)
 - [ ] 08-04-PLAN.md — TEST-05 live-tier semantic golden suite (6-question YAML fixture)
