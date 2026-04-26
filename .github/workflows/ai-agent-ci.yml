@@ -1,8 +1,11 @@
 # Plan 08-07 — PR-blocking CI for the ai-agent add-on.
 #
-# Runs on every push to main + every PR. Default ./gradlew test excludes @Tag('live')
-# and @Tag('rag-it'); both stay opt-in (live via ai-agent-live.yml; integration test
-# requires Docker on the runner — gated by isDockerAvailable() in ai-agent.gradle).
+# Runs on every push to main + every PR. We invoke `./gradlew check`, which executes the
+# default `test` task (excludes @Tag('live') and @Tag('rag-it')) PLUS — when Docker is
+# detected on the runner — the `integrationTest` task wired into `check` by
+# ai-agent/ai-agent.gradle. GitHub-hosted ubuntu-latest runners ship with Docker, so the
+# Phase-5 pgvector/RAG @Tag('rag-it') integration contracts are gated on every PR.
+# @Tag('live') stays opt-in (manual dispatch only — see ai-agent-live.yml).
 name: ai-agent CI
 
 on:
@@ -52,8 +55,15 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved aiAgentVersion: $VERSION"
 
-      - name: Compile + test (default tier — excludes @Tag(live) and @Tag(rag-it))
-        run: ./gradlew :ai-agent:ai-agent:test --no-daemon
+      # WR-002: invoke `check` (not just `test`) so the Docker-gated `integrationTest`
+      # task — wired into `check` by ai-agent/ai-agent.gradle when Docker is detected on
+      # the runner — runs as part of the PR gate. GitHub ubuntu-latest runners ship with
+      # Docker, so the @Tag('rag-it') pgvector/RAG integration suite executes here.
+      # Default `test` still runs first via task dependency and excludes @Tag('live') +
+      # @Tag('rag-it'); the integration tier is added on top, not in place of, the
+      # default tier.
+      - name: Compile + check (default + Docker-gated integration tier)
+        run: ./gradlew :ai-agent:ai-agent:check --no-daemon
 
       - name: Publish ai-agent + ai-agent-starter to local maven (for downstream smoke)
         run: ./gradlew :ai-agent:ai-agent:publishToMavenLocal :ai-agent:ai-agent-starter:publishToMavenLocal --no-daemon
