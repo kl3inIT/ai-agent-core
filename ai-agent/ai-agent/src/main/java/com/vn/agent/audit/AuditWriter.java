@@ -5,8 +5,8 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.spi.AuditKind;
 import com.vn.agent.spi.AuditListener;
-import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.UnconstrainedDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -57,11 +57,20 @@ public class AuditWriter {
 
     private static final Logger log = LoggerFactory.getLogger(AuditWriter.class);
 
-    private final DataManager dataManager;
+    /**
+     * Unconstrained: audit-event writes are system infrastructure that must persist regardless
+     * of caller authentication. End-user roles (e.g. AiAgentUserRole) intentionally do NOT grant
+     * CREATE on ai_AiAuditEvent — the audit log is tamper-evident. Switching from DataManager
+     * to UnconstrainedDataManager is the canonical Jmix pattern for system-internal persistence
+     * (see /jmix-framework/jmix-context7 data-manager.html) and avoids the role-grant brittleness
+     * of runWithSystem (which is itself policy-gated under jmix-security-data). See project memory
+     * feedback_jmix_unconstrained_for_system_writes and 08-08-INVESTIGATION.md.
+     */
+    private final UnconstrainedDataManager dataManager;
     private final Metadata metadata;
     private final AuditListenerDispatcher dispatcher;
 
-    public AuditWriter(DataManager dataManager, Metadata metadata, AuditListenerDispatcher dispatcher) {
+    public AuditWriter(UnconstrainedDataManager dataManager, Metadata metadata, AuditListenerDispatcher dispatcher) {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.dispatcher = dispatcher;

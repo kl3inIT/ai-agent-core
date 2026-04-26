@@ -80,7 +80,9 @@ class RetrievalAuditRoundTripTest {
 
             assertThat(docs).hasSize(3);
 
-            AiAuditEvent root = dataManager.load(AiAuditEvent.class)
+            // jmix-security-data: ai_AiAuditEvent reads under runWithSystem use .unconstrained()
+            // (system user is policy-gated). See feedback_jmix_unconstrained_for_system_writes.
+            AiAuditEvent root = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(rootId)
                     .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("children", FetchPlan.BASE))
                     .one();
@@ -115,7 +117,9 @@ class RetrievalAuditRoundTripTest {
         conversation.setTitle("conv-retrieval-fk");
         conversation.setCreatedBy("user-A");
         conversation.setCreatedDate(OffsetDateTime.now());
-        return dataManager.save(conversation).getId();
+        // jmix-security-data: fixture seeding under runWithSystem uses .unconstrained() —
+        // see feedback_jmix_unconstrained_for_system_writes.
+        return dataManager.unconstrained().save(conversation).getId();
     }
 
     private static Document buildDoc(String id, double score) {

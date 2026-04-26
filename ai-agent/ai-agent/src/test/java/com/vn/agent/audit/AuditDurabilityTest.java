@@ -48,6 +48,18 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
 @Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+// Verification-read convention under jmix-security-data:
+// The 6 verification-read assertions on AiAuditEvent in this class use
+// dataManager.unconstrained().load(...) because (a) ai_AiAuditEvent is a system-internal
+// entity, (b) under jmix-security-data the system user is itself policy-gated (runWithSystem
+// does NOT auto-grant CRUD on AI entities), so a constrained load under runWithSystem returns
+// 0 rows. SUT triggers (auditWriter.writeChatStart/writeToolCall/writeChatFinish, decorator.call)
+// remain on the constrained injection path so AuditWriter's REQUIRES_NEW + UnconstrainedDataManager
+// contract is exercised under realistic auth. Read-policy correctness for ai_AiAuditEvent is
+// verified separately by FilteredSchemaAndExecutionDenialTest.carol_* (orthogonal contract:
+// those tests use constrained DM precisely because they assert read-policy enforcement).
+// T-08-08-08 disposition: accept (information-disclosure threat; mitigation: orthogonal coverage).
+// See 08-08-INVESTIGATION-2.md and project memory feedback_jmix_unconstrained_for_system_writes.
 class AuditDurabilityTest {
 
     @Autowired AuditWriter auditWriter;
@@ -70,7 +82,7 @@ class AuditDurabilityTest {
                 status.setRollbackOnly();
             });
 
-            List<AiAuditEvent> rows = dataManager.load(AiAuditEvent.class)
+            List<AiAuditEvent> rows = dataManager.unconstrained().load(AiAuditEvent.class)
                     .query("select a from ai_AiAuditEvent a where a.runId = :rid")
                     .parameter("rid", runId)
                     .list();
@@ -111,7 +123,7 @@ class AuditDurabilityTest {
                     "{}", "{}", 3L, AiToolCallOutcome.SUCCESS, null, null);
 
             // Sanity: child is visible BEFORE finish, via the composition collection
-            AiAuditEvent beforeFinish = dataManager.load(AiAuditEvent.class)
+            AiAuditEvent beforeFinish = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(rootId)
                     .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("children", FetchPlan.BASE))
                     .one();
@@ -122,7 +134,7 @@ class AuditDurabilityTest {
             auditWriter.writeChatFinish(rootId, 50L, "SUCCESS", null);
 
             // Assert: child MUST still be there — not orphan-removed, not re-saved by cascade
-            AiAuditEvent afterFinish = dataManager.load(AiAuditEvent.class)
+            AiAuditEvent afterFinish = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(rootId)
                     .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("children", FetchPlan.BASE))
                     .one();
@@ -134,7 +146,7 @@ class AuditDurabilityTest {
             assertThat(afterFinish.getOutcomeRaw()).isEqualTo("SUCCESS");
 
             // And the child row itself is fully preserved — kind + eventName survive
-            AiAuditEvent reloadedChild = dataManager.load(AiAuditEvent.class).id(childId).one();
+            AiAuditEvent reloadedChild = dataManager.unconstrained().load(AiAuditEvent.class).id(childId).one();
             assertThat(reloadedChild.getKind()).isEqualTo(AuditKind.TOOL);
             assertThat(reloadedChild.getEventName()).isEqualTo("echo");
         });
@@ -208,7 +220,7 @@ class AuditDurabilityTest {
 
             // Assert: AUD-02 — REQUIRES_NEW commit independent of outer rollback (R-02b).
             // Filter to TOOL kind because writeChatStart already wrote a CHAT row under runId.
-            List<AiAuditEvent> rows = dataManager.load(AiAuditEvent.class)
+            List<AiAuditEvent> rows = dataManager.unconstrained().load(AiAuditEvent.class)
                     .query("select a from ai_AiAuditEvent a where a.runId = :rid and a.kind = :k")
                     .parameter("rid", runId)
                     .parameter("k", AuditKind.TOOL)
@@ -229,7 +241,7 @@ class AuditDurabilityTest {
 
             // R-02d: parent linkage + runId consistency on the surviving child.
             // Reload with a parent fetch plan so the lazy ManyToOne is materialized safely.
-            AiAuditEvent reloaded = dataManager.load(AiAuditEvent.class)
+            AiAuditEvent reloaded = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(surviving.getId())
                     .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("parent", FetchPlan.BASE))
                     .one();

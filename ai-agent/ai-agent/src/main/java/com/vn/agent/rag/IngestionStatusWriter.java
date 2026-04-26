@@ -3,7 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
-import io.jmix.core.DataManager;
+import io.jmix.core.UnconstrainedDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -57,10 +57,21 @@ public class IngestionStatusWriter {
     /** Entity {@code ERROR_MESSAGE} column is {@code VARCHAR(1024)}. */
     private static final int ERROR_MESSAGE_MAX_LENGTH = 1024;
 
-    private final DataManager dataManager;
+    /**
+     * Unconstrained: status persistence for in-flight async ingestion jobs is system-internal
+     * bookkeeping that runs after the user-facing authorization check (KnowledgeDocumentService
+     * / async worker entry-point gates the operation by document id). Routing through
+     * {@link UnconstrainedDataManager} avoids requiring entity-CRUD grants on
+     * {@code ai_AiKnowledgeDocument} for the system worker context. Same architectural pattern
+     * as {@link com.vn.agent.audit.AuditWriter} and
+     * {@link com.vn.agent.orchestration.ProjectingChatMemoryRepository}. See project memory
+     * {@code feedback_jmix_unconstrained_for_system_writes} and
+     * {@code 08-08-INVESTIGATION-2.md}.
+     */
+    private final UnconstrainedDataManager dataManager;
     private final ApplicationEventPublisher publisher;
 
-    public IngestionStatusWriter(DataManager dataManager, ApplicationEventPublisher publisher) {
+    public IngestionStatusWriter(UnconstrainedDataManager dataManager, ApplicationEventPublisher publisher) {
         this.dataManager = dataManager;
         this.publisher = publisher;
     }

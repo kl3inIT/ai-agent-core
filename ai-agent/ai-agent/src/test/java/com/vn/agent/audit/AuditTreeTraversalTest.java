@@ -51,7 +51,10 @@ class AuditTreeTraversalTest {
                     "{\"hits\":[]}", 8L, "SUCCESS", null);
             auditWriter.writeChatFinish(rootId, 20L, "SUCCESS", null);
 
-            AiAuditEvent root = dataManager.load(AiAuditEvent.class)
+            // jmix-security-data: ai_AiAuditEvent reads under runWithSystem use .unconstrained()
+            // (system user is policy-gated; orthogonal read-policy coverage in
+            // FilteredSchemaAndExecutionDenialTest.carol_*). See feedback_jmix_unconstrained_for_system_writes.
+            AiAuditEvent root = dataManager.unconstrained().load(AiAuditEvent.class)
                     .id(rootId)
                     .fetchPlan(fp -> fp.addFetchPlan(FetchPlan.BASE).add("children", FetchPlan.BASE))
                     .one();
