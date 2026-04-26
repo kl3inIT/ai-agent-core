@@ -388,7 +388,7 @@ Plans:
 
 **Needs research phase:** No.
 
-**Plans:** 7 plans
+**Plans:** 8 plans (08-08 appended via /gsd-plan-phase 8 --gaps for VERIFICATION.md Gap 1 closure)
 
 Plans:
 - [x] 08-01-PLAN.md — TEST-04 negative-case suite + NoCustomerReadRole test config (delivered 2026-04-26; 6 new @Test methods, 3 PASS / 3 RED — REDs trigger R-XP-2 `--gaps` replan, see `08-01-SUMMARY.md`)
@@ -398,6 +398,7 @@ Plans:
 - [~] 08-05-PLAN.md — DEFERRED. Investigated end-to-end pipeline; surfaced 6-layer starter-consumability gap chain (changelog path, primary DataSource, UserRepository, WebApplicationContext, LoginView, pgvector CREATE EXTENSION). All consumer-smoke/ files reverted; recommendations recorded in `08-05-SUMMARY.md`. Recommend follow-up phase to add stub VectorStore bean OR reframe as Testcontainers integration test.
 - [x] 08-06-PLAN.md — Operator README (270 lines, 9 sections, Configuration Matrix derived from real `@ConfigurationProperties` source) + CLAUDE.md `Java 17` → `Java 21` (R-06c)
 - [x] 08-07-PLAN.md — Release polish: version 1.0.0 sourced from gradle.properties, snapshot-vs-release URL conditional, leaked Nexus credentials removed (FOREVER BURNT comment + CHANGELOG Security entry per R-07a), CHANGELOG.md (Keep-a-Changelog v1.1.0 with [Unreleased] discipline + per-phase 1.0.0 backfill), 3 GitHub Actions workflows (ci/live/publish) with explicit permissions + concurrency + preflight secrets check
+- [ ] 08-08-PLAN.md — GAP CLOSURE for VERIFICATION.md Gap 1 (R-XP-2 trigger): add jmix-security-data-starter dep to ai-agent.gradle to register CrudEntityConstraint + ReadEntityQueryConstraint into AccessConstraintsRegistry — flips 3 RED tests in com.vn.agent.security to GREEN (carol filtered-schema + carol findRecords access_denied + bob conversation-list row-level filter); 12/12 closure target in com.vn.agent.security.* with zero regression in 08-02/03 + Phase 2 foundations
 
 ---
 
