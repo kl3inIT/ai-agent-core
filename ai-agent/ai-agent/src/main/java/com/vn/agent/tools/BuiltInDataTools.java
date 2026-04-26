@@ -4,6 +4,7 @@ import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
 import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
@@ -45,6 +46,21 @@ import java.util.Set;
 @Component
 public class BuiltInDataTools {
 
+    /**
+     * D-14 procedural retry hints for {@code unknown_entity} tool errors. NOT translated; these
+     * are LLM-protocol English strings (RESEARCH Pitfall 7 — tool-protocol strings live in Java
+     * constants, not {@code messages.properties}, because they are model-directed instructions).
+     *
+     * <p>Order is locked: list once, retry on match, give up on no match — no guessing. The
+     * exact-once + no-guess wording is PROMPT-05's whole point and survives translation into
+     * the procedural shape. The em dash in the third hint is intentional and preserved.
+     */
+    private static final List<String> UNKNOWN_ENTITY_HINTS = List.of(
+            "call list_entities exactly once",
+            "if a name in list_entities matches your intent, retry the original tool with that exact name",
+            "if no entity in list_entities matches, tell the user no such entity exists — do not guess"
+    );
+
     private final DataManager dataManager;
     private final Metadata metadata;
     private final MetadataTools metadataTools;
@@ -54,6 +70,7 @@ public class BuiltInDataTools {
     private final StructuredFilterConditionMapper structuredFilterConditionMapper;
     private final FilterLiteralValueConverter filterLiteralValueConverter;
     private final ToolResultFormatter toolResultFormatter;
+    private final FetchPlanResolver fetchPlanResolver;
 
     public BuiltInDataTools(DataManager dataManager,
                             Metadata metadata,
@@ -63,7 +80,8 @@ public class BuiltInDataTools {
                             CurrentUserSchemaAccess currentUserSchemaAccess,
                             StructuredFilterConditionMapper structuredFilterConditionMapper,
                             FilterLiteralValueConverter filterLiteralValueConverter,
-                            ToolResultFormatter toolResultFormatter) {
+                            ToolResultFormatter toolResultFormatter,
+                            FetchPlanResolver fetchPlanResolver) {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
@@ -73,6 +91,7 @@ public class BuiltInDataTools {
         this.structuredFilterConditionMapper = structuredFilterConditionMapper;
         this.filterLiteralValueConverter = filterLiteralValueConverter;
         this.toolResultFormatter = toolResultFormatter;
+        this.fetchPlanResolver = fetchPlanResolver;
     }
 
     // -------- Tool 1: list_entities (D-01) --------
@@ -166,17 +185,18 @@ public class BuiltInDataTools {
             int clampedLimit = ToolLimits.clampLimit(limit);
             Condition condition = filter == null ? null : structuredFilterConditionMapper.map(filter, metaClass);
 
+            FetchPlan plan = fetchPlanResolver.resolve("find_records", metaClass);
             List<?> rows;
             if (condition == null) {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .all()
-                        .fetchPlan(FetchPlan.BASE)
+                        .fetchPlan(plan)
                         .maxResults(clampedLimit + 1)
                         .list();
             } else {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .condition(condition)
-                        .fetchPlan(FetchPlan.BASE)
+                        .fetchPlan(plan)
                         .maxResults(clampedLimit + 1)
                         .list();
             }
@@ -218,9 +238,10 @@ public class BuiltInDataTools {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
             Object parsedId = parseEntityId(id, metaClass);
+            FetchPlan plan = fetchPlanResolver.resolve("get_record", metaClass);
             Object entity = dataManager.load(metaClass.getJavaClass())
                     .id(parsedId)
-                    .fetchPlan(FetchPlan.BASE)
+                    .fetchPlan(plan)
                     .optional()
                     .orElse(null);
             if (entity == null) {
@@ -262,8 +283,14 @@ public class BuiltInDataTools {
                         "cannot read target entity " + targetMetaClass.getName());
             }
 
+            // D-13: SPI overrides the data fetch plan only; INSTANCE_NAME on the relationship
+            // is a separate label-projection concern outside the SPI surface in v1.1. The
+            // intersector has already pruned dataPlan's properties; INSTANCE_NAME below
+            // bypasses intersection because it only fetches what @InstanceName declared,
+            // which is by definition readable to anyone who can read the entity.
+            FetchPlan dataPlan = fetchPlanResolver.resolve("get_related_records", rootMetaClass);
             FetchPlan fetchPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
-                    .addFetchPlan(FetchPlan.BASE)
+                    .addFetchPlan(dataPlan)
                     .add(relationship, fetchPlanBuilder -> fetchPlanBuilder.addFetchPlan(FetchPlan.INSTANCE_NAME))
                     .build();
             Object rootEntity = dataManager.load(rootMetaClass.getJavaClass())
@@ -299,20 +326,23 @@ public class BuiltInDataTools {
      */
     private MetaClass resolveReadableEntityOrThrow(String entityName) {
         if (entityName == null || entityName.isBlank()) {
-            throw new ToolUserError("unknown_entity", "entity name must not be blank");
+            throw new ToolUserError("unknown_entity", "entity name must not be blank", UNKNOWN_ENTITY_HINTS);
         }
 
         MetaClass metaClass;
         try {
             metaClass = metadata.getClass(entityName);
         } catch (RuntimeException runtimeException) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UNKNOWN_ENTITY_HINTS);
         }
 
         if (metaClass == null) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UNKNOWN_ENTITY_HINTS);
         }
         if (!currentUserSchemaAccess.canReadEntity(metaClass)) {
+            // Phase 3 D-08 opacity preserved: existing access_denied code stays. Phase 10
+            // LlmExposurePolicy substitution will unify this to unknown_entity uniformly;
+            // Phase 9 only adds new readers on top (CONTEXT §domain — out of scope for Phase 9).
             throw new ToolUserError("access_denied", "no read access to " + entityName);
         }
         return metaClass;
