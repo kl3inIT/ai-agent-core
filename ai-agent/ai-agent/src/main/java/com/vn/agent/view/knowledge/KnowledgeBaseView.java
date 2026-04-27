@@ -1,10 +1,20 @@
 package com.vn.agent.view.knowledge;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.CheckboxGroup;
+import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.upload.FileRejectedEvent;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.streams.UploadHandler;
@@ -13,10 +23,15 @@ import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.push.DocumentStatusChangedEvent;
 import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
+import com.vn.agent.rag.UpdatePermissionsResult;
 import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.utils.NotificationUtils;
+import com.vn.agent.view.exposure.MetaclassComboBoxHelper;
+import io.jmix.core.MessageTools;
 import io.jmix.core.Messages;
+import io.jmix.core.Metadata;
+import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
@@ -37,14 +52,21 @@ import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import io.jmix.flowui.view.ViewController;
 import io.jmix.flowui.view.ViewDescriptor;
+import io.jmix.security.model.ResourceRole;
+import io.jmix.security.role.ResourceRoleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -82,8 +104,11 @@ import java.util.UUID;
 public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBaseView.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String MSG_UPLOAD_REJECTED = "knowledgeBase.upload.rejected";
+    /** Em dash U+2014 placeholder for empty source-entity cell. */
+    private static final String SOURCE_ENTITY_EMPTY = "—";
 
     @ViewComponent
     private DataGrid<AiKnowledgeDocument> documentsDataGrid;
@@ -93,6 +118,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     private CollectionLoader<AiKnowledgeDocument> documentsDl;
     @ViewComponent
     private CollectionContainer<AiKnowledgeDocument> documentsDc;
+    @ViewComponent
+    private ComboBox<MetaClass> sourceEntityNameComboBox;
 
     @Autowired
     private KnowledgeDocumentUploadService uploadService;
@@ -105,9 +132,17 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     @Autowired
     private Messages messages;
     @Autowired
+    private MessageTools messageTools;
+    @Autowired
+    private Metadata metadataApi;
+    @Autowired
     private TemporaryStorage temporaryStorage;
     @Autowired
     private UiComponents uiComponents;
+    @Autowired
+    private MetaclassComboBoxHelper metaclassComboBoxHelper;
+    @Autowired
+    private ResourceRoleRepository resourceRoleRepository;
 
     /** Captured onAttach so the push listener can UI.access() the correct UI per-browser-tab. */
     private volatile UI ownerUi;
@@ -115,9 +150,19 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
     @Subscribe
     public void onInit(final InitEvent event) {
+        // Populate the source-entity ComboBox via the shared helper (Plan 10-06).
+        sourceEntityNameComboBox.setItems(metaclassComboBoxHelper.buildFilteredList());
+        sourceEntityNameComboBox.setItemLabelGenerator(mc ->
+                messageTools.getEntityCaption(mc) + " (" + mc.getName() + ")");
+
         documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
             try {
-                uploadService.upload(stagedFile.toURI().toString(), metadata.contentType(), Collections.emptyList());
+                // Plan 10-08 / D-07: capture sourceEntityName at upload time so it is
+                // persisted on the document BEFORE the async ingester runs.
+                MetaClass selectedMc = sourceEntityNameComboBox.getValue();
+                String sourceEntityName = selectedMc != null ? selectedMc.getName() : null;
+                uploadService.upload(stagedFile.toURI().toString(), metadata.contentType(),
+                        Collections.emptyList(), sourceEntityName);
                 notifications.create(messages.formatMessage("knowledgeBase.toast.uploadStarted", metadata.fileName())).show();
                 documentsDl.load();
             } catch (IllegalArgumentException ex) {
@@ -183,6 +228,34 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     @Subscribe("documentsDataGrid.delete")
     public void onDeleteAction(final ActionPerformedEvent event) {
         onDeleteClick();
+    }
+
+    @Subscribe("documentsDataGrid.editPermissions")
+    public void onEditPermissionsAction(final ActionPerformedEvent event) {
+        onEditPermissionsClick();
+    }
+
+    /**
+     * Renders the source-entity column. Shows the localized entity caption with the
+     * raw {@code MetaClass.getName()} in parentheses (matching the ComboBox label
+     * format), or an em-dash placeholder when the document has no link
+     * (Plan 10-08, D-06 legacy-doc contract).
+     */
+    @Supply(to = "documentsDataGrid.sourceEntity", subject = "renderer")
+    private Renderer<AiKnowledgeDocument> documentsDataGridSourceEntityRenderer() {
+        return new ComponentRenderer<>(doc -> {
+            Span span = new Span();
+            String name = doc.getSourceEntityName();
+            if (name == null || name.isBlank()) {
+                span.setText(SOURCE_ENTITY_EMPTY);
+            } else {
+                MetaClass mc = metadataApi.getSession().findClass(name);
+                span.setText(mc != null
+                        ? messageTools.getEntityCaption(mc) + " (" + name + ")"
+                        : name);
+            }
+            return span;
+        });
     }
 
     @Subscribe
@@ -287,6 +360,115 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
                 .open();
+    }
+
+    private void onEditPermissionsClick() {
+        AiKnowledgeDocument doc = documentsDataGrid.getSingleSelectedItem();
+        if (doc == null) {
+            return;
+        }
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(messages.getMessage(getClass(), "knowledgeBase.action.editPermissions"));
+        dialog.setWidth("420px");
+
+        // Roles multi-select — populated from Jmix ResourceRoleRepository.
+        CheckboxGroup<String> rolesGroup = new CheckboxGroup<>();
+        rolesGroup.setLabel(messages.getMessage(getClass(), "knowledgeBase.upload.field.allowedRoles"));
+        List<String> allRoleCodes = resourceRoleRepository.getAllRoles().stream()
+                .map(ResourceRole::getCode)
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        rolesGroup.setItems(allRoleCodes);
+        rolesGroup.setValue(parseAllowedRoles(doc.getAllowedRolesJson()));
+
+        // Source-entity ComboBox — same helper as upload form.
+        ComboBox<MetaClass> entityCombo = new ComboBox<>();
+        entityCombo.setLabel(messages.getMessage(getClass(), "knowledgeBase.upload.field.sourceEntityName"));
+        entityCombo.setHelperText(messages.getMessage(getClass(),
+                "knowledgeBase.upload.field.sourceEntityName.helper"));
+        entityCombo.setItems(metaclassComboBoxHelper.buildFilteredList());
+        entityCombo.setItemLabelGenerator(mc ->
+                messageTools.getEntityCaption(mc) + " (" + mc.getName() + ")");
+        entityCombo.setClearButtonVisible(true);
+        entityCombo.setWidthFull();
+        if (doc.getSourceEntityName() != null) {
+            MetaClass current = metadataApi.getSession().findClass(doc.getSourceEntityName());
+            if (current != null) {
+                entityCombo.setValue(current);
+            }
+        }
+
+        VerticalLayout content = new VerticalLayout(rolesGroup, entityCombo);
+        content.setPadding(false);
+        dialog.add(content);
+
+        Button saveBtn = new Button(
+                messages.getMessage(getClass(), "knowledgeBase.dialog.editPermissions.save"),
+                e -> confirmAndSavePermissions(doc, rolesGroup.getValue(), entityCombo.getValue(), dialog));
+        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        Button cancelBtn = new Button(
+                messages.getMessage(getClass(), "knowledgeBase.dialog.editPermissions.cancel"),
+                e -> dialog.close());
+
+        dialog.getFooter().add(cancelBtn, saveBtn);
+        dialog.open();
+    }
+
+    /**
+     * Reingest-required confirmation step (UI-SPEC: Surface 3, copywriting table).
+     * On OK delegates to the service; the view does not orchestrate save+reingest
+     * itself (Fix W3, CLAUDE.md "no business logic in views").
+     */
+    private void confirmAndSavePermissions(AiKnowledgeDocument doc,
+                                           Set<String> selectedRoles,
+                                           MetaClass selectedEntity,
+                                           Dialog dialog) {
+        dialogs.createOptionDialog()
+                .withHeader(messages.getMessage(getClass(),
+                        "knowledgeBase.confirm.editPermissions.reingest.title"))
+                .withText(messages.getMessage(getClass(),
+                        "knowledgeBase.confirm.editPermissions.reingest.body"))
+                .withActions(
+                        new DialogAction(DialogAction.Type.OK)
+                                .withVariant(ActionVariant.PRIMARY)
+                                .withHandler(ev -> {
+                                    Collection<String> roles = selectedRoles == null
+                                            ? Collections.emptySet()
+                                            : new LinkedHashSet<>(selectedRoles);
+                                    String sourceEntityName = selectedEntity != null
+                                            ? selectedEntity.getName() : null;
+
+                                    UpdatePermissionsResult result = documentService
+                                            .updatePermissionsAndReingest(doc.getId(), roles, sourceEntityName);
+
+                                    switch (result.status()) {
+                                        case SAVED_AND_REINGESTING ->
+                                                notifications.create(messages.getMessage(getClass(),
+                                                        "knowledgeBase.notification.reingestStarted")).show();
+                                        case SAVED_REINGEST_FAILED ->
+                                                notifyError(messages.getMessage(getClass(),
+                                                        "knowledgeBase.error.editPermissionsReingest"));
+                                    }
+                                    documentsDl.load();
+                                    dialog.close();
+                                }),
+                        new DialogAction(DialogAction.Type.CANCEL))
+                .open();
+    }
+
+    private static Set<String> parseAllowedRoles(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptySet();
+        }
+        try {
+            List<String> roles = JSON.readValue(json, new TypeReference<>() {});
+            return roles == null ? Collections.emptySet() : new LinkedHashSet<>(roles);
+        } catch (Exception e) {
+            log.warn("Failed to parse allowedRolesJson; treating as empty: {}", json, e);
+            return Collections.emptySet();
+        }
     }
 
     private void onDeleteClick() {
