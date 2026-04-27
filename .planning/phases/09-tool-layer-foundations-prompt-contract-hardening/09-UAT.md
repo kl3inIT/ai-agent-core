@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 09-tool-layer-foundations-prompt-contract-hardening
 source:
   - .planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-01-SUMMARY.md
@@ -9,7 +9,7 @@ source:
   - .planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-05-SUMMARY.md
   - .planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-06-SUMMARY.md
 started: 2026-04-27T06:38:51.2343084+07:00
-updated: 2026-04-27T16:22:33.7979380+07:00
+updated: 2026-04-27T16:24:10.6831287+07:00
 ---
 
 ## Current Test
@@ -75,5 +75,17 @@ blocked: 0
     User reported: describe_entity returns the widened metadata payload with comments, attribute type, cardinality, mandatory/readOnly/persistent/transient/primaryKey flags, enum value name+label pairs, relationship target name+label pairs, and maxLength where applicable. Record-list tool output is wrapped as <data entity="label" type="internalName">JSON</data> without duplicating entityName inside the JSON payload. how can i check that and 1 see 1 problem is even in base line context has agent.entities=Customer (Khách hàng) but when agent try to calling tool first time it still select {"entityName": "jmixapp_Customer", "filter": {"property": "name", "operation": "equals", "value": "Công ty An Phát"}, "limit": 100}
   severity: major
   test: 3
-  artifacts: []
-  missing: []
+  root_cause: |-
+    Model-facing prompt/tool metadata has a contract gap. Phase 9 forbids internal entity names in user-facing replies, but it does not clearly require entityName tool arguments to be copied exactly from agent.entities/list_entities. Existing prompt text and @ToolParam descriptions still mention canonical/Jmix entity names and hard-coded jmixapp_* examples, which can bias the model to invent or reuse an internal prefix.
+  artifacts:
+    - path: "ai-agent/ai-agent/src/main/java/com/vn/agent/guard/AgentSystemPromptRules.java"
+      issue: "PROMPT_RULES says tool calls still use canonical entity names and includes a concrete jmixapp_Customer example, but does not say entityName must be copied exactly from agent.entities/list_entities."
+    - path: "ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java"
+      issue: "@ToolParam descriptions still say Jmix entity name and describe_entity gives the concrete example jmixapp_Order."
+    - path: "ai-agent/ai-agent/src/test/java/com/vn/agent/PromptContractMockTest.java"
+      issue: "Prompt-contract tests assert user-facing vocabulary and hints, but do not lock the tool-call entityName selection rule."
+  missing:
+    - "Add a prompt rule that entityName tool arguments must use the exact name string from agent.entities or list_entities; the model must not infer or add host prefixes."
+    - "Remove hard-coded jmixapp_* examples from model-facing prompt/tool metadata, or replace them with exact-name-from-inventory wording."
+    - "Add regression tests proving the composed system prompt carries the exact-name tool-call rule and no concrete host-prefix example."
+  debug_session: ".planning/debug/prompt-entity-name-contract.md"
