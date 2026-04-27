@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-27T16:54:56.014Z"
+last_updated: "2026-04-27T17:05:26.107Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 17
-  completed_plans: 14
-  percent: 82
+  completed_plans: 15
+  percent: 88
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 10 (ai-specific-llm-exposure-policy) — EXECUTING
-Plan: 8 of 10
+Plan: 9 of 10
 | Field | Value |
 |-------|-------|
 | Phase | Phase 10 (next) |
@@ -129,6 +129,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-06: Toggle save uses UnconstrainedDataManager and Fix R2 enforced — view does NOT inject ApplicationEventPublisher; AiExposureRuleEntityListener remains the single LlmExposureChangedEvent publish site
 - [Phase ?]: Plan 10-06: MetaclassComboBoxHelper extracted as shared @Component for reuse across exposure detail view (10-07) and KB upload form (10-08); single source of truth for @SystemLevel + AI-* internals exclusion
 - [Phase ?]: Plan 10-07: detail view reuses MetaclassComboBoxHelper; ComboBox<MetaClass> value-bridged in controller; ReadyEvent for pre-select; 10-08 reingest error keys shipped ahead in Group B; menu uses <item>; EN bundle is messages_en.properties
+- [Phase ?]: Plan 10-09: VectorStoreDebugView shipped — plain Vaadin Grid<Document> (Fix R7) over VectorStore.similaritySearch (empty query, topK=100, threshold=0.0); FilterExpressionTextParser with inline setErrorMessage on parse error; metadataFilterField is TypedTextField<String> (Fix W2); 3 programmatic addColumn calls; expand uses standard Vaadin Dialog (Document is Spring AI POJO, no Jmix metaclass); read-only — no edit/delete per CONTEXT D-09
 
 ### Performance Metrics
 
@@ -148,6 +149,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 10 P10-05 | 12 | 2 tasks | 3 files |
 | Phase 10 P10-06 | 12 | 2 tasks | 5 files |
 | Phase 10 P10-07 | 18 | 2 tasks | 5 files |
+| Phase Phase 10 PP10-09 | 8 | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -157,7 +159,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T16:54:50.553Z
+**Last session:** 2026-04-27T17:05:14.566Z
 **Stopped at:** Completed Plan 10-01 (entity foundations)
 **Resume file:** None
 **Blockers:** None.
