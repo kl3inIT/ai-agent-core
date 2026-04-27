@@ -24,6 +24,14 @@ public final class ChunkMetadata {
     /** JSON list of Jmix role codes — stored for audit/debug; retrieval uses flattened flags. */
     public static final String ALLOWED_ROLES = "allowedRoles";
 
+    /**
+     * Jmix MetaClass name of the entity this document describes.
+     * Used by EXP-05 NOT IN denylist filter in {@code RetrievalFilterBuilder}.
+     * Ingestion writer MUST mirror this key at write time (Phase 10 D-07).
+     * A rename here is a BREAKING change requiring full knowledge-base reingest.
+     */
+    public static final String SOURCE_ENTITY = "source_entity";
+
     /** Prefix for flattened per-role boolean flags (Option A / Pitfall #1 mitigation). */
     public static final String ROLE_FLAG_PREFIX = "role_";
 
