@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Roadmap defined
-stopped_at: Completed 09-06-PLAN.md
-last_updated: "2026-04-27T09:27:29.014Z"
+status: ready_to_plan
+stopped_at: Completed 09-07-PLAN.md
+last_updated: "2026-04-27T09:37:32.846Z"
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 17
 ---
 
 # Project State
@@ -23,24 +23,24 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 09 — tool-layer-foundations-prompt-contract-hardening
+**Current focus:** Phase 10 — ai-specific-llm-exposure-policy
 
 ## Current Position
 
-Phase: 09 (tool-layer-foundations-prompt-contract-hardening) — EXECUTING
-Plan: 1 of 7
+Phase: 10
+Plan: Not started
 | Field | Value |
 |-------|-------|
-| Phase | Phase 9 (executing) |
-| Plan | 02 (next) — Plan 01 complete |
-| Status | Phase 9 executing; Plan 01 (AUD-07 plumbing) done |
-| Last activity | 2026-04-27 — Completed quick task 260427-9ci: read-only baseline context UI |
+| Phase | Phase 10 (next) |
+| Plan | Not started |
+| Status | Phase 9 complete; ready to plan Phase 10 |
+| Last activity | 2026-04-27 — Completed Phase 9 gap closure (09-07) |
 
 ## Phase Status
 
 | Phase | Status | Plans Complete | Started | Completed |
 |-------|--------|----------------|---------|-----------|
-| 9. Tool-Layer Foundations & Prompt-Contract Hardening | Executing | 1/6 | 2026-04-27 | - |
+| 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Not started | 0/0 | - | - |
 | 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
@@ -131,6 +131,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 09 P04 | 28min | 3 tasks | 10 files |
 | Phase 09 P05 | 22min | 2 tasks | 14 files |
 | Phase 09 P06 | 30min | 2 tasks | 3 files |
+| Phase 09 P07 | 12min | 4 tasks | 6 files |
 
 ### Quick Tasks Completed
 
@@ -140,8 +141,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-26T22:38:53.398Z
-**Stopped at:** Completed 09-06-PLAN.md
+**Last session:** 2026-04-27T09:37:32.631Z
+**Stopped at:** Completed 09-07-PLAN.md
 **Resume file:** None
 **Blockers:** None.
-**Next action:** `/gsd-execute-phase 9` to continue Phase 9 (Plan 02 next), or `/gsd-plan-phase 9` if Plan 02 PLAN.md is not yet drafted.
+**Next action:** `$gsd-plan-phase 10` to plan Phase 10, or `$gsd-discuss-phase 10` to revisit context first.

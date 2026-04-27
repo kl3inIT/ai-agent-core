@@ -21,7 +21,7 @@
 
 ## Phases
 
-- [ ] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
+- [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
 - [ ] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut.
 - [ ] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`.
 - [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
@@ -47,6 +47,7 @@
 - [x] 09-04-PLAN.md — Tool-layer changes: FetchPlanIntersector + FetchPlanResolver wiring, describe_entity TOOL-09 widening, PROMPT-04 records wrapper, unknown_entity D-14 hints
 - [x] 09-05-PLAN.md — Output scanner pattern packs (HostPrefixPatternProvider + ToolNamePatternProvider) + AgentSystemPromptRules + DefaultChatServiceImpl rule wiring
 - [x] 09-06-PLAN.md — TEST-08 prompt-contract regression: PromptContractMockTest (EN+VI parameterized) + PromptContractLiveTest (@Tag("live"))
+- [x] 09-07-PLAN.md — Gap closure: exact entityName tool-call guidance from agent.entities/list_entities
 
 ### Phase 10: AI-Specific LLM Exposure Policy
 **Goal**: Admin can narrow the LLM-visible surface (entities and attributes) below the user's Jmix permissions through a single denylist-only governance layer; the policy is uniformly enforced across schema discovery, tool calls, baseline prompt, and RAG.
@@ -126,7 +127,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Tool-Layer Foundations & Prompt-Contract Hardening | 0/6 | Not started | - |
+| 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 0/0 | Not started | - |
 | 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |

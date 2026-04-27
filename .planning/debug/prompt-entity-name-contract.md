@@ -2,7 +2,7 @@
 status: resolved
 trigger: "UAT Test 3: model selected jmixapp_Customer even though baseline context showed Customer (Khach hang)"
 created: 2026-04-27T16:24:10.6831287+07:00
-updated: 2026-04-27T16:24:10.6831287+07:00
+updated: 2026-04-27T16:36:27.8511537+07:00
 ---
 
 ## Current Focus
@@ -10,7 +10,7 @@ updated: 2026-04-27T16:24:10.6831287+07:00
 hypothesis: Prompt/tool metadata gives the model conflicting entity-name guidance.
 test: Inspect baseline rendering, prompt rules, tool parameter descriptions, and prompt-contract tests.
 expecting: If true, model-facing text will still mention canonical Jmix/internal names or hard-coded prefixes for tool-call arguments.
-next_action: Plan a gap-closure change that aligns tool-call entityName guidance with agent.entities/list_entities.
+next_action: Gap closure executed and verified.
 reasoning_checkpoint: null
 tdd_checkpoint: null
 
@@ -46,8 +46,12 @@ started: Discovered during UAT.
 ## Resolution
 
 root_cause: Model-facing prompt/tool metadata has a contract gap. Phase 9 forbids internal entity names in user-facing replies, but it does not clearly require entityName tool arguments to be copied exactly from agent.entities/list_entities. Existing prompt text and @ToolParam descriptions still mention canonical/Jmix entity names and hard-coded jmixapp_* examples, which can bias the model to invent or reuse an internal prefix.
-fix: Planned only. Add exact-name tool-call guidance, remove hard-coded jmixapp_* examples from prompt/tool metadata, and add prompt-contract tests.
-verification: Gap closure plan 09-07 created for execution.
+fix: Commit 5657e39 added exact-name tool-call guidance, removed hard-coded jmixapp_* examples from prompt/tool metadata, and added prompt-contract tests.
+verification: Focused Gradle suite passed; JetBrains build passed for touched files.
 files_changed:
   - .planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-UAT.md
   - .planning/phases/09-tool-layer-foundations-prompt-contract-hardening/09-07-PLAN.md
+  - ai-agent/ai-agent/src/main/java/com/vn/agent/guard/AgentSystemPromptRules.java
+  - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java
+  - ai-agent/ai-agent/src/test/java/com/vn/agent/guard/AgentSystemPromptRulesTest.java
+  - ai-agent/ai-agent/src/test/java/com/vn/agent/PromptContractMockTest.java
