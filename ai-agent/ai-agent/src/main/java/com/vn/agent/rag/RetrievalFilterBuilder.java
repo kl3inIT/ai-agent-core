@@ -1,5 +1,6 @@
 package com.vn.agent.rag;
 
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.security.AiAgentAdminRole;
@@ -9,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -47,11 +49,14 @@ public class RetrievalFilterBuilder {
 
     private final AiAgentRagProperties ragProps;
     private final AiAgentEmbeddingProperties embeddingProps;
+    private final LlmExposurePolicy llmExposurePolicy;
 
     public RetrievalFilterBuilder(AiAgentRagProperties ragProps,
-                                  AiAgentEmbeddingProperties embeddingProps) {
+                                  AiAgentEmbeddingProperties embeddingProps,
+                                  LlmExposurePolicy llmExposurePolicy) {
         this.ragProps = ragProps;
         this.embeddingProps = embeddingProps;
+        this.llmExposurePolicy = llmExposurePolicy;
     }
 
     public Filter.Expression buildFor(Authentication auth) {
@@ -90,6 +95,31 @@ public class RetrievalFilterBuilder {
             scopedAnyRole = (scopedAnyRole == null)
                     ? modelAndRole
                     : b.or(scopedAnyRole, modelAndRole);
+        }
+
+        // EXP-05 / D-05: entity denylist NOT IN clause. Admin bypass (above) already returned
+        // null so this code only runs for authenticated non-admin users.
+        //
+        // D-06 (legacy-doc carve-out, Fix R6): chunks WITHOUT a SOURCE_ENTITY metadata key MUST
+        // remain visible regardless of denylist contents. The pgvector backend stores chunk
+        // metadata as JSONB and translates filter expressions into JSONPath predicates; with a
+        // bare nin predicate the missing-key case is converter-dependent and Spring AI's
+        // pgvector converter has historically excluded such rows (the JSONPath predicate
+        // evaluates to NULL → filtered out). To guarantee D-06 is satisfied across all current
+        // and future Spring AI 1.1.x converters, we use the defensive nullable form:
+        //
+        //     (source_entity IS NULL) OR (source_entity NOT IN <denied>)
+        //
+        // FilterExpressionBuilder.isNull() and nin() are both confirmed present on the generic
+        // builder (Spring AI 1.1.4) and pgvector implements both predicates.
+        Set<String> denied = llmExposurePolicy.getDenylistedEntityNames();
+        if (!denied.isEmpty()) {
+            FilterExpressionBuilder.Op notInClause = b.or(
+                    b.isNull(ChunkMetadata.SOURCE_ENTITY),
+                    b.nin(ChunkMetadata.SOURCE_ENTITY, new ArrayList<>(denied)));
+            scopedAnyRole = (scopedAnyRole == null)
+                    ? notInClause
+                    : b.and(scopedAnyRole, notInClause);
         }
 
         return scopedAnyRole.build();
