@@ -4,7 +4,7 @@ buildscript {
     }
     dependencies {
         classpath 'io.jmix.gradle:jmix-gradle-plugin:2.8.1'
-        classpath "io.spring.gradle:dependency-management-plugin:1.1.6"
+        classpath "io.spring.gradle:dependency-management-plugin:1.1.7"
     }
 }
 
