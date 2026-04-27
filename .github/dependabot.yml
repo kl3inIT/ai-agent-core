@@ -10,7 +10,6 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Bangkok"
-    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "gradle"
@@ -29,7 +28,6 @@ updates:
       day: "monday"
       time: "09:30"
       timezone: "Asia/Bangkok"
-    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "npm"
@@ -48,7 +46,6 @@ updates:
       day: "monday"
       time: "10:00"
       timezone: "Asia/Bangkok"
-    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "github-actions"
