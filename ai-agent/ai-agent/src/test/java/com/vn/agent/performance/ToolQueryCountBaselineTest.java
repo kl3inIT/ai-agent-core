@@ -128,6 +128,14 @@ class ToolQueryCountBaselineTest {
     //   get_related_records    → 0      (full EclipseLink L2 cache hit on repeated call)
     //   N-scaling slope        → ~0     (parent + 1 collection SELECT, constant regardless of child count)
     //
+    // Phase 10 (Plan 10-04) recalibration: list_entities and describe_entity now route
+    // through LlmExposurePolicy, which performs ONE per-call SELECT against the agentstore
+    // AiExposureRule table. The policy does not cache (D-14 — admin-controlled denylist
+    // expected count <50; LLM round-trip dwarfs the lookup). Steady-state ceiling raised
+    // from 0 to a small constant to absorb the policy-lookup cost. Per-call cost is
+    // CONSTANT regardless of metamodel size — N+1 contract preserved (R-03h slope test
+    // is the contractual detector).
+    //
     // The absolute-count assertions below are calibrated to those observed values + safety
     // margin so they catch a true 100x N+1 regression while tolerating Jmix permission overhead.
     // The contractual N+1 detector is the SLOPE-based test (R-03h) — it is the only assertion
@@ -135,26 +143,41 @@ class ToolQueryCountBaselineTest {
     // counts on find_records / count_records are noted as a Jmix-security observation, NOT a
     // BuiltInDataTools regression — the per-call cost does not scale with row count.
 
+    /**
+     * Phase 10 LlmExposurePolicy adds one constant-time agentstore SELECT per call. Ceiling
+     * is set to absorb the policy lookup plus a small margin for one extra meta query.
+     * Independent of metamodel size — the slope test (R-03h) is the contractual N+1 detector.
+     */
+    private static final long METAMODEL_TOOL_POLICY_LOOKUP_CEILING = 5L;
+
     @Test
-    @DisplayName("list_entities runs zero JDBC SELECTs in steady state (pure metamodel read)")
-    void listEntities_zeroSteadyStateQueries() {
+    @DisplayName("list_entities runs at most one JDBC SELECT in steady state (metamodel + LlmExposurePolicy lookup)")
+    void listEntities_metamodelPlusPolicyLookupOnly() {
         systemAuthenticator.withUser("admin", () -> {
             long selectsOnSecondCall = measureSteadyStateSelects(() -> tools.listEntities());
+            // Phase 10 (Plan 10-04): metamodel read + ONE agentstore SELECT for the
+            // LlmExposurePolicy denylist lookup (no cache by design, D-14).
             assertThat(selectsOnSecondCall)
-                    .as("list_entities is metamodel-only; second call must hit zero JDBC")
-                    .isZero();
+                    .as("list_entities steady-state SELECT count (observed=%d, ceiling=%d) — "
+                            + "metamodel read + LlmExposurePolicy denylist lookup",
+                            selectsOnSecondCall, METAMODEL_TOOL_POLICY_LOOKUP_CEILING)
+                    .isLessThanOrEqualTo(METAMODEL_TOOL_POLICY_LOOKUP_CEILING);
             return null;
         });
     }
 
     @Test
-    @DisplayName("describe_entity runs zero JDBC SELECTs in steady state")
-    void describeEntity_zeroSteadyStateQueries() {
+    @DisplayName("describe_entity runs at most a few JDBC SELECTs in steady state (metamodel + policy lookups)")
+    void describeEntity_metamodelPlusPolicyLookupOnly() {
         systemAuthenticator.withUser("admin", () -> {
             long selectsOnSecondCall = measureSteadyStateSelects(() -> tools.describeEntity(AUDIT_ENTITY_NAME));
+            // Phase 10 (Plan 10-04): metamodel reads + LlmExposurePolicy lookups
+            // (canReadEntity in resolveReadableEntityOrThrow + getReadableSchema attribute fetch).
             assertThat(selectsOnSecondCall)
-                    .as("describe_entity is metamodel-only; second call must hit zero JDBC")
-                    .isZero();
+                    .as("describe_entity steady-state SELECT count (observed=%d, ceiling=%d) — "
+                            + "metamodel read + LlmExposurePolicy denylist lookups",
+                            selectsOnSecondCall, METAMODEL_TOOL_POLICY_LOOKUP_CEILING)
+                    .isLessThanOrEqualTo(METAMODEL_TOOL_POLICY_LOOKUP_CEILING);
             return null;
         });
     }

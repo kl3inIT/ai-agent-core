@@ -36,7 +36,8 @@ import java.util.List;
  *   <li>{@code FilteredSchemaAndExecutionDenialTest} — schema filter excludes denied entity
  *       at both entity AND attribute granularity (R-01f)</li>
  *   <li>{@code FilteredSchemaAndExecutionDenialTest#carol_findRecords...} — BuiltInDataTools
- *       returns the {@code access_denied} JSON envelope on denied lookups (R-01a)</li>
+ *       returns the {@code unknown_entity} JSON envelope on denied lookups (Phase 10 Fix R4
+ *       full uniformity: denied entities indistinguishable from non-existent ones, R-01a).</li>
  * </ul>
  *
  * <p><b>Plan 08-01 deviation note (Rule 3 — blocking adaptation):</b> CONTEXT.md and the
