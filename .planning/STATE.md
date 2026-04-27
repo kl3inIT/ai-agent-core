@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-27T16:45:55.449Z"
+last_updated: "2026-04-27T16:54:56.014Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 17
-  completed_plans: 13
-  percent: 76
+  completed_plans: 14
+  percent: 82
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 10 (ai-specific-llm-exposure-policy) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 | Field | Value |
 |-------|-------|
 | Phase | Phase 10 (next) |
@@ -128,6 +128,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-05: RetrievalFilterBuilder applies defensive (source_entity IS NULL) OR (NOT IN <denied>) for non-empty denylist (Fix R6); AsyncIngestionWorker.enrich mirrors sourceEntityName to ChunkMetadata.SOURCE_ENTITY when non-null. Legacy chunks unaffected until reingested (D-06).
 - [Phase ?]: Plan 10-06: Toggle save uses UnconstrainedDataManager and Fix R2 enforced — view does NOT inject ApplicationEventPublisher; AiExposureRuleEntityListener remains the single LlmExposureChangedEvent publish site
 - [Phase ?]: Plan 10-06: MetaclassComboBoxHelper extracted as shared @Component for reuse across exposure detail view (10-07) and KB upload form (10-08); single source of truth for @SystemLevel + AI-* internals exclusion
+- [Phase ?]: Plan 10-07: detail view reuses MetaclassComboBoxHelper; ComboBox<MetaClass> value-bridged in controller; ReadyEvent for pre-select; 10-08 reingest error keys shipped ahead in Group B; menu uses <item>; EN bundle is messages_en.properties
 
 ### Performance Metrics
 
@@ -146,6 +147,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 10 P10-04 | 18 | 2 tasks | 9 files |
 | Phase 10 P10-05 | 12 | 2 tasks | 3 files |
 | Phase 10 P10-06 | 12 | 2 tasks | 5 files |
+| Phase 10 P10-07 | 18 | 2 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -155,7 +157,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T16:45:55.433Z
+**Last session:** 2026-04-27T16:54:50.553Z
 **Stopped at:** Completed Plan 10-01 (entity foundations)
 **Resume file:** None
 **Blockers:** None.

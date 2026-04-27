@@ -58,14 +58,14 @@
   2. An entity that the current user can read in Jmix but is denylisted for the LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or `find_records` responses; attempting to address it surfaces uniformly as `unknown_entity` (never `access_denied`), preserving denylist opacity.
   3. `BuiltInDataTools`, `BaselineContextProvider`, and `RetrievalFilterBuilder` all consult `LlmExposurePolicy` (composed as `userVisible AND NOT excluded`); `LlmExposureRuleRepository` uses `UnconstrainedDataManager` so user-role tweaks cannot bypass admin governance.
   4. Rule create/update/delete publishes `LlmExposureChangedEvent`; `AiAgentAdminRole` carries CRUD + view + menu policies for `AiExposureRule`.
-**Plans:** 6/10 plans executed
+**Plans:** 7/10 plans executed
 - [x] 10-01-PLAN.md — Entity foundations: AiExposureRuleMode enum + AiExposureRule entity + ChunkMetadata.SOURCE_ENTITY + AiKnowledgeDocument.sourceEntityName + Liquibase changelogs 060/061
 - [x] 10-02-PLAN.md — Service layer: LlmExposureChangedEvent + LlmExposureRuleRepository + AiExposureRuleEntityListener + LlmExposurePolicy
 - [x] 10-03-PLAN.md — Security role extension: AiAgentAdminRole CRUD + view + menu policies for AiExposureRule + VectorStoreDebugView
 - [x] 10-04-PLAN.md — Call-site swap: CurrentUserSchemaAccess → LlmExposurePolicy in BaselineContextProvider + FetchPlanIntersector + BuiltInDataTools
 - [x] 10-05-PLAN.md — RAG integration: RetrievalFilterBuilder nin clause + AsyncIngestionWorker SOURCE_ENTITY metadata enrichment
 - [x] 10-06-PLAN.md — AiExposureRuleListView: MetaclassComboBoxHelper + list view XML + Java with @Supply toggle renderer
-- [ ] 10-07-PLAN.md — AiExposureRuleDetailView: comboBox + checkbox + Java wiring + all ~53 message keys in both locales + menu.xml entries
+- [x] 10-07-PLAN.md — AiExposureRuleDetailView: comboBox + checkbox + Java wiring + all ~53 message keys in both locales + menu.xml entries
 - [ ] 10-08-PLAN.md — KnowledgeBaseView extensions: sourceEntityName comboBox in upload form + editPermissions action + reingest action + sourceEntity column renderer
 - [ ] 10-09-PLAN.md — VectorStoreDebugView: filter input row + VectorStore.similaritySearch + FilterExpressionTextParser + expand dialog
 - [ ] 10-10-PLAN.md — Tests: RetrievalFilterBuilderDenylistTest (unit) + LlmExposurePolicyIntegrationTest (@SpringBootTest)
@@ -138,7 +138,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
-| 10. AI-Specific LLM Exposure Policy | 6/10 | In Progress|  |
+| 10. AI-Specific LLM Exposure Policy | 7/10 | In Progress|  |
 | 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
