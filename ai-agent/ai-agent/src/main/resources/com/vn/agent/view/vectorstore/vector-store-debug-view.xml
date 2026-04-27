@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///vectorStoreDebug.title"
+      focusComponent="metadataFilterField">
+    <!-- D-09 / Plan 10-09 / Fix R7: NO Jmix data block, NO Jmix dataGrid element.
+         Grid is a plain Vaadin Grid (over Spring AI Document POJOs) added programmatically
+         by the controller; Document is not a Jmix entity, so a Jmix CollectionContainer
+         plus dataGrid binding would fail metaclass lookup. The controller fills the
+         chunksContainer vbox in onInit. -->
+    <layout padding="true" spacing="true">
+        <hbox alignItems="CENTER" width="100%">
+            <span text="msg:///vectorStoreDebug.filter.label" minWidth="8em"/>
+            <textField id="metadataFilterField" width="100%" datatype="string">
+                <suffix>
+                    <hbox spacing="false">
+                        <button id="filterClearBtn"
+                                themeNames="tertiary-inline"
+                                icon="vaadin:close-small"
+                                title="msg:///vectorStoreDebug.filter.clear"/>
+                        <button id="filterHelpBtn"
+                                themeNames="tertiary-inline"
+                                icon="vaadin:question-circle-o"
+                                title="msg:///vectorStoreDebug.filter.help"/>
+                    </hbox>
+                </suffix>
+            </textField>
+        </hbox>
+        <hbox id="buttonsPanel" classNames="buttons-panel">
+            <button id="searchBtn"
+                    text="msg:///vectorStoreDebug.action.search"
+                    themeNames="primary"/>
+        </hbox>
+        <!-- chunksContainer: programmatic Grid<Document> added here in controller onInit -->
+        <vbox id="chunksContainer" width="100%" minHeight="20em"/>
+    </layout>
+</view>
