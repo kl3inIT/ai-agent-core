@@ -1,7 +1,7 @@
 package com.vn.agent.orchestration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import io.jmix.core.AccessManager;
 import io.jmix.core.MessageTools;
 import io.jmix.core.accesscontext.CrudEntityContext;
@@ -417,7 +417,7 @@ class BaselineContextProviderTest {
             when(ca.getLocale()).thenReturn(cfg.locale);
         }
 
-        CurrentUserSchemaAccess schemaAccess = mock(CurrentUserSchemaAccess.class);
+        LlmExposurePolicy schemaAccess = mock(LlmExposurePolicy.class);
         when(schemaAccess.getReadableSchema()).thenReturn(cfg.schema);
 
         AccessManager accessManager = mock(AccessManager.class);

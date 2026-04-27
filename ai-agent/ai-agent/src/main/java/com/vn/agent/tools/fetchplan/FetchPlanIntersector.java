@@ -2,7 +2,7 @@ package com.vn.agent.tools.fetchplan;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.orchestration.RunContext;
 import io.jmix.core.FetchMode;
 import io.jmix.core.FetchPlan;
@@ -23,8 +23,14 @@ import java.util.List;
 /**
  * Narrows a host-supplied or default {@link FetchPlan} to the attributes the current user can
  * read (TOOL-11, SPI-09 D-11). Walks the input plan recursively; any property whose
- * {@link CurrentUserSchemaAccess#canReadAttribute(MetaClass, String)} check fails is dropped,
+ * {@link LlmExposurePolicy#canReadAttribute(MetaClass, String)} check fails is dropped,
  * and the returned plan is rebuilt from the surviving properties via {@link FetchPlans}.
+ *
+ * <p><b>Phase 10 (Plan 10-04, Fix R5):</b> both the per-attribute check
+ * ({@link LlmExposurePolicy#canReadAttribute}) AND the per-relationship-target check
+ * ({@link LlmExposurePolicy#canReadEntity}) route through the exposure policy. Denylisted
+ * entities reachable via relationship hops in nested fetch plans are pruned from the projection,
+ * not surfaced via nested fetch.
  *
  * <p><b>{@value #PROJECTION_NOT_SECURITY_COMMENT}</b> The intersection here is a defense in
  * depth — Jmix {@code AccessManager} already gates {@code DataManager.load(...)} at the
@@ -62,16 +68,16 @@ public class FetchPlanIntersector {
     public static final String PROJECTION_NOT_SECURITY_COMMENT = "fetch plan is projection, not security.";
 
     private final FetchPlans fetchPlans;
-    private final CurrentUserSchemaAccess schemaAccess;
+    private final LlmExposurePolicy llmExposurePolicy;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
 
     public FetchPlanIntersector(FetchPlans fetchPlans,
-                                CurrentUserSchemaAccess schemaAccess,
+                                LlmExposurePolicy llmExposurePolicy,
                                 AuditWriter auditWriter,
                                 CurrentAuthentication currentAuthentication) {
         this.fetchPlans = fetchPlans;
-        this.schemaAccess = schemaAccess;
+        this.llmExposurePolicy = llmExposurePolicy;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
     }
@@ -100,7 +106,7 @@ public class FetchPlanIntersector {
         builder.partial(plan.loadPartialEntities());
         for (FetchPlanProperty property : plan.getProperties()) {
             String propertyName = property.getName();
-            if (!schemaAccess.canReadAttribute(metaClass, propertyName)) {
+            if (!llmExposurePolicy.canReadAttribute(metaClass, propertyName)) {
                 droppedAttributePaths.add(metaClass.getName() + "." + propertyName);
                 continue;
             }
@@ -110,7 +116,7 @@ public class FetchPlanIntersector {
                 MetaProperty metaProperty = metaClass.findProperty(propertyName);
                 if (metaProperty != null && metaProperty.getRange().isClass()) {
                     MetaClass nestedMetaClass = metaProperty.getRange().asClass();
-                    if (!schemaAccess.canReadEntity(nestedMetaClass)) {
+                    if (!llmExposurePolicy.canReadEntity(nestedMetaClass)) {
                         droppedAttributePaths.add(metaClass.getName() + "." + propertyName + " (target denied)");
                         continue;
                     }

@@ -2,7 +2,7 @@ package com.vn.agent.tools;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.spi.FetchPlanContext;
 import com.vn.agent.spi.ToolFetchPlanCustomizer;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
@@ -55,7 +55,7 @@ import static org.mockito.Mockito.when;
 class FetchPlanIntersectorTest {
 
     private FetchPlans fetchPlans;
-    private CurrentUserSchemaAccess schemaAccess;
+    private LlmExposurePolicy schemaAccess;
     private AuditWriter auditWriter;
     private CurrentAuthentication currentAuthentication;
     private FetchPlanIntersector intersector;
@@ -63,7 +63,7 @@ class FetchPlanIntersectorTest {
     @BeforeEach
     void setUp() {
         fetchPlans = mock(FetchPlans.class);
-        schemaAccess = mock(CurrentUserSchemaAccess.class);
+        schemaAccess = mock(LlmExposurePolicy.class);
         auditWriter = mock(AuditWriter.class);
         currentAuthentication = mock(CurrentAuthentication.class);
         intersector = new FetchPlanIntersector(fetchPlans, schemaAccess, auditWriter, currentAuthentication);

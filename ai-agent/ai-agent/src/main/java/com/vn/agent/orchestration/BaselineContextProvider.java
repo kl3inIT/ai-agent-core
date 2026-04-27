@@ -2,7 +2,7 @@ package com.vn.agent.orchestration;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import io.jmix.core.AccessManager;
 import io.jmix.core.MessageTools;
 import io.jmix.core.accesscontext.CrudEntityContext;
@@ -60,9 +60,11 @@ import java.util.stream.Collectors;
  * if Phase 10+ introduces caching the cache key MUST be {@code (userId, roleSet,
  * metaclass-name-set)}, never the rendered text.</p>
  *
- * <p><b>Phase 10 substitution seam:</b> the only schema-source call site is
- * {@code currentUserSchemaAccess.getReadableSchema()}; Phase 10's {@code LlmExposurePolicy} will
- * substitute the source class without changing call sites or render shapes.</p>
+ * <p><b>Phase 10 substitution seam (complete):</b> the schema-source call site
+ * {@code llmExposurePolicy.getReadableSchema()} now sources through the exposure policy
+ * boundary (Plan 10-04). The policy delegates to the Jmix-permission source of truth and
+ * additionally narrows the result by removing admin-denylisted entities. Call shape and
+ * render shape are unchanged from Phase 9.</p>
  */
 @Component
 public class BaselineContextProvider {
@@ -70,20 +72,20 @@ public class BaselineContextProvider {
     private static final Logger log = LoggerFactory.getLogger(BaselineContextProvider.class);
 
     private final CurrentAuthentication currentAuthentication;
-    private final CurrentUserSchemaAccess currentUserSchemaAccess;
+    private final LlmExposurePolicy llmExposurePolicy;
     private final AccessManager accessManager;
     private final MessageTools messageTools;
     private final ObjectMapper objectMapper;
     private final AiAgentPromptProperties promptProperties;
 
     public BaselineContextProvider(CurrentAuthentication currentAuthentication,
-                                   CurrentUserSchemaAccess currentUserSchemaAccess,
+                                   LlmExposurePolicy llmExposurePolicy,
                                    AccessManager accessManager,
                                    MessageTools messageTools,
                                    ObjectMapper objectMapper,
                                    AiAgentPromptProperties promptProperties) {
         this.currentAuthentication = currentAuthentication;
-        this.currentUserSchemaAccess = currentUserSchemaAccess;
+        this.llmExposurePolicy = llmExposurePolicy;
         this.accessManager = accessManager;
         this.messageTools = messageTools;
         this.objectMapper = objectMapper;
@@ -101,10 +103,10 @@ public class BaselineContextProvider {
         ctx.put("agent.conversationId", conversationId != null ? conversationId.toString() : null);
 
         // Phase 9 D-01 / D-02 / D-03: agent.entities + agent.permissions.
-        // Source: CurrentUserSchemaAccess (Phase 10 will substitute LlmExposurePolicy here without
-        // churning call sites). NEVER cached — labels are locale-sensitive and resolved per render
-        // (P-8: locale labels are NOT in any cache key).
-        Map<MetaClass, Set<String>> readableSchema = currentUserSchemaAccess.getReadableSchema();
+        // Source: LlmExposurePolicy (Plan 10-04 substituted the source — denylisted entities are
+        // removed before this call returns). NEVER cached — labels are locale-sensitive and
+        // resolved per render (P-8: locale labels are NOT in any cache key).
+        Map<MetaClass, Set<String>> readableSchema = llmExposurePolicy.getReadableSchema();
         List<MetaClass> visibleEntities = visibleEntities(readableSchema);
         if (!visibleEntities.isEmpty()) {
             ctx.put("agent.entities", renderEntitiesBlock(visibleEntities, readableSchema.size()));
