@@ -284,6 +284,15 @@ public class AsyncIngestionWorker {
             if (role == null || role.isBlank()) continue;
             merged.put(ChunkMetadata.roleFlagKey(role), true);
         }
+        // EXP-05 / D-07: Mirror sourceEntityName to chunk metadata so RetrievalFilterBuilder
+        // can apply the entity denylist filter (source_entity NOT IN <denied>). Null-guarded:
+        // chunks from documents without a sourceEntityName do NOT receive the SOURCE_ENTITY
+        // key. This preserves the D-06 legacy-doc contract — chunks without the key remain
+        // visible regardless of denylist contents until the document is reingested with
+        // sourceEntityName populated.
+        if (doc.getSourceEntityName() != null) {
+            merged.put(ChunkMetadata.SOURCE_ENTITY, doc.getSourceEntityName());
+        }
         return chunk.mutate().metadata(merged).build();
     }
 

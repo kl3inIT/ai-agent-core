@@ -1,5 +1,6 @@
 package com.vn.agent.rag;
 
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.security.AiAgentAdminRole;
@@ -11,8 +12,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link RetrievalFilterBuilder} — the pure-function RAG-05 filter.
@@ -35,6 +39,21 @@ class RetrievalFilterBuilderTest {
 
     private static AiAgentRagProperties ragProps(boolean adminBypass) {
         return new AiAgentRagProperties(adminBypass, 5, 0.5, null, null, null, null, null, null);
+    }
+
+    /** Default mock returning an empty denylist — preserves pre-Plan-10-05 builder behavior. */
+    private static LlmExposurePolicy emptyExposurePolicy() {
+        LlmExposurePolicy mock = mock(LlmExposurePolicy.class);
+        when(mock.getDenylistedEntityNames()).thenReturn(Set.of());
+        return mock;
+    }
+
+    /** Mock returning a fixed denylist for EXP-05 nin-clause assertions. */
+    private static LlmExposurePolicy exposurePolicyWithDenylist(String... entityNames) {
+        LlmExposurePolicy mock = mock(LlmExposurePolicy.class);
+        when(mock.getDenylistedEntityNames())
+                .thenReturn(new java.util.LinkedHashSet<>(java.util.Arrays.asList(entityNames)));
+        return mock;
     }
 
     private static Authentication authWith(String... authorities) {
@@ -60,7 +79,7 @@ class RetrievalFilterBuilderTest {
     // Test A — D-06 admin bypass ON
     @Test
     void admin_with_bypass_on_returns_null() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith(AiAgentAdminRole.CODE);
 
         assertThat(builder.buildFor(auth)).isNull();
@@ -68,7 +87,7 @@ class RetrievalFilterBuilderTest {
 
     @Test
     void jmix_prefixed_admin_authority_with_bypass_on_returns_null() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith("ROLE_AI_AGENT_ADMIN");
 
         assertThat(builder.buildFor(auth)).isNull();
@@ -76,7 +95,7 @@ class RetrievalFilterBuilderTest {
 
     @Test
     void jmix_system_full_access_with_bypass_on_returns_null() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith("ROLE_SYSTEM_FULL_ACCESS");
 
         assertThat(builder.buildFor(auth)).isNull();
@@ -85,7 +104,7 @@ class RetrievalFilterBuilderTest {
     // Test B — D-06 admin bypass OFF forces admin through role-overlap filter
     @Test
     void admin_with_bypass_off_gets_role_overlap_filter() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(false), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(false), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith(AiAgentAdminRole.CODE);
 
         Filter.Expression exp = builder.buildFor(auth);
@@ -100,7 +119,7 @@ class RetrievalFilterBuilderTest {
     // Test C — non-admin gets model pin + normalized role flag
     @Test
     void non_admin_gets_embedding_pin_and_role_flag() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith(AiAgentUserRole.CODE);
 
         Filter.Expression exp = builder.buildFor(auth);
@@ -116,7 +135,7 @@ class RetrievalFilterBuilderTest {
 
     @Test
     void jmix_prefixed_non_admin_authority_maps_back_to_role_code_flag() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith("ROLE_AI_AGENT_USER");
 
         Filter.Expression exp = builder.buildFor(auth);
@@ -130,7 +149,7 @@ class RetrievalFilterBuilderTest {
     // Test D — D-05 empty roles fail-closed
     @Test
     void empty_roles_fail_closed_uses_sentinel() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = new UsernamePasswordAuthenticationToken("anon", "n/a", List.of());
 
         Filter.Expression exp = builder.buildFor(auth);
@@ -146,7 +165,7 @@ class RetrievalFilterBuilderTest {
     // Test E — multi-role ANY semantics: both flags present, joined via OR
     @Test
     void multi_role_produces_or_of_role_flags() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
         Authentication auth = authWith(AiAgentUserRole.CODE, "custom-host-role");
 
         Filter.Expression exp = builder.buildFor(auth);
@@ -165,7 +184,7 @@ class RetrievalFilterBuilderTest {
     // Test F — defensive: null Authentication → fail-closed empty-roles path
     @Test
     void null_authentication_falls_through_to_fail_closed() {
-        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps());
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
 
         Filter.Expression exp = builder.buildFor(null);
 
