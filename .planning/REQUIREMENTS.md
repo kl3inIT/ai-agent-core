@@ -38,7 +38,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [ ] **EXP-07**: Admin Flow UI: `AiExposureRuleListView` + `AiExposureRuleDetailView` with `genericFilter` + `propertyFilter`, action-column for enable/disable, gated to `AiAgentAdminRole`. Menu entry under admin section. UI label uses "Hide from AI" / "Visible to AI" (never "Allow").
 - [x] **EXP-08**: `LlmExposureChangedEvent` Spring event published on rule create/update/delete. Cache-invalidation hook for any per-request schema cache (current code has none, but the event is required for future caching).
 - [ ] **EXP-09**: Negative test asserting an entity readable by the user but denylisted for the LLM does NOT appear in `list_entities`, `agent.entities`, RAG hits, or `find_records` errors (uniform `unknown_entity` opacity, P-13).
-- [ ] **EXP-10**: `AiAgentAdminRole` extended with policies for `AiExposureRule` (CRUD + view + menu).
+- [x] **EXP-10**: `AiAgentAdminRole` extended with policies for `AiExposureRule` (CRUD + view + menu).
 
 ### Mutation-Capable Built-In Tools
 
@@ -128,7 +128,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ### Security Extensions
 
-- [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu), `AiUiSettings` (read + update; no create/delete since single-row).
+- [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — pending Phase 12).
 - [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
 - [ ] **SEC-07**: New `AiAgentMutationRole` resource role granting CRUD on entities the LLM may mutate (host composes it with their own roles). Default role catalog ships empty mutation set; hosts opt in.
 
