@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-27T16:34:12.371Z"
+last_updated: "2026-04-27T16:45:55.449Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 17
-  completed_plans: 12
-  percent: 71
+  completed_plans: 13
+  percent: 76
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 10 (ai-specific-llm-exposure-policy) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 | Field | Value |
 |-------|-------|
 | Phase | Phase 10 (next) |
@@ -126,6 +126,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 10]: Plan 10-03: AiAgentAdminRole extended with @EntityPolicy AiExposureRule + menu/view IDs for AiExposureRule list/detail and VectorStoreDebug; pure additive (zero existing policies removed); SEC-05 partially complete (AiUiSettings policies will fully close in Phase 12)
 - [Phase ?]: Plan 10-04: Mechanical call-site swap complete — BaselineContextProvider, BuiltInDataTools, FetchPlanIntersector inject LlmExposurePolicy instead of CurrentUserSchemaAccess. Fix R4 unification: ALL canReadEntity()==false branches in BuiltInDataTools throw unknown_entity (not access_denied) — full opacity per EXP-09 + Phase 3 D-08. Fix R5: FetchPlanIntersector routes both canReadAttribute AND canReadEntity through the policy. UNKNOWN_ENTITY_HINTS byte-for-byte preserved (em dash U+2014). ToolQueryCountBaselineTest recalibrated for D-14 no-cache: list_entities/describe_entity ceiling raised from 0 to 5 SELECTs to absorb the per-call agentstore policy lookup.
 - [Phase ?]: Plan 10-05: RetrievalFilterBuilder applies defensive (source_entity IS NULL) OR (NOT IN <denied>) for non-empty denylist (Fix R6); AsyncIngestionWorker.enrich mirrors sourceEntityName to ChunkMetadata.SOURCE_ENTITY when non-null. Legacy chunks unaffected until reingested (D-06).
+- [Phase ?]: Plan 10-06: Toggle save uses UnconstrainedDataManager and Fix R2 enforced — view does NOT inject ApplicationEventPublisher; AiExposureRuleEntityListener remains the single LlmExposureChangedEvent publish site
+- [Phase ?]: Plan 10-06: MetaclassComboBoxHelper extracted as shared @Component for reuse across exposure detail view (10-07) and KB upload form (10-08); single source of truth for @SystemLevel + AI-* internals exclusion
 
 ### Performance Metrics
 
@@ -143,6 +145,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 10 P03 | 1 | 1 tasks | 1 files |
 | Phase 10 P10-04 | 18 | 2 tasks | 9 files |
 | Phase 10 P10-05 | 12 | 2 tasks | 3 files |
+| Phase 10 P10-06 | 12 | 2 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -152,7 +155,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T16:33:50.825Z
+**Last session:** 2026-04-27T16:45:55.433Z
 **Stopped at:** Completed Plan 10-01 (entity foundations)
 **Resume file:** None
 **Blockers:** None.
