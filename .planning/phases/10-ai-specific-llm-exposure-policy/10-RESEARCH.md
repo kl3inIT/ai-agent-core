@@ -752,21 +752,21 @@ If this table is non-empty: claims A1 and A2 concern the VectorStoreDebugView on
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`SearchRequest.Builder.offset()` availability in Spring AI 1.1.4**
    - What we know: `topK` is confirmed. `offset()` is not documented in the pgvector reference page checked.
    - What's unclear: Whether `SearchRequest` supports offset-based pagination or only topK-capped results.
-   - Recommendation: Planner implements debug view page 1 with large `topK` (default 100). If admin needs page 2+, add a "Load more" button appending another topK batch. True pagination deferred to v1.2.
+   - **RESOLVED:** Plan 10-09 implements debug view page 1 with large `topK` (default 100). True offset pagination deferred to v1.2. If admin needs page 2+, a "Load more" button appending another topK batch is the v1.2 path.
 
 2. **TEST-09 RAG assertion approach for `StubVectorStoreConfiguration`**
    - What we know: The existing `RagTestConfiguration` and `StubVectorStoreConfiguration` provide a mock `VectorStore`. Phase 10 needs to assert that the `RetrievalFilterBuilder` adds a `nin` clause when a denylist rule exists.
    - What's unclear: Whether the stub VectorStore captures the filter expression for assertion, or whether the test must directly unit-test `RetrievalFilterBuilder.buildFor()`.
-   - Recommendation: Add a dedicated `RetrievalFilterBuilderDenylistTest` (unit test using `Mockito`) that seeds a mock `LlmExposurePolicy.getDenylistedEntityNames()` returning `{"Order"}` and asserts the built `Filter.Expression` serializes to contain `nin` or `source_entity`. The `@SpringBootTest` integration test verifies the wiring; the unit test verifies the expression shape.
+   - **RESOLVED:** Plan 10-10 adds a dedicated `RetrievalFilterBuilderDenylistTest` (unit test using `Mockito`) that seeds a mock `LlmExposurePolicy.getDenylistedEntityNames()` returning `{"Order"}` and asserts the built `Filter.Expression` serializes to contain `nin` or `source_entity`. The `@SpringBootTest` integration test (`LlmExposurePolicyIntegrationTest`) verifies the wiring; the unit test verifies the expression shape. Plan 10-10 Test 4 adds the null-key carve-out assertion (Fix R6 cross-link).
 
 3. **`AiExposureRule` JPQL entity name confirmation**
    - What we know: Jmix derives the JPQL name from `@Entity(name="...")`. Existing entities use pattern `ai_AiKnowledgeDocument` → entity name `"ai_AiKnowledgeDocument"`.
-   - Recommendation: Use `@Entity(name = "aiExposure_AiExposureRule")` to match the `exposure` package namespace. Verify at boot with a simple `dataManager.load(AiExposureRule.class).query("select e from aiExposure_AiExposureRule e").list()`.
+   - **RESOLVED:** Plan 10-01 uses `@Entity(name = "aiExposure_AiExposureRule")` to match the `exposure` package namespace. Boot-time verification via a simple `dataManager.load(AiExposureRule.class).query("select e from aiExposure_AiExposureRule e").list()` is part of Plan 10-02 acceptance criteria.
 
 ---
 
