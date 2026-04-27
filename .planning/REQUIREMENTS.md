@@ -30,13 +30,13 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 ### AI-Specific LLM Exposure Policy (SEED-007 activated)
 
 - [x] **EXP-01**: `AiExposureRule` Jmix entity in `agentstore` — `entityName` (Jmix metaClass name), `attributePath` (nullable; null = whole entity), `mode` enum with single value `EXCLUDE` (no `ALLOW` shape — prevents widening, P-6), `enabled`, audit fields. Liquibase changelog included in root.
-- [ ] **EXP-02**: `LlmExposurePolicy` `@Component` wraps `CurrentUserSchemaAccess`; same method signatures (`getReadableSchema`, `canReadEntity`, `canReadAttribute`). Composition is `userVisible AND NOT excluded` (boolean AND, never OR).
+- [x] **EXP-02**: `LlmExposurePolicy` `@Component` wraps `CurrentUserSchemaAccess`; same method signatures (`getReadableSchema`, `canReadEntity`, `canReadAttribute`). Composition is `userVisible AND NOT excluded` (boolean AND, never OR).
 - [ ] **EXP-03**: `BuiltInDataTools` migrated to consult `LlmExposurePolicy` instead of `CurrentUserSchemaAccess` directly (mechanical replacement at all call sites).
 - [ ] **EXP-04**: `BaselineContextProvider` sources `agent.entities` and `agent.permissions` from `LlmExposurePolicy` (so denied entities never leak into the system prompt).
 - [x] **EXP-05**: `RetrievalFilterBuilder` integrates exposure policy — RAG retrieval excludes documents whose source-entity is denylisted, even when the user has Jmix read access. Admin denylist is leaky for KB docs without this.
-- [ ] **EXP-06**: `LlmExposureRuleRepository` uses `UnconstrainedDataManager` (rules apply globally; user roles must NOT be able to bypass by un-granting read on `AiExposureRule`).
+- [x] **EXP-06**: `LlmExposureRuleRepository` uses `UnconstrainedDataManager` (rules apply globally; user roles must NOT be able to bypass by un-granting read on `AiExposureRule`).
 - [ ] **EXP-07**: Admin Flow UI: `AiExposureRuleListView` + `AiExposureRuleDetailView` with `genericFilter` + `propertyFilter`, action-column for enable/disable, gated to `AiAgentAdminRole`. Menu entry under admin section. UI label uses "Hide from AI" / "Visible to AI" (never "Allow").
-- [ ] **EXP-08**: `LlmExposureChangedEvent` Spring event published on rule create/update/delete. Cache-invalidation hook for any per-request schema cache (current code has none, but the event is required for future caching).
+- [x] **EXP-08**: `LlmExposureChangedEvent` Spring event published on rule create/update/delete. Cache-invalidation hook for any per-request schema cache (current code has none, but the event is required for future caching).
 - [ ] **EXP-09**: Negative test asserting an entity readable by the user but denylisted for the LLM does NOT appear in `list_entities`, `agent.entities`, RAG hits, or `find_records` errors (uniform `unknown_entity` opacity, P-13).
 - [ ] **EXP-10**: `AiAgentAdminRole` extended with policies for `AiExposureRule` (CRUD + view + menu).
 

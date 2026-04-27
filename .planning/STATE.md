@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-27T15:30:29.411Z"
+last_updated: "2026-04-27T15:44:39.676Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 17
-  completed_plans: 8
-  percent: 47
+  completed_plans: 9
+  percent: 53
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 10 (ai-specific-llm-exposure-policy) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 | Field | Value |
 |-------|-------|
 | Phase | Phase 10 (next) |
@@ -121,6 +121,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 2026-04-27 (Plan 09-05): AgentSystemPromptRules.PROMPT_RULES carries verbatim PROMPT-03 vocabulary rules + D-15 retry contract whose three hint substrings match BuiltInDataTools.UNKNOWN_ENTITY_HINTS BYTE-FOR-BYTE (em dash U+2014 preserved). Lowercase 'if' bullets sacrificed sentence-case to keep the cross-assertion green for TEST-08 in Plan 09-06. Constant lives in com.vn.agent.guard alongside OutputScannerAdvisor (both leak-prevention). DefaultChatServiceImpl wires PROMPT_RULES at BOTH composition sites (blocking ask + streaming stream) so rules apply on every turn regardless of transport mode and even when profile prompt is blank. Hardcoded English (no i18n) per RESEARCH Pitfall 7 — model-directed instructions, not user-facing UI.
 - [Phase ?]: Plan 09-06 (TEST-08): cross-locale prompt-contract regression suite landed; Phase 9 feature-complete
 - [Phase ?]: Plan 10-01: AiExposureRule (entity-level only, no attributePath) + AiExposureRuleMode (EXCLUDE only) in com.vn.agent.exposure. Liquibase 060+061 auto-loaded. ChunkMetadata.SOURCE_ENTITY=source_entity constant for EXP-05 NOT IN denylist (Plan 10-05 consumer).
+- [Phase ?]: Plan 10-02: dataManager.load(EntityClass).query() auto-resolves store from @Store annotation; .store() chain method only applies to raw-JPQL loadValue paths
+- [Phase ?]: Plan 10-02: LlmExposurePolicy.canModify ships unused in Phase 10; Phase 11 mutation gating wires it before DataManager.save
 
 ### Performance Metrics
 
@@ -134,6 +136,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 09 P06 | 30min | 2 tasks | 3 files |
 | Phase 09 P07 | 12min | 4 tasks | 6 files |
 | Phase 10 P01 | 15 | 2 tasks | 6 files |
+| Phase 10 P10-02 | 9 | 2 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -143,7 +146,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T15:30:29.374Z
+**Last session:** 2026-04-27T15:44:11.529Z
 **Stopped at:** Completed Plan 10-01 (entity foundations)
 **Resume file:** None
 **Blockers:** None.
