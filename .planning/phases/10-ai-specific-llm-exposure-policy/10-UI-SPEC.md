@@ -102,6 +102,7 @@ Accent (`--lumo-primary-color`) reserved for:
 **View id:** `AiAgent_AiExposureRule.list`
 **Route:** admin menu entry `aiAgent.exposureRules.list`
 **Layout structure:** `layout padding="true" spacing="true"` (matches auditList pattern)
+**Focal point:** `createBtn` (Create Rule, primary accent via `list_create` built-in action)
 
 #### Filter bar
 - `<genericFilter id="exposureRulesFilter" dataLoader="exposureRulesDl">`
@@ -159,6 +160,7 @@ Built-in list actions declared via `list_create`, `list_edit`, `list_remove` act
 
 **View id:** `AiAgent_AiExposureRule.detail`
 **Layout:** `<formLayout>` with single-column `<responsiveStep minWidth="0" columns="1"/>`.
+**Focal point:** `saveBtn` (Save Rule, primary accent)
 
 #### Fields
 | Field | Component | Notes |
@@ -196,6 +198,7 @@ Built-in list actions declared via `list_create`, `list_edit`, `list_remove` act
 ### Surface 3: KnowledgeBaseView — Extensions
 
 **View id:** `AiAgent_KnowledgeBase` (existing view extended, NOT replaced)
+**Focal point:** `uploadSubmitBtn` (primary accent — triggers upload + ingest with collected metadata)
 
 #### Upload form additions (above existing `<upload>`)
 New `<formLayout id="uploadMetaForm">` inserted between the `<upload>` component and the
@@ -251,6 +254,7 @@ null. Position: after the existing `roles` column.
 **Route:** admin menu entry `aiAgent.vectorStoreDebug`
 **Access:** `AiAgentAdminRole` only (admin bypass in `RetrievalFilterBuilder` applies — admin sees
 all chunks without entity denylist filter)
+**Focal point:** `searchBtn` (Search, primary accent)
 
 **Layout structure:** `layout padding="true" spacing="true"` (matches audit view)
 
@@ -279,6 +283,13 @@ all chunks without entity denylist filter)
   `vectorStoreDebug.filter.help.tooltip`.
 - Parse error shown as inline notification below the field (Vaadin `errorMessage` on the
   textField), not a toast.
+- **Accessibility:** `filterClearBtn` and `filterHelpBtn` are icon-only. In addition to the XML
+  `title` attribute, the executor MUST call `filterClearBtn.setAriaLabel(messages.getMessage(...,
+  "vectorStoreDebug.filter.clear"))` and `filterHelpBtn.setAriaLabel(messages.getMessage(...,
+  "vectorStoreDebug.filter.help"))` in the controller's `onInit` (or equivalent `@Subscribe
+  InitEvent` handler) so screen readers expose the same label as the tooltip. Message keys
+  `vectorStoreDebug.filter.clear` and `vectorStoreDebug.filter.help` already exist in the
+  inventory below.
 
 #### Buttons row
 ```xml
@@ -331,7 +342,7 @@ all chunks without entity denylist filter)
 | Surface | Primary CTA | Key |
 |---------|------------|-----|
 | ExposureRule list | Create Rule | `exposureRulesList.action.create` (via `list_create`) |
-| ExposureRule detail | Save | `exposureRulesDetail.action.save` |
+| ExposureRule detail | Save Rule | `exposureRulesDetail.action.save` |
 | KB row action | Edit permissions | `knowledgeBase.action.editPermissions` |
 | KB row action | Reingest | `knowledgeBase.action.reingest` (existing) |
 | VectorStore debug | Search | `vectorStoreDebug.action.search` |
@@ -414,7 +425,7 @@ Keys already present in existing bundles are marked `(existing)`.
 | `exposureRulesDetail.field.entityName.placeholder` | Select entity... | Chọn thực thể... |
 | `exposureRulesDetail.field.entityName.helper` | Choose the Jmix entity to hide from AI tools and the knowledge base. | Chọn thực thể Jmix cần ẩn khỏi công cụ AI và cơ sở tri thức. |
 | `exposureRulesDetail.field.enabled` | Active (hide from AI when checked) | Đang hoạt động (ẩn khỏi AI khi được chọn) |
-| `exposureRulesDetail.action.save` | Save | Lưu |
+| `exposureRulesDetail.action.save` | Save Rule | Lưu quy tắc |
 
 ### KnowledgeBase additions (new keys only)
 | Key | EN | VI |
