@@ -1,5 +1,7 @@
 package com.vn.agent.rag;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import io.jmix.core.DataManager;
 import org.slf4j.Logger;
@@ -7,11 +9,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -50,6 +56,7 @@ import java.util.UUID;
 public class KnowledgeDocumentService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeDocumentService.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final DataManager dataManager;
     private final VectorStore vectorStore;
@@ -134,6 +141,50 @@ public class KnowledgeDocumentService {
         }
     }
 
+    /**
+     * Persist permission and source-entity changes to the document row, then schedule
+     * reingest. Save runs first; reingest enqueue runs second (Plan 10-08, Fix W3
+     * orchestration extracted from {@code KnowledgeBaseView}).
+     *
+     * <p>On reingest enqueue failure the save is NOT rolled back — the document
+     * metadata is correct and the admin can retry via the "Reingest" row action
+     * (Phase 10 D-08, threat T-10-08 accepted). The view consumes only the typed
+     * {@link UpdatePermissionsResult} and routes a localized notification.
+     *
+     * @param documentId       id of the document to update
+     * @param allowedRoles     new set of allowed role codes (serialized to JSON)
+     * @param sourceEntityName Jmix entity name link; nullable (clears the link)
+     * @return result with {@link UpdatePermissionsResult.Status#SAVED_AND_REINGESTING}
+     *         or {@link UpdatePermissionsResult.Status#SAVED_REINGEST_FAILED}
+     * @throws DocumentNotFoundException if no document exists with the given id
+     */
+    public UpdatePermissionsResult updatePermissionsAndReingest(UUID documentId,
+                                                                Collection<String> allowedRoles,
+                                                                @Nullable String sourceEntityName) {
+        Objects.requireNonNull(documentId, "documentId must not be null");
+
+        AiKnowledgeDocument doc = loadOrThrow(documentId);
+        List<String> roles = allowedRoles == null ? List.of() : new ArrayList<>(allowedRoles);
+        doc.setAllowedRolesJson(writeRolesJson(roles));
+        // null clears the link — chunks reingested without source_entity (D-06 contract).
+        doc.setSourceEntityName(sourceEntityName);
+
+        // FIRST: persist metadata changes. Runs under the class-level @Transactional
+        // boundary so save + reingest's REQUIRES_NEW status reset are coordinated.
+        dataManager.save(doc);
+
+        // SECOND: schedule reingest. On failure the save is intentionally NOT rolled back —
+        // doc row is correct; admin retries via row action.
+        try {
+            reingest(documentId);
+            return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
+        } catch (Exception e) {
+            log.warn("updatePermissionsAndReingest: save committed but reingest enqueue failed for {}",
+                    documentId, e);
+            return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_REINGEST_FAILED);
+        }
+    }
+
     private AiKnowledgeDocument loadOrThrow(UUID documentId) {
         return dataManager.load(AiKnowledgeDocument.class)
                 .id(documentId)
@@ -145,5 +196,14 @@ public class KnowledgeDocumentService {
         return new FilterExpressionBuilder()
                 .eq(ChunkMetadata.DOCUMENT_ID, id.toString())
                 .build();
+    }
+
+    private static String writeRolesJson(List<String> roles) {
+        try {
+            return JSON.writeValueAsString(roles);
+        } catch (JsonProcessingException e) {
+            // List<String> is trivially serializable; an exception here is a JVM bug.
+            throw new IllegalStateException("Failed to serialise allowedRoles to JSON", e);
+        }
     }
 }

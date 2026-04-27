@@ -93,6 +93,11 @@ public class KnowledgeDocumentUploadService {
      * Validates role codes, persists a PENDING {@link AiKnowledgeDocument}, and
      * schedules async ingestion after commit.
      *
+     * <p>Convenience overload that delegates to
+     * {@link #upload(String, String, Collection, String)} with a {@code null}
+     * {@code sourceEntityName} (no entity link). Existing callers remain
+     * source-compatible.
+     *
      * @param sourceUri    Spring {@code ResourceLoader}-resolvable URI (see class Javadoc)
      * @param sourceKind   free-form label (MIME type or synthetic marker); nullable
      * @param allowedRoles Jmix role codes granting retrieval visibility; nullable (treated as empty)
@@ -101,6 +106,30 @@ public class KnowledgeDocumentUploadService {
      */
     @Transactional
     public AiKnowledgeDocument upload(String sourceUri, String sourceKind, Collection<String> allowedRoles) {
+        return upload(sourceUri, sourceKind, allowedRoles, null);
+    }
+
+    /**
+     * Extended upload that captures an optional Jmix entity link
+     * ({@code sourceEntityName}) so it is persisted on the document BEFORE
+     * {@code dataManager.save()} runs and BEFORE the async ingester schedules.
+     * Required by Plan 10-08 / Phase 10 D-07: chunk metadata
+     * ({@link com.vn.agent.rag.ChunkMetadata#SOURCE_ENTITY}) is mirrored from the
+     * document row at ingest time, so the field MUST already be persisted when
+     * {@link AsyncIngestionWorker#ingest(java.util.UUID)} reloads the row.
+     *
+     * @param sourceUri        Spring {@code ResourceLoader}-resolvable URI
+     * @param sourceKind       free-form label (MIME type or synthetic marker); nullable
+     * @param allowedRoles     Jmix role codes granting retrieval visibility; nullable (treated as empty)
+     * @param sourceEntityName Jmix entity name (MetaClass#getName) to link the document to;
+     *                         nullable (no link → chunks ingest without {@code source_entity}
+     *                         metadata; legacy-doc contract per D-06)
+     */
+    @Transactional
+    public AiKnowledgeDocument upload(String sourceUri,
+                                      String sourceKind,
+                                      Collection<String> allowedRoles,
+                                      String sourceEntityName) {
         Objects.requireNonNull(sourceUri, "sourceUri must not be null");
 
         // CR-01: reject arbitrary server-side URIs (threat T-05-03-05 hardening). Only
@@ -125,6 +154,9 @@ public class KnowledgeDocumentUploadService {
         document.setFileName(sourceUri);
         document.setMimeType(sourceKind);
         document.setAllowedRolesJson(writeRolesJson(roles));
+        // Plan 10-08 / D-07: persist sourceEntityName BEFORE dataManager.save so the
+        // async ingester sees the field when it reloads the row. Null clears the field.
+        document.setSourceEntityName(sourceEntityName);
         document.setStatus(AiKnowledgeDocumentStatus.PENDING);
         // Note: embeddingModel is not a column on the Phase 2 entity — it is carried on each
         // chunk via ChunkMetadata.EMBEDDING_MODEL during enrichment in AsyncIngestionWorker.
