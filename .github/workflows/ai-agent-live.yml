@@ -33,7 +33,7 @@ jobs:
           java-version: '21'
 
       - name: Gradle setup
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Preflight — OPENROUTER_API_KEY must be set
         run: |
