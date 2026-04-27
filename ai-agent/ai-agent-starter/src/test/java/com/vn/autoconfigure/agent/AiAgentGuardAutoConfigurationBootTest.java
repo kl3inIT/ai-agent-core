@@ -3,8 +3,12 @@ package com.vn.autoconfigure.agent;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.guard.AiAgentGuardProperties;
 import com.vn.agent.guard.GuardedToolCallingManager;
+import com.vn.agent.guard.HostPrefixPatternProvider;
 import com.vn.agent.guard.OutputScannerAdvisor;
+import com.vn.agent.guard.ToolNamePatternProvider;
 import com.vn.agent.spi.ToolGuard;
+import io.jmix.core.Metadata;
+import io.jmix.core.metamodel.model.Session;
 import io.jmix.core.security.CurrentAuthentication;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -88,6 +92,30 @@ class AiAgentGuardAutoConfigurationBootTest {
         /** Sentinel delegate bean — the guard decorator looks this up by name. */
         @Bean(name = "toolCallingManager")
         ToolCallingManager toolCallingManager() { return mock(ToolCallingManager.class); }
+
+        // Phase 9 PROMPT-06: HostPrefixPatternProvider depends on Jmix Metadata; supply a tiny
+        // stub returning an empty class set so the provider compiles to no host-prefix regex.
+        // ToolNamePatternProvider is wired with no ToolContributor beans so it carries only the
+        // seven D-07 baseline names (six built-ins + RETRIEVAL).
+        @Bean
+        Metadata metadata() {
+            Metadata m = mock(Metadata.class);
+            Session session = mock(Session.class);
+            org.mockito.Mockito.when(m.getSession()).thenReturn(session);
+            org.mockito.Mockito.when(session.getClasses()).thenReturn(java.util.Set.of());
+            return m;
+        }
+
+        @Bean
+        HostPrefixPatternProvider hostPrefixPatternProvider(Metadata metadata,
+                                                             AiAgentGuardProperties props) {
+            return new HostPrefixPatternProvider(metadata, props);
+        }
+
+        @Bean
+        ToolNamePatternProvider toolNamePatternProvider(AiAgentGuardProperties props) {
+            return new ToolNamePatternProvider(java.util.List.of(), props);
+        }
     }
 
     @Configuration(proxyBeanMethods = false)

@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -43,8 +44,8 @@ class OutputScannerAdvisorTest {
     void scannerFlagsAsExpected(String text, String expectedPatternKey) {
         AiAgentGuardProperties props = new AiAgentGuardProperties(
                 null, null, null,
-                new AiAgentGuardProperties.OutputScanner(true, null)); // null → D-18 defaults
-        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props);
+                new AiAgentGuardProperties.OutputScanner(true, null, null, null)); // null → D-18 defaults
+        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props, null, null);
 
         Map<String, Object> contextMap = new HashMap<>();
         ChatClientResponse stubbed = stubResponse(text, contextMap);
@@ -69,8 +70,8 @@ class OutputScannerAdvisorTest {
     void disabledScannerNeverFlags() {
         AiAgentGuardProperties props = new AiAgentGuardProperties(
                 null, null, null,
-                new AiAgentGuardProperties.OutputScanner(false, null));
-        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props);
+                new AiAgentGuardProperties.OutputScanner(false, null, null, null));
+        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props, null, null);
 
         Map<String, Object> contextMap = new HashMap<>();
         ChatClientResponse stubbed = stubResponse(
@@ -84,6 +85,22 @@ class OutputScannerAdvisorTest {
     }
 
     @org.junit.jupiter.api.Test
+    void nullCallResponseThrowsInsteadOfReturningNull() {
+        AiAgentGuardProperties props = new AiAgentGuardProperties(
+                null, null, null,
+                new AiAgentGuardProperties.OutputScanner(true, null, null, null));
+        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props, null, null);
+
+        ChatClientRequest req = mock(ChatClientRequest.class);
+        CallAdvisorChain chain = mock(CallAdvisorChain.class);
+        when(chain.nextCall(req)).thenReturn(null);
+
+        assertThatThrownBy(() -> advisor.adviseCall(req, chain))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("CallAdvisorChain returned null ChatClientResponse");
+    }
+
+    @org.junit.jupiter.api.Test
     void oversizedInputIsTruncatedBeforeScanning() {
         // Build text that would trigger IGNORE_PREVIOUS_INSTRUCTIONS only BEYOND the 8 KiB cap —
         // assert the scanner does NOT flag (cap works). Then rebuild with the trigger INSIDE the
@@ -94,8 +111,8 @@ class OutputScannerAdvisorTest {
 
         AiAgentGuardProperties props = new AiAgentGuardProperties(
                 null, null, null,
-                new AiAgentGuardProperties.OutputScanner(true, null));
-        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props);
+                new AiAgentGuardProperties.OutputScanner(true, null, null, null));
+        OutputScannerAdvisor advisor = new OutputScannerAdvisor(props, null, null);
 
         Map<String, Object> ctx1 = new HashMap<>();
         ChatClientResponse resp1 = stubResponse(beyond, ctx1);

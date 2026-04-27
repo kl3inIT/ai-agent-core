@@ -3,7 +3,9 @@ package com.vn.autoconfigure.agent;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.guard.AiAgentGuardProperties;
 import com.vn.agent.guard.GuardedToolCallingManager;
+import com.vn.agent.guard.HostPrefixPatternProvider;
 import com.vn.agent.guard.OutputScannerAdvisor;
+import com.vn.agent.guard.ToolNamePatternProvider;
 import com.vn.agent.spi.ToolGuard;
 import io.jmix.core.security.CurrentAuthentication;
 import org.slf4j.Logger;
@@ -109,8 +111,14 @@ public class AiAgentGuardAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(name = "outputScannerAdvisor")
-    public CallAdvisor outputScannerAdvisor(AiAgentGuardProperties props) {
-        return new OutputScannerAdvisor(props);
+    public OutputScannerAdvisor outputScannerAdvisor(AiAgentGuardProperties props,
+                                                     HostPrefixPatternProvider hostPrefixProvider,
+                                                     ToolNamePatternProvider toolNameProvider) {
+        // Returns the concrete OutputScannerAdvisor (Phase 9): the type implements both
+        // CallAdvisor and StreamAdvisor so Spring exposes the bean under both contracts. The
+        // existing @Qualifier("outputScannerAdvisor") CallAdvisor injection in ChatClientFactory
+        // continues to resolve unchanged because OutputScannerAdvisor is-a CallAdvisor.
+        return new OutputScannerAdvisor(props, hostPrefixProvider, toolNameProvider);
     }
 
     /**

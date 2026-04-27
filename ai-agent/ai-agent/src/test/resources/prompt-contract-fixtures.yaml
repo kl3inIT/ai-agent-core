@@ -1,0 +1,41 @@
+# TEST-08 fixture inventory. Mirrors the assertions in PromptContractMockTest. Documentation
+# only — the test file itself contains the assertion data inline. Including the YAML keeps
+# reviewers in sync with the test ground truth.
+
+prompt_rules_substrings:
+  - "do NOT use internal entity names"
+  - "do NOT mention tool names"
+  - "call list_entities exactly once"
+  - "do not guess"
+
+unknown_entity_hints:
+  - "call list_entities exactly once"
+  - "if a name in list_entities matches your intent, retry the original tool with that exact name"
+  - "if no entity in list_entities matches, tell the user no such entity exists — do not guess"
+
+# NOTE on the entity-prefix leak fixture: the planner's example uses "jmixapp_Customer" as the
+# leaky reply, but the test JmixModule (AITestConfiguration) only registers entities under the
+# "ai" prefix (ai_AiAuditEvent, ai_AiMessage, ai_AiConversation, ai_AiParameters,
+# ai_AiKnowledgeDocument). The HostPrefixPatternProvider's runtime-derived regex therefore
+# compiles as `\b(ai)_\w+\b`, which does NOT match "jmixapp_Customer". The test uses
+# "ai_Customer" so the dynamically-built regex actually triggers HOST_PREFIX_LEAK in this
+# environment (Rule 3 deviation — preserves the planner intent of asserting on the dynamic
+# pattern rather than the literal "jmixapp" string).
+leaky_replies:
+  - text: "The ai_Customer table has 12 rows."
+    expected_pattern_key: HOST_PREFIX_LEAK
+  - text: "I will call find_records to look them up."
+    expected_pattern_key: TOOL_NAME_LEAK
+
+benign_replies:
+  - text_en: "You have 12 customers."
+  - text_vi: "Bạn có 12 khách hàng."
+
+user_messages:
+  en: "How many customers?"
+  vi: "có bao nhiêu khách hàng?"
+
+# D-17 cross-locale assertion targets — what BaselineContextProvider emits in agent.locale.
+agent_locale_tokens:
+  en: "agent.locale=en"
+  vi: "agent.locale=vi_VN"

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <menu-config xmlns="http://jmix.io/schema/flowui/menu">
 
-    <menu id="application" title="msg://com.vn.jmixapp/menu.application.title" opened="true">
+    <menu opened="true" id="application" title="msg://com.vn.jmixapp/menu.application.title">
         <item view="User.list" title="msg://com.vn.jmixapp.view.user/UserListView.title"/>
         <item view="Customer.list" title="msg://com.vn.jmixapp.view.customer/CustomerListView.title"/>
         <item view="Product.list" title="msg://com.vn.jmixapp.view.product/ProductListView.title"/>
@@ -14,6 +14,8 @@
         <item view="AiAgent_Parameters.list" id="aiAgent.parameters.list" title="msg://com.vn.agent/menu.parameters"/>
         <item view="AiAgent_KnowledgeBase.list" id="aiAgent.knowledge.list" title="msg://com.vn.agent/menu.knowledge"/>
         <item view="AiAgent_AiAuditEvent.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
+        <item view="AiAgent_BaselineContext" id="aiAgent.baselineContext"
+              title="msg://com.vn.agent/menu.baselineContext"/>
     </menu>
     <menu id="security" title="msg://com.vn.agent/menu.security.title">
         <item view="sec_ResourceRoleModel.list"
@@ -27,5 +29,4 @@
         <item view="datatl_dataModelListView"
               title="msg://io.jmix.datatoolsflowui.view.datamodel/entityModelListView.title"/>
     </menu>
-
 </menu-config>

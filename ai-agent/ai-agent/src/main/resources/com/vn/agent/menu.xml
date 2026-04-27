@@ -4,6 +4,8 @@
     <menu id="AI" title="msg://com.vn.agent/menu.addon" opened="true">
         <item id="aiAgent.chat" view="AiAgent_Chat"
               title="msg://com.vn.agent/menu.chat"/>
+        <item id="aiAgent.baselineContext" view="AiAgent_BaselineContext"
+              title="msg://com.vn.agent/menu.baselineContext"/>
         <item id="aiAgent.conversations" view="AiAgent_Conversation.list"
               title="msg://com.vn.agent/menu.conversations"/>
         <item id="aiAgent.parameters.list" view="AiAgent_Parameters.list"

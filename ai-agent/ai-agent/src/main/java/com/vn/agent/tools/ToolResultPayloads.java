@@ -8,25 +8,42 @@ import java.util.Map;
 record ReadableEntitySummary(String name, String label) {
 }
 
-record DescribeEntityResult(String entityName, String label, List<AttributeDescription> attributes) {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+record DescribeEntityResult(String name,
+                            String label,
+                            String comment,
+                            List<AttributeDescription> attributes) {
 }
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 record AttributeDescription(String name,
-                            String type,
-                            boolean nullable,
                             String label,
-                            List<String> enumValues,
-                            String relationshipTarget,
+                            String comment,
+                            String attributeType,
+                            String cardinality,
+                            boolean mandatory,
+                            boolean readOnly,
+                            boolean persistent,
+                            boolean transientProperty,
+                            boolean primaryKey,
+                            List<EnumValueDescription> enumValues,
+                            EntityRef relationshipTarget,
                             Integer maxLength) {
 }
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-record RecordsResult(String entityName,
-                     List<Map<String, Object>> rows,
-                     int limit,
-                     boolean truncated,
-                     String hint) {
+record EnumValueDescription(String name, String label) {
+}
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+record EntityRef(String name, String label) {
+}
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+record RecordsPayload(List<Map<String, Object>> rows,
+                      int limit,
+                      boolean truncated,
+                      String hint) {
 }
 
 record RelatedRecordsResult(String entityName,

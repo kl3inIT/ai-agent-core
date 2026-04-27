@@ -117,14 +117,33 @@ class FindRecordsLimitCapTest {
 
     /**
      * R-03b adaptation: plan named the JSON array key {@code "records"}; the actual
-     * {@code RecordsResult} POJO field is named {@code rows} (verified empirically against
+     * {@code RecordsPayload} POJO field is named {@code rows} (verified empirically against
      * a real find_records response on first test run). Use {@code "rows"}.
+     *
+     * <p>Phase 9 PROMPT-04: {@code find_records} now wraps its inner JSON payload in the
+     * literal envelope {@code <data entity="<label>" type="<internalName>">JSON</data>}.
+     * Strip the envelope before JSON parsing.
      */
-    private int countRowsInJson(String json) {
+    private int countRowsInJson(String response) {
         try {
-            return OBJECT_MAPPER.readTree(json).get("rows").size();
+            String inner = stripPromptDataEnvelope(response);
+            return OBJECT_MAPPER.readTree(inner).get("rows").size();
         } catch (Exception e) {
-            throw new AssertionError("Failed to parse find_records JSON response: " + json, e);
+            throw new AssertionError("Failed to parse find_records response: " + response, e);
         }
+    }
+
+    private static String stripPromptDataEnvelope(String response) {
+        // Match the OUTER envelope from PROMPT-04. The inner row payload may itself contain
+        // <data>...</data> per-row wraps, so we cannot just strip the first/last tags by
+        // length — we strip the leading <data ...> open tag and the final </data> close tag.
+        int openEnd = response.indexOf('>');
+        int closeStart = response.lastIndexOf("</data>");
+        if (openEnd < 0 || closeStart < 0 || !response.startsWith("<data ")) {
+            // Defensive: tolerate older bare-JSON shape (none expected in v1.1, but the
+            // test should fail with a clearer message when the envelope is missing).
+            return response;
+        }
+        return response.substring(openEnd + 1, closeStart);
     }
 }

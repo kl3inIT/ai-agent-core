@@ -45,17 +45,28 @@ public record AiAgentGuardProperties(
     public record IterationCap(Integer maxIterations) {
     }
 
-    /** Output-side injection-pattern scanner config (D-17/D-18, GUARD-05). */
-    public record OutputScanner(Boolean enabled, List<Pattern> patterns) {
+    /** Output-side injection-pattern scanner config (D-17/D-18, GUARD-05; Phase 9 PROMPT-06). */
+    public record OutputScanner(Boolean enabled,
+                                List<Pattern> patterns,
+                                HostPrefixLeak hostPrefixLeak,
+                                ToolNameLeak toolNameLeak) {
 
         /** One scanner pattern: a stable {@code key} for audit rows + the regex {@code source}. */
         public record Pattern(String key, String regex) {
+        }
+
+        /** Phase 9 D-08: host-prefix leak pattern toggle (default enabled). */
+        public record HostPrefixLeak(Boolean enabled) {
+        }
+
+        /** Phase 9 D-08: tool-name leak pattern toggle (default enabled). */
+        public record ToolNameLeak(Boolean enabled) {
         }
     }
 
     /** D-13: rate-limit defaults to enabled when block omitted. */
     public boolean rateLimitEnabled() {
-        return rateLimit == null || !Boolean.FALSE.equals(rateLimit.enabled());
+        return rateLimit == null || enabledByDefault(rateLimit.enabled());
     }
 
     /** D-13: default ceiling 10 requests/min per user. */
@@ -65,7 +76,7 @@ public record AiAgentGuardProperties(
 
     /** D-14: token breaker defaults to enabled when block omitted. */
     public boolean tokenBreakerEnabled() {
-        return tokenBreaker == null || !Boolean.FALSE.equals(tokenBreaker.enabled());
+        return tokenBreaker == null || enabledByDefault(tokenBreaker.enabled());
     }
 
     /** D-14: default ceiling 100_000 tokens per conversation. */
@@ -80,7 +91,7 @@ public record AiAgentGuardProperties(
 
     /** D-17: output scanner defaults to enabled when block omitted. */
     public boolean outputScannerEnabled() {
-        return outputScanner == null || !Boolean.FALSE.equals(outputScanner.enabled());
+        return outputScanner == null || enabledByDefault(outputScanner.enabled());
     }
 
     /**
@@ -100,5 +111,32 @@ public record AiAgentGuardProperties(
             );
         }
         return outputScanner.patterns();
+    }
+
+    /**
+     * Phase 9 D-08: host-prefix-leak pattern pack defaults to enabled when the nested block is
+     * absent. Operator opts out via {@code jmix.ai-agent.guard.output-scanner.host-prefix-leak.enabled=false}
+     * without disabling the parent {@code outputScanner} or affecting the bundled defaults.
+     */
+    public boolean hostPrefixLeakEnabled() {
+        if (outputScanner == null || outputScanner.hostPrefixLeak() == null) {
+            return true;
+        }
+        return enabledByDefault(outputScanner.hostPrefixLeak().enabled());
+    }
+
+    /**
+     * Phase 9 D-08: tool-name-leak pattern pack defaults to enabled when the nested block is
+     * absent. Operator opts out via {@code jmix.ai-agent.guard.output-scanner.tool-name-leak.enabled=false}.
+     */
+    public boolean toolNameLeakEnabled() {
+        if (outputScanner == null || outputScanner.toolNameLeak() == null) {
+            return true;
+        }
+        return enabledByDefault(outputScanner.toolNameLeak().enabled());
+    }
+
+    private static boolean enabledByDefault(Boolean value) {
+        return !Boolean.FALSE.equals(value);
     }
 }

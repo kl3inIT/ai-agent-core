@@ -16,13 +16,28 @@ If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-docume
 
 The MVP is now a working Jmix add-on spanning packaging, secured metadata tools, Spring AI orchestration, RAG, guardrails, Flow UI, audit tree, release documentation, and GitHub Actions CI. The branch shipped through PR #3 and CI passed on `main`.
 
-**Known production caveat:** the clean-consumer smoke requirement remains deferred. Plan 08-05 proved that a minimal consumer needs PostgreSQL/pgvector or a starter-provided stub VectorStore boot mode before the smoke can be made honest.
+**In progress:** v1.1.0 milestone — Phase 9 prompt-contract/tool-layer hardening is complete; Phase 10 AI-specific exposure governance is next, followed by mutation-capable built-in tools and configurable chat surfaces.
 
-## Next Milestone Goals
+**Known production caveat:** the clean-consumer smoke requirement remains deferred. Plan 08-05 proved that a minimal consumer needs PostgreSQL/pgvector or a starter-provided stub VectorStore boot mode before the smoke can be made honest. Explicitly OUT of scope for v1.1; revisit in a later milestone.
 
-- Close the consumer-smoke gap with either a Testcontainers-backed clean consumer or an explicit stub VectorStore boot profile.
-- Harden prompt/user-facing contracts: readable entity inventory, unknown-entity retry, and hiding internal tool/entity names from chat output.
-- Revisit UX follow-ups captured in pending todos, especially richer chat input and clearer tool detail rendering.
+## Current Milestone: v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces
+
+**Goal:** Harden prompt/tool contracts, expand built-in tools to safe Jmix-secured mutations, give admins governance over the LLM-visible surface, and ship configurable chat surfaces (full / sidebar / floating).
+
+**Target features:**
+
+- Prompt-contract hardening — readable entity inventory in baseline context, internal tool/entity names hidden from user-facing chat, deterministic `unknown_entity` retry contract.
+- Tool-layer refinements — richer `describe_entity` wrapper with selected Jmix metadata, host-controlled fetch-plan override SPI, LLM permission inventory at entity + attribute level.
+- Mutation-capable built-in tools — create / update / related-write tools layered over `DataManager`, gated by Jmix `AccessManager` CRUD + attribute policies, opt-in by host configuration, audited end-to-end.
+- AI-specific LLM exposure policy (SEED-007 activated) — admin-governed layer that narrows the LLM-visible surface BELOW the user's Jmix permissions; entity + attribute denylist/allowlist with Flow UI.
+- Chat task input — speech-to-text and task-scoped file attachment in chat, separate lifecycle from KB upload.
+- Intent-driven extraction → prefilled Jmix forms — intent-first workflow producing a structured draft that opens a Jmix form with prefilled data after user confirmation.
+- Configurable chat surfaces (SEED-005 activated, refined) — three presentation surfaces over the same backend and reusable `ChatPanelFragment` (full `ChatView`, right-sidebar chat, floating launcher) with admin-controlled toggle for which surfaces are enabled/visible.
+
+**Explicitly OUT of scope for v1.1:**
+
+- Collapsible per-turn tool-detail panel + ephemeral streaming-status component in chat UI (deferred — small UX polish, not blocking).
+- Clean-consumer smoke (PKG-05 / TEST-07) — Plan 08-05 carryover; deferred.
 
 ## Requirements
 
@@ -36,12 +51,25 @@ The MVP is now a working Jmix add-on spanning packaging, secured metadata tools,
 - ✓ pgvector RAG ingestion/retrieval with role-scoped filters and document lifecycle operations — v1.0.0
 - ✓ Built-in Flow UI for chat, conversations, parameters, knowledge base, and audit — v1.0.0
 - ✓ Release readiness: operator README, CHANGELOG 1.0.0, CI workflows, and Phase 8 regression bars green — v1.0.0
+- ✓ Prompt-contract hardening: baseline `agent.entities` / `agent.permissions`, internal vocabulary guardrails, deterministic `unknown_entity` retry contract, output scanner pattern packs, and cross-locale prompt-contract tests — Phase 9
+- ✓ Tool-layer refinements: richer `describe_entity`, host fetch-plan override SPI, ACL-intersected fetch plans, prompt-safe record envelope, and LLM permission inventory — Phase 9
 
-### Active / Deferred For Next Milestone
+### Active (v1.1.0 — being defined)
 
-- [ ] Clean-consumer smoke (PKG-05/TEST-07): Plan 08-05 deferred this after proving the minimal HSQLDB-only consumer premise was false. Next milestone should implement a Postgres/pgvector Testcontainers smoke or a starter stub VectorStore boot mode.
-- [ ] Prompt-contract hardening bundle: readable entity inventory in baseline context, unknown-entity retry contract, and hiding internal tool/entity names from user-facing chat.
-- [ ] UX follow-ups from pending todos: richer chat input, collapsible tool detail, speech/file task input, and intent-driven form extraction.
+Detailed REQ-IDs are produced by the v1.1 requirements gathering step that follows; this list previews the high-level commitments:
+
+- [x] Prompt-contract hardening: readable entity inventory in baseline context, hide internal tool/entity names from user-facing chat, enforce `unknown_entity` retry contract. Validated in Phase 9.
+- [x] Tool-layer refinements: richer `describe_entity` wrapper, host-override SPI for tool fetch plans, LLM permission inventory (entity + attribute level). Validated in Phase 9.
+- [ ] Mutation-capable built-in tools: create / update / related-write under `DataManager`, gated by Jmix `AccessManager` policies, opt-in per host, audited.
+- [ ] AI-specific LLM exposure policy: admin-governed denylist/allowlist that narrows the LLM-visible surface beneath the user's Jmix permissions, with Flow UI.
+- [ ] Chat task input: speech-to-text and task-scoped file attachment, separate from KB ingestion.
+- [ ] Intent-driven extraction → prefilled Jmix forms: intent-first workflow with confirmed UI navigation and form prefill.
+- [ ] Configurable chat surfaces: full `ChatView`, right-sidebar chat, floating launcher; admin toggle for which are enabled/visible.
+
+### Deferred (not in v1.1)
+
+- [ ] Clean-consumer smoke (PKG-05 / TEST-07): Plan 08-05 carryover from v1.0.0. Either Postgres/pgvector Testcontainers smoke or a starter stub VectorStore boot mode. Revisit in a later milestone.
+- [ ] Collapsible per-turn tool-detail panel + ephemeral streaming-status indicator in chat UI: secondary UX polish; deferred to a later milestone.
 
 ### Out of Scope
 
@@ -124,4 +152,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 after v1.0.0 milestone*
+*Last updated: 2026-04-27 — Phase 9 complete; Phase 10 next*

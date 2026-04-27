@@ -4,6 +4,8 @@ import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
 import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
+import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.FetchPlans;
@@ -54,6 +56,8 @@ public class BuiltInDataTools {
     private final StructuredFilterConditionMapper structuredFilterConditionMapper;
     private final FilterLiteralValueConverter filterLiteralValueConverter;
     private final ToolResultFormatter toolResultFormatter;
+    private final FetchPlanResolver fetchPlanResolver;
+    private final FetchPlanIntersector fetchPlanIntersector;
 
     public BuiltInDataTools(DataManager dataManager,
                             Metadata metadata,
@@ -63,7 +67,9 @@ public class BuiltInDataTools {
                             CurrentUserSchemaAccess currentUserSchemaAccess,
                             StructuredFilterConditionMapper structuredFilterConditionMapper,
                             FilterLiteralValueConverter filterLiteralValueConverter,
-                            ToolResultFormatter toolResultFormatter) {
+                            ToolResultFormatter toolResultFormatter,
+                            FetchPlanResolver fetchPlanResolver,
+                            FetchPlanIntersector fetchPlanIntersector) {
         this.dataManager = dataManager;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
@@ -73,6 +79,8 @@ public class BuiltInDataTools {
         this.structuredFilterConditionMapper = structuredFilterConditionMapper;
         this.filterLiteralValueConverter = filterLiteralValueConverter;
         this.toolResultFormatter = toolResultFormatter;
+        this.fetchPlanResolver = fetchPlanResolver;
+        this.fetchPlanIntersector = fetchPlanIntersector;
     }
 
     // -------- Tool 1: list_entities (D-01) --------
@@ -95,12 +103,48 @@ public class BuiltInDataTools {
         }
     }
 
-    // -------- Tool 2: describe_entity (D-02) --------
+    // -------- Tool 2: describe_entity (D-02; widened in Phase 9 TOOL-09 / D-04) --------
 
+    /**
+     * Tool 2: describe_entity (D-02; widened in Phase 9 TOOL-09 / D-04).
+     *
+     * <p>Returns Jmix-{@link MetadataTools}-derived attribute fields: {@code comment},
+     * {@code attributeType}, {@code cardinality}, {@code mandatory}, {@code readOnly},
+     * {@code persistent}, {@code transientProperty}, {@code primaryKey}, {@code enumValues}
+     * (each as {@code [{name, label}]} with locale-resolved labels via {@link io.jmix.core.Messages}),
+     * {@code relationshipTarget} ({@code {name, label}} mirroring the {@code agent.entities}
+     * shape), and {@code maxLength}. Top-level {@code comment} carries any entity-level
+     * {@link io.jmix.core.metamodel.annotation.Comment}.
+     *
+     * <p><b>Excluded fields (D-05 — documented in Javadoc only, NOT echoed into LLM-facing
+     * payload):</b> DDL column names, JPA fetch type, cascade rules, raw annotations, internal
+     * store name, framework-managed audit columns. The exclusion keeps the prompt token-cost
+     * bounded and avoids leaking host-storage details that the LLM cannot act on.
+     *
+     * <p>Implementation rule: every metadata read goes through {@link MetadataTools} (e.g.
+     * {@code getMetaAnnotationValue}, {@code isJpa}, {@code getPrimaryKeyProperty}). Raw reflection
+     * is forbidden in this code path; the only allowed reflection in {@code tools/} is
+     * {@code ToolResultFormatter.columnLength} for {@code @Column.length}, which has no
+     * {@code MetadataTools} accessor.
+     *
+     * <p><b>Future-cache contract (mirrors AiAgentPromptProperties PROMPT-02):</b>
+     * the {@code DescribeEntityResult} payload carries locale-sensitive labels (entity caption,
+     * attribute captions, enum captions) resolved through {@link MessageTools} /
+     * {@link io.jmix.core.Messages}. If a future phase (10/11+) introduces a cache layer in
+     * front of {@code describe_entity}, that cache MUST NOT include {@link java.util.Locale}
+     * in the cache key. Locale-sensitive labels must be resolved AFTER the cache lookup
+     * (post-cache label rendering against the current
+     * {@code CurrentAuthentication.getLocale()}), exactly as
+     * {@code AiAgentPromptProperties.effectiveSystemPrompt(...)} resolves prompt text post-cache.
+     * Including locale in the cache key would create the PROMPT-02 forbidden coupling and force
+     * per-locale cache duplication; it is a known anti-pattern. The structural metadata
+     * (attribute names, types, cardinality) is locale-invariant and is the legitimate cache
+     * target.
+     */
     @Tool(name = "describe_entity",
             description = "Describe an entity's attributes, types, constraints, relationships, and enum values.")
     public String describeEntity(
-            @ToolParam(description = "Jmix entity name from list_entities, e.g. 'jmixapp_Order'")
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
@@ -120,7 +164,8 @@ public class BuiltInDataTools {
             description = "Find records matching a structured filter object. Default limit 20, max 100. "
                     + "When results exceed the limit, response includes truncated=true and a hint to use count_records.")
     public String findRecords(
-            @ToolParam(description = "Jmix entity name from list_entities") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(required = false,
                     description = "Structured filter: {and:[...]} | {or:[...]} | {not:{...}} | {property,operation,value}")
             FilterNode filter,
@@ -130,17 +175,18 @@ public class BuiltInDataTools {
             int clampedLimit = ToolLimits.clampLimit(limit);
             Condition condition = filter == null ? null : structuredFilterConditionMapper.map(filter, metaClass);
 
+            FetchPlan plan = fetchPlanResolver.resolve("find_records", metaClass);
             List<?> rows;
             if (condition == null) {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .all()
-                        .fetchPlan(FetchPlan.BASE)
+                        .fetchPlan(plan)
                         .maxResults(clampedLimit + 1)
                         .list();
             } else {
                 rows = dataManager.load(metaClass.getJavaClass())
                         .condition(condition)
-                        .fetchPlan(FetchPlan.BASE)
+                        .fetchPlan(plan)
                         .maxResults(clampedLimit + 1)
                         .list();
             }
@@ -160,7 +206,8 @@ public class BuiltInDataTools {
     @Tool(name = "count_records",
             description = "Count records matching a filter. Use when find_records returned truncated=true.")
     public String countRecords(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(required = false, description = "Same structured filter shape as find_records") FilterNode filter) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
@@ -177,14 +224,16 @@ public class BuiltInDataTools {
     @Tool(name = "get_record",
             description = "Load a single record by id. Returns the entity's _instance_name attributes.")
     public String getRecord(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(description = "Record id (UUID string for entities using UUID ids)") String id) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
             Object parsedId = parseEntityId(id, metaClass);
+            FetchPlan plan = fetchPlanResolver.resolve("get_record", metaClass);
             Object entity = dataManager.load(metaClass.getJavaClass())
                     .id(parsedId)
-                    .fetchPlan(FetchPlan.BASE)
+                    .fetchPlan(plan)
                     .optional()
                     .orElse(null);
             if (entity == null) {
@@ -201,7 +250,8 @@ public class BuiltInDataTools {
     @Tool(name = "get_related_records",
             description = "Load related records via a relationship attribute. Returns related rows' _instance_name attributes.")
     public String getRelatedRecords(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(description = "Root entity id") String id,
             @ToolParam(description = "Relationship attribute name (from describe_entity)") String relationship) {
         try {
@@ -226,10 +276,17 @@ public class BuiltInDataTools {
                         "cannot read target entity " + targetMetaClass.getName());
             }
 
-            FetchPlan fetchPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
-                    .addFetchPlan(FetchPlan.BASE)
+            // D-13: SPI overrides the data fetch plan only; INSTANCE_NAME on the relationship
+            // is a separate label-projection concern outside the SPI surface in v1.1. The
+            // composed plan is intersected again because Jmix instance-name attributes are
+            // normal attributes and can still be denied by the current user's policies.
+            FetchPlan dataPlan = fetchPlanResolver.resolve("get_related_records", rootMetaClass);
+            FetchPlan composedPlan = fetchPlans.builder(rootMetaClass.getJavaClass())
+                    .addFetchPlan(dataPlan)
                     .add(relationship, fetchPlanBuilder -> fetchPlanBuilder.addFetchPlan(FetchPlan.INSTANCE_NAME))
                     .build();
+            FetchPlan fetchPlan = fetchPlanIntersector.intersectWithAcl(
+                    composedPlan, rootMetaClass, "get_related_records");
             Object rootEntity = dataManager.load(rootMetaClass.getJavaClass())
                     .id(parseEntityId(id, rootMetaClass))
                     .fetchPlan(fetchPlan)
@@ -263,20 +320,23 @@ public class BuiltInDataTools {
      */
     private MetaClass resolveReadableEntityOrThrow(String entityName) {
         if (entityName == null || entityName.isBlank()) {
-            throw new ToolUserError("unknown_entity", "entity name must not be blank");
+            throw new ToolUserError("unknown_entity", "entity name must not be blank", UnknownEntityHints.AS_LIST);
         }
 
         MetaClass metaClass;
         try {
             metaClass = metadata.getClass(entityName);
         } catch (RuntimeException runtimeException) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
 
         if (metaClass == null) {
-            throw new ToolUserError("unknown_entity", "no entity named " + entityName);
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
         if (!currentUserSchemaAccess.canReadEntity(metaClass)) {
+            // Phase 3 D-08 opacity preserved: existing access_denied code stays. Phase 10
+            // LlmExposurePolicy substitution will unify this to unknown_entity uniformly;
+            // Phase 9 only adds new readers on top (CONTEXT §domain — out of scope for Phase 9).
             throw new ToolUserError("access_denied", "no read access to " + entityName);
         }
         return metaClass;
