@@ -17,7 +17,8 @@ import com.vn.agent.tools.UnknownEntityHints;
  * <ul>
  *   <li><b>PROMPT-03:</b> forbid host-prefixed entity names and raw tool / advisor names in
  *       user-facing reply text. Pair with {@code agent.entities} inventory so the LLM has a
- *       label to use instead.</li>
+ *       label to use instead, and require {@code entityName} tool arguments to copy an exact
+ *       inventory name.</li>
  *   <li><b>PROMPT-05 / D-15:</b> surface the {@code unknown_entity} retry contract globally —
  *       call {@code list_entities} exactly once on unknown-entity errors, retry on match,
  *       give up on no match (no guessing).</li>
@@ -42,12 +43,14 @@ public final class AgentSystemPromptRules {
             "",
             "Vocabulary rules:",
             "- In user-facing replies, do NOT use internal entity names that look like '<prefix>_<Name>'"
-                    + " (for example 'jmixapp_Customer'). Use the human label from agent.entities instead.",
+                    + ". Use the human label from agent.entities instead.",
             "- In user-facing replies, do NOT mention tool names such as list_entities, describe_entity,"
                     + " find_records, count_records, get_record, get_related_records, or RETRIEVAL."
                     + " Refer to actions in plain business language.",
-            "- These vocabulary rules apply to text the user reads. Tool calls themselves still use the"
-                    + " canonical entity and tool names.",
+            "- For tool arguments named entityName, use exactly one entity name shown in agent.entities"
+                    + " or returned by list_entities. Do NOT infer, add, or rewrite application prefixes.",
+            "- These vocabulary rules apply to text the user reads. Tool calls still use the exact"
+                    + " tool schema names required by the tool definitions.",
             "",
             "Unknown-entity recovery (mandatory):",
             "- When a tool returns an 'unknown_entity' error, " + UnknownEntityHints.CALL_ONCE + ".",

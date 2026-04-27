@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -74,7 +76,38 @@ class AgentSystemPromptRulesTest {
     }
 
     @Test
-    void agentSystemPromptRules_isFinalConstantsHolder() throws Exception {
+    void promptRules_instructExactEntityNameForToolArguments() {
+        assertThat(AgentSystemPromptRules.PROMPT_RULES)
+                .as("Tool calls must copy entityName from the visible inventory, not invent prefixes")
+                .contains("tool arguments named entityName")
+                .contains("use exactly one entity name shown in agent.entities or returned by list_entities")
+                .contains("Do NOT infer, add, or rewrite application prefixes");
+    }
+
+    @Test
+    void promptRules_doNotPrimeHardCodedHostPrefixExample() {
+        assertThat(AgentSystemPromptRules.PROMPT_RULES)
+                .as("Concrete host-prefix examples bias the model toward invented internal names")
+                .doesNotContain("jmixapp_Customer");
+    }
+
+    @Test
+    void builtInDataToolsEntityNameToolParams_doNotPrimeHardCodedHostPrefixExample() throws Exception {
+        Path source = Path.of("src/main/java/com/vn/agent/tools/BuiltInDataTools.java");
+        if (!Files.exists(source)) {
+            source = Path.of("ai-agent/ai-agent/src/main/java/com/vn/agent/tools/BuiltInDataTools.java");
+        }
+        String body = Files.readString(source);
+
+        assertThat(body)
+                .as("entityName tool metadata should use exact-name inventory wording")
+                .contains("Exact entity name from agent.entities or list_entities")
+                .contains("do not infer or add prefixes")
+                .doesNotContain("jmixapp_Order");
+    }
+
+    @Test
+    void agentSystemPromptRules_isFinalConstantsHolder() {
         Class<?> clazz = AgentSystemPromptRules.class;
         assertThat(Modifier.isFinal(clazz.getModifiers()))
                 .as("Constants holder must be a final class")

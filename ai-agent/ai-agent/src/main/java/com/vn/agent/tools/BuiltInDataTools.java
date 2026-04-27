@@ -144,7 +144,7 @@ public class BuiltInDataTools {
     @Tool(name = "describe_entity",
             description = "Describe an entity's attributes, types, constraints, relationships, and enum values.")
     public String describeEntity(
-            @ToolParam(description = "Jmix entity name from list_entities, e.g. 'jmixapp_Order'")
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
@@ -164,7 +164,8 @@ public class BuiltInDataTools {
             description = "Find records matching a structured filter object. Default limit 20, max 100. "
                     + "When results exceed the limit, response includes truncated=true and a hint to use count_records.")
     public String findRecords(
-            @ToolParam(description = "Jmix entity name from list_entities") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(required = false,
                     description = "Structured filter: {and:[...]} | {or:[...]} | {not:{...}} | {property,operation,value}")
             FilterNode filter,
@@ -205,7 +206,8 @@ public class BuiltInDataTools {
     @Tool(name = "count_records",
             description = "Count records matching a filter. Use when find_records returned truncated=true.")
     public String countRecords(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(required = false, description = "Same structured filter shape as find_records") FilterNode filter) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
@@ -222,7 +224,8 @@ public class BuiltInDataTools {
     @Tool(name = "get_record",
             description = "Load a single record by id. Returns the entity's _instance_name attributes.")
     public String getRecord(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(description = "Record id (UUID string for entities using UUID ids)") String id) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
@@ -247,7 +250,8 @@ public class BuiltInDataTools {
     @Tool(name = "get_related_records",
             description = "Load related records via a relationship attribute. Returns related rows' _instance_name attributes.")
     public String getRelatedRecords(
-            @ToolParam(description = "Jmix entity name") String entityName,
+            @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
+            String entityName,
             @ToolParam(description = "Root entity id") String id,
             @ToolParam(description = "Relationship attribute name (from describe_entity)") String relationship) {
         try {

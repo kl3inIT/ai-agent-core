@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.lang.NonNull;
 
 import java.util.List;
 import java.util.Locale;
@@ -115,14 +116,14 @@ class PromptContractMockTest {
         // Use ai_Customer (rather than the planner-example jmixapp_Customer) so the dynamically-
         // derived HostPrefixPatternProvider regex \b(ai)_\w+\b actually triggers in this test
         // metamodel (Rule 3 deviation; rationale documented at class-level Javadoc).
-        recorder.scriptReply("HOST_PREFIX_LEAK", "The ai_Customer table has 12 rows.");
+        recorder.scriptReply("The ai_Customer table has 12 rows.");
         runChatTurnAndAssertFlag(locale, userMessage, "HOST_PREFIX_LEAK");
     }
 
     @ParameterizedTest(name = "[{0}] toolNameLeak triggers TOOL_NAME_LEAK")
     @MethodSource("locales")
     void toolNameLeak_triggersToolNameLeakFlag(Locale locale, String userMessage) {
-        recorder.scriptReply("TOOL_NAME_LEAK", "I will call find_records to look them up.");
+        recorder.scriptReply("I will call find_records to look them up.");
         runChatTurnAndAssertFlag(locale, userMessage, "TOOL_NAME_LEAK");
     }
 
@@ -132,7 +133,7 @@ class PromptContractMockTest {
         String benign = locale.getLanguage().equals("vi")
                 ? "Bạn có 12 khách hàng."
                 : "You have 12 customers.";
-        recorder.scriptReply("BENIGN", benign);
+        recorder.scriptReply(benign);
         runChatTurnAndAssertNoFlag(locale, userMessage);
     }
 
@@ -140,7 +141,7 @@ class PromptContractMockTest {
 
     @Test
     void systemPromptRulesAreCarriedThroughToLLM() {
-        recorder.scriptReply("PASSTHROUGH", "Anything.");
+        recorder.scriptReply("Anything.");
         systemAuthenticator.runWithSystem(() ->
                 chatService.ask("test-user", null, "ping"));
         Prompt captured = recorder.lastPrompt();
@@ -148,6 +149,10 @@ class PromptContractMockTest {
         String systemText = extractSystemText(captured);
         assertThat(systemText).contains("do NOT use internal entity names");
         assertThat(systemText).contains("do NOT mention tool names");
+        assertThat(systemText).contains("tool arguments named entityName");
+        assertThat(systemText)
+                .contains("use exactly one entity name shown in agent.entities or returned by list_entities");
+        assertThat(systemText).contains("Do NOT infer, add, or rewrite application prefixes");
         assertThat(systemText).contains("call list_entities exactly once");
         assertThat(systemText).contains("do not guess");
     }
@@ -162,7 +167,7 @@ class PromptContractMockTest {
      */
     @Test
     void systemPromptCarriesDifferentAgentLocaleTokenPerIteration() {
-        recorder.scriptReply("PASSTHROUGH", "Anything.");
+        recorder.scriptReply("Anything.");
 
         recorder.setLocale(Locale.ENGLISH);
         systemAuthenticator.runWithSystem(() ->
@@ -267,16 +272,6 @@ class PromptContractMockTest {
         }
 
         /**
-         * Phase 9 D-17 locale-injection mechanism (locked).
-         *
-         * <p>BaselineContextProvider reads {@code currentAuthentication.getLocale()} on every
-         * chat turn. By overriding the {@code CurrentAuthentication} bean with a Mockito mock
-         * whose {@code getLocale()} delegates to the per-test {@link Recorder}, each
-         * parameterised iteration sees a distinct effective locale: the EN iteration -&gt;
-         * {@code Locale.ENGLISH} -&gt; baseline emits {@code agent.locale=en}; the VI iteration
-         * -&gt; {@code Locale.of("vi","VN")} -&gt; baseline emits {@code agent.locale=vi_VN}.
-         */
-        /**
          * Per-test {@link CurrentAuthentication} that delegates locale to the {@link Recorder}
          * (so each parameterised iteration sees a distinct effective locale via D-17), and
          * delegates {@code getAuthentication()} / {@code getUser()} to the live
@@ -342,7 +337,7 @@ class PromptContractMockTest {
         public ChatModel promptContractScriptedChatModel(Recorder recorder) {
             return new ChatModel() {
                 @Override
-                public ChatResponse call(Prompt prompt) {
+                public @NonNull ChatResponse call(@NonNull Prompt prompt) {
                     recorder.recordPrompt(prompt);
                     AssistantMessage reply = new AssistantMessage(recorder.scriptedReply());
                     return new ChatResponse(List.of(new Generation(reply)));
@@ -356,7 +351,7 @@ class PromptContractMockTest {
             private volatile Prompt lastPrompt;
             private volatile Locale locale = Locale.ENGLISH;
 
-            public void scriptReply(String key, String body) {
+            public void scriptReply(String body) {
                 this.scriptedReply = body;
             }
 
