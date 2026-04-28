@@ -369,7 +369,11 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         }
 
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle(messages.getMessage(getClass(), "knowledgeBase.action.editPermissions"));
+        // WARNING-06: keys live in the project root bundle (per memory
+        // feedback_jmix_messages_over_spring "keep keys in root bundle"); use the
+        // package-default lookup to keep the whole class consistent with the
+        // formatMessage/getMessage(key) calls used elsewhere in this file.
+        dialog.setHeaderTitle(messages.getMessage("knowledgeBase.action.editPermissions"));
         dialog.setWidth("420px");
 
         // Roles multi-select — populated from Jmix ResourceRoleRepository, filtered to
@@ -378,7 +382,7 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         // WARNING-02: pinning to system-full-access only would consume embedding storage
         // while the document remains invisible to all end users.
         CheckboxGroup<String> rolesGroup = new CheckboxGroup<>();
-        rolesGroup.setLabel(messages.getMessage(getClass(), "knowledgeBase.upload.field.allowedRoles"));
+        rolesGroup.setLabel(messages.getMessage("knowledgeBase.upload.field.allowedRoles"));
         List<String> allRoleCodes = resourceRoleRepository.getAllRoles().stream()
                 .map(ResourceRole::getCode)
                 .filter(code -> !isSystemRole(code))
@@ -389,8 +393,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
 
         // Source-entity ComboBox — same helper as upload form.
         ComboBox<MetaClass> entityCombo = new ComboBox<>();
-        entityCombo.setLabel(messages.getMessage(getClass(), "knowledgeBase.upload.field.sourceEntityName"));
-        entityCombo.setHelperText(messages.getMessage(getClass(),
+        entityCombo.setLabel(messages.getMessage("knowledgeBase.upload.field.sourceEntityName"));
+        entityCombo.setHelperText(messages.getMessage(
                 "knowledgeBase.upload.field.sourceEntityName.helper"));
         entityCombo.setItems(metaclassComboBoxHelper.buildFilteredList());
         entityCombo.setItemLabelGenerator(mc ->
@@ -409,12 +413,12 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         dialog.add(content);
 
         Button saveBtn = new Button(
-                messages.getMessage(getClass(), "knowledgeBase.dialog.editPermissions.save"),
+                messages.getMessage("knowledgeBase.dialog.editPermissions.save"),
                 e -> confirmAndSavePermissions(doc, rolesGroup.getValue(), entityCombo.getValue(), dialog));
         saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         Button cancelBtn = new Button(
-                messages.getMessage(getClass(), "knowledgeBase.dialog.editPermissions.cancel"),
+                messages.getMessage("knowledgeBase.dialog.editPermissions.cancel"),
                 e -> dialog.close());
 
         dialog.getFooter().add(cancelBtn, saveBtn);
@@ -431,9 +435,9 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                            MetaClass selectedEntity,
                                            Dialog dialog) {
         dialogs.createOptionDialog()
-                .withHeader(messages.getMessage(getClass(),
+                .withHeader(messages.getMessage(
                         "knowledgeBase.confirm.editPermissions.reingest.title"))
-                .withText(messages.getMessage(getClass(),
+                .withText(messages.getMessage(
                         "knowledgeBase.confirm.editPermissions.reingest.body"))
                 .withActions(
                         new DialogAction(DialogAction.Type.OK)
@@ -445,16 +449,25 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                     String sourceEntityName = selectedEntity != null
                                             ? selectedEntity.getName() : null;
 
-                                    UpdatePermissionsResult result = documentService
-                                            .updatePermissionsAndReingest(doc.getId(), roles, sourceEntityName);
+                                    try {
+                                        UpdatePermissionsResult result = documentService
+                                                .updatePermissionsAndReingest(doc.getId(), roles, sourceEntityName);
 
-                                    switch (result.status()) {
-                                        case SAVED_AND_REINGESTING ->
-                                                notifications.create(messages.getMessage(getClass(),
-                                                        "knowledgeBase.notification.reingestStarted")).show();
-                                        case SAVED_REINGEST_FAILED ->
-                                                notifyError(messages.getMessage(getClass(),
-                                                        "knowledgeBase.error.editPermissionsReingest"));
+                                        switch (result.status()) {
+                                            case SAVED_AND_REINGESTING ->
+                                                    notifications.create(messages.getMessage(
+                                                            "knowledgeBase.notification.reingestStarted")).show();
+                                            case SAVED_REINGEST_FAILED ->
+                                                    notifyError(messages.getMessage(
+                                                            "knowledgeBase.error.editPermissionsReingest"));
+                                        }
+                                    } catch (Exception ex) {
+                                        // WARNING-07: catch DocumentNotFoundException (or any service-layer
+                                        // exception) so the dialog closes cleanly instead of leaving the
+                                        // user staring at an open dialog with no error feedback.
+                                        log.warn("editPermissions update failed for {}", doc.getId(), ex);
+                                        NotificationUtils.errorWithDetail(notifications, messages,
+                                                "knowledgeBase.error.editPermissionsReingest", ex);
                                     }
                                     documentsDl.load();
                                     dialog.close();
