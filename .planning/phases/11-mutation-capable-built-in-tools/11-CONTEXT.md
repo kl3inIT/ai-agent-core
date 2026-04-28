@@ -63,6 +63,11 @@ to any entity surfaced by `find_records` / `get_record`.
 - New `AiAgentMutationRole` resource role is an enforced marker gate for AI
   mutation tool calls. It grants no entity CRUD by itself; users need both this
   marker and ordinary Jmix create/update policies on target host entities.
+  The marker check is exact Jmix resource-role authority equality: compare
+  against `RoleGrantedAuthorityUtils.createResourceRoleGrantedAuthority(
+  AiAgentMutationRole.CODE).getAuthority()`. Substring/contains checks are
+  forbidden because a different authority string could merely contain the role
+  code.
 - `BuiltInLinkTools` `@Component` (always-on, independent of `mutation.enabled`).
   2 `@Tool`: `generate_entity_list_link`, `generate_entity_detail_link`.
   `LlmExposurePolicy.canReadEntity` opacity gate (returns `unknown_entity` not
@@ -401,7 +406,18 @@ to any entity surfaced by `find_records` / `get_record`.
   replay lookup.
 
 ### New code to create (planner sketches package layout)
-- `com.vn.agent.tools.mutation.BuiltInMutationTools` — 4 `@Tool` methods.
+- `com.vn.agent.tools.mutation.BuiltInMutationTools` — thin orchestration bean
+  with 4 `@Tool` methods only.
+- `com.vn.agent.tools.mutation.MutationAuthorizationService` — exact marker-role
+  check plus Jmix CRUD/attribute/read gates.
+- `com.vn.agent.tools.mutation.MutationAttributeBinder` — strict scalar/to-one
+  coercion and mass-assignment validation.
+- `com.vn.agent.tools.mutation.MutationRequestHasher` — canonical raw-call-shape
+  request hashing.
+- `com.vn.agent.tools.mutation.RelatedWriteMetadataResolver` — verified
+  relationship support matrix.
+- `com.vn.agent.tools.mutation.MutationCommitCoordinator` — reservation replay,
+  commit-state finalization, and non-throwing audit writes.
 - `com.vn.agent.tools.mutation.MutationErrorTranslator` — exception → 6-code
   mapper with `expected` hints.
 - `com.vn.agent.tools.mutation.AiAgentMutationProperties` — `@ConfigurationProperties`.

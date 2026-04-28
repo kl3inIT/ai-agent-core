@@ -6,6 +6,7 @@ wave: 7
 depends_on:
   - 11-07A-PLAN.md
 files_modified:
+  - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/mutation/RelatedWriteMetadataResolver.java
   - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/mutation/BuiltInMutationTools.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationParentFixture.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationChildFixture.java
@@ -22,6 +23,8 @@ must_haves:
   truths:
     - "Task 0 is mandatory: verify actual Jmix 2.8/project metadata APIs before implementing related-write helpers, then record findings and sources in 11-07B-SUMMARY.md."
     - "add_related_record and remove_related_record use the exact D-01 signatures and keep AiAgentMutationRole.CODE as the first gate inherited from 11-07A."
+    - "Related-write metadata logic lives in RelatedWriteMetadataResolver; BuiltInMutationTools calls the resolver and does not contain relationship annotation/metamodel traversal internals."
+    - "The support matrix below is binding, but the concrete API calls are not assumed until Task 0 verifies them. If MetaProperty/annotation access differs in Jmix 2.8, update this plan before coding rather than forcing the reference snippet."
     - "Related-write @Tool descriptions explicitly say the tools support only non-composition parent @OneToMany(mappedBy) relationships with a child-side to-one inverse; unsupported relationships return validation_failed."
     - "Focused helper-level tests prove the related metadata support matrix before add_related_record/remove_related_record tool methods are implemented."
     - "Supported v1.1 related writes are only parent collection @OneToMany(mappedBy=...) with a child-side single-valued @ManyToOne/@OneToOne inverse."
@@ -42,7 +45,7 @@ Add the relationship metadata resolver and the two related-write tools after cre
 <task type="auto" tdd="false">
   <name>Task 0: Verify Jmix/JPA relationship metadata before coding helpers</name>
   <action>
-Before implementing helper logic, inspect the actual Jmix 2.8 `MetaProperty` API and the project fixture annotations. Record the exact source of each fact in `11-07B-SUMMARY.md`: parent `@OneToMany(mappedBy)`, child inverse property lookup, `MetaProperty.getInverse()` behavior, `@Composition`, `orphanRemoval`, `@ManyToOne(optional)`, and `@JoinColumn(nullable)`. If any API differs from the reference contract, stop and repair this plan before coding.
+Before implementing helper logic, inspect the actual Jmix 2.8 `MetaProperty` API and the project fixture annotations. Record the exact source of each fact in `11-07B-SUMMARY.md`: parent mapped-by ownership evidence, child inverse property lookup, whether `MetaProperty.getInverse()` exists and what it returns, composition detection, orphanRemoval/delete-capable detection, required inverse detection, and how to read `ManyToOne(optional)` / `JoinColumn(nullable)` or the Jmix equivalent. If any API differs from the reference contract, stop and repair this plan before coding.
 Use Context7 `/jmix-framework/jmix-context7`, local source/Javadocs, and the fixture entity annotations as evidence; do not rely on guessed method names for inverse metadata.
   </action>
   <verify>
@@ -53,13 +56,13 @@ Use Context7 `/jmix-framework/jmix-context7`, local source/Javadocs, and the fix
 <task type="auto" tdd="false">
   <name>Task 1: Related-write metadata resolver helpers</name>
   <action>
-Implement and compile helper methods only:
+Implement and compile `RelatedWriteMetadataResolver` helper methods only:
 - `resolveSupportedRelatedWriteRelationship`
-- child inverse lookup from `@OneToMany(mappedBy=...)`, cross-checked with `MetaProperty.getInverse()` when available
+- child inverse lookup from the verified mapped-by metadata source, cross-checked with `MetaProperty.getInverse()` only if Task 0 proves it is available and semantically reliable
 - `isCompositionOrDeleteCapable`
 - `wireInverseReference`, `clearInverseReference`, `childBelongsToParent`
 
-Support only parent collection `@OneToMany(mappedBy=...)` with a child-side single-valued `@ManyToOne`/`@OneToOne` inverse. Reject many-to-many, unidirectional relationships, collection-valued inverses, composition, orphanRemoval, required inverse clearing, and ambiguous metadata as `validation_failed` before any host save.
+Support only parent collection relationships with verified mapped-by ownership and a child-side single-valued inverse. Reject many-to-many, unidirectional relationships, collection-valued inverses, composition, orphanRemoval/delete-capable relationships, required inverse clearing, and ambiguous metadata as `validation_failed` before any host save.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:compileJava</automated>
@@ -86,7 +89,7 @@ If the Plan 11-10 fixture entities are not available yet, move the minimal fixtu
 <task type="auto" tdd="false">
   <name>Task 3: add_related_record and remove_related_record</name>
   <action>
-Add the two related-write tools using the helper support matrix. They must enforce parent update, relationship attribute modify, child LLM read/modify exposure, child read/update, inverse attribute modify, idempotency reservation, guard, transactional saveAll, and non-throwing audit.
+Add the two related-write tools using `RelatedWriteMetadataResolver` as the only relationship-metadata authority. They must enforce parent update, relationship attribute modify, child LLM read/modify exposure, child read/update, inverse attribute modify, idempotency reservation, guard, transactional saveAll, and non-throwing audit.
 Keep related-write result/error/audit behavior aligned with the 11-07 reference snippets, including `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`, `not_found`, `parameter_conversion_error`, and full hashed argument envelopes.
 Update both related-write tool descriptions so the LLM sees the narrow v1.1 scope and does not attempt composition, many-to-many, unidirectional, required-inverse, or delete-capable relationship writes.
   </action>
@@ -99,6 +102,8 @@ Update both related-write tool descriptions so the LLM sees the narrow v1.1 scop
 <success_criteria>
 - `11-07B-SUMMARY.md` records the verified Jmix/JPA metadata APIs used by the helpers.
 - Related-write support compiles separately from create/update core.
+- No related-write acceptance criterion depends on an unverified method name. `11-07B-SUMMARY.md` maps each resolver decision to a verified Jmix/JPA API or fixture annotation source.
+- `BuiltInMutationTools` delegates all relationship metadata interpretation to `RelatedWriteMetadataResolver`.
 - Unsupported metadata fails closed before `MutationSaveExecutor.save/saveAll`.
 - `RelatedWriteMetadataResolverTest` passes before broad related-write tool tests are attempted.
 - Related writes never rewrite parent collections and never delete child rows in v1.1.
