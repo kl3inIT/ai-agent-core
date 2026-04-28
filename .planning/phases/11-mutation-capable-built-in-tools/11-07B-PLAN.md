@@ -8,10 +8,14 @@ depends_on:
 files_modified:
   - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/mutation/RelatedWriteMetadataResolver.java
   - ai-agent/ai-agent/src/main/java/com/vn/agent/tools/mutation/BuiltInMutationTools.java
+  - ai-agent/ai-agent/src/test/java/com/vn/agent/AITestConfiguration.java
+  - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationTestFixture.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationParentFixture.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationChildFixture.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationLinkedParentFixture.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/fixture/MutationLinkedChildFixture.java
+  - ai-agent/ai-agent/src/test/resources/com/vn/agent/test_liquibase/010-mutation-test-fixture.xml
+  - ai-agent/ai-agent/src/test/resources/com/vn/agent/test_liquibase/test-main-changelog.xml
   - ai-agent/ai-agent/src/test/java/com/vn/agent/tools/mutation/RelatedWriteMetadataResolverTest.java
 autonomous: true
 requirements:
@@ -24,6 +28,7 @@ must_haves:
     - "Task 0 is mandatory: verify actual Jmix 2.8/project metadata APIs before implementing related-write helpers, then record findings and sources in 11-07B-SUMMARY.md."
     - "add_related_record and remove_related_record use the exact D-01 signatures and keep AiAgentMutationRole.CODE as the first gate inherited from 11-07A."
     - "Related-write metadata logic lives in RelatedWriteMetadataResolver; BuiltInMutationTools calls the resolver and does not contain relationship annotation/metamodel traversal internals."
+    - "11-07B is the sole owner of mutation fixture entity classes, their main-store test Liquibase changelog, and test Jmix module registration. Plans 11-10 and 11-11 reuse these fixtures read-only and must not redefine or edit them."
     - "The support matrix below is binding, but the concrete API calls are not assumed until Task 0 verifies them. If MetaProperty/annotation access differs in Jmix 2.8, update this plan before coding rather than forcing the reference snippet."
     - "Related-write @Tool descriptions explicitly say the tools support only non-composition parent @OneToMany(mappedBy) relationships with a child-side to-one inverse; unsupported relationships return validation_failed."
     - "Focused helper-level tests prove the related metadata support matrix before add_related_record/remove_related_record tool methods are implemented."
@@ -45,11 +50,20 @@ Add the relationship metadata resolver and the two related-write tools after cre
 <task type="auto" tdd="false">
   <name>Task 0: Verify Jmix/JPA relationship metadata before coding helpers</name>
   <action>
-Before implementing helper logic, inspect the actual Jmix 2.8 `MetaProperty` API and the project fixture annotations. Record the exact source of each fact in `11-07B-SUMMARY.md`: parent mapped-by ownership evidence, child inverse property lookup, whether `MetaProperty.getInverse()` exists and what it returns, composition detection, orphanRemoval/delete-capable detection, required inverse detection, and how to read `ManyToOne(optional)` / `JoinColumn(nullable)` or the Jmix equivalent. If any API differs from the reference contract, stop and repair this plan before coding.
+Before implementing helper logic, first create/register the shared mutation fixture package and main-store test Liquibase changelog that later plans reuse:
+- `MutationTestFixture` for scalar create/update tests
+- `MutationParentFixture` / `MutationChildFixture` for composition/orphanRemoval rejection
+- `MutationLinkedParentFixture` / `MutationLinkedChildFixture` for supported non-composition related-write success
+- `010-mutation-test-fixture.xml` plus `test-main-changelog.xml`
+- `AITestConfiguration` registration so all five fixture classes are visible to Jmix metadata
+
+Fixture shape is fixed here so later plans do not redefine it: every fixture has `@JmixEntity`, UUID `@JmixGeneratedValue`, `@Version`, and `@InstanceName`; `MutationTestFixture` has `name`, sensitive `secret`, and integer `priority`; `MutationParentFixture.children` is `@Composition` + `@OneToMany(mappedBy="parent", orphanRemoval=true)` with child inverse `MutationChildFixture.parent`; `MutationLinkedParentFixture.linkedChildren` is non-composition `@OneToMany(mappedBy="linkedParent")` with child inverse `MutationLinkedChildFixture.linkedParent`; the changelog creates all five host fixture tables and both parent-child foreign keys in the main store only.
+
+Then inspect the actual Jmix 2.8 `MetaProperty` API and the project fixture annotations. Record the exact source of each fact in `11-07B-SUMMARY.md`: parent mapped-by ownership evidence, child inverse property lookup, whether `MetaProperty.getInverse()` exists and what it returns, composition detection, orphanRemoval/delete-capable detection, required inverse detection, and how to read `ManyToOne(optional)` / `JoinColumn(nullable)` or the Jmix equivalent. Add a summary table with columns `Resolver decision`, `Verified API/annotation`, `Source file/doc`, and `Fallback/fail-closed behavior`. If any API differs from the reference contract, stop and repair this plan before coding.
 Use Context7 `/jmix-framework/jmix-context7`, local source/Javadocs, and the fixture entity annotations as evidence; do not rely on guessed method names for inverse metadata.
   </action>
   <verify>
-    <automated>./gradlew :ai-agent:compileJava</automated>
+    <automated>./gradlew :ai-agent:compileTestJava</automated>
   </verify>
 </task>
 
@@ -79,7 +93,7 @@ Before adding the two tool methods, create `RelatedWriteMetadataResolverTest` fo
 - prove required inverse clearing is rejected for remove
 - prove `wireInverseReference`, `clearInverseReference`, and `childBelongsToParent` operate on the child-side inverse and never rewrite parent collections
 
-If the Plan 11-10 fixture entities are not available yet, move the minimal fixture subset required for these helper tests into this plan and document that move in `11-07B-SUMMARY.md`. Do not proceed to the broad related-write tool methods until these focused helper tests pass.
+Do not defer fixture creation to Plan 11-10. This plan owns the fixture classes and changelog so helper tests and later mutation-tool tests share one source of truth. Do not proceed to the broad related-write tool methods until these focused helper tests pass.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:test --tests "com.vn.agent.tools.mutation.RelatedWriteMetadataResolverTest"</automated>
@@ -101,6 +115,8 @@ Update both related-write tool descriptions so the LLM sees the narrow v1.1 scop
 
 <success_criteria>
 - `11-07B-SUMMARY.md` records the verified Jmix/JPA metadata APIs used by the helpers.
+- `11-07B-SUMMARY.md` includes the resolver decision table: `Resolver decision`, `Verified API/annotation`, `Source file/doc`, and `Fallback/fail-closed behavior`.
+- `MutationTestFixture`, `MutationParentFixture`, `MutationChildFixture`, `MutationLinkedParentFixture`, and `MutationLinkedChildFixture` are created/registered here, with `010-mutation-test-fixture.xml` and `test-main-changelog.xml`; later plans must reuse them read-only.
 - Related-write support compiles separately from create/update core.
 - No related-write acceptance criterion depends on an unverified method name. `11-07B-SUMMARY.md` maps each resolver decision to a verified Jmix/JPA API or fixture annotation source.
 - `BuiltInMutationTools` delegates all relationship metadata interpretation to `RelatedWriteMetadataResolver`.

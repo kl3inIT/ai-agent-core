@@ -55,8 +55,9 @@ Before implementing `validateWritableProperty`, `coerceAttributeValue`, or to-on
 - `MetaProperty.getRange()` and cardinality helpers for scalar, to-one, and collection properties
 - `EntityValues.setValue(...)` behavior for typed scalar values, enum-backed fields, and loaded entity references
 - annotated-element/property annotation access needed by the validator
+- `RoleGrantedAuthorityUtils.createResourceRoleGrantedAuthority(AiAgentMutationRole.CODE).getAuthority()` behavior and the exact Spring Security authority string emitted for a Jmix resource role
 
-Record the exact source of each fact in `11-07A-SUMMARY.md`. Use Context7 `/jmix-framework/jmix-context7`, local Jmix source/Javadocs, and existing project usages; do not guess method names from memory. If an API differs from the 11-07 reference snippet, stop and repair this plan before coding.
+Record the exact source of each fact in `11-07A-SUMMARY.md`. Use Context7 `/jmix-framework/jmix-context7`, local Jmix source/Javadocs, and existing project usages; do not guess method names or authority formats from memory. If an API differs from the 11-07 reference snippet, stop and repair this plan before coding.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:compileJava</automated>
