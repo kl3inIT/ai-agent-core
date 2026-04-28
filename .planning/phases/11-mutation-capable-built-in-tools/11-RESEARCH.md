@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 11 converts the Phase 10 read-only LLM surface into a **conditionally-enabled** mutation surface. Four tools (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) ship behind a single `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled")` flag, plus an always-on `BuiltInLinkTools` (2 tools) for verify-link generation. The fail-closed gating chain has four distinct steps that MUST run in order on every call: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → `MutationGuard.check` → `@Transactional("agentstoreTransactionManager")`-bracketed save? — **No**: mutations operate on **HOST entities in the main store**, not agentstore. The `@Transactional` boundary is therefore the default Jmix transaction manager. Audit, idempotency, and dedup writes target `agentstore` and use a SECOND transactional surface (`AuditWriter` already has REQUIRES_NEW; the new `MutationIntentRepository` mirrors that pattern).
+Phase 11 converts the Phase 10 read-only LLM surface into a **conditionally-enabled** mutation surface. Four tools (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) ship behind a single `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled")` flag, plus an always-on `BuiltInLinkTools` (2 tools) for verify-link generation. The fail-closed gating chain has distinct steps that MUST run before host writes: `LlmExposurePolicy.canModify` on the root entity → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → pre-host-save idempotency reservation → type coercion + writable-property validation → `MutationGuard.check` with post-coercion attributes → default-transaction-manager `DataManager.save` on host entities. Relationship targets/children also pass `LlmExposurePolicy.canReadEntity` and, for related writes that modify the child inverse, `LlmExposurePolicy.canModify`. Audit, idempotency, and dedup writes target `agentstore` and use a SECOND transactional surface (`AuditWriter` already has REQUIRES_NEW; the new `MutationIntentRepository` mirrors that pattern).
 
 All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are honored. No CONTEXT.md decision needs revisiting based on this research.
 
@@ -22,7 +22,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
   - `add_related_record(String entityName, String id, String relationship, String relatedId, String idempotencyKey)` → `{outcome, parentId, relationship, relatedId}`
   - `remove_related_record(String entityName, String id, String relationship, String relatedId, String idempotencyKey)` → `{outcome, parentId, relationship, relatedId}`
 - **D-02:** `AiMutationIntent` unique constraint `(tool_name, idempotency_key, user_username)`; row stores `resultEntityId`+`resultEntityName` only (NOT full result JSON); replay re-resolves `instanceName` live; TTL default 24h.
-- **D-03:** `MutationGuard.check(MutationIntent intent)` SPI with minimal record shape (toolName + metaClass + entityId + attributes Map). `entityId` null on create. `MutationGuard` mirrors `ToolGuard`. Default no-op bean.
+- **D-03:** `MutationGuard.check(MutationIntent intent)` SPI with minimal record shape (toolName + metaClass + entityId + attributes Map). `entityId` null on create. The attributes Map contains post-conversion typed values, not raw LLM strings. `MutationGuard` mirrors `ToolGuard`. Default no-op bean.
 - **D-04:** 6 stable error codes: `access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`, `parameter_conversion_error`, `not_found`. Each carries `ToolErrorDto.expected` hint. `unknown_entity` is reserved for the entity-resolution path (Phase 10 R4 opacity), distinct from `access_denied`.
 - **D-05:** `BuiltInLinkTools` always-on (independent of `mutation.enabled`). 2 `@Tool`: `generate_entity_list_link`, `generate_entity_detail_link`. Both gated by `LlmExposurePolicy.canReadEntity` with uniform `unknown_entity` opacity. Returns a JSON object with a single `url` property; detail links validate and URL-encode UUID path segments.
 - **D-06:** All 6 new tools (4 mutation + 2 link) use the 5-section description pattern from MEMORY `feedback_rich_tool_descriptions`. Mutation tools especially need ~50–150 line descriptions covering idempotency contract, per-attribute denial recovery, and type-conversion rules. `BuiltInDataTools` is NOT retrofitted in Phase 11.
@@ -62,7 +62,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 |----|-------------|------------------|
 | MUT-01 | `BuiltInMutationTools` separate `@Component`, `@ConditionalOnProperty(... enabled, havingValue="true")`, default OFF | `@ConditionalOnProperty` is standard Spring; gated bean's `@Tool` methods are NOT discovered by `MethodToolCallbackProvider` if the bean isn't registered (Spring AI tool callback lookup is bean-driven, not classpath-driven) — see Q5 |
 | MUT-02 | 4 tools: `create_record`, `update_record`, `add_related_record`, `remove_related_record`. NO `delete_record`. | Tool methods declared in the new class only. Tests assert callback names match exactly. |
-| MUT-03 | Layered fail-closed gating: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext`+per-attribute `EntityAttributeContext.canModify` → `MutationGuard.check` → `@Transactional` `DataManager.save` (regular DM) | Each step shipped or pre-existing: `canModify` (Phase 10), `CrudEntityContext`/`EntityAttributeContext` (Jmix core, see Q2), `ToolGuard` pattern (Phase 9), `DataManager.save` (Jmix). |
+| MUT-03 | Layered fail-closed gating: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext`+per-attribute `EntityAttributeContext.canModify` → pre-save idempotency reservation → type coercion + writable-property validation → `MutationGuard.check` with post-coercion values → `@Transactional` `DataManager.save` (regular DM). Relationship targets also pass LLM exposure gates. | Each step shipped or pre-existing: `canModify` (Phase 10), `CrudEntityContext`/`EntityAttributeContext` (Jmix core, see Q2), `ToolGuard` pattern (Phase 9), `DataManager.save` (Jmix). |
 | MUT-04 | Mandatory `idempotencyKey` UUID string; `AiMutationIntent` table; replay returns same `entityId`+`instanceName` with `outcome=IDEMPOTENT_REPLAY`; TTL 24h. | Unique constraint `(tool_name, idempotency_key, user_username)`. Replay re-resolves `instanceName` live (not stored). |
 | MUT-05 | `MutationGuard` SPI with default no-op bean | Mirror `ToolFetchPlanCustomizer`/`SpiDefaultsAutoConfiguration` registration pattern (Phase 9). Reuse `ToolVetoedException`. |
 | MUT-06 | `AiAgentMutationProperties`: `enabled` (false), `allowDelete` (false; reserved), `confirmationRequired` (true), `idempotencyTtl` (24h) | `@ConfigurationProperties("ai-agent.tools.mutation")` per `AiAgentAuditProperties` pattern. |
@@ -153,15 +153,17 @@ LLM (Spring AI ChatClient)
 │       new EntityAttributeContext(metaClass, attrPath)   │
 │       accessManager.applyRegisteredConstraints(ctx)     │
 │       ctx.canModify()  → false ⇒ access_denied          │
-│  ③ MutationIntentRepository.findExisting(toolName,      │  ── if hit: replay, no save
-│       idempotencyKey, userUsername)                     │     return outcome=IDEMPOTENT_REPLAY
-│  ④ MutationGuard.check(MutationIntent)                  │  ── ToolVetoedException ⇒ blocked
-│  ⑤ FilterLiteralValueConverter.convertValue per attr    │  ── failure ⇒ parameter_conversion_error
+│  ③ MutationIntentRepository.reserveOrReplay(toolName,   │  ── replay/violation/pending: no save
+│       idempotencyKey, userUsername, requestHash)        │
+│  ④ validateWritableProperty + type coercion per attr    │  ── failure ⇒ parameter_conversion_error/validation_failed
+│       relationship targets pass LLM exposure gates      │
+│  ⑤ MutationGuard.check(MutationIntent typed attrs)      │  ── ToolVetoedException ⇒ blocked
 │  ⑥ DataManager.create / .load + setValue + .save        │
 │       within @Transactional (default txn manager)       │
 │       OptimisticLockException ⇒ concurrent_modification │
 │       ConstraintViolationException ⇒ validation_failed  │
-│  ⑦ MutationIntentRepository.create(record dedup row)    │  REQUIRES_NEW boundary (agentstore)
+│  ⑦ MutationIntentRepository.markCommitted/markFailed/   │  agentstore finalization
+│       markCommitUnknown                                 │
 │  ⑧ AuditWriter.writeToolCall(...)                       │  REQUIRES_NEW (agentstore) — survives ⑥ rollback
 └─────────────────────────────────────────────────────────┘
    │
@@ -684,7 +686,7 @@ dc.save();
 
 For `add_related_record` we should **NOT** load `parent` with the children fetch plan — that re-saves all existing children with bumped `@Version` (Pitfall #6). The cleanest path: load parent with `_base` (no children), create child via `dataManager.create`, set the parent reference on the child via `EntityValues.setValue(child, mappedByAttr, parent)`, save both via `dataManager.save(parent, child)`.
 
-For `remove_related_record`: load the CHILD by id, load its parent reference, verify child's parent matches the parent id from the LLM call, then `dataManager.remove(child)`. The `@Composition` `orphanRemoval=true` semantics mean removing the child via `DataManager.remove` works exactly as removing from the parent collection; no need to re-save parent.
+For `remove_related_record`: v1.1 supports non-deleting unlink only. Load the CHILD by id, load its parent reference, verify child's parent matches the parent id from the LLM call, clear the child-side to-one inverse, then save parent+child through the transactional executor. If metadata shows `@Composition` / `orphanRemoval=true`, fail closed with `validation_failed` before any host save/remove attempt; Phase 11 intentionally does not expose delete-capable relationship removal while `delete_record` is deferred.
 
 **Edge case:** Bidirectional `@OneToMany` without `@Composition` — pure association. `add_related_record` is then ambiguous: does it mean "create a brand new related entity" or "set an existing related entity's FK to the parent"? CONTEXT.md D-01 signature is `add_related_record(parent, relationship, relatedId)` — passing `relatedId` of an EXISTING child, so semantics are unambiguous: load both, set the FK side, save the FK-owning side. For composition, the same shape works: `add_related_record` requires the related entity to exist already; the LLM uses `create_record` for the child first, then `add_related_record` to attach (only meaningful for non-composition associations — composition children are attached at `setOrder(parent)` time).
 

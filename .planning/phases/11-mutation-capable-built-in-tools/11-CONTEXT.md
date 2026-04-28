@@ -28,7 +28,7 @@ to any entity surfaced by `find_records` / `get_record`.
   `remove_related_record`. NO `delete_record` (deferred to v1.2 — destructive
   ops need separate UX with confirmation/undo).
 - `MutationGuard` SPI with minimal `MutationIntent` shape (toolName, metaClass,
-  entityId, attributes map). Default no-op bean. Veto via `ToolVetoedException`
+  entityId, post-coercion typed attributes map). Default no-op bean. Veto via `ToolVetoedException`
   (existing exception, reused).
 - `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`):
   `enabled` (default false), `allowDelete` (default false; reserved for v1.2 —
@@ -256,8 +256,10 @@ to any entity surfaced by `find_records` / `get_record`.
   each exact call shape. Reuse it only for an exact retry of the same
   arguments. If you change any field values after `validation_failed` or
   `parameter_conversion_error`, use a fresh idempotencyKey. On `access_denied`
-  do NOT retry — surface to the user. On `concurrent_modification` call get_record,
-  then retry with a fresh idempotencyKey. On success, you may call
+  do NOT retry — surface to the user. On `concurrent_modification` call
+  get_record or find_records to verify state; if the result says commit outcome
+  is unknown, do not retry automatically and ask the user before any further
+  mutation. On success, you may call
   generate_entity_detail_link to render a verify-link." Planner refines text;
   must NOT mention `prepare_form_draft` (Phase 14 forward reference).
 - `AiAgentMutationRole` shape — empty marker `@ResourceRole` interface. Do
@@ -273,13 +275,15 @@ to any entity surfaced by `find_records` / `get_record`.
 - `BuiltInLinkTools` location of route resolution — `ViewRegistry` lookups
   cached vs per-call. Per-call is fine; `ViewRegistry` is in-memory.
 - `AuditWriter.writeToolCall` `argumentsJson` payload format — JSON
-  serialization of the `attributes` Map verbatim, with PII fields hashed via
-  `AuditFieldHasher` (Phase 9 plumbing) when the attribute name appears in
-  `AiAgentAuditProperties.sensitiveFields`. `resultSummary` for update_record
-  carries `[{"attribute","from","to"}]` JSON array; for create_record carries
-  `[{"attribute","to"}]`; for add_/remove_related carries
-  `{"relationship","action":"ADD|REMOVE","relatedId"}`. From/to values for
-  sensitive attributes are SHA-256 hashed.
+  serialization of the full LLM tool argument object, with PII-bearing
+  attribute values hashed via `AuditFieldHasher` (Phase 9 plumbing) when the
+  attribute name appears in `AiAgentAuditProperties.sensitiveFields`.
+  create/update carry `{entityName,id?,attributes,idempotencyKey}`;
+  add_/remove_related carry `{entityName,id,relationship,relatedId,idempotencyKey}`.
+  `resultSummary` for update_record carries `[{"attribute","from","to"}]`
+  JSON array; for create_record carries `[{"attribute","to"}]`; for
+  add_/remove_related carries `{"relationship","action":"ADD|REMOVE","relatedId"}`.
+  From/to values for sensitive attributes are SHA-256 hashed.
 
 ### Folded Todos
 
@@ -396,7 +400,7 @@ to any entity surfaced by `find_records` / `get_record`.
   cleanup.
 - `com.vn.agent.spi.MutationGuard` — SPI interface.
 - `com.vn.agent.spi.MutationIntent` — record carrying toolName + metaClass +
-  entityId + attributes (passed to `MutationGuard.check`). Distinct from
+  entityId + post-coercion typed attributes (passed to `MutationGuard.check`). Distinct from
   `AiMutationIntent` JPA entity (different concept — runtime call descriptor
   vs persistence dedup row).
 - `com.vn.agent.tools.ToolEntityResolver` — shared `@Component` (D-09 of MUT-09).
@@ -518,9 +522,10 @@ to any entity surfaced by `find_records` / `get_record`.
   `feedback_jmix_unconstrained_for_system_writes` (replay row creation MUST
   succeed regardless of user-role grants on `AiMutationIntent`).
 - **Audit:** reuse `AuditWriter.writeToolCall` REQUIRES_NEW path. `eventName`
-  carries the tool name; `argumentsJson` carries serialized attributes Map
-  with PII hashing; `resultSummary` carries diff JSON for update / created
-  id+name for create / relationship action for related-write.
+  carries the tool name; `argumentsJson` carries full serialized tool args
+  with PII hashing for sensitive attribute values; `resultSummary` carries
+  diff JSON for update / created id+name for create / relationship action for
+  related-write.
 - **Locales:** every new UI / error string in BOTH `messages.properties` and
   `messages_vi.properties`.
 - **Liquibase:** numeric prefix per existing convention; include in parent
@@ -533,9 +538,12 @@ to any entity surfaced by `find_records` / `get_record`.
   `mutation.enabled=true`. Each call: `ToolEntityResolver.resolveWritableEntityOrThrow`
   → `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` +
   per-attribute `EntityAttributeContext.canModify` per attribute the LLM
-  writes → `MutationGuard.check` → `MutationIntentRepository.reserveOrReplay`
-  (pre-host-save idempotency reservation) → `@Transactional DataManager.save`
-  → intent finalization → audit via `writeToolCall` → return result.
+  writes → `MutationIntentRepository.reserveOrReplay` (pre-host-save
+  idempotency reservation) → type coercion + writable-property validation →
+  `MutationGuard.check` with post-coercion attributes → `@Transactional
+  DataManager.save` → intent finalization → audit via `writeToolCall` →
+  return result. Relationship targets additionally pass `LlmExposurePolicy`
+  (`canReadEntity` and, for related writes, `canModify`) before assignment/link.
 - `BuiltInLinkTools` is on every chat turn (always-on, ~5ms route lookup
   per call against in-memory `ViewRegistry`). LlmExposurePolicy lookup is
   the same hot-path call BuiltInDataTools already pays.

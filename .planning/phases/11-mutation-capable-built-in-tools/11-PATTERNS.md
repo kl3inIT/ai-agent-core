@@ -76,8 +76,9 @@ public String createRecord(
         MetaClass metaClass = toolEntityResolver.resolveWritableEntityOrThrow(entityName);
         // ② AccessManager + per-attribute canModify (Research Pattern 1)
         // ③ pre-host-save idempotency reservation + request hash
-        // ④ MutationGuard.check
-        // ⑤ FilterLiteralValueConverter coercion per attribute
+        // ④ validateWritableProperty + FilterLiteralValueConverter coercion per attribute
+        //    (relationship targets also pass LlmExposurePolicy)
+        // ⑤ MutationGuard.check with post-coercion typed attributes
         // ⑥ DataManager.save inside @Transactional helper
         // ⑦ MutationIntentRepository.markCommitted / markFailed / markCommitUnknown
         // ⑧ AuditWriter.writeToolCall (REQUIRES_NEW — survives ⑥ rollback)
@@ -94,7 +95,7 @@ public String createRecord(
 ```
 
 **Differs from analog:**
-- `BuiltInDataTools` uses `dataManager.load(...)` only; `BuiltInMutationTools` uses `dataManager.create(...) + setValue + save` plus a 5-step gating chain BEFORE `save`.
+- `BuiltInDataTools` uses `dataManager.load(...)` only; `BuiltInMutationTools` uses `dataManager.create(...) + setValue + save` plus a fail-closed gating chain BEFORE `save`. Guard input is post-coercion, and writable-property validation rejects PK/version/read-only/transient/calculated/system fields before any `EntityValues.setValue`.
 - ASM read-only test (`BuiltInDataToolsReadOnlyTest`) MUST stay green — mutation tools live in a separate class so the test scope is unchanged (CONTEXT.md "preserves the v1.0 ASM read-only test").
 - 5-section description per D-06 (~50-150 lines) vs analog's one-liner descriptions.
 
@@ -628,10 +629,11 @@ public static final String PROMPT_RULES = String.join("\n",
 public static final String MUTATION_PROMPT_RULES = String.join("\n",
         "",
         "Mutation tool rules (only when mutation tools are enabled):",
-        "- Generate a fresh UUID idempotencyKey per logical operation; reuse SAME key to retry.",
+        "- Reuse an idempotencyKey ONLY for an exact retry with identical arguments.",
+        "- If you change any values after validation_failed or parameter_conversion_error, use a fresh idempotencyKey.",
         "- On 'access_denied' do NOT retry — surface to the user.",
         "- On 'parameter_conversion_error' re-read describe_entity attributeType and retry with corrected types.",
-        "- On 'concurrent_modification' call get_record, then retry with a fresh idempotencyKey.",
+        "- On 'concurrent_modification' call get_record or find_records to verify state. If the tool result says the commit outcome is unknown, do not retry automatically; ask the user before any further mutation.",
         "- On success, you may call generate_entity_detail_link to render a verify-link.",
         ""
 );
@@ -761,7 +763,7 @@ auditWriter.writeToolCall(
         currentAuthentication.getUser().getUsername(),
         runContext.conversationId(),
         toolName,                              // "create_record" / "update_record" / etc.
-        argumentsJson,                         // JSON of attributes Map (PII-hashed where applicable)
+        argumentsJson,                         // full tool args JSON; sensitive attribute values hashed
         resultSummary,                         // diff JSON for update / created id+name for create / rel action for related
         latencyMs,
         AiToolCallOutcome.SUCCESS,             // or IDEMPOTENT_REPLAY / BLOCKED / ERROR / COMMIT_FAILED
@@ -792,7 +794,7 @@ REQUIRES_NEW boundary at AuditWriter line 87 survives caller rollback (TEST-12 d
 ### Sensitive-field hashing (AUD-07)
 
 **Source:** `com/vn/agent/audit/AuditFieldHasher.sha256Hex(value)` + `AiAgentAuditProperties.resolvedSensitiveFields()` lines 38-41 + RESEARCH Pattern 3 + Q8
-**Apply to:** `BuiltInMutationTools` diff serialization in `update_record`, `argumentsJson` formatting in all 4 mutation tools where attribute key matches sensitive set.
+**Apply to:** `BuiltInMutationTools` diff serialization in `update_record`, plus full `argumentsJson` formatting in all 4 mutation tools. `argumentsJson` must include the complete LLM tool arguments (`entityName`, `id` where applicable, `relationship`, `relatedId`, `idempotencyKey`, and nested `attributes`) while hashing sensitive attribute values by key.
 
 ### `@Tool` 5-section description (D-06)
 
