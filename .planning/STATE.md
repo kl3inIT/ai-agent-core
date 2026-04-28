@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
 stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-28T20:23:41.054Z"
+last_updated: "2026-04-28T20:39:15.645Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 31
-  completed_plans: 20
-  percent: 65
+  completed_plans: 21
+  percent: 68
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
-Plan: 4 of 14
+Plan: 5 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
@@ -137,6 +137,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: MutationIntent attributes use Collections.unmodifiableMap(new LinkedHashMap<>(attributes)) NOT Map.copyOf — null attribute values represent optional-field clears
 - [Phase ?]: MutationGuard default no-op bean lives directly in AIConfiguration via @ConditionalOnMissingBean — no separate SpiDefaultsAutoConfiguration class (mirrors aiAgentIngestExecutor precedent)
 - [Phase ?]: ToolVetoedException reused verbatim for MutationGuard veto path — no new exception type
+- [Phase ?]: Plan 11-04: ToolEntityResolver shared @Component centralizes Phase 10 R4 unknown_entity opacity for both READ and WRITE tool paths
+- [Phase ?]: Plan 11-04: LlmExposurePolicy split into operation-specific canCreate/canUpdate; canModify retained as backward-compatible alias delegating to canUpdate
 
 ### Performance Metrics
 
@@ -162,6 +164,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase Phase 11 PP11-01 | 2min | 2 tasks | 8 files |
 | Phase Phase 11 PP11-02 | 3min | 2 tasks | 6 files |
 | Phase 11-mutation-capable-built-in-tools P03 | 2min | 1 tasks | 3 files |
+| Phase 11 P04 | 11min | 2 tasks | 4 files |
 
 ### Quick Tasks Completed
 
@@ -171,7 +174,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T20:23:27.879Z
+**Last session:** 2026-04-28T20:39:04.088Z
 **Stopped at:** Plan 11-01 complete; ready for Plan 11-02
 **Resume file:** None
 **Blockers:** None.
