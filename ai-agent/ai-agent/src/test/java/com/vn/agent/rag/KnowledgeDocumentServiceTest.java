@@ -1,8 +1,11 @@
 package com.vn.agent.rag;
 
 import com.vn.agent.entity.AiKnowledgeDocument;
+import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
+import io.jmix.security.model.ResourceRole;
+import io.jmix.security.role.ResourceRoleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +22,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -41,6 +46,7 @@ class KnowledgeDocumentServiceTest {
     private CancellationRegistry cancellationRegistry;
     private AsyncIngestionWorker asyncIngestionWorker;
     private IngestionStatusWriter ingestionStatusWriter;
+    private ResourceRoleRepository roleRepository;
 
     private KnowledgeDocumentService service;
 
@@ -51,13 +57,14 @@ class KnowledgeDocumentServiceTest {
         cancellationRegistry = mock(CancellationRegistry.class);
         asyncIngestionWorker = mock(AsyncIngestionWorker.class);
         ingestionStatusWriter = mock(IngestionStatusWriter.class);
+        roleRepository = mock(ResourceRoleRepository.class);
 
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
         service = new KnowledgeDocumentService(
                 dataManager, vectorStore, cancellationRegistry,
-                asyncIngestionWorker, ingestionStatusWriter);
+                asyncIngestionWorker, ingestionStatusWriter, roleRepository);
     }
 
     @AfterEach
@@ -87,6 +94,15 @@ class KnowledgeDocumentServiceTest {
         FluentLoader<AiKnowledgeDocument> loader = mock(FluentLoader.class, RETURNS_DEEP_STUBS);
         when(dataManager.load(AiKnowledgeDocument.class)).thenReturn(loader);
         when(loader.id(id).optional()).thenReturn(Optional.ofNullable(value));
+    }
+
+    private void stubRoleKnown(String code) {
+        ResourceRole role = mock(ResourceRole.class);
+        when(roleRepository.findRoleByCode(code)).thenReturn(role);
+    }
+
+    private void stubRoleUnknown(String code) {
+        when(roleRepository.findRoleByCode(code)).thenReturn(null);
     }
 
     // --- Delete tests --------------------------------------------------------
@@ -202,5 +218,113 @@ class KnowledgeDocumentServiceTest {
         verify(cancellationRegistry).clear(id);
         verify(ingestionStatusWriter, never()).markPending(any());
         verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_propagates_purge_failure_before_metadata_save() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
+        doThrow(new RuntimeException("pgvector down"))
+                .when(vectorStore).delete(any(Filter.Expression.class));
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of("ai-agent-user"), "sales_Order"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("pgvector down");
+
+        assertThat(document.getAllowedRolesJson()).isNull();
+        assertThat(document.getSourceEntityName()).isNull();
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(ingestionStatusWriter, never()).markPending(any());
+        verify(ingestionStatusWriter, never()).markFailed(any(), any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_resets_status_and_schedules_afterCommit_without_statusWriter() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        document.setStatus(AiKnowledgeDocumentStatus.FAILED);
+        document.setErrorMessage("stale failure");
+        document.setIngestedAt(java.time.OffsetDateTime.now());
+        stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
+
+        UpdatePermissionsResult result = service.updatePermissionsAndReingest(
+                id, List.of("ai-agent-user"), "sales_Order");
+
+        assertThat(result.status()).isEqualTo(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
+        assertThat(document.getAllowedRolesJson()).contains("ai-agent-user");
+        assertThat(document.getSourceEntityName()).isEqualTo("sales_Order");
+        assertThat(document.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PENDING);
+        assertThat(document.getErrorMessage()).isNull();
+        assertThat(document.getIngestedAt()).isNull();
+
+        InOrder order = inOrder(cancellationRegistry, vectorStore, dataManager);
+        order.verify(cancellationRegistry).bumpGeneration(id);
+        order.verify(cancellationRegistry).clear(id);
+        order.verify(vectorStore).delete(any(Filter.Expression.class));
+        order.verify(dataManager).save(document);
+
+        verify(ingestionStatusWriter, never()).markPending(any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+
+        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(syncs).hasSize(1);
+        syncs.get(0).afterCommit();
+        verify(asyncIngestionWorker).ingest(id);
+    }
+
+    @Test
+    void updatePermissionsAndReingest_afterCommitSchedulingFailureMarksDocumentFailed() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
+        doThrow(new RuntimeException("executor down")).when(asyncIngestionWorker).ingest(id);
+
+        service.updatePermissionsAndReingest(id, List.of("ai-agent-user"), "sales_Order");
+
+        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(syncs).hasSize(1);
+
+        syncs.get(0).afterCommit();
+
+        verify(ingestionStatusWriter).markFailed(
+                eq(id),
+                contains("Reingest could not be scheduled: executor down"));
+    }
+
+    @Test
+    void updatePermissionsAndReingest_rejects_unknown_role_before_save_or_reingest() {
+        UUID id = UUID.randomUUID();
+        stubLoad(id, doc(id));
+        stubRoleUnknown("phantom-role");
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of("phantom-role"), null))
+                .isInstanceOf(UnknownRoleCodeException.class)
+                .matches(e -> "phantom-role".equals(((UnknownRoleCodeException) e).getCode()));
+
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
+        verify(ingestionStatusWriter, never()).markPending(any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_rejects_blank_role_before_repository_lookup() {
+        UUID id = UUID.randomUUID();
+        stubLoad(id, doc(id));
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of(" "), null))
+                .isInstanceOf(UnknownRoleCodeException.class);
+
+        verify(roleRepository, never()).findRoleByCode(any());
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
     }
 }

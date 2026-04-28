@@ -49,6 +49,9 @@ public class AiKnowledgeDocument {
     @Column(name = "ALLOWED_ROLES_JSON")
     private String allowedRolesJson;
 
+    @Column(name = "SOURCE_ENTITY_NAME", length = 255)
+    private String sourceEntityName;
+
     @Column(name = "CREATED_BY")
     private String createdBy;
 
@@ -81,6 +84,8 @@ public class AiKnowledgeDocument {
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     public String getAllowedRolesJson() { return allowedRolesJson; }
     public void setAllowedRolesJson(String allowedRolesJson) { this.allowedRolesJson = allowedRolesJson; }
+    public String getSourceEntityName() { return sourceEntityName; }
+    public void setSourceEntityName(String sourceEntityName) { this.sourceEntityName = sourceEntityName; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedDate() { return createdDate; }

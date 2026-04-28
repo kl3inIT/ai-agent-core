@@ -34,12 +34,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       entity-level absence (R-01f base) AND attribute-level absence (R-01f tightening:
  *       even if a denied entity is reachable through a relation from a permitted entity,
  *       its protected attributes must not appear in the readable-attribute set).</li>
- *   <li>{@code carol_findRecordsDeniedEntity_returnsAccessDeniedJson} — exercises
+ *   <li>{@code carol_findRecordsDeniedEntity_returnsUnknownEntityJson} — exercises
  *       {@link BuiltInDataTools#findRecords(String, com.vn.agent.tools.FilterNode, Integer)}
  *       on a denied entity name. R-01a: pinned to the actual error envelope returned by
- *       the SUT — JSON contains {@code "error":"access_denied"} (the literal {@code error}
- *       code from {@code BuiltInDataTools.resolveReadableEntityOrThrow} line 280 + the
- *       JSON field name from {@link com.vn.agent.tools.ToolErrorDto#error()}).</li>
+ *       the SUT — JSON contains {@code "error":"unknown_entity"} (Phase 10 Fix R4 unified
+ *       opacity: denied entities are indistinguishable from non-existent ones, EXP-09 +
+ *       Phase 3 D-08).</li>
  * </ol>
  *
  * <p><b>Plan 08-01 deviation (Rule 3):</b> the planner originally named the demo
@@ -109,18 +109,21 @@ class FilteredSchemaAndExecutionDenialTest {
     }
 
     @Test
-    void carol_findRecordsDeniedEntity_returnsAccessDeniedJson() {
+    void carol_findRecordsDeniedEntity_returnsUnknownEntityJson() {
         systemAuthenticator.withUser("carol", () -> {
             // R-01a: BuiltInDataTools.findRecords does NOT throw on access denial — it
-            // returns toolResultFormatter.error(ToolUserError) JSON. The error code emitted
-            // by resolveReadableEntityOrThrow is the literal "access_denied"
-            // (BuiltInDataTools.java:280). The JSON field name is "error" (ToolErrorDto record
-            // component name). Pin the assertion to BOTH literals.
+            // returns toolResultFormatter.error(ToolUserError) JSON.
+            //
+            // Phase 10 Fix R4 (Plan 10-04): the error code emitted by resolveReadableEntityOrThrow
+            // is now the literal "unknown_entity" for ALL denial paths (full uniformity per
+            // EXP-09 + Phase 3 D-08). Denied entities are indistinguishable from non-existent
+            // ones to the LLM. The JSON field name is "error" (ToolErrorDto record component).
             String result = builtInDataTools.findRecords(CUSTOMER_ENTITY_NAME, null, 10);
             assertThat(result)
                     .as("find_records denial must return JSON error envelope, not throw")
                     .contains("\"error\"")
-                    .contains("access_denied");
+                    .contains("unknown_entity")
+                    .doesNotContain("access_denied");
             return null;
         });
     }

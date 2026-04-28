@@ -11,6 +11,13 @@
             <textField id="generatedAtField"
                        label="msg:///baselineContext.generatedAt"
                        readOnly="true"/>
+            <textField id="activeProfileField"
+                       label="msg:///baselineContext.activeProfile"
+                       readOnly="true"/>
+            <textField id="previewConversationIdField"
+                       label="msg:///baselineContext.previewConversationId"
+                       readOnly="true"
+                       width="22em"/>
             <button id="refreshButton"
                     text="msg:///baselineContext.action.refresh"
                     themeNames="primary"/>
@@ -19,6 +26,11 @@
                     label="msg:///baselineContext.preview"
                     readOnly="true"
                     width="100%"
-                    minHeight="36em"/>
+                    minHeight="24em"/>
+        <codeEditor id="composedPromptPreviewField"
+                    label="msg:///baselineContext.composedPrompt"
+                    readOnly="true"
+                    width="100%"
+                    minHeight="42em"/>
     </layout>
 </view>

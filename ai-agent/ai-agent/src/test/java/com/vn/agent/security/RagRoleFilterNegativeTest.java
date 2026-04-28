@@ -1,6 +1,7 @@
 package com.vn.agent.security;
 
 import com.vn.agent.AITestConfiguration;
+import com.vn.agent.rag.ChunkMetadata;
 import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
@@ -61,19 +62,18 @@ class RagRoleFilterNegativeTest {
             String exprText = expr.toString();
 
             // Positive contract: alice's flattened role flag appears in the filter.
-            // RetrievalFilterBuilder uses ChunkMetadata.roleFlagKey(role) which lowercases
-            // the role code and replaces non-key characters (e.g. '-') with '_'. So
-            // "ai-agent-user" becomes the metadata key "role_ai_agent_user".
+            // RetrievalFilterBuilder uses ChunkMetadata.roleFlagKey(role), which hex-encodes
+            // the exact resource role code to avoid metadata-key collisions.
             assertThat(exprText)
-                    .as("Filter must reference the user's normalized role flag for "
+                    .as("Filter must reference the user's encoded role flag for "
                             + "AiAgentUserRole-only callers")
-                    .contains("role_ai_agent_user");
+                    .contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
 
-            // Negative contract: admin role flag (normalized form of ai-agent-admin) MUST
+            // Negative contract: admin role flag (encoded form of ai-agent-admin) MUST
             // NOT appear in the serialized filter for non-admin callers (RAG-04/05).
             assertThat(exprText)
                     .as("Filter must NOT include admin-tagged chunks for non-admin caller (RAG-04/05)")
-                    .doesNotContain("ai_agent_admin");
+                    .doesNotContain(ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE));
             return null;
         });
     }
@@ -97,11 +97,9 @@ class RagRoleFilterNegativeTest {
                         + "(RAG-06 — RetrievalFilterBuilder.java:78)")
                 .contains("__none__");
 
-        // Defense in depth: the admin role flag (normalized) must not leak even on the
-        // fail-closed path. ChunkMetadata.roleFlagKey lowercases + replaces '-' with '_',
-        // so "ai-agent-admin" → "ai_agent_admin".
+        // Defense in depth: the admin role flag must not leak even on the fail-closed path.
         assertThat(exprText)
                 .as("Fail-closed filter must not reference admin role flag")
-                .doesNotContain("ai_agent_admin");
+                .doesNotContain(ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE));
     }
 }

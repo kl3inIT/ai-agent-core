@@ -3,7 +3,7 @@ package com.vn.agent.tools;
 import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
 import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
@@ -23,9 +23,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The six read-only @Tool methods the LLM can call (TOOL-03). A single {@link Component} so
@@ -40,9 +42,15 @@ import java.util.Set;
  * {@link Metadata#getClass(Object)}. Plan 04's ASM test enforces this at build time.
  *
  * <p><b>Security</b>: Jmix entity-, attribute-, and row-level security apply automatically via
- * {@link DataManager}; {@link CurrentUserSchemaAccess} gates entity/attribute visibility on top.
- * Fail-closed errors leave this class as {@link ToolUserError} →
+ * {@link DataManager}; {@link LlmExposurePolicy} gates entity/attribute visibility on top
+ * (Phase 10 — wraps the underlying Jmix-permission source of truth and additionally narrows
+ * by the admin denylist). Fail-closed errors leave this class as {@link ToolUserError} →
  * {@code ToolResultFormatter.error}.
+ *
+ * <p><b>Phase 10 Fix R4 — uniform opacity:</b> {@code resolveReadableEntityOrThrow} returns
+ * {@code unknown_entity} for BOTH unknown-name and Jmix-/denylist-denied cases. The LLM cannot
+ * distinguish "no such entity" from "entity exists but denied" — full opacity per EXP-09 +
+ * Phase 3 D-08.
  */
 @Component
 public class BuiltInDataTools {
@@ -52,7 +60,7 @@ public class BuiltInDataTools {
     private final MetadataTools metadataTools;
     private final MessageTools messageTools;
     private final FetchPlans fetchPlans;
-    private final CurrentUserSchemaAccess currentUserSchemaAccess;
+    private final LlmExposurePolicy llmExposurePolicy;
     private final StructuredFilterConditionMapper structuredFilterConditionMapper;
     private final FilterLiteralValueConverter filterLiteralValueConverter;
     private final ToolResultFormatter toolResultFormatter;
@@ -64,7 +72,7 @@ public class BuiltInDataTools {
                             MetadataTools metadataTools,
                             MessageTools messageTools,
                             FetchPlans fetchPlans,
-                            CurrentUserSchemaAccess currentUserSchemaAccess,
+                            LlmExposurePolicy llmExposurePolicy,
                             StructuredFilterConditionMapper structuredFilterConditionMapper,
                             FilterLiteralValueConverter filterLiteralValueConverter,
                             ToolResultFormatter toolResultFormatter,
@@ -75,7 +83,7 @@ public class BuiltInDataTools {
         this.metadataTools = metadataTools;
         this.messageTools = messageTools;
         this.fetchPlans = fetchPlans;
-        this.currentUserSchemaAccess = currentUserSchemaAccess;
+        this.llmExposurePolicy = llmExposurePolicy;
         this.structuredFilterConditionMapper = structuredFilterConditionMapper;
         this.filterLiteralValueConverter = filterLiteralValueConverter;
         this.toolResultFormatter = toolResultFormatter;
@@ -89,7 +97,7 @@ public class BuiltInDataTools {
             description = "List entities the current user can read. Returns a JSON array of {name, label}.")
     public String listEntities() {
         try {
-            Map<MetaClass, Set<String>> readableSchemaByEntity = currentUserSchemaAccess.getReadableSchema();
+            Map<MetaClass, Set<String>> readableSchemaByEntity = llmExposurePolicy.getReadableSchema();
             List<ReadableEntitySummary> entities = new ArrayList<>(readableSchemaByEntity.size());
             for (MetaClass metaClass : readableSchemaByEntity.keySet()) {
                 entities.add(new ReadableEntitySummary(
@@ -148,10 +156,14 @@ public class BuiltInDataTools {
             String entityName) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
-            Set<String> readableAttributeNames = currentUserSchemaAccess.getReadableSchema().get(metaClass);
-            if (readableAttributeNames == null) {
-                throw new ToolUserError("access_denied", "no read access to " + entityName);
+            Set<String> schemaAttributeNames = llmExposurePolicy.getReadableSchema().get(metaClass);
+            if (schemaAttributeNames == null) {
+                // Phase 10 EXP-09 uniform opacity: denial paths surface as unknown_entity (Fix R4).
+                // The defensive null guard hits if canReadEntity passed but the schema map omits
+                // this key (e.g. denylist races); treat as opaque-not-found.
+                throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
             }
+            Set<String> readableAttributeNames = llmReadableAttributes(metaClass, schemaAttributeNames);
             return toolResultFormatter.describe(metaClass, readableAttributeNames);
         } catch (ToolUserError toolUserError) {
             return toolResultFormatter.error(toolUserError);
@@ -265,15 +277,20 @@ public class BuiltInDataTools {
                 throw new ToolUserError("not_a_relationship",
                         relationship + " is not an association");
             }
-            if (!currentUserSchemaAccess.canReadAttribute(rootMetaClass, relationship)) {
-                throw new ToolUserError("access_denied",
-                        "cannot read " + rootMetaClass.getName() + "." + relationship);
+            if (!llmExposurePolicy.canReadAttribute(rootMetaClass, relationship)) {
+                // Phase 10 EXP-09 uniform opacity (Fix R4): a denied relationship attribute
+                // surfaces identically to a non-existent attribute. The LLM cannot distinguish
+                // "exists but you can't read it" from "no such attribute".
+                throw new ToolUserError("unknown_attribute",
+                        "no attribute " + relationship + " on " + rootMetaClass.getName());
             }
 
             MetaClass targetMetaClass = relationshipProperty.getRange().asClass();
-            if (!currentUserSchemaAccess.canReadEntity(targetMetaClass)) {
-                throw new ToolUserError("access_denied",
-                        "cannot read target entity " + targetMetaClass.getName());
+            if (!llmExposurePolicy.canReadEntity(targetMetaClass)) {
+                // Phase 10 EXP-09 uniform opacity: if the relationship target entity is hidden,
+                // the relationship itself is hidden. Do not disclose the target entity name.
+                throw new ToolUserError("unknown_attribute",
+                        "no attribute " + relationship + " on " + rootMetaClass.getName());
             }
 
             // D-13: SPI overrides the data fetch plan only; INSTANCE_NAME on the relationship
@@ -313,6 +330,17 @@ public class BuiltInDataTools {
 
     // -------- helpers --------
 
+    private Set<String> llmReadableAttributes(MetaClass metaClass, Set<String> readableAttributeNames) {
+        return readableAttributeNames.stream()
+                .filter(attributeName -> {
+                    MetaProperty property = metaClass.findProperty(attributeName);
+                    return property == null
+                            || !property.getRange().isClass()
+                            || llmExposurePolicy.canReadEntity(property.getRange().asClass());
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     /**
      * Resolve an LLM-supplied entity name to a {@link MetaClass}, verifying read access against
      * the current user's Jmix security (D-11). Fail-closed: unknown names and denied entities
@@ -333,11 +361,13 @@ public class BuiltInDataTools {
         if (metaClass == null) {
             throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
-        if (!currentUserSchemaAccess.canReadEntity(metaClass)) {
-            // Phase 3 D-08 opacity preserved: existing access_denied code stays. Phase 10
-            // LlmExposurePolicy substitution will unify this to unknown_entity uniformly;
-            // Phase 9 only adds new readers on top (CONTEXT §domain — out of scope for Phase 9).
-            throw new ToolUserError("access_denied", "no read access to " + entityName);
+        if (!llmExposurePolicy.canReadEntity(metaClass)) {
+            // Phase 10 Fix R4 — full uniformity (EXP-09, Phase 3 D-08): denied entities surface
+            // identically to non-existent ones. The LLM cannot distinguish "no such entity"
+            // from "entity exists but denied" (whether by Jmix role OR admin denylist).
+            // UNKNOWN_ENTITY_HINTS strings are byte-for-byte unchanged (em dash U+2014 on hint #3
+            // preserved per Phase 9 D-14 / TEST-08).
+            throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
         }
         return metaClass;
     }

@@ -16,20 +16,53 @@
         <dataLoadCoordinator auto="true"/>
     </facets>
     <layout padding="true" spacing="true">
-        <upload id="documentUpload"
-                acceptedFileTypes="application/pdf,text/markdown,text/plain,text/html,.pdf,.md,.txt,.html"
-                maxFiles="10"
-                maxFileSize="10485760"
-                dropLabel="msg:///knowledgeBase.upload.placeholder"
-                uploadText="msg:///knowledgeBase.upload.button"
-                receiverType="MultiFileTemporaryStorageBuffer"
-                width="100%"/>
+        <details id="uploadPolicyGroup"
+                 summaryText="msg:///knowledgeBase.upload.group.title"
+                 opened="true"
+                 width="100%">
+            <formLayout id="uploadMetaForm" width="100%">
+                <responsiveSteps>
+                    <responsiveStep minWidth="0" columns="1"/>
+                    <responsiveStep minWidth="40em" columns="2"/>
+                </responsiveSteps>
+                <comboBox id="sourceEntityNameComboBox"
+                          label="msg:///knowledgeBase.upload.field.sourceEntityName"
+                          helperText="msg:///knowledgeBase.upload.field.sourceEntityName.helper"
+                          clearButtonVisible="true"
+                          width="100%"/>
+                <!--
+                    WARNING-08: use a chip-style multiSelectComboBox instead of an inline
+                    checkboxGroup so larger role sets stay scannable and do not sprawl across
+                    the upload surface. Empty still means admin-only per D-05.
+                -->
+                <multiSelectComboBox id="uploadAllowedRolesField"
+                                     label="msg:///knowledgeBase.upload.field.allowedRoles"
+                                     helperText="msg:///knowledgeBase.upload.field.allowedRoles.helper"
+                                     placeholder="msg:///knowledgeBase.upload.field.allowedRoles.placeholder"
+                                     width="100%"/>
+            </formLayout>
+            <!--
+                WARNING-03: receiverType="..." was removed because it routes through the deprecated
+                Vaadin Upload.setReceiver(...) (24.8 forRemoval=true) — the controller wires the
+                non-deprecated UploadHandler.toFile(...) path in onInit. Keeping both led to
+                ambiguous, version-dependent behaviour (MEMORY feedback_jmix_upload_receiver_deprecated).
+            -->
+            <upload id="documentUpload"
+                    acceptedFileTypes="application/pdf,text/markdown,text/plain,text/html,.pdf,.md,.txt,.html"
+                    maxFiles="10"
+                    dropLabel="msg:///knowledgeBase.upload.placeholder"
+                    uploadText="msg:///knowledgeBase.upload.button"
+                    width="100%"/>
+        </details>
         <dataGrid id="documentsDataGrid"
                   dataContainer="documentsDc"
                   width="100%"
                   minHeight="20em"
                   themeNames="compact">
             <actions>
+                <action id="editPermissions"
+                        type="list_itemTracking"
+                        text="msg:///knowledgeBase.action.editPermissions"/>
                 <action id="reingest"
                         type="list_itemTracking"
                         text="msg:///knowledgeBase.action.reingest"/>
@@ -41,13 +74,10 @@
                 <column property="fileName" header="msg:///knowledgeBase.column.filename"/>
                 <column property="mimeType" header="msg:///knowledgeBase.column.mimeType"/>
                 <column key="status" header="msg:///knowledgeBase.column.status"/>
-                <column property="createdDate" header="msg:///knowledgeBase.column.uploadedDate"/>
-                <column key="actions" header="msg:///common.column.actions"/>
+                <column key="sourceEntity" header="msg:///knowledgeBase.column.sourceEntity"/>
+                <column key="uploadedDate" header="msg:///knowledgeBase.column.uploadedDate"/>
+                <column key="actions" header="msg:///common.column.actions" width="9em" flexGrow="0"/>
             </columns>
         </dataGrid>
-        <hbox id="rowActionsBar" spacing="true">
-            <button id="reingestBtn" action="documentsDataGrid.reingest"/>
-            <button id="deleteBtn" action="documentsDataGrid.delete" themeNames="error"/>
-        </hbox>
     </layout>
 </view>

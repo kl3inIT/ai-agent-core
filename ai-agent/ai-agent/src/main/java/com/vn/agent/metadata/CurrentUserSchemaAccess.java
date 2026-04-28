@@ -1,14 +1,17 @@
 package com.vn.agent.metadata;
 
 import io.jmix.core.AccessManager;
+import io.jmix.core.annotation.Secret;
 import io.jmix.core.Metadata;
 import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.accesscontext.EntityAttributeContext;
 import io.jmix.core.entity.annotation.SystemLevel;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
+import io.jmix.core.metamodel.model.MetaPropertyPath;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.AnnotatedElement;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -62,6 +65,9 @@ public class CurrentUserSchemaAccess {
      * {@code "customer.region.code"}) — {@code EntityAttributeContext} accepts property paths.
      */
     public boolean canReadAttribute(MetaClass metaClass, String attributePath) {
+        if (isSensitiveAttributePath(metaClass, attributePath)) {
+            return false;
+        }
         EntityAttributeContext attributeAccessContext =
                 new EntityAttributeContext(metaClass, attributePath);
         accessManager.applyRegisteredConstraints(attributeAccessContext);
@@ -85,10 +91,27 @@ public class CurrentUserSchemaAccess {
     private Set<String> collectReadableAttributeNames(MetaClass metaClass) {
         Set<String> readableAttributeNames = new LinkedHashSet<>();
         for (MetaProperty metaProperty : metaClass.getProperties()) {
-            if (canReadAttribute(metaClass, metaProperty.getName())) {
+            if (!isSensitiveAttribute(metaProperty)
+                    && canReadAttribute(metaClass, metaProperty.getName())) {
                 readableAttributeNames.add(metaProperty.getName());
             }
         }
         return readableAttributeNames;
+    }
+
+    private boolean isSensitiveAttributePath(MetaClass metaClass, String attributePath) {
+        try {
+            MetaPropertyPath propertyPath = metaClass.getPropertyPath(attributePath);
+            return propertyPath != null && isSensitiveAttribute(propertyPath.getMetaProperty());
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private boolean isSensitiveAttribute(MetaProperty metaProperty) {
+        AnnotatedElement annotatedElement = metaProperty.getAnnotatedElement();
+        return annotatedElement != null
+                && (annotatedElement.isAnnotationPresent(SystemLevel.class)
+                || annotatedElement.isAnnotationPresent(Secret.class));
     }
 }

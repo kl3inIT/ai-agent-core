@@ -67,7 +67,14 @@ class AdminViewAccessTest {
     }
 
     @Test
+    void deniesAiConfigurationForNonAdmin() {
+        assertThat(permittedFor("alice", "AiAgent_Configuration"))
+                .as("Non-admin must NOT see AI configuration").isFalse();
+    }
+
+    @Test
     void allowsAdminViewsForAdmin() {
+        assertThat(permittedFor("admin", "AiAgent_Configuration")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();

@@ -19,6 +19,9 @@ import com.vn.agent.tools.UnknownEntityHints;
  *       user-facing reply text. Pair with {@code agent.entities} inventory so the LLM has a
  *       label to use instead, and require {@code entityName} tool arguments to copy an exact
  *       inventory name.</li>
+ *   <li><b>KB grounding:</b> clarify that retrieved knowledge-base excerpts are application
+ *       context filtered by authorization, while host-authored system prompts still decide how
+ *       the assistant should use that context.</li>
  *   <li><b>PROMPT-05 / D-15:</b> surface the {@code unknown_entity} retry contract globally —
  *       call {@code list_entities} exactly once on unknown-entity errors, retry on match,
  *       give up on no match (no guessing).</li>
@@ -51,6 +54,14 @@ public final class AgentSystemPromptRules {
                     + " or returned by list_entities. Do NOT infer, add, or rewrite application prefixes.",
             "- These vocabulary rules apply to text the user reads. Tool calls still use the exact"
                     + " tool schema names required by the tool definitions.",
+            "",
+            "Knowledge-base context:",
+            "- Retrieved knowledge-base excerpts are application-provided context already filtered"
+                    + " by authorization. Use them only according to the host application's system"
+                    + " prompt and access policy.",
+            "- When using knowledge-base excerpts, ground the answer in those excerpts. If the"
+                    + " available excerpts do not support an answer, say the available context is"
+                    + " insufficient.",
             "",
             "Unknown-entity recovery (mandatory):",
             "- When a tool returns an 'unknown_entity' error, " + UnknownEntityHints.CALL_ONCE + ".",

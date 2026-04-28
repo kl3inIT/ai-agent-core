@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.security.AiAgentAdminRole;
 import com.vn.agent.security.AiAgentUserRole;
 import io.jmix.core.security.SystemAuthenticator;
+import io.jmix.security.role.RoleGrantedAuthorityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
@@ -11,7 +12,7 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
@@ -32,6 +33,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
     @Autowired SystemAuthenticator systemAuthenticator;
     @Autowired RetrievalFilterBuilder retrievalFilterBuilder;
+    @Autowired RoleGrantedAuthorityUtils roleGrantedAuthorityUtils;
 
     @AfterEach
     void cleanVectors() {
@@ -43,7 +45,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
         runAsAdmin(() -> {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-alpha.md", List.of());
 
-            Authentication user = authWith(AiAgentUserRole.CODE);
+            Authentication user = authWith(roleGrantedAuthorityUtils, AiAgentUserRole.CODE);
             Filter.Expression filter = retrievalFilterBuilder.buildFor(user);
             assertThat(filter).as("non-admin MUST receive a concrete filter, never null").isNotNull();
 
@@ -68,7 +70,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
             UUID id = uploadAndAwaitReady("classpath:ai-kb/fixture-beta.md",
                     List.of(AiAgentTestBetaRole.CODE));
 
-            Authentication user = authWith(AiAgentUserRole.CODE);
+            Authentication user = authWith(roleGrantedAuthorityUtils, AiAgentUserRole.CODE);
             Filter.Expression filter = retrievalFilterBuilder.buildFor(user);
             assertThat(filter).isNotNull();
 
@@ -114,6 +116,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
 
         @Autowired SystemAuthenticator systemAuthenticator;
         @Autowired RetrievalFilterBuilder retrievalFilterBuilder;
+        @Autowired RoleGrantedAuthorityUtils roleGrantedAuthorityUtils;
 
         @AfterEach
         void cleanVectors() {
@@ -128,7 +131,7 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
                 UUID gammaId = uploadAndAwaitReady("classpath:ai-kb/fixture-gamma.md",
                         List.of(AiAgentAdminRole.CODE));
 
-                Authentication admin = authWith(AiAgentAdminRole.CODE);
+                Authentication admin = authWith(roleGrantedAuthorityUtils, AiAgentAdminRole.CODE);
                 Filter.Expression filter = retrievalFilterBuilder.buildFor(admin);
                 assertThat(filter)
                         .as("with admin-bypass=false, admin MUST receive a concrete role filter")
@@ -150,9 +153,9 @@ class FailClosedPostureIntegrationTest extends AbstractRagIntegrationTest {
         }
     }
 
-    private static Authentication authWith(String... roles) {
-        List<SimpleGrantedAuthority> auths = java.util.Arrays.stream(roles)
-                .map(SimpleGrantedAuthority::new)
+    private static Authentication authWith(RoleGrantedAuthorityUtils roleGrantedAuthorityUtils, String... roles) {
+        List<GrantedAuthority> auths = java.util.Arrays.stream(roles)
+                .map(roleGrantedAuthorityUtils::createResourceRoleGrantedAuthority)
                 .collect(Collectors.toList());
         return new UsernamePasswordAuthenticationToken("user", "n/a", auths);
     }

@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed 09-07-PLAN.md
-last_updated: "2026-04-27T09:46:44.910Z"
+status: phase_10_shipped
+stopped_at: Phase 10 shipped - PR #18
+last_updated: "2026-04-28T09:47:37.495Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 2
+  total_plans: 17
+  completed_plans: 17
   percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-04-27
+**Last updated:** 2026-04-28
 
 ## Project Reference
 
@@ -27,21 +27,21 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (ai-specific-llm-exposure-policy) — SHIPPED
+Plan: 10 of 10
 | Field | Value |
 |-------|-------|
-| Phase | Phase 10 (next) |
-| Plan | Not started |
-| Status | Phase 9 complete; ready to plan Phase 10 |
-| Last activity | 2026-04-27 — Completed Phase 9 gap closure (09-07) |
+| Phase | Phase 10 |
+| Plan | 10 of 10 complete |
+| Status | Phase 10 shipped - PR #18 |
+| Last activity | 2026-04-28 — Shipped Phase 10 PR #18 and prepared v1.0.1 Maven release |
 
 ## Phase Status
 
 | Phase | Status | Plans Complete | Started | Completed |
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
-| 10. AI-Specific LLM Exposure Policy | Not started | 0/0 | - | - |
+| 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
@@ -120,6 +120,18 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 2026-04-27 (Plan 09-05): Output-scanner Phase 9 pattern packs (HOST_PREFIX_LEAK / TOOL_NAME_LEAK) shipped as @Component providers with startup snapshot at ApplicationReadyEvent + lazy-fallback build in asPattern() (eager-singleton ordering safety). OutputScannerAdvisor widened to implement CallAdvisor + StreamAdvisor; streaming uses ChatClientMessageAggregator. Pattern.quote per token (T-09-22 ReDoS). Default-on toggles in module.properties.
 - [Phase ?]: 2026-04-27 (Plan 09-05): AgentSystemPromptRules.PROMPT_RULES carries verbatim PROMPT-03 vocabulary rules + D-15 retry contract whose three hint substrings match BuiltInDataTools.UNKNOWN_ENTITY_HINTS BYTE-FOR-BYTE (em dash U+2014 preserved). Lowercase 'if' bullets sacrificed sentence-case to keep the cross-assertion green for TEST-08 in Plan 09-06. Constant lives in com.vn.agent.guard alongside OutputScannerAdvisor (both leak-prevention). DefaultChatServiceImpl wires PROMPT_RULES at BOTH composition sites (blocking ask + streaming stream) so rules apply on every turn regardless of transport mode and even when profile prompt is blank. Hardcoded English (no i18n) per RESEARCH Pitfall 7 — model-directed instructions, not user-facing UI.
 - [Phase ?]: Plan 09-06 (TEST-08): cross-locale prompt-contract regression suite landed; Phase 9 feature-complete
+- [Phase ?]: Plan 10-01: AiExposureRule (entity-level only, no attributePath) + AiExposureRuleMode (EXCLUDE only) in com.vn.agent.exposure. Liquibase 060+061 auto-loaded. ChunkMetadata.SOURCE_ENTITY=source_entity constant for EXP-05 NOT IN denylist (Plan 10-05 consumer).
+- [Phase ?]: Plan 10-02: dataManager.load(EntityClass).query() auto-resolves store from @Store annotation; .store() chain method only applies to raw-JPQL loadValue paths
+- [Phase ?]: Plan 10-02: LlmExposurePolicy.canModify ships unused in Phase 10; Phase 11 mutation gating wires it before DataManager.save
+- [Phase 10]: Plan 10-03: AiAgentAdminRole extended with @EntityPolicy AiExposureRule + menu/view IDs for AiExposureRule list/detail and VectorStoreDebug; pure additive (zero existing policies removed); SEC-05 partially complete (AiUiSettings policies will fully close in Phase 12)
+- [Phase ?]: Plan 10-04: Mechanical call-site swap complete — BaselineContextProvider, BuiltInDataTools, FetchPlanIntersector inject LlmExposurePolicy instead of CurrentUserSchemaAccess. Fix R4 unification: ALL canReadEntity()==false branches in BuiltInDataTools throw unknown_entity (not access_denied) — full opacity per EXP-09 + Phase 3 D-08. Fix R5: FetchPlanIntersector routes both canReadAttribute AND canReadEntity through the policy. UNKNOWN_ENTITY_HINTS byte-for-byte preserved (em dash U+2014). ToolQueryCountBaselineTest recalibrated for D-14 no-cache: list_entities/describe_entity ceiling raised from 0 to 5 SELECTs to absorb the per-call agentstore policy lookup.
+- [Phase ?]: Plan 10-05: RetrievalFilterBuilder applies defensive (source_entity IS NULL) OR (NOT IN <denied>) for non-empty denylist (Fix R6); AsyncIngestionWorker.enrich mirrors sourceEntityName to ChunkMetadata.SOURCE_ENTITY when non-null. Legacy chunks unaffected until reingested (D-06).
+- [Phase ?]: Plan 10-06: Toggle save uses UnconstrainedDataManager and Fix R2 enforced — view does NOT inject ApplicationEventPublisher; AiExposureRuleEntityListener remains the single LlmExposureChangedEvent publish site
+- [Phase ?]: Plan 10-06: MetaclassComboBoxHelper extracted as shared @Component for reuse across exposure detail view (10-07) and KB upload form (10-08); single source of truth for @SystemLevel + AI-* internals exclusion
+- [Phase ?]: Plan 10-07: detail view reuses MetaclassComboBoxHelper; ComboBox<MetaClass> value-bridged in controller; ReadyEvent for pre-select; 10-08 reingest error keys shipped ahead in Group B; menu uses <item>; EN bundle is messages_en.properties
+- [Phase ?]: Plan 10-09: VectorStoreDebugView shipped — plain Vaadin Grid<Document> (Fix R7) over VectorStore.similaritySearch (empty query, topK=100, threshold=0.0); FilterExpressionTextParser with inline setErrorMessage on parse error; metadataFilterField is TypedTextField<String> (Fix W2); 3 programmatic addColumn calls; expand uses standard Vaadin Dialog (Document is Spring AI POJO, no Jmix metaclass); read-only — no edit/delete per CONTEXT D-09
+- [Phase ?]: Plan 10-08: KB upload sourceEntityName persisted BEFORE dataManager.save (D-07 invariant); KnowledgeDocumentService.updatePermissionsAndReingest returns UpdatePermissionsResult enum so view has zero business logic (CLAUDE.md compliant); 3-arg upload overload preserved for backward compatibility with IngesterManager + tests
+- [Phase ?]: Plan 10-10: TEST-09 four-path uniform-opacity gate landed (RetrievalFilterBuilderDenylistTest unit + LlmExposurePolicyIntegrationTest integration). Two-tier RAG filter coverage. Phase 10 complete (10/10 plans).
 
 ### Performance Metrics
 
@@ -132,6 +144,16 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 09 P05 | 22min | 2 tasks | 14 files |
 | Phase 09 P06 | 30min | 2 tasks | 3 files |
 | Phase 09 P07 | 12min | 4 tasks | 6 files |
+| Phase 10 P01 | 15 | 2 tasks | 6 files |
+| Phase 10 P10-02 | 9 | 2 tasks | 5 files |
+| Phase 10 P03 | 1 | 1 tasks | 1 files |
+| Phase 10 P10-04 | 18 | 2 tasks | 9 files |
+| Phase 10 P10-05 | 12 | 2 tasks | 3 files |
+| Phase 10 P10-06 | 12 | 2 tasks | 5 files |
+| Phase 10 P10-07 | 18 | 2 tasks | 5 files |
+| Phase Phase 10 PP10-09 | 8 | 2 tasks | 2 files |
+| Phase Phase 10 PP10-08 | 25 | 2 tasks | 7 files |
+| Phase Phase 10 PP10-10 | 5 | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -141,8 +163,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T09:37:32.631Z
-**Stopped at:** Completed 09-07-PLAN.md
+**Last session:** 2026-04-28T02:27:47.910Z
+**Stopped at:** Phase 10 shipped - PR #18
 **Resume file:** None
 **Blockers:** None.
-**Next action:** `$gsd-plan-phase 10` to plan Phase 10, or `$gsd-discuss-phase 10` to revisit context first.
+**Next action:** Review/merge PR #18, confirm v1.0.1 publish workflow, then start Phase 11.

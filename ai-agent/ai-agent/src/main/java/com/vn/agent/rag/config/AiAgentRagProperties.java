@@ -52,6 +52,8 @@ public record AiAgentRagProperties(
         Ingest ingest,
         Upload upload) {
 
+    private static final int DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES = 104_857_600;
+
     /** {@code TokenTextSplitter} sizing — see D-13 and RESEARCH Pitfall #5. */
     public record Splitter(Integer chunkSize, Integer chunkOverlap, Integer minChunkSizeChars) {}
 
@@ -80,13 +82,18 @@ public record AiAgentRagProperties(
      *       which every {@code file:} URI must resolve. Default {@code null} means
      *       {@code file:} URIs are refused outright. Phase 7 Flow UI sets this to the
      *       temp-staging directory it owns for admin uploads.</li>
+     *   <li>{@code maxFileSizeBytes} — per-file Flow UI upload cap in bytes. Hosts should
+     *       keep Spring Boot {@code spring.servlet.multipart.*} limits at or above this value.</li>
      * </ul>
      *
      * <p>Without this guard a caller with access to {@code upload()} could ingest
      * arbitrary server-side files (e.g. {@code file:/etc/passwd}, classpath config
      * resources) into the vector store and exfiltrate them via retrieval.</p>
      */
-    public record Upload(java.util.List<String> classpathAllowedPrefixes, String fileStagingRoot) {}
+    public record Upload(
+            java.util.List<String> classpathAllowedPrefixes,
+            String fileStagingRoot,
+            Integer maxFileSizeBytes) {}
 
     /** D-06: admin bypass default is {@code true}. */
     public boolean isAdminBypass() {
@@ -101,5 +108,13 @@ public record AiAgentRagProperties(
     /** AI-SPEC §4 default similarity threshold {@code 0.50}. */
     public double resolvedSimilarityThreshold() {
         return similarityThreshold == null ? 0.50 : similarityThreshold;
+    }
+
+    /** Default upload cap is 100 MiB; non-positive configured values fall back to this default. */
+    public int resolvedUploadMaxFileSizeBytes() {
+        if (upload == null || upload.maxFileSizeBytes() == null || upload.maxFileSizeBytes() <= 0) {
+            return DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES;
+        }
+        return upload.maxFileSizeBytes();
     }
 }

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -43,9 +44,9 @@ import java.util.UUID;
  *   <li>{@link ChunkMetadata#DOCUMENT_ID} — {@code document.id.toString()} (used by D-21 delete)</li>
  *   <li>{@link ChunkMetadata#EMBEDDING_MODEL} — current configured model (D-03 drift filter)</li>
  *   <li>{@link ChunkMetadata#ALLOWED_ROLES} — JSON-parsed list of role codes from the entity</li>
- *   <li>{@code role_<normalized-code>} = {@code true} — Option A flattened role flags,
- *       normalized via {@link ChunkMetadata#normalizeRoleCode(String)} so filter keys are valid
- *       JSONPath member names (threat T-05-03-08 mitigation).</li>
+ *   <li>{@code role_<hex-encoded-role-code>} = {@code true} — Option A flattened role flags,
+ *       encoded via {@link ChunkMetadata#roleFlagKey(String)} so filter keys are valid JSONPath
+ *       member names without collapsing distinct role codes (threat T-05-03-08 mitigation).</li>
  * </ul>
  *
  * <p><b>RAG-03 atomicity</b>: on any failure, the catch block deletes all chunks already written
@@ -273,16 +274,36 @@ public class AsyncIngestionWorker {
 
     private Document enrich(Document chunk, AiKnowledgeDocument doc,
                             List<String> allowedRoles, String embeddingModel) {
+        // WARNING-10: defensive guard — current dispatch paths always pass a managed
+        // entity loaded by id, but a future test or alternate dispatch path could pass a
+        // transient AiKnowledgeDocument with a null id. The DOCUMENT_ID chunk metadata
+        // is the join key for delete/reingest; a null here would silently break those.
+        Objects.requireNonNull(doc.getId(), "document id must not be null");
         // Copy into a fresh mutable map — splitter-produced Documents may have unmodifiable metadata.
         Map<String, Object> merged = new HashMap<>();
         merged.putAll(chunk.getMetadata());
         merged.put(ChunkMetadata.SOURCE, doc.getFileName());
         merged.put(ChunkMetadata.DOCUMENT_ID, doc.getId().toString());
         merged.put(ChunkMetadata.EMBEDDING_MODEL, embeddingModel);
-        merged.put(ChunkMetadata.ALLOWED_ROLES, List.copyOf(allowedRoles));
-        for (String role : allowedRoles) {
-            if (role == null || role.isBlank()) continue;
+        // BLOCKER-01: filter null/blank roles BEFORE List.copyOf — that method throws NPE on
+        // any null element. The role-flag loop below already skips null/blank entries, so the
+        // canonical ALLOWED_ROLES list MUST mirror the same shape (otherwise downstream
+        // consumers that scan ALLOWED_ROLES would see a different set than the role flags).
+        List<String> safeAllowedRoles = allowedRoles.stream()
+                .filter(r -> r != null && !r.isBlank())
+                .toList();
+        merged.put(ChunkMetadata.ALLOWED_ROLES, safeAllowedRoles);
+        for (String role : safeAllowedRoles) {
             merged.put(ChunkMetadata.roleFlagKey(role), true);
+        }
+        // EXP-05 / D-07: Mirror sourceEntityName to chunk metadata so RetrievalFilterBuilder
+        // can apply the entity denylist filter (source_entity NOT IN <denied>). Null-guarded:
+        // chunks from documents without a sourceEntityName do NOT receive the SOURCE_ENTITY
+        // key. This preserves the D-06 legacy-doc contract — chunks without the key remain
+        // visible regardless of denylist contents until the document is reingested with
+        // sourceEntityName populated.
+        if (doc.getSourceEntityName() != null) {
+            merged.put(ChunkMetadata.SOURCE_ENTITY, doc.getSourceEntityName());
         }
         return chunk.mutate().metadata(merged).build();
     }

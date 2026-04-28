@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
 import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
@@ -35,9 +35,13 @@ import static org.mockito.Mockito.when;
 
 /**
  * PROMPT-05 / D-14 — verifies the {@code unknown_entity} retry hints appear verbatim in the
- * locked order, that {@code access_denied} opacity is preserved (Phase 9 does NOT unify
- * those), and that the three data-load {@code @Tool} methods route their {@code FetchPlan}
- * through {@link FetchPlanResolver}.
+ * locked order, and that the three data-load {@code @Tool} methods route their
+ * {@code FetchPlan} through {@link FetchPlanResolver}.
+ *
+ * <p><b>Phase 10 (Plan 10-04, Fix R4) update:</b> denied entities now surface as
+ * {@code unknown_entity} (full uniformity per EXP-09 + Phase 3 D-08). The LLM cannot
+ * distinguish "no such entity" from "entity exists but denied" — denied and unknown
+ * resolutions return the same error code and the same three retry hints.
  *
  * <p>Pure-unit Mockito test. The DataManager fluent loader chain is mocked end-to-end so
  * the test does not require a Spring context.
@@ -51,7 +55,7 @@ class UnknownEntityRetryHintTest {
     private MetadataTools metadataTools;
     private MessageTools messageTools;
     private FetchPlans fetchPlans;
-    private CurrentUserSchemaAccess schemaAccess;
+    private LlmExposurePolicy schemaAccess;
     private StructuredFilterConditionMapper filterMapper;
     private FilterLiteralValueConverter literalConverter;
     private ToolResultFormatter formatter;
@@ -66,7 +70,7 @@ class UnknownEntityRetryHintTest {
         metadataTools = mock(MetadataTools.class);
         messageTools = mock(MessageTools.class);
         fetchPlans = mock(FetchPlans.class);
-        schemaAccess = mock(CurrentUserSchemaAccess.class);
+        schemaAccess = mock(LlmExposurePolicy.class);
         filterMapper = mock(StructuredFilterConditionMapper.class);
         literalConverter = mock(FilterLiteralValueConverter.class);
         formatter = new ToolResultFormatter(
@@ -110,10 +114,10 @@ class UnknownEntityRetryHintTest {
         assertThat(root.path("expected").size()).isEqualTo(3);
     }
 
-    // ---- Test 3: Denied entity → access_denied with empty expected (Phase 9 opacity preserved) ----
+    // ---- Test 3: Denied entity → unknown_entity with three hints (Phase 10 Fix R4 unification) ----
 
     @Test
-    void deniedEntity_returnsAccessDeniedNotUnknownEntity_andEmptyExpected() throws Exception {
+    void deniedEntity_returnsUnknownEntityWithThreeHints() throws Exception {
         MetaClass metaClass = mock(MetaClass.class);
         when(metadata.getClass("acme_Customer")).thenReturn(metaClass);
         when(schemaAccess.canReadEntity(metaClass)).thenReturn(false);
@@ -121,11 +125,21 @@ class UnknownEntityRetryHintTest {
         String json = tools.describeEntity("acme_Customer");
         JsonNode root = OBJECT_MAPPER.readTree(json);
         assertThat(root.path("error").asText())
-                .as("Phase 3 D-08 opacity preserved in Phase 9 — denied stays as access_denied")
-                .isEqualTo("access_denied");
-        assertThat(root.path("expected").size())
-                .as("access_denied does not carry unknown_entity hints — they belong to the recovery flow")
-                .isEqualTo(0);
+                .as("Phase 10 Fix R4 — full uniformity: denied entities surface as unknown_entity, "
+                        + "indistinguishable from non-existent ones (EXP-09 + Phase 3 D-08)")
+                .isEqualTo("unknown_entity");
+        JsonNode expected = root.path("expected");
+        assertThat(expected.isArray()).isTrue();
+        assertThat(expected.size())
+                .as("Phase 10 Fix R4 — denial path now carries the three retry hints, "
+                        + "byte-for-byte identical to unknown-name path (TEST-08 invariant)")
+                .isEqualTo(3);
+        assertThat(expected.get(0).asText()).isEqualTo("call list_entities exactly once");
+        assertThat(expected.get(1).asText())
+                .isEqualTo("if a name in list_entities matches your intent, retry the original tool with that exact name");
+        // Em dash preserved verbatim per D-14
+        assertThat(expected.get(2).asText())
+                .isEqualTo("if no entity in list_entities matches, tell the user no such entity exists — do not guess");
     }
 
     // ---- Test 4: find_records consults FetchPlanResolver ----

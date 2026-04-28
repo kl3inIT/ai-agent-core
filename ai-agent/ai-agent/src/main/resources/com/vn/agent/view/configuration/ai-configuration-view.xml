@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///aiConfiguration.title"
+      focusComponent="parametersDataGrid">
+    <data>
+        <collection id="parametersDc" class="com.vn.agent.entity.AiParameters">
+            <fetchPlan extends="_base"/>
+            <loader id="parametersDl" readOnly="true">
+                <query>
+                    <![CDATA[select e from ai_AiParameters e order by e.active desc, e.profileName asc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
+    <facets>
+        <dataLoadCoordinator auto="true"/>
+    </facets>
+    <layout padding="true" spacing="true">
+        <tabSheet id="configurationTabs" width="100%">
+            <tab id="parametersTab" label="msg:///aiConfiguration.tab.parameters">
+                <vbox id="parametersContent" padding="true" spacing="true" width="100%">
+                    <hbox id="parametersButtonsPanel" classNames="buttons-panel">
+                        <button id="createBtn" action="parametersDataGrid.createAction"/>
+                        <button id="editBtn" action="parametersDataGrid.editAction"/>
+                        <button id="removeBtn" action="parametersDataGrid.removeAction"/>
+                        <button id="setActiveBtn"
+                                action="parametersDataGrid.setActive"
+                                themeNames="primary success"/>
+                    </hbox>
+                    <dataGrid id="parametersDataGrid"
+                              width="100%"
+                              minHeight="20em"
+                              dataContainer="parametersDc">
+                        <actions>
+                            <action id="createAction" type="list_create"/>
+                            <action id="editAction" type="list_edit"/>
+                            <action id="removeAction" type="list_remove"/>
+                            <action id="setActive"
+                                    type="list_itemTracking"
+                                    text="msg:///parametersList.action.setActive"/>
+                        </actions>
+                        <columns resizable="true">
+                            <column property="profileName" header="msg:///parametersList.column.name"/>
+                            <column key="model" header="msg:///parametersList.column.model"/>
+                            <column key="status" header="msg:///parametersList.column.active"/>
+                            <column property="createdDate"/>
+                            <column key="actions" header="msg:///common.column.actions"/>
+                        </columns>
+                    </dataGrid>
+                </vbox>
+            </tab>
+            <tab id="exposureRulesTab" label="msg:///aiConfiguration.tab.exposureRules">
+                <vbox id="exposureRulesContent" padding="true" spacing="true" width="100%">
+                    <multiSelectComboBox id="hiddenEntitiesField"
+                                         label="msg:///aiConfiguration.exposure.hiddenEntities"
+                                         helperText="msg:///aiConfiguration.exposure.hiddenEntities.helper"
+                                         placeholder="msg:///aiConfiguration.exposure.hiddenEntities.placeholder"
+                                         width="100%"/>
+                    <hbox id="exposureRulesButtonsPanel" classNames="buttons-panel">
+                        <button id="saveExposureRulesButton"
+                                text="msg:///aiConfiguration.exposure.action.save"
+                                themeNames="primary"/>
+                        <button id="refreshExposureRulesButton"
+                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                    </hbox>
+                </vbox>
+            </tab>
+            <tab id="promptContextTab" label="msg:///aiConfiguration.tab.promptContext">
+                <vbox id="promptContextContent" padding="true" spacing="true" width="100%">
+                    <hbox id="promptToolbar"
+                          width="100%"
+                          alignItems="END"
+                          justifyContent="BETWEEN"
+                          padding="false"
+                          spacing="true">
+                        <textField id="generatedAtField"
+                                   label="msg:///baselineContext.generatedAt"
+                                   readOnly="true"/>
+                        <textField id="activeProfileField"
+                                   label="msg:///baselineContext.activeProfile"
+                                   readOnly="true"/>
+                        <textField id="previewConversationIdField"
+                                   label="msg:///baselineContext.previewConversationId"
+                                   readOnly="true"
+                                   width="22em"/>
+                        <button id="refreshPromptButton"
+                                text="msg:///baselineContext.action.refresh"
+                                themeNames="primary"/>
+                    </hbox>
+                    <codeEditor id="baselinePreviewField"
+                                label="msg:///baselineContext.preview"
+                                readOnly="true"
+                                width="100%"
+                                minHeight="24em"/>
+                    <codeEditor id="composedPromptPreviewField"
+                                label="msg:///baselineContext.composedPrompt"
+                                readOnly="true"
+                                width="100%"
+                                minHeight="42em"/>
+                </vbox>
+            </tab>
+        </tabSheet>
+    </layout>
+</view>
