@@ -87,6 +87,11 @@ to any entity surfaced by `find_records` / `get_record`.
 - Mutation preview/dry-run mode — `confirmationRequired=true` is a UX hint
   metadata only; no separate dry-run code path in v1.1. Phase 12 chat surfaces
   may render the preview UI; Phase 11 does not.
+- Strict stale-read compare-and-swap updates — v1.1 `update_record` does not
+  accept `expectedVersion`; it maps optimistic-lock conflicts detected during
+  its own save but does not promise protection against stale LLM decisions from
+  earlier turns. Add explicit expected-version semantics in a future phase if
+  product needs that contract.
 - Auto-title service (separate todo, Phase 12).
 - JPQL/analytics tool (SEED-008, future milestone).
 - Attribute-level exposure rules — Phase 10 deferred; not a Phase 11 concern.

@@ -81,7 +81,7 @@
   3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); known `DataManager.save` rollback failures still write a durable `ERROR` audit row, while post-host-save idempotency finalization failures write `outcome=COMMIT_FAILED` and leave the intent non-reclaimable (TEST-12).
   4. The layered fail-closed gating chain runs in order on every mutation call: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → pre-host-save idempotency reservation → type coercion + writable-property validation → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
   5. Locale message keys for every denial / success / idempotency / error path are present in all locale bundles; new audit `eventName` strings (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) and new `outcome` values (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`) are observable on `AiAuditEvent` rows; `AiMutationIntent` dedup table honors a 24h TTL by default.
-**Plans:** 11 plans
+**Plans:** 14 plan artifacts (11 executable waves plus 11-07 reference split into 11-07A/B/C)
 
 **Wave 1**
 - [ ] 11-01-PLAN.md — Foundation: AiMutationIntent entity/status + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
@@ -94,7 +94,10 @@
 - [ ] 11-06-PLAN.md — MutationErrorTranslator (6 stable error codes, converter-code remapping) + locale captions
 
 **Wave 3 (blocked on Wave 2 completion)**
-- [ ] 11-07-PLAN.md — BuiltInMutationTools @ConditionalOnProperty: 4 @Tool methods with full gating chain + DiffSerializer + MutationSaveExecutor transactional boundary
+- [ ] 11-07-PLAN.md — Reference contract for split BuiltInMutationTools implementation (do not execute as a monolith)
+- [ ] 11-07A-PLAN.md — BuiltInMutationTools create/update core + DiffSerializer + MutationRequestHasher + MutationSaveExecutor
+- [ ] 11-07B-PLAN.md — Related-write metadata helpers + add_related_record/remove_related_record
+- [ ] 11-07C-PLAN.md — Commit-state, replay, non-throwing audit, and locale hardening
 - [ ] 11-08-PLAN.md — BuiltInLinkTools always-on: 2 @Tool methods over ViewRegistry + ServerProperties
 
 **Wave 4 (blocked on Wave 3 completion)**
