@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-28T02:28:12.533Z"
+status: phase_10_shipped
+stopped_at: Phase 10 shipped - PR #18
+last_updated: "2026-04-28T09:47:37.495Z"
 progress:
   total_phases: 6
   completed_phases: 2
@@ -15,7 +15,7 @@ progress:
 
 # Project State
 
-**Last updated:** 2026-04-27
+**Last updated:** 2026-04-28
 
 ## Project Reference
 
@@ -27,21 +27,21 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 10 (ai-specific-llm-exposure-policy) — EXECUTING
+Phase: 10 (ai-specific-llm-exposure-policy) — SHIPPED
 Plan: 10 of 10
 | Field | Value |
 |-------|-------|
-| Phase | Phase 10 (next) |
-| Plan | Not started |
-| Status | Phase 9 complete; ready to plan Phase 10 |
-| Last activity | 2026-04-27 — Completed Phase 9 gap closure (09-07) |
+| Phase | Phase 10 |
+| Plan | 10 of 10 complete |
+| Status | Phase 10 shipped - PR #18 |
+| Last activity | 2026-04-28 — Shipped Phase 10 PR #18 and prepared v1.0.1 Maven release |
 
 ## Phase Status
 
 | Phase | Status | Plans Complete | Started | Completed |
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
-| 10. AI-Specific LLM Exposure Policy | Not started | 0/0 | - | - |
+| 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
@@ -164,7 +164,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-04-28T02:27:47.910Z
-**Stopped at:** Completed Plan 10-01 (entity foundations)
+**Stopped at:** Phase 10 shipped - PR #18
 **Resume file:** None
 **Blockers:** None.
-**Next action:** `$gsd-plan-phase 10` to plan Phase 10, or `$gsd-discuss-phase 10` to revisit context first.
+**Next action:** Review/merge PR #18, confirm v1.0.1 publish workflow, then start Phase 11.
