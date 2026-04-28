@@ -27,13 +27,18 @@
                       clearButtonVisible="true"
                       width="100%"/>
         </formLayout>
+        <!--
+            WARNING-03: receiverType="..." was removed because it routes through the deprecated
+            Vaadin Upload.setReceiver(...) (24.8 forRemoval=true) — the controller wires the
+            non-deprecated UploadHandler.toFile(...) path in onInit. Keeping both led to
+            ambiguous, version-dependent behaviour (MEMORY feedback_jmix_upload_receiver_deprecated).
+        -->
         <upload id="documentUpload"
                 acceptedFileTypes="application/pdf,text/markdown,text/plain,text/html,.pdf,.md,.txt,.html"
                 maxFiles="10"
                 maxFileSize="10485760"
                 dropLabel="msg:///knowledgeBase.upload.placeholder"
                 uploadText="msg:///knowledgeBase.upload.button"
-                receiverType="MultiFileTemporaryStorageBuffer"
                 width="100%"/>
         <dataGrid id="documentsDataGrid"
                   dataContainer="documentsDc"
