@@ -372,11 +372,16 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         dialog.setHeaderTitle(messages.getMessage(getClass(), "knowledgeBase.action.editPermissions"));
         dialog.setWidth("420px");
 
-        // Roles multi-select — populated from Jmix ResourceRoleRepository.
+        // Roles multi-select — populated from Jmix ResourceRoleRepository, filtered to
+        // exclude Jmix system roles (system-full-access, system-minimal, etc.) so admins
+        // cannot accidentally pin a document to a role no interactive user holds.
+        // WARNING-02: pinning to system-full-access only would consume embedding storage
+        // while the document remains invisible to all end users.
         CheckboxGroup<String> rolesGroup = new CheckboxGroup<>();
         rolesGroup.setLabel(messages.getMessage(getClass(), "knowledgeBase.upload.field.allowedRoles"));
         List<String> allRoleCodes = resourceRoleRepository.getAllRoles().stream()
                 .map(ResourceRole::getCode)
+                .filter(code -> !isSystemRole(code))
                 .sorted(Comparator.naturalOrder())
                 .toList();
         rolesGroup.setItems(allRoleCodes);
@@ -456,6 +461,15 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                 }),
                         new DialogAction(DialogAction.Type.CANCEL))
                 .open();
+    }
+
+    /**
+     * WARNING-02: Jmix system roles (system-full-access, system-minimal, ...) are not
+     * intended targets for "end-user can read this knowledge document". Filter them
+     * out of the role-selection UI so admins only see project-supplied resource roles.
+     */
+    private static boolean isSystemRole(String code) {
+        return code != null && code.startsWith("system-");
     }
 
     private static Set<String> parseAllowedRoles(String json) {
