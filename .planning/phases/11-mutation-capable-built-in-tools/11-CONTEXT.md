@@ -108,7 +108,9 @@ to any entity surfaced by `find_records` / `get_record`.
 
 - **D-01:** Mutation tools accept field values as `Map<String,Object>
   attributes` and reference relationships by foreign-key UUID strings inside
-  the same map. Tool signatures:
+  the same map. v1.1 mutation tools are UUID-id tools only: every mutation
+  id/relatedId/reference id is passed through `requireUuidId(...)`, so
+  non-UUID-keyed host entities remain read-only until a later phase. Tool signatures:
   - `create_record(String entityName, Map<String,Object> attributes, String
     idempotencyKey)` → `{outcome, entityId, instanceName}`
   - `update_record(String entityName, String id, Map<String,Object> attributes,
@@ -199,8 +201,9 @@ to any entity surfaced by `find_records` / `get_record`.
     entity is hidden. Does NOT verify the id exists (LLM uses get_record for
     that).
   Both gated through `LlmExposurePolicy.canReadEntity` (uniform-opacity per
-  Phase 10 D-04 R4). Returns RAW URL string — chat UI / system prompt
-  instructs the LLM to render Markdown links. Audited via
+  Phase 10 D-04 R4). Returns a JSON object with a single `url` property,
+  e.g. `{"url":"/<contextPath>/<route>"}`; chat UI / system prompt
+  instructs the LLM to render Markdown links from that field. Audited via
   `AuditWriter.writeToolCall` (eventName `generate_entity_list_link` /
   `generate_entity_detail_link`). Mutation tool result schema stays clean
   (`{entityId, instanceName}`); LLM calls the link tool separately when it

@@ -23,7 +23,7 @@ must_haves:
   truths:
     - "BuiltInMutationTools is a @Component gated by @ConditionalOnProperty(prefix=\"ai-agent.tools.mutation\", name=\"enabled\", havingValue=\"true\") and remains absent by default."
     - "11-07A exposes only create_record and update_record initially, with the exact D-01 signatures and mandatory idempotencyKey; delete_record must not exist."
-    - "Both tools enforce AiAgentMutationRole.CODE before entity resolution, idempotency reservation, MutationGuard, or MutationSaveExecutor."
+    - "Both tools enforce AiAgentMutationRole.CODE before entity resolution, idempotency reservation, MutationGuard, or MutationSaveExecutor, using CurrentAuthentication authority strings verified by RoleGrantedAuthorityUtils-created test users."
     - "Task 0 is mandatory: verify actual Jmix 2.8/project metadata APIs for scalar/to-one mutation before implementing mass-assignment validation, then record findings and sources in 11-07A-SUMMARY.md."
     - "create_record uses ToolEntityResolver.resolveCreatableEntityOrThrow; update_record uses resolveUpdatableEntityOrThrow. Create visibility is intentionally conservative: the entity must be LLM-visible and create-permitted, not write-only hidden."
     - "Every expected ToolUserError path flows through MutationErrorTranslator before ToolResultFormatter.error; malformed ids and converter failures normalize to parameter_conversion_error."
