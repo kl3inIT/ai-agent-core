@@ -27,7 +27,7 @@ must_haves:
     - "create_record uses ToolEntityResolver.resolveCreatableEntityOrThrow; update_record uses resolveUpdatableEntityOrThrow. Create visibility is intentionally conservative: the entity must be LLM-visible and create-permitted, not write-only hidden."
     - "Every expected ToolUserError path flows through MutationErrorTranslator before ToolResultFormatter.error; malformed ids and converter failures normalize to parameter_conversion_error."
     - "Idempotency reservation happens before any host save and only RESERVED may proceed. REPLAY/VIOLATION/PENDING short-circuit without host mutation."
-    - "Attribute mutation rejects unknown attributes, primary key, version, audit/system fields, read-only fields, non-JPA/transient/calculated fields, and collection relationships before EntityValues.setValue."
+    - "Attribute mutation checks metaClass.findProperty(attributeName) before EntityAttributeContext, then rejects unknown attributes, primary key, version, audit/system fields, read-only fields, non-JPA/transient/calculated fields, and collection relationships before EntityValues.setValue."
     - "To-one relationship attributes accept UUID strings only, load the referenced entity through regular DataManager, enforce target LLM read exposure plus Jmix read permission, then assign the loaded entity instance."
     - "MutationGuard receives post-coercion typed immutable attributes, not raw LLM strings."
     - "MutationSaveExecutor is the only @Transactional save boundary; BuiltInMutationTools itself contains no @Transactional private/self-invoked save."
@@ -75,7 +75,9 @@ Implement the create/update mutation core only. This splits the former 11-07 mon
 - `MutationRequestHasher` is production code, not a private method hidden from tests.
 - Audit failure cannot recursively enter the mutation catch ladder.
 - Mass-assignment validation rejects unknown attributes, primary key, `version`, audit/system fields, read-only fields, non-JPA/transient/calculated fields, and collection-valued relationships before `EntityValues.setValue`.
+- Unknown attributes are rejected by `metaClass.findProperty(...) == null` before any `EntityAttributeContext` is constructed for that attribute.
 - `MutationIntent.attributes()` receives post-coercion typed values and is immutable per Plan 11-03.
+- `MutationIntent.attributes()` preserves null values so guards can see optional-field clears.
 - To-one relationship attribute assignment loads the target through regular `DataManager`, checks target LLM read exposure plus Jmix read permission, and rejects missing target rows as `not_found`.
 - Commit-state handling follows the reference contract: `NO_HOST_WRITE` can mark `FAILED`, `HOST_SAVE_RETURNED` can mark `COMMIT_UNKNOWN`, and `INTENT_COMMITTED` is never downgraded.
 </success_criteria>

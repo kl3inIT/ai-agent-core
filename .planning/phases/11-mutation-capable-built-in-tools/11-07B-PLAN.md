@@ -17,6 +17,7 @@ must_haves:
   truths:
     - "Task 0 is mandatory: verify actual Jmix 2.8/project metadata APIs before implementing related-write helpers, then record findings and sources in 11-07B-SUMMARY.md."
     - "add_related_record and remove_related_record use the exact D-01 signatures and keep AiAgentMutationRole.CODE as the first gate inherited from 11-07A."
+    - "Related-write @Tool descriptions explicitly say the tools support only non-composition parent @OneToMany(mappedBy) relationships with a child-side to-one inverse; unsupported relationships return validation_failed."
     - "Supported v1.1 related writes are only parent collection @OneToMany(mappedBy=...) with a child-side single-valued @ManyToOne/@OneToOne inverse."
     - "Reject many-to-many, unidirectional relationships, parent-side to-one properties, map-valued relationships, collection-valued inverses, composition, orphanRemoval/delete-capable relationships, required inverse clearing, and ambiguous metadata as validation_failed before save."
     - "Related writes never rewrite parent collections and never call remove/delete. They mutate only the verified child-side inverse and save through MutationSaveExecutor.saveAll."
@@ -64,6 +65,7 @@ Support only parent collection `@OneToMany(mappedBy=...)` with a child-side sing
   <action>
 Add the two related-write tools using the helper support matrix. They must enforce parent update, relationship attribute modify, child LLM read/modify exposure, child read/update, inverse attribute modify, idempotency reservation, guard, transactional saveAll, and non-throwing audit.
 Keep related-write result/error/audit behavior aligned with the 11-07 reference snippets, including `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`, `not_found`, `parameter_conversion_error`, and full hashed argument envelopes.
+Update both related-write tool descriptions so the LLM sees the narrow v1.1 scope and does not attempt composition, many-to-many, unidirectional, required-inverse, or delete-capable relationship writes.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:compileJava</automated>

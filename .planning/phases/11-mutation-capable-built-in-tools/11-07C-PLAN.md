@@ -24,7 +24,9 @@ must_haves:
     - "Replay is live: use resultEntityName/resultEntityId with FetchPlan.INSTANCE_NAME and current security/locale; do not store or replay full result JSON."
     - "COMMIT_FAILED means commit outcome unknown after host save returned, not a known database rollback. Locale captions must not say database commit failed."
     - "Known save-time rollback failures map to stable error JSON and ERROR audit; post-host-save finalization failures use COMMIT_FAILED and leave the intent non-reclaimable."
+    - "markCommitUnknown is defensive: it re-reads the current AiMutationIntent row and never downgrades COMMITTED to COMMIT_UNKNOWN after a transaction-completion exception."
     - "INTENT_COMMITTED later audit/result failures never downgrade the idempotency row; exact retry returns IDEMPOTENT_REPLAY."
+    - "A swallowed success-audit failure is explicitly visible as structured ERROR log marker AI_AGENT_MUTATION_AUDIT_WRITE_FAILED with no raw arguments/PII; this is the accepted residual risk after host data is committed."
     - "Success, error, blocked, replay, and commit-failed audits include full hashed tool arguments, not only the attributes map."
 ---
 
@@ -41,6 +43,7 @@ Harden the final mutation boundary: commit-state handling, idempotent replay fet
 3. `INTENT_COMMITTED` failures must never downgrade the idempotency row; exact retry must replay.
 4. Replay loads use `FetchPlan.INSTANCE_NAME`.
 5. Preserve the 11-07 reference finalization order: host save/saveAll returns, markCommitted succeeds, success audit is attempted, success result is returned.
+6. Require `MutationIntentRepository.markCommitUnknown` to re-read by id and no-op if the current row is already `COMMITTED`.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:compileJava</automated>
@@ -54,6 +57,7 @@ Harden the final mutation boundary: commit-state handling, idempotent replay fet
 2. No expected mutation/audit/idempotency failure should throw through `MutationToolCallbackBoundaryDecorator`.
 3. Use "Commit outcome unknown" captions in both locales.
 4. Add grep-level checks or tests proving `auditWriter.writeToolCall` is only called inside `safeWriteAudit` and `COMMIT_FAILED` captions do not claim the database commit failed.
+5. `safeWriteAudit` must log audit-write failures at ERROR with marker `AI_AGENT_MUTATION_AUDIT_WRITE_FAILED`, tool name/outcome/run id/root audit id when available, and no raw `argumentsJson` or user-supplied attribute values.
   </action>
   <verify>
     <automated>./gradlew :ai-agent:compileJava</automated>
@@ -68,4 +72,6 @@ Harden the final mutation boundary: commit-state handling, idempotent replay fet
 - Replay loads use `FetchPlan.INSTANCE_NAME` and returns fresh `instanceName` from `resultEntityId/resultEntityName` without storing full result JSON.
 - Success/failure audit arguments include the full tool argument envelope with sensitive values hashed.
 - `safeWriteAudit` catches/logs `RuntimeException` and must not alter `MutationCommitState`.
+- `safeWriteAudit` failure logging contains `AI_AGENT_MUTATION_AUDIT_WRITE_FAILED` and intentionally avoids raw arguments/PII.
+- `markCommitUnknown` cannot overwrite a currently `COMMITTED` row.
 </success_criteria>
