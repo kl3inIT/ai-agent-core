@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
 stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-28T20:46:49.870Z"
+last_updated: "2026-04-28T20:54:46.471Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 31
-  completed_plans: 22
-  percent: 71
+  completed_plans: 23
+  percent: 74
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
-Plan: 6 of 14
+Plan: 7 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
@@ -142,6 +142,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Repository reservation uses TransactionTemplate (REQUIRES_NEW) so commit-time DataIntegrityViolationException is caught around execute(...) and re-classified
 - [Phase ?]: MutationIntentFailureProbe is a package-public ObjectProvider test seam for TEST-12 COMMIT_UNKNOWN coverage
 - [Phase ?]: Cleanup job logs but never deletes PENDING/COMMIT_UNKNOWN; auto-deletion would allow duplicate host writes after a finalization failure
+- [Phase ?]: MutationErrorTranslator NEVER echoes raw exception text or LLM-supplied attribute names; pre-typed ToolUserError instances are sanitized via canned safe templates per code (P-22 mitigation)
+- [Phase ?]: commitFailed maps to concurrent_modification stable code with 'do not retry automatically' hint; the 6-code D-04 taxonomy is closed (no synthetic 7th code for commit-unknown)
+- [Phase ?]: Both OptimisticLockException flavors (jakarta + Spring's translated) AND both AccessDeniedException flavors (Spring + io.jmix.core.security) are caught explicitly per RESEARCH Pitfall 5
 
 ### Performance Metrics
 
@@ -169,6 +172,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11-mutation-capable-built-in-tools P03 | 2min | 1 tasks | 3 files |
 | Phase 11 P04 | 11min | 2 tasks | 4 files |
 | Phase 11 P05 | 9min | 2 tasks | 2 files |
+| Phase 11-mutation-capable-built-in-tools P06 | 6min | 2 tasks | 3 files |
 
 ### Quick Tasks Completed
 
@@ -178,7 +182,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T20:45:50.413Z
+**Last session:** 2026-04-28T20:53:56.259Z
 **Stopped at:** Plan 11-01 complete; ready for Plan 11-02
 **Resume file:** None
 **Blockers:** None.
