@@ -74,15 +74,38 @@ public class LlmExposurePolicy {
     }
 
     /**
-     * Ships in Phase 10; no Phase 10 caller consumes it. Phase 11 mutation gating step 1
-     * wires this as: {@code LlmExposurePolicy.canModify(entity)} checked before DataManager.save.
-     * Implemented inline via AccessManager so CurrentUserSchemaAccess remains unchanged (D-02).
+     * Phase 11 MUT-09: create-side entity gate. Returns {@code true} only when the current
+     * user has CRUD-create permission AND the entity is not denylisted from the LLM surface.
+     * Consumed by {@code ToolEntityResolver.resolveCreatableEntityOrThrow} (mutation tools
+     * Wave 4+).
      */
-    public boolean canModify(MetaClass mc) {
+    public boolean canCreate(MetaClass mc) {
+        CrudEntityContext ctx = new CrudEntityContext(mc);
+        accessManager.applyRegisteredConstraints(ctx);
+        return ctx.isCreatePermitted()
+                && !hiddenEntityNames().contains(mc.getName());
+    }
+
+    /**
+     * Phase 11 MUT-09: update-side entity gate. Returns {@code true} only when the current
+     * user has CRUD-update permission AND the entity is not denylisted from the LLM surface.
+     * Consumed by {@code ToolEntityResolver.resolveUpdatableEntityOrThrow} (mutation tools
+     * Wave 4+).
+     */
+    public boolean canUpdate(MetaClass mc) {
         CrudEntityContext ctx = new CrudEntityContext(mc);
         accessManager.applyRegisteredConstraints(ctx);
         return ctx.isUpdatePermitted()
                 && !hiddenEntityNames().contains(mc.getName());
+    }
+
+    /**
+     * Compatibility alias for existing Phase 10 call sites; update semantics only.
+     * Phase 11 mutation tools should call {@link #canCreate} / {@link #canUpdate} directly
+     * for operation-specific gating (HIGH review feedback addressed in Plan 11-04).
+     */
+    public boolean canModify(MetaClass mc) {
+        return canUpdate(mc);
     }
 
     /**
