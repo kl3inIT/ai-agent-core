@@ -181,6 +181,22 @@ public class KnowledgeDocumentService {
         } catch (Exception e) {
             log.warn("updatePermissionsAndReingest: save committed but reingest enqueue failed for {}",
                     documentId, e);
+            // WARNING-01: the metadata update has committed but the chunk purge / status reset
+            // path threw partway through. The document row now carries new sourceEntityName /
+            // allowedRolesJson while pgvector chunks may still hold the OLD metadata, partially
+            // defeating the EXP-05 NIN denylist filter. Mark the document FAILED via a
+            // REQUIRES_NEW transaction so the admin UI flags the row and the
+            // DocumentStatusChangedEvent listener triggers a push refresh. The admin's remedy
+            // remains "Reingest" — same as the user-facing notification — but the failed
+            // status makes the dangerous mid-state observable instead of silent.
+            try {
+                ingestionStatusWriter.markFailed(documentId,
+                        "Reingest enqueue failed after permissions save; chunks may be stale. "
+                                + "Use the Reingest action to retry.");
+            } catch (Exception inner) {
+                log.warn("updatePermissionsAndReingest: markFailed fallback also failed for {}",
+                        documentId, inner);
+            }
             return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_REINGEST_FAILED);
         }
     }
