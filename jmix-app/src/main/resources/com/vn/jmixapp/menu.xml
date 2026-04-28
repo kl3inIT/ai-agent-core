@@ -16,6 +16,8 @@
         <item view="AiAgent_AiAuditEvent.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
         <item view="AiAgent_BaselineContext" id="aiAgent.baselineContext"
               title="msg://com.vn.agent/menu.baselineContext"/>
+        <item view="AiAgent_AiExposureRule.list" id="aiAgent.exposureRules.list"
+              title="msg://com.vn.agent/menu.exposureRules"/>
     </menu>
     <menu id="security" title="msg://com.vn.agent/menu.security.title">
         <item view="sec_ResourceRoleModel.list"
