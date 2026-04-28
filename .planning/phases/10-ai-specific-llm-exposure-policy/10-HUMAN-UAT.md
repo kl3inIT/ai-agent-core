@@ -3,15 +3,15 @@ status: partial
 phase: 10-ai-specific-llm-exposure-policy
 source: [10-VERIFICATION.md]
 started: 2026-04-28T02:47:51Z
-updated: 2026-04-28T05:53:22Z
+updated: 2026-04-28T08:21:28Z
 ---
 
 ## Current Test
 
-number: 3
-name: REVIEW WARNING-08 — KB upload form passes Collections.emptyList() for allowedRoles
+number: 5
+name: Visual verification of AiExposureRuleListView + AiExposureRuleDetailView admin workflow
 expected: |
-  CONTEXT D-07 specified collecting `allowedRoles` from the upload form before ingestion, but plan 10-08 stopped at the service signature. Functional UX gap — admins will hit "every uploaded doc is admin-only by default" on first use.
+  Admin can list, filter (genericFilter+propertyFilter), create, edit, toggle, and delete exposure rules. Toggle action flips `enabled` and persists. Detail view enforces required fields and unique entityName constraint. Both EN and VI message bundles render correctly.
 awaiting: user response
 
 ## Tests
@@ -26,7 +26,7 @@ result: pass
 
 ### 3. REVIEW WARNING-08 — KB upload form passes Collections.emptyList() for allowedRoles
 expected: CONTEXT D-07 specified collecting `allowedRoles` from the upload form before ingestion, but plan 10-08 stopped at the service signature. Functional UX gap — admins will hit "every uploaded doc is admin-only by default" on first use.
-result: [pending]
+result: pass
 
 ### 4. REVIEW WARNING-01 — partial-failure window in updatePermissionsAndReingest
 expected: If reingest fails after permission save commits, stale chunks remain visible with new permissions until manually reingested. Edge-case RAG leak. Confirm acceptable risk or schedule mitigation.
@@ -38,15 +38,16 @@ result: [pending]
 
 ### 6. Visual verification of VectorStoreDebugView pagination + FilterExpressionTextParser UX
 expected: Admin-only access enforced. Empty-string similaritySearch returns chunk preview. Metadata filter input parses via FilterExpressionTextParser; invalid syntax shows readable error. Read-only — no row mutation actions exposed.
-result: [pending]
+result: skipped
+reason: Removed by product decision; Knowledge Document Detail view now replaces the needed vector chunk inspection workflow.
 
 ## Summary
 
 total: 6
-passed: 3
+passed: 4
 issues: 0
-pending: 3
-skipped: 0
+pending: 1
+skipped: 1
 blocked: 0
 
 ## Gaps

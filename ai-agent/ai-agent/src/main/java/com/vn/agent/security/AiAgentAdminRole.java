@@ -38,8 +38,7 @@ public interface AiAgentAdminRole {
             "aiAgent.parameters.list",
             "aiAgent.knowledge.list",
             "aiAgent.audit.list",
-            "aiAgent.exposureRules.list",
-            "aiAgent.vectorStoreDebug"})
+            "aiAgent.exposureRules.list"})
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
             "AiAgent_BaselineContext",
@@ -47,7 +46,6 @@ public interface AiAgentAdminRole {
             "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
             "AiAgent_KnowledgeBase.list", "AiAgent_KnowledgeDocument.detail",
             "AiAgent_AiAuditEvent.list", "AiAgent_AiAuditEvent.detailDialog",
-            "AiAgent_AiExposureRule.list", "AiAgent_AiExposureRule.detail",
-            "AiAgent_VectorStoreDebug"})
+            "AiAgent_AiExposureRule.list", "AiAgent_AiExposureRule.detail"})
     void adminViews();
 }

@@ -16,8 +16,6 @@
               title="msg://com.vn.agent/menu.audit"/>
         <item id="aiAgent.exposureRules.list" view="AiAgent_AiExposureRule.list"
               title="msg://com.vn.agent/menu.exposureRules"/>
-        <item id="aiAgent.vectorStoreDebug" view="AiAgent_VectorStoreDebug"
-              title="msg://com.vn.agent/menu.vectorStoreDebug"/>
     </menu>
 
 </menu-config>
