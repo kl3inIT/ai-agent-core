@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
 stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-28T20:39:15.645Z"
+last_updated: "2026-04-28T20:46:49.870Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 31
-  completed_plans: 21
-  percent: 68
+  completed_plans: 22
+  percent: 71
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
-Plan: 5 of 14
+Plan: 6 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
@@ -139,6 +139,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: ToolVetoedException reused verbatim for MutationGuard veto path — no new exception type
 - [Phase ?]: Plan 11-04: ToolEntityResolver shared @Component centralizes Phase 10 R4 unknown_entity opacity for both READ and WRITE tool paths
 - [Phase ?]: Plan 11-04: LlmExposurePolicy split into operation-specific canCreate/canUpdate; canModify retained as backward-compatible alias delegating to canUpdate
+- [Phase ?]: Repository reservation uses TransactionTemplate (REQUIRES_NEW) so commit-time DataIntegrityViolationException is caught around execute(...) and re-classified
+- [Phase ?]: MutationIntentFailureProbe is a package-public ObjectProvider test seam for TEST-12 COMMIT_UNKNOWN coverage
+- [Phase ?]: Cleanup job logs but never deletes PENDING/COMMIT_UNKNOWN; auto-deletion would allow duplicate host writes after a finalization failure
 
 ### Performance Metrics
 
@@ -165,6 +168,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase Phase 11 PP11-02 | 3min | 2 tasks | 6 files |
 | Phase 11-mutation-capable-built-in-tools P03 | 2min | 1 tasks | 3 files |
 | Phase 11 P04 | 11min | 2 tasks | 4 files |
+| Phase 11 P05 | 9min | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -174,7 +178,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T20:39:04.088Z
+**Last session:** 2026-04-28T20:45:50.413Z
 **Stopped at:** Plan 11-01 complete; ready for Plan 11-02
 **Resume file:** None
 **Blockers:** None.
