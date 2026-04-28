@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Completed Plan 10-01 (entity foundations)
-last_updated: "2026-04-27T17:18:39.152Z"
+last_updated: "2026-04-28T02:28:12.533Z"
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 17
-  completed_plans: 16
-  percent: 94
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -131,6 +131,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-07: detail view reuses MetaclassComboBoxHelper; ComboBox<MetaClass> value-bridged in controller; ReadyEvent for pre-select; 10-08 reingest error keys shipped ahead in Group B; menu uses <item>; EN bundle is messages_en.properties
 - [Phase ?]: Plan 10-09: VectorStoreDebugView shipped — plain Vaadin Grid<Document> (Fix R7) over VectorStore.similaritySearch (empty query, topK=100, threshold=0.0); FilterExpressionTextParser with inline setErrorMessage on parse error; metadataFilterField is TypedTextField<String> (Fix W2); 3 programmatic addColumn calls; expand uses standard Vaadin Dialog (Document is Spring AI POJO, no Jmix metaclass); read-only — no edit/delete per CONTEXT D-09
 - [Phase ?]: Plan 10-08: KB upload sourceEntityName persisted BEFORE dataManager.save (D-07 invariant); KnowledgeDocumentService.updatePermissionsAndReingest returns UpdatePermissionsResult enum so view has zero business logic (CLAUDE.md compliant); 3-arg upload overload preserved for backward compatibility with IngesterManager + tests
+- [Phase ?]: Plan 10-10: TEST-09 four-path uniform-opacity gate landed (RetrievalFilterBuilderDenylistTest unit + LlmExposurePolicyIntegrationTest integration). Two-tier RAG filter coverage. Phase 10 complete (10/10 plans).
 
 ### Performance Metrics
 
@@ -152,6 +153,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 10 P10-07 | 18 | 2 tasks | 5 files |
 | Phase Phase 10 PP10-09 | 8 | 2 tasks | 2 files |
 | Phase Phase 10 PP10-08 | 25 | 2 tasks | 7 files |
+| Phase Phase 10 PP10-10 | 5 | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -161,7 +163,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-27T17:18:30.313Z
+**Last session:** 2026-04-28T02:27:47.910Z
 **Stopped at:** Completed Plan 10-01 (entity foundations)
 **Resume file:** None
 **Blockers:** None.

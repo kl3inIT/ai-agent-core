@@ -135,7 +135,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 ### Testing
 
 - [x] **TEST-08**: Prompt-contract suite (regression-locks PROMPT-03/04/05): chat reply to "có bao nhiêu khách hàng?" must NOT contain the literal substring matching the internal entity-name pattern; reply must NOT contain literal tool names. Runs in Vietnamese AND English locales.
-- [ ] **TEST-09**: `LlmExposurePolicy` integration test — entity readable by user but denylisted for LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or surface as `access_denied` (uniform `unknown_entity`).
+- [x] **TEST-09**: `LlmExposurePolicy` integration test — entity readable by user but denylisted for LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or surface as `access_denied` (uniform `unknown_entity`).
 - [ ] **TEST-10**: Mutation gating integration test — user with READ but not MODIFY on attribute `X` triggers `update_record(attribute=X)` → blocked at gating step 2; tool returns structured error; `DataManager.save` never called.
 - [ ] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
 - [ ] **TEST-12**: Mutation audit-vs-transaction test — force `DataManager.save` to throw post-flush; assert audit row written with `outcome=COMMIT_FAILED` (P-4 regression gate).

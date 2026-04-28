@@ -22,7 +22,7 @@
 ## Phases
 
 - [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
-- [ ] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut.
+- [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
 - [ ] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`.
 - [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
 - [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
@@ -58,7 +58,7 @@
   2. An entity that the current user can read in Jmix but is denylisted for the LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or `find_records` responses; attempting to address it surfaces uniformly as `unknown_entity` (never `access_denied`), preserving denylist opacity.
   3. `BuiltInDataTools`, `BaselineContextProvider`, and `RetrievalFilterBuilder` all consult `LlmExposurePolicy` (composed as `userVisible AND NOT excluded`); `LlmExposureRuleRepository` uses `UnconstrainedDataManager` so user-role tweaks cannot bypass admin governance.
   4. Rule create/update/delete publishes `LlmExposureChangedEvent`; `AiAgentAdminRole` carries CRUD + view + menu policies for `AiExposureRule`.
-**Plans:** 9/10 plans executed
+**Plans:** 10/10 plans complete
 - [x] 10-01-PLAN.md — Entity foundations: AiExposureRuleMode enum + AiExposureRule entity + ChunkMetadata.SOURCE_ENTITY + AiKnowledgeDocument.sourceEntityName + Liquibase changelogs 060/061
 - [x] 10-02-PLAN.md — Service layer: LlmExposureChangedEvent + LlmExposureRuleRepository + AiExposureRuleEntityListener + LlmExposurePolicy
 - [x] 10-03-PLAN.md — Security role extension: AiAgentAdminRole CRUD + view + menu policies for AiExposureRule + VectorStoreDebugView
@@ -68,7 +68,7 @@
 - [x] 10-07-PLAN.md — AiExposureRuleDetailView: comboBox + checkbox + Java wiring + all ~53 message keys in both locales + menu.xml entries
 - [x] 10-08-PLAN.md — KnowledgeBaseView extensions: sourceEntityName comboBox in upload form + editPermissions action + reingest action + sourceEntity column renderer
 - [x] 10-09-PLAN.md — VectorStoreDebugView: filter input row + VectorStore.similaritySearch + FilterExpressionTextParser + expand dialog
-- [ ] 10-10-PLAN.md — Tests: RetrievalFilterBuilderDenylistTest (unit) + LlmExposurePolicyIntegrationTest (@SpringBootTest)
+- [x] 10-10-PLAN.md — Tests: RetrievalFilterBuilderDenylistTest (unit) + LlmExposurePolicyIntegrationTest (@SpringBootTest)
 **UI hint**: yes
 
 ### Phase 11: Mutation-Capable Built-In Tools
@@ -138,7 +138,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
-| 10. AI-Specific LLM Exposure Policy | 9/10 | In Progress|  |
+| 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
