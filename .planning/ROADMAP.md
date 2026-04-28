@@ -81,7 +81,17 @@
   3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); when `DataManager.save` throws post-flush, the audit row is still committed with `outcome=COMMIT_FAILED` thanks to the existing REQUIRES_NEW boundary (TEST-12).
   4. The layered fail-closed gating chain runs in order on every mutation call: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
   5. Locale message keys for every denial / success / idempotency / error path are present in all locale bundles; new audit `eventName` strings (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) and new `outcome` values (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`) are observable on `AiAuditEvent` rows; `AiMutationIntent` dedup table honors a 24h TTL by default.
-**Plans**: TBD
+**Plans:** 10 plans
+- [ ] 11-01-PLAN.md — Foundation: AiMutationIntent entity + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
+- [ ] 11-02-PLAN.md — AiAgentMutationProperties @ConfigurationProperties + AiToolCallOutcome enum extension + @EnableScheduling
+- [ ] 11-03-PLAN.md — MutationGuard SPI + MutationIntent record + default no-op bean
+- [ ] 11-04-PLAN.md — ToolEntityResolver shared @Component (extracted from BuiltInDataTools) + resolveWritableEntityOrThrow
+- [ ] 11-05-PLAN.md — MutationIntentRepository (UnconstrainedDataManager + afterCommit) + MutationIntentCleanupJob @Scheduled hourly
+- [ ] 11-06-PLAN.md — MutationErrorTranslator (6 stable error codes) + locale captions
+- [ ] 11-07-PLAN.md — BuiltInMutationTools @ConditionalOnProperty: 4 @Tool methods with full gating chain + DiffSerializer + locale captions
+- [ ] 11-08-PLAN.md — BuiltInLinkTools always-on: 2 @Tool methods over ViewRegistry + ServerProperties
+- [ ] 11-09-PLAN.md — AgentToolCallbacks wiring (ObjectProvider) + AgentSystemPromptRules MUTATION_PROMPT_RULES gated injection
+- [ ] 11-10-PLAN.md — Tests TEST-10..13 + BuiltInLinkToolsOpacityTest + MutationErrorTranslatorTest
 
 ### Phase 12: Configurable Chat Surfaces
 **Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
@@ -139,7 +149,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
+| 11. Mutation-Capable Built-In Tools | 0/10 | Not started | - |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |

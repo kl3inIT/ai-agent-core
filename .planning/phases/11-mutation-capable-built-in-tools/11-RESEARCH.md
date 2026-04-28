@@ -814,27 +814,27 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 
 **Confidence:** HIGH.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`AiInternalEntityNames` exact metaClass name.**
    - What we know: existing names use prefix patterns like `ai_`, `aiExposure_`. Likely `aiMutation_AiMutationIntent`.
    - What's unclear: whether the planner will adopt that prefix or use `ai_AiMutationIntent` to keep new entities under one prefix.
-   - Recommendation: Use `aiMutation_AiMutationIntent` to match the package layout (`com.vn.agent.tools.mutation`) and mirror the `aiExposure_` precedent. Add to `AiInternalEntityNames.NAMES` set.
+   - RESOLVED: Use `aiMutation_AiMutationIntent` to match the package layout (`com.vn.agent.tools.mutation`) and mirror the `aiExposure_` precedent. Add to `AiInternalEntityNames.NAMES` set.
 
 2. **Role for `AiMutationIntent` admin visibility.**
    - What we know: `AiAgentAdminRole` extension is suggested. CONTEXT.md says "if planner ships an admin list view".
    - What's unclear: Is a list view in scope? CONTEXT.md "Deferred Ideas" says NO list view in v1.1.
-   - Recommendation: Add `@EntityPolicy(entityClass=AiMutationIntent.class, actions=ALL)` to `AiAgentAdminRole` so admins CAN query the table programmatically (or via Jmix Studio at runtime). Skip `@MenuPolicy/@ViewPolicy` entries since no list view ships.
+   - RESOLVED: Add `@EntityPolicy(entityClass=AiMutationIntent.class, actions=ALL)` to `AiAgentAdminRole` so admins CAN query the table programmatically (or via Jmix Studio at runtime). Skip `@MenuPolicy/@ViewPolicy` entries since no list view ships.
 
 3. **`AiAgentMutationRole` initial population.**
    - What we know: CONTEXT.md says "empty default role". SEC-07 says "host composes with their own roles".
    - What's unclear: Should the role have ANY policies? An empty `@ResourceRole` interface compiles but does nothing.
-   - Recommendation: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Optional concrete: `@EntityPolicy(entityClass=AiMutationIntent.class, actions=READ)` so the role CAN see its own dedup table for replay (planner picks).
+   - RESOLVED: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Optional concrete: `@EntityPolicy(entityClass=AiMutationIntent.class, actions=READ)` so the role CAN see its own dedup table for replay (planner picks).
 
 4. **Dedup row write before vs after host save.**
    - What we know: Cross-store transactions are not atomic; CONTEXT.md says "REQUIRES_NEW boundary keeps audit durable".
    - What's unclear: Should `MutationIntentRepository.create` be called inside the host `@Transactional` (rolls back together) or via `TransactionSynchronization.afterCommit`?
-   - Recommendation: Use `afterCommit` — same pattern as `AuditWriter.registerAfterCommit`. Dedup row's existence then proves host save committed. On commit failure, no dedup row, replay safely retries. This means `IDEMPOTENT_REPLAY` only triggers for previously-COMMITTED operations — exactly the desired semantic.
+   - RESOLVED: Use `afterCommit` — same pattern as `AuditWriter.registerAfterCommit`. Dedup row's existence then proves host save committed. On commit failure, no dedup row, replay safely retries. This means `IDEMPOTENT_REPLAY` only triggers for previously-COMMITTED operations — exactly the desired semantic.
 
 ## Project Constraints (from CLAUDE.md)
 
