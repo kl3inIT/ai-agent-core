@@ -159,10 +159,11 @@ public class KnowledgeDocumentUploadService {
         document.setSourceEntityName(sourceEntityName);
         document.setStatus(AiKnowledgeDocumentStatus.PENDING);
         // Note: embeddingModel is not a column on the Phase 2 entity — it is carried on each
-        // chunk via ChunkMetadata.EMBEDDING_MODEL during enrichment in AsyncIngestionWorker.
-        // The call to embeddingProperties.resolvedModel() below is kept for future use and to
-        // document the coupling; it is intentionally not persisted on the entity.
-        embeddingProperties.resolvedModel();
+        // chunk via ChunkMetadata.EMBEDDING_MODEL by AsyncIngestionWorker.enrich() during
+        // ingest. WARNING-05: the previous side-effect-free call to
+        // embeddingProperties.resolvedModel() was removed — a discarded result does not
+        // protect against rename/removal of the property and only created a misleading
+        // signal that the upload service consumed it.
 
         AiKnowledgeDocument saved = dataManager.save(document);
 
