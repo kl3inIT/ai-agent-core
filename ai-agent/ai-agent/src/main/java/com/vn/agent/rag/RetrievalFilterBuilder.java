@@ -91,23 +91,15 @@ public class RetrievalFilterBuilder {
         // clause; exposure rules are "current user visibility AND NOT excluded".
         //
         // D-06 (legacy-doc carve-out, Fix R6): chunks WITHOUT a SOURCE_ENTITY metadata key MUST
-        // remain visible regardless of denylist contents. The pgvector backend stores chunk
-        // metadata as JSONB and translates filter expressions into JSONPath predicates; with a
-        // bare nin predicate the missing-key case is converter-dependent and Spring AI's
-        // pgvector converter has historically excluded such rows (the JSONPath predicate
-        // evaluates to NULL → filtered out). To guarantee D-06 is satisfied across all current
-        // and future Spring AI 1.1.x converters, we use the defensive nullable form:
-        //
-        //     (source_entity IS NULL) OR (source_entity NOT IN <denied>)
-        //
-        // FilterExpressionBuilder.isNull() and nin() are both confirmed present on the generic
-        // builder (Spring AI 1.1.4) and pgvector implements both predicates.
+        // remain visible regardless of denylist contents. Spring AI 1.1.4's generic
+        // FilterExpressionBuilder exposes isNull(), but PgVectorFilterExpressionConverter does
+        // NOT support ExpressionType.ISNULL. Use the pgvector-supported NIN expression only;
+        // the Docker-backed RAG integration tests pin that missing source_entity metadata still
+        // passes this JSONPath form.
         Set<String> denied = llmExposurePolicy.getDenylistedEntityNames();
         FilterExpressionBuilder.Op exposureClause = null;
         if (!denied.isEmpty()) {
-            exposureClause = b.or(
-                    b.isNull(ChunkMetadata.SOURCE_ENTITY),
-                    b.nin(ChunkMetadata.SOURCE_ENTITY, new ArrayList<>(denied)));
+            exposureClause = b.nin(ChunkMetadata.SOURCE_ENTITY, new ArrayList<>(denied));
         }
 
         // D-06: admin bypass bypasses role-overlap checks only. If a denylist exists, keep the

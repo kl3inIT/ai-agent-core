@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.security.AiAgentAdminRole;
 import com.vn.agent.security.AiAgentUserRole;
 import io.jmix.core.security.SystemAuthenticator;
+import io.jmix.security.role.RoleGrantedAuthorityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.GrantedAuthority;
 
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,7 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
 
     @Autowired SystemAuthenticator systemAuthenticator;
     @Autowired RetrievalFilterBuilder retrievalFilterBuilder;
+    @Autowired RoleGrantedAuthorityUtils roleGrantedAuthorityUtils;
 
     private UUID alphaId;
     private UUID betaId;
@@ -64,12 +66,25 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
         Authentication admin = authWith(AiAgentAdminRole.CODE);
         Filter.Expression filter = retrievalFilterBuilder.buildFor(admin);
 
-        // D-06: admin bypass returns null — retrieve with no filter.
-        assertThat(filter).as("admin with admin-bypass=true MUST produce null filter").isNull();
+        // D-06 / EXP-05: admin bypass skips role-overlap filtering only. The built-in
+        // AI-internal denylist still contributes an exposure filter for every caller.
+        assertThat(filter)
+                .as("admin with admin-bypass=true must keep exposure filtering but skip role filtering")
+                .isNotNull();
+        String rendered = filter.toString();
+        assertThat(rendered).contains(ChunkMetadata.EMBEDDING_MODEL);
+        assertThat(rendered).contains(ChunkMetadata.SOURCE_ENTITY);
+        assertThat(rendered)
+                .as("admin exposure filter must not include role-overlap metadata")
+                .doesNotContain(
+                        ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE),
+                        ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE),
+                        ChunkMetadata.roleFlagKey(AiAgentTestBetaRole.CODE));
 
         List<Document> hits = vectorStore.similaritySearch(SearchRequest.builder()
                 .query("onboarding pricing compliance")
                 .topK(50)
+                .filterExpression(filter)
                 .build());
 
         Set<String> docIds = hits.stream()
@@ -148,9 +163,9 @@ class RoleScopedRetrievalIntegrationTest extends AbstractRagIntegrationTest {
         });
     }
 
-    private static Authentication authWith(String... roles) {
-        List<SimpleGrantedAuthority> auths = java.util.Arrays.stream(roles)
-                .map(SimpleGrantedAuthority::new)
+    private Authentication authWith(String... roles) {
+        List<GrantedAuthority> auths = java.util.Arrays.stream(roles)
+                .map(roleGrantedAuthorityUtils::createResourceRoleGrantedAuthority)
                 .collect(Collectors.toList());
         return new UsernamePasswordAuthenticationToken("user", "n/a", auths);
     }

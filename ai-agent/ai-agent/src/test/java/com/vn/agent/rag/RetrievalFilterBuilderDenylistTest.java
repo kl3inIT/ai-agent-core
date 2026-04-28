@@ -37,10 +37,9 @@ import static org.mockito.Mockito.when;
  *   <li>Admin user → admin bypass skips role-overlap filtering only; denylist filtering still
  *       applies when denylist contents are present.</li>
  *   <li><b>Fix R6 / D-06 legacy-doc carve-out:</b> a chunk with NO {@code source_entity}
- *       metadata key remains visible. Plan 10-05 chose the defensive
- *       {@code OR(isNull(source_entity), nin(source_entity, denied))} form to guarantee this
- *       across pgvector JSONPath converter versions. The expression must therefore contain
- *       {@code ISNULL} (the OR branch that lets missing-key chunks through).</li>
+ *       metadata key remains visible. Spring AI 1.1.4 pgvector does not support
+ *       {@code ISNULL}, so this unit suite pins the pgvector-compatible {@code NIN} shape;
+ *       the Docker-backed RAG integration tests prove missing-key chunks still pass.</li>
  * </ol>
  */
 class RetrievalFilterBuilderDenylistTest {
@@ -151,29 +150,13 @@ class RetrievalFilterBuilderDenylistTest {
     }
 
     /**
-     * Test 4 (Fix R6 / D-06 legacy-doc carve-out) — chunks with NO {@code source_entity}
-     * metadata key must remain visible regardless of denylist contents. Plan 10-05 chose
-     * the defensive nullable form for this guarantee:
-     *
-     * <pre>
-     *     (source_entity IS NULL) OR (source_entity NOT IN &lt;denied&gt;)
-     * </pre>
-     *
-     * The {@code Filter.ExpressionType.ISNULL} enum literal renders verbatim as
-     * {@code ISNULL} in the {@code Filter.Expression} record's auto-generated
-     * {@code toString}. Asserting its presence proves that a chunk whose metadata map
-     * lacks {@code source_entity} cannot match the denylisted half of the OR — it satisfies
-     * the {@code IS NULL} branch and passes the filter.
-     *
-     * <p>This is the in-source proof of the D-06 contract documented in Plan 10-05's
-     * {@code RetrievalFilterBuilder.java} comment block. A future change that drops the
-     * {@code isNull} branch (e.g. switching to bare {@code nin}) would be caught by this
-     * assertion failing — and would silently break legacy-doc visibility because Spring AI's
-     * pgvector JSONPath converter excludes rows with a missing metadata key under bare
-     * {@code nin}.
+     * Test 4 (Fix R6 / D-06 legacy-doc carve-out) - Spring AI 1.1.4 pgvector
+     * supports {@code NIN} but rejects {@code ISNULL}. This unit test keeps the
+     * generated expression within the converter's supported subset; Docker-backed
+     * integration tests prove the missing {@code source_entity} metadata case still passes.
      */
     @Test
-    void whenDenylistNonEmptyAndChunkHasNoSourceEntityKey_thenChunkRemainsVisible() {
+    void whenDenylistNonEmpty_thenUsesPgVectorCompatibleNinWithoutIsNull() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(
                 ragProps(true), embeddingProps(),
                 exposurePolicyWithDenylist("OrderEntity"));
@@ -184,14 +167,13 @@ class RetrievalFilterBuilderDenylistTest {
         assertThat(expr).isNotNull();
         String rendered = expr.toString();
 
-        // D-06 / Fix R6: defensive (source_entity IS NULL) OR (source_entity NIN denied) form.
-        // The ISNULL branch is what guarantees missing-key chunks remain visible — without it
-        // bare nin would exclude them under the pgvector JSONPath converter.
+        // Spring AI 1.1.4 PgVectorFilterExpressionConverter supports NIN but not ISNULL.
+        // The integration tests cover the missing-key visibility contract against real pgvector.
         assertThat(rendered.toUpperCase())
-                .as("Plan 10-05 Fix R6 defensive form must include an ISNULL clause on source_entity "
-                        + "so legacy chunks with no source_entity metadata key remain visible (D-06)")
-                .contains("ISNULL");
-        // Both halves of the OR reference source_entity: one as the ISNULL key, one as the NIN key.
+                .as("The expression must stay pgvector-compatible; ISNULL is not supported by "
+                        + "Spring AI 1.1.4 PgVectorFilterExpressionConverter")
+                .doesNotContain("ISNULL")
+                .contains("NIN");
         assertThat(rendered).contains(ChunkMetadata.SOURCE_ENTITY);
     }
 }
