@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
-import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
@@ -71,20 +70,17 @@ public class KnowledgeDocumentUploadService {
     private final DataManager dataManager;
     private final ResourceRoleRepository roleRepository;
     private final AsyncIngestionWorker asyncIngestionWorker;
-    private final AiAgentEmbeddingProperties embeddingProperties;
     private final AiAgentRagProperties ragProperties;
 
     public KnowledgeDocumentUploadService(Metadata metadata,
                                           DataManager dataManager,
                                           ResourceRoleRepository roleRepository,
                                           AsyncIngestionWorker asyncIngestionWorker,
-                                          AiAgentEmbeddingProperties embeddingProperties,
                                           AiAgentRagProperties ragProperties) {
         this.metadata = metadata;
         this.dataManager = dataManager;
         this.roleRepository = roleRepository;
         this.asyncIngestionWorker = asyncIngestionWorker;
-        this.embeddingProperties = embeddingProperties;
         this.ragProperties = ragProperties;
     }
 
@@ -151,10 +147,7 @@ public class KnowledgeDocumentUploadService {
         document.setStatus(AiKnowledgeDocumentStatus.PENDING);
         // Note: embeddingModel is not a column on the Phase 2 entity — it is carried on each
         // chunk via ChunkMetadata.EMBEDDING_MODEL by AsyncIngestionWorker.enrich() during
-        // ingest. WARNING-05: the previous side-effect-free call to
-        // embeddingProperties.resolvedModel() was removed — a discarded result does not
-        // protect against rename/removal of the property and only created a misleading
-        // signal that the upload service consumed it.
+        // ingest. Upload does not consume embedding model state.
 
         AiKnowledgeDocument saved = dataManager.save(document);
 

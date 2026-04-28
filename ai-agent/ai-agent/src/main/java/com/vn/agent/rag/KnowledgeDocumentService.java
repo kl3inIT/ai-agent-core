@@ -25,7 +25,7 @@ import java.util.UUID;
  * Manages the lifecycle of {@link AiKnowledgeDocument} rows after initial upload:
  * atomic delete (RAG-07) and reingest (RAG-08). Upload itself lives in
  * {@link KnowledgeDocumentUploadService} because it has a different collaborator
- * set (role repository + embedding properties).
+ * set (source validation + upload dispatch).
  *
  * <p><b>Atomic delete (RAG-07 / D-06 / D-20):</b> {@link #delete(UUID)} runs under
  * {@code @Transactional(REQUIRED)} and executes, in order:

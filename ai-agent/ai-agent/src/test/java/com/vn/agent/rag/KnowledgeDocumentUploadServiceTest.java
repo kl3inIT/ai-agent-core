@@ -2,7 +2,6 @@ package com.vn.agent.rag;
 
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
-import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
@@ -40,7 +39,6 @@ class KnowledgeDocumentUploadServiceTest {
     private DataManager dataManager;
     private ResourceRoleRepository roleRepository;
     private AsyncIngestionWorker asyncIngestionWorker;
-    private AiAgentEmbeddingProperties embeddingProperties;
 
     private KnowledgeDocumentUploadService service;
 
@@ -50,8 +48,6 @@ class KnowledgeDocumentUploadServiceTest {
         dataManager = mock(DataManager.class);
         roleRepository = mock(ResourceRoleRepository.class);
         asyncIngestionWorker = mock(AsyncIngestionWorker.class);
-        embeddingProperties = new AiAgentEmbeddingProperties(
-                "qwen/qwen3-embedding-4b", 2000, null);
 
         // Metadata.create returns a fresh AiKnowledgeDocument (bypasses @JmixGeneratedValue).
         when(metadata.create(AiKnowledgeDocument.class)).thenAnswer(inv -> new AiKnowledgeDocument());
@@ -75,7 +71,7 @@ class KnowledgeDocumentUploadServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         service = new KnowledgeDocumentUploadService(
-                metadata, dataManager, roleRepository, asyncIngestionWorker, embeddingProperties, ragProperties);
+                metadata, dataManager, roleRepository, asyncIngestionWorker, ragProperties);
     }
 
     @AfterEach
