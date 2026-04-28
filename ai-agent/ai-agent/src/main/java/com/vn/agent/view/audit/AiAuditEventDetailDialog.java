@@ -123,6 +123,8 @@ public class AiAuditEventDetailDialog extends StandardView {
             case ERROR -> "error";
             case BLOCKED -> "warning";
             case FLAGGED -> "contrast";
+            case IDEMPOTENT_REPLAY -> "success";   // Phase 11 D-08 — replayed success result
+            case COMMIT_FAILED -> "error";          // Phase 11 D-08 — host save returned but finalization failed
         };
     }
 
