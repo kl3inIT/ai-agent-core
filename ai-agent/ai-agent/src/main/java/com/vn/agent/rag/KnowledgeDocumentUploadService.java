@@ -8,7 +8,6 @@ import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
-import io.jmix.security.model.ResourceRole;
 import io.jmix.security.role.ResourceRoleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -140,15 +138,7 @@ public class KnowledgeDocumentUploadService {
         // is refused before persistence.
         validateSourceUri(sourceUri);
 
-        List<String> roles = allowedRoles == null ? List.of() : new ArrayList<>(allowedRoles);
-
-        // D-07 fail-closed role validation — every code MUST resolve, unknown codes abort.
-        for (String code : roles) {
-            ResourceRole role = resolveRole(code);
-            if (role == null) {
-                throw new UnknownRoleCodeException(code);
-            }
-        }
+        List<String> roles = KnowledgeDocumentRoleValidator.validateRoleCodes(allowedRoles, roleRepository);
 
         // PATTERNS: entity instantiation via Metadata.create (constructor path is forbidden).
         AiKnowledgeDocument document = metadata.create(AiKnowledgeDocument.class);
@@ -186,17 +176,6 @@ public class KnowledgeDocumentUploadService {
         }
 
         return saved;
-    }
-
-    private ResourceRole resolveRole(String code) {
-        try {
-            return roleRepository.findRoleByCode(code);
-        } catch (RuntimeException e) {
-            // Jmix may consult the runtime role store after design-time role lookup misses.
-            // If that store is unavailable or not present in a lightweight test/host schema,
-            // keep the public contract fail-closed: the caller supplied an unusable role code.
-            throw new UnknownRoleCodeException(code, e);
-        }
     }
 
     /**

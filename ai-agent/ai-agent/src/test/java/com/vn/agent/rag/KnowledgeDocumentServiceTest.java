@@ -3,6 +3,8 @@ package com.vn.agent.rag;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
+import io.jmix.security.model.ResourceRole;
+import io.jmix.security.role.ResourceRoleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,7 @@ class KnowledgeDocumentServiceTest {
     private CancellationRegistry cancellationRegistry;
     private AsyncIngestionWorker asyncIngestionWorker;
     private IngestionStatusWriter ingestionStatusWriter;
+    private ResourceRoleRepository roleRepository;
 
     private KnowledgeDocumentService service;
 
@@ -51,13 +54,14 @@ class KnowledgeDocumentServiceTest {
         cancellationRegistry = mock(CancellationRegistry.class);
         asyncIngestionWorker = mock(AsyncIngestionWorker.class);
         ingestionStatusWriter = mock(IngestionStatusWriter.class);
+        roleRepository = mock(ResourceRoleRepository.class);
 
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
         service = new KnowledgeDocumentService(
                 dataManager, vectorStore, cancellationRegistry,
-                asyncIngestionWorker, ingestionStatusWriter);
+                asyncIngestionWorker, ingestionStatusWriter, roleRepository);
     }
 
     @AfterEach
@@ -87,6 +91,15 @@ class KnowledgeDocumentServiceTest {
         FluentLoader<AiKnowledgeDocument> loader = mock(FluentLoader.class, RETURNS_DEEP_STUBS);
         when(dataManager.load(AiKnowledgeDocument.class)).thenReturn(loader);
         when(loader.id(id).optional()).thenReturn(Optional.ofNullable(value));
+    }
+
+    private void stubRoleKnown(String code) {
+        ResourceRole role = mock(ResourceRole.class);
+        when(roleRepository.findRoleByCode(code)).thenReturn(role);
+    }
+
+    private void stubRoleUnknown(String code) {
+        when(roleRepository.findRoleByCode(code)).thenReturn(null);
     }
 
     // --- Delete tests --------------------------------------------------------
@@ -209,6 +222,7 @@ class KnowledgeDocumentServiceTest {
         UUID id = UUID.randomUUID();
         AiKnowledgeDocument document = doc(id);
         stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
         doThrow(new RuntimeException("pgvector down"))
                 .when(vectorStore).delete(any(Filter.Expression.class));
 
@@ -222,5 +236,36 @@ class KnowledgeDocumentServiceTest {
         verify(dataManager).save(document);
         verify(ingestionStatusWriter, never()).markFailed(any(), any());
         verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_rejects_unknown_role_before_save_or_reingest() {
+        UUID id = UUID.randomUUID();
+        stubLoad(id, doc(id));
+        stubRoleUnknown("phantom-role");
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of("phantom-role"), null))
+                .isInstanceOf(UnknownRoleCodeException.class)
+                .matches(e -> "phantom-role".equals(((UnknownRoleCodeException) e).getCode()));
+
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
+        verify(ingestionStatusWriter, never()).markPending(any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_rejects_blank_role_before_repository_lookup() {
+        UUID id = UUID.randomUUID();
+        stubLoad(id, doc(id));
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of(" "), null))
+                .isInstanceOf(UnknownRoleCodeException.class);
+
+        verify(roleRepository, never()).findRoleByCode(any());
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(vectorStore, never()).delete(any(Filter.Expression.class));
     }
 }

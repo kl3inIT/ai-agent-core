@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import io.jmix.core.DataManager;
+import io.jmix.security.role.ResourceRoleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -15,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -63,17 +63,20 @@ public class KnowledgeDocumentService {
     private final CancellationRegistry cancellationRegistry;
     private final AsyncIngestionWorker asyncIngestionWorker;
     private final IngestionStatusWriter ingestionStatusWriter;
+    private final ResourceRoleRepository roleRepository;
 
     public KnowledgeDocumentService(DataManager dataManager,
                                     VectorStore vectorStore,
                                     CancellationRegistry cancellationRegistry,
                                     AsyncIngestionWorker asyncIngestionWorker,
-                                    IngestionStatusWriter ingestionStatusWriter) {
+                                    IngestionStatusWriter ingestionStatusWriter,
+                                    ResourceRoleRepository roleRepository) {
         this.dataManager = dataManager;
         this.vectorStore = vectorStore;
         this.cancellationRegistry = cancellationRegistry;
         this.asyncIngestionWorker = asyncIngestionWorker;
         this.ingestionStatusWriter = ingestionStatusWriter;
+        this.roleRepository = roleRepository;
     }
 
     /**
@@ -164,7 +167,7 @@ public class KnowledgeDocumentService {
         Objects.requireNonNull(documentId, "documentId must not be null");
 
         AiKnowledgeDocument doc = loadOrThrow(documentId);
-        List<String> roles = allowedRoles == null ? List.of() : new ArrayList<>(allowedRoles);
+        List<String> roles = KnowledgeDocumentRoleValidator.validateRoleCodes(allowedRoles, roleRepository);
         doc.setAllowedRolesJson(writeRolesJson(roles));
         // null clears the link — chunks reingested without source_entity (D-06 contract).
         doc.setSourceEntityName(sourceEntityName);
