@@ -151,6 +151,7 @@ public class VectorStoreDebugView extends StandardView {
     }
 
     private void loadChunks() {
+        metadataFilterField.setInvalid(false);
         metadataFilterField.setErrorMessage(null);
         String filterText = metadataFilterField.getValue();
 
@@ -167,6 +168,7 @@ public class VectorStoreDebugView extends StandardView {
                 log.debug("Vector store debug filter parse failed for input '{}'", filterText, ex);
                 metadataFilterField.setErrorMessage(
                         messages.getMessage("vectorStoreDebug.error.filterParse"));
+                metadataFilterField.setInvalid(true);
                 return;
             }
         }
@@ -180,6 +182,7 @@ public class VectorStoreDebugView extends StandardView {
     @Subscribe("filterClearBtn")
     public void onFilterClearBtnClick(final ClickEvent<Button> event) {
         metadataFilterField.clear();
+        metadataFilterField.setInvalid(false);
         metadataFilterField.setErrorMessage(null);
     }
 
