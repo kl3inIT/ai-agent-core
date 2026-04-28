@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
 stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-28T20:17:42.681Z"
+last_updated: "2026-04-28T20:23:41.054Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 31
-  completed_plans: 19
-  percent: 61
+  completed_plans: 20
+  percent: 65
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
-Plan: 3 of 14
+Plan: 4 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
@@ -134,6 +134,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-10: TEST-09 four-path uniform-opacity gate landed (RetrievalFilterBuilderDenylistTest unit + LlmExposurePolicyIntegrationTest integration). Two-tier RAG filter coverage. Phase 10 complete (10/10 plans).
 - [Phase ?]: Plan 11-01: AiMutationIntent agentstore entity ships with composite unique index on (TOOL_NAME, IDEMPOTENCY_KEY, USER_USERNAME) + REQUEST_HASH + STATUS_ enum (PENDING/COMMITTED/FAILED/COMMIT_UNKNOWN). PENDING reserved before host save so DB unique index serializes duplicates. COMMIT_UNKNOWN parks post-save finalization failures. AiAgentMutationRole is empty marker (no AiMutationIntent READ to avoid leaking idempotency keys); AiAgentAdminRole gains @EntityPolicy(AiMutationIntent, ALL); both locale bundles updated. IDX_AI_MUT_INTENT_STATUS added beyond plan baseline for cleanup-job diagnostics.
 - [Phase ?]: Plan 11-02: AiAgentMutationProperties (@ConfigurationProperties ai-agent.tools.mutation) record + AiToolCallOutcome enum extension (IDEMPOTENT_REPLAY/COMMIT_FAILED via EnumClass<String>, no schema migration) + @EnableScheduling on AIConfiguration. Rule 3 auto-fix: AiAuditEventDetailDialog.outcomeTheme switch extended with the 2 new cases. Rule 2 auto-fix: bilingual auditList.outcome.* lowercase keys added alongside metaclass-format keys (AiAuditEventListView+DetailDialog use lowercase convention).
+- [Phase ?]: MutationIntent attributes use Collections.unmodifiableMap(new LinkedHashMap<>(attributes)) NOT Map.copyOf — null attribute values represent optional-field clears
+- [Phase ?]: MutationGuard default no-op bean lives directly in AIConfiguration via @ConditionalOnMissingBean — no separate SpiDefaultsAutoConfiguration class (mirrors aiAgentIngestExecutor precedent)
+- [Phase ?]: ToolVetoedException reused verbatim for MutationGuard veto path — no new exception type
 
 ### Performance Metrics
 
@@ -158,6 +161,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase Phase 10 PP10-10 | 5 | 2 tasks | 2 files |
 | Phase Phase 11 PP11-01 | 2min | 2 tasks | 8 files |
 | Phase Phase 11 PP11-02 | 3min | 2 tasks | 6 files |
+| Phase 11-mutation-capable-built-in-tools P03 | 2min | 1 tasks | 3 files |
 
 ### Quick Tasks Completed
 
@@ -167,7 +171,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T20:16:44.774Z
+**Last session:** 2026-04-28T20:23:27.879Z
 **Stopped at:** Plan 11-01 complete; ready for Plan 11-02
 **Resume file:** None
 **Blockers:** None.

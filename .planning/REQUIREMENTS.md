@@ -50,7 +50,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
   3. Optional `MutationGuard` SPI veto (throws `ToolVetoedException`).
   4. `@Transactional` (REQUIRED, propagation default) `DataManager.save(...)` — regular `DataManager` (NOT `UnconstrainedDataManager`).
 - [x] **MUT-04**: Mandatory `@ToolParam idempotencyKey` (UUID string) on every mutation tool. Server-side `AiMutationIntent` dedup table records `(toolName, idempotencyKey, userId, conversationId, resultEntityId, createdAt)`. Replay returns the original result with `outcome=IDEMPOTENT_REPLAY`. TTL 24h default, configurable.
-- [ ] **MUT-05**: `MutationGuard` SPI defined: `interface MutationGuard { void check(MutationIntent intent) throws ToolVetoedException; }`. Default no-op bean. Mirrors `ToolGuard`.
+- [x] **MUT-05**: `MutationGuard` SPI defined: `interface MutationGuard { void check(MutationIntent intent) throws ToolVetoedException; }`. Default no-op bean. Mirrors `ToolGuard`.
 - [x] **MUT-06**: `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`): `enabled` (default false), `allowDelete` (default false; reserved for v1.2), `confirmationRequired` (default true; UX hint, not enforcement), `idempotencyTtl` (default 24h).
 - [ ] **MUT-07**: `MutationErrorTranslator` translates JPA / `AccessDeniedException` into stable error codes (`access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`) — never echoes user-supplied PII or constraint message text into the LLM result string (P-22 mitigation).
 - [ ] **MUT-08**: Audit reuses `AuditWriter.writeToolCall` with `eventName` ∈ {`create_record`, `update_record`, `add_related_record`, `remove_related_record`}. `argumentsJson` carries LLM JSON; `resultSummary` carries new entity id (create), or compact diff summary (update). New `outcome` values: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED` (`COMMIT_FAILED` means host save returned but idempotency finalization failed, so commit outcome must be verified). Existing REQUIRES_NEW boundary keeps audit durable across mutation rollback.
@@ -115,7 +115,7 @@ All five entities follow CLAUDE.md conventions: `@JmixEntity` + UUID + `@JmixGen
 ### New SPIs
 
 - [x] **SPI-09**: `ToolFetchPlanCustomizer` (per TOOL-10)
-- [ ] **SPI-10**: `MutationGuard` (per MUT-05)
+- [x] **SPI-10**: `MutationGuard` (per MUT-05)
 - [ ] **SPI-11**: `TranscriptionPostProcessor` (per STT-04)
 - [ ] **SPI-12**: `IntentExtractor<T>` (per EXTRACT-02)
 
