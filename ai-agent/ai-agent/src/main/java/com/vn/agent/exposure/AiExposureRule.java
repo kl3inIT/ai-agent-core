@@ -52,7 +52,11 @@ public class AiExposureRule {
 
     @InstanceName
     @NotNull
-    @Column(name = "ENTITY_NAME", nullable = false, unique = true, length = 255)
+    // BLOCKER-02: Uniqueness is enforced by the @Index(unique=true) declaration above
+    // (matching Liquibase IDX_AI_EXPOSURE_RULE_ENTITY_NAME). The column-level unique=true
+    // flag was removed because some JPA providers emit it as a SEPARATE unique constraint
+    // with a generated name, clashing with the Liquibase-managed index.
+    @Column(name = "ENTITY_NAME", nullable = false, length = 255)
     private String entityName;
 
     @NotNull

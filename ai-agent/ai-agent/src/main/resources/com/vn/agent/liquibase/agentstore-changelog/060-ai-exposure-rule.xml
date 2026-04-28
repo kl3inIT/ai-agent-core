@@ -30,9 +30,19 @@
     </changeSet>
 
     <changeSet id="2" author="ai-agent">
-        <addUniqueConstraint tableName="AI_EXPOSURE_RULE"
-                             columnNames="ENTITY_NAME"
-                             constraintName="UNQ_AI_EXPOSURE_RULE_ENTITY_NAME"/>
+        <!--
+            BLOCKER-02: index name MUST match the JPA @Index(name="IDX_AI_EXPOSURE_RULE_ENTITY_NAME",
+            unique=true) declaration on AiExposureRule. Mismatched names caused JPA schema
+            validators (hibernate.hbm2ddl.auto / Jmix validator) to attempt a duplicate index
+            creation and broke DDL parity across environments. Liquibase remains the single
+            source of truth for the constraint shape; the unique=true index is sufficient —
+            no separate addUniqueConstraint is needed.
+        -->
+        <createIndex indexName="IDX_AI_EXPOSURE_RULE_ENTITY_NAME"
+                     tableName="AI_EXPOSURE_RULE"
+                     unique="true">
+            <column name="ENTITY_NAME"/>
+        </createIndex>
         <createIndex indexName="IDX_AI_EXPOSURE_RULE_ENABLED"
                      tableName="AI_EXPOSURE_RULE">
             <column name="ENABLED"/>
