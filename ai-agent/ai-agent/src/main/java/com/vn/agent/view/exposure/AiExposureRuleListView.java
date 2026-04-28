@@ -89,7 +89,7 @@ public class AiExposureRuleListView extends StandardListView<AiExposureRule> {
      * {@code feedback_jmix_action_column_renderer}.
      */
     @Supply(to = "exposureRulesDataGrid.toggleAction", subject = "renderer")
-    private ComponentRenderer<Button, AiExposureRule> toggleRenderer() {
+    private Renderer<AiExposureRule> toggleRenderer() {
         return new ComponentRenderer<>(rule -> {
             Button btn = new Button();
             if (Boolean.TRUE.equals(rule.getEnabled())) {
