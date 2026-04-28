@@ -120,6 +120,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
     private CollectionContainer<AiKnowledgeDocument> documentsDc;
     @ViewComponent
     private ComboBox<MetaClass> sourceEntityNameComboBox;
+    @ViewComponent
+    private CheckboxGroup<String> uploadAllowedRolesGroup;
 
     @Autowired
     private KnowledgeDocumentUploadService uploadService;
@@ -155,14 +157,30 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
         sourceEntityNameComboBox.setItemLabelGenerator(mc ->
                 messageTools.getEntityCaption(mc) + " (" + mc.getName() + ")");
 
+        // WARNING-08: populate the upload-form allowedRoles checkbox group with the same
+        // filtered list used in the edit-permissions dialog (system-* roles excluded —
+        // WARNING-02). Without this field every upload landed admin-only-visible.
+        List<String> uploadRoleCodes = resourceRoleRepository.getAllRoles().stream()
+                .map(ResourceRole::getCode)
+                .filter(code -> !isSystemRole(code))
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        uploadAllowedRolesGroup.setItems(uploadRoleCodes);
+
         documentUpload.setUploadHandler(UploadHandler.toFile((metadata, stagedFile) -> {
             try {
                 // Plan 10-08 / D-07: capture sourceEntityName at upload time so it is
                 // persisted on the document BEFORE the async ingester runs.
                 MetaClass selectedMc = sourceEntityNameComboBox.getValue();
                 String sourceEntityName = selectedMc != null ? selectedMc.getName() : null;
+                // WARNING-08: pass the admin-selected role list (may be empty — empty means
+                // admin-only-visible per the D-05 fail-closed retrieval contract).
+                Set<String> selectedRoles = uploadAllowedRolesGroup.getValue();
+                Collection<String> roles = selectedRoles == null
+                        ? Collections.emptySet()
+                        : new LinkedHashSet<>(selectedRoles);
                 uploadService.upload(stagedFile.toURI().toString(), metadata.contentType(),
-                        Collections.emptyList(), sourceEntityName);
+                        roles, sourceEntityName);
                 notifications.create(messages.formatMessage("knowledgeBase.toast.uploadStarted", metadata.fileName())).show();
                 documentsDl.load();
             } catch (IllegalArgumentException ex) {

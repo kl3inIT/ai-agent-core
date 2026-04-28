@@ -26,6 +26,18 @@
                       helperText="msg:///knowledgeBase.upload.field.sourceEntityName.helper"
                       clearButtonVisible="true"
                       width="100%"/>
+            <!--
+                WARNING-08: allowedRoles selector for the upload form. Without it, every
+                uploaded document landed with an empty allowedRoles list and was invisible
+                to all non-admin users (D-05 fail-closed retrieval contract). Items are
+                populated programmatically from ResourceRoleRepository minus system-* roles
+                (see WARNING-02 filter). Helper text reminds the admin that an empty
+                selection means "admin-only".
+            -->
+            <checkboxGroup id="uploadAllowedRolesGroup"
+                           label="msg:///knowledgeBase.upload.field.allowedRoles"
+                           helperText="msg:///knowledgeBase.upload.field.allowedRoles.helper"
+                           width="100%"/>
         </formLayout>
         <!--
             WARNING-03: receiverType="..." was removed because it routes through the deprecated
