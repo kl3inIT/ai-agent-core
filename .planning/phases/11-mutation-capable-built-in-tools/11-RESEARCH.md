@@ -79,7 +79,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 | SPI-10 | `MutationGuard` SPI | See MUT-05. |
 | TEST-10 | Per-attribute denial → `access_denied`, `DataManager.save` never called | `@SpringBootTest`. Mock `AccessManager` to deny one attribute; assert tool returns structured `access_denied`. |
 | TEST-11 | Same `idempotencyKey` → same result, `outcome=IDEMPOTENT_REPLAY`, only one row | `@SpringBootTest`. Run tool twice; assert dedup row count = 1, second call audit `outcome=IDEMPOTENT_REPLAY`. |
-| TEST-12 | Post-flush save throws → audit row written with `outcome=COMMIT_FAILED` | `@SpringBootTest`. Mock `DataManager.save` to throw `OptimisticLockException`; assert audit row exists with that outcome (REQUIRES_NEW separates the boundary). |
+| TEST-12 | Durable audit across both rollback and commit-unknown paths | `@SpringBootTest`. Use a real host save plus mocked `MutationIntentRepository.markCommitted(...)` failure for the `COMMIT_FAILED` path; assert the host row persisted once, audit outcome is `COMMIT_FAILED`, and the intent is `COMMIT_UNKNOWN`/`PENDING`, never `FAILED`. Add a separate known save-rollback case (`DataIntegrityViolationException`/`ConstraintViolationException`) that maps to stable `ERROR` audit + `FAILED` intent, not `COMMIT_FAILED`. |
 | TEST-13 | Default-config boot: zero mutation callbacks in `forCurrentUser()` | `@SpringBootTest`. Default property `mutation.enabled=false`. Assert callback array length = 8 (6 data + 2 link), no callback name matches `create_record|update_record|add_related_record|remove_related_record|delete_record`. |
 
 ## Architectural Responsibility Map
@@ -386,7 +386,7 @@ private String serializeDiff(MetaClass metaClass,
 
 **How to avoid:** Catch BOTH (or the common ancestor `org.springframework.dao.OptimisticLockingFailureException`, which is the parent of `ObjectOptimisticLockingFailureException` and is also wrapped around `javax.persistence.OptimisticLockException`). Confirmed via Context7 — Jmix's `Versioned` trait standard JPA `@Version`, behavior is the standard Spring/JPA contract; no Jmix-specific wrapper exists.
 
-**Warning signs:** TEST-12 mock that throws `javax.persistence.OptimisticLockException` doesn't trigger `concurrent_modification` mapping in unit test but does in integration test (or vice-versa).
+**Warning signs:** translator tests that throw only `javax.persistence.OptimisticLockException` pass while integration cases surface Spring's optimistic-lock wrapper (or vice-versa).
 
 ### Pitfall 6: `@Composition` re-save cascades on `add_related_record`
 
@@ -887,7 +887,7 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
 | A1 | OpenAI / Azure OpenAI gpt-4-class models reliably emit valid JSON object payloads against a free-form `Map<String,Object>` schema | Q1 | If wrong: planner falls back to D-01 Option D (`String payloadJson` server-side parse). Cost: one extra parsing layer + slightly worse error messages. Mitigation: jmix-crm production evidence makes this LOW risk. |
-| A2 | Jmix 2.8 + Spring Boot 3.x consistently translates `jakarta.persistence.OptimisticLockException` into `org.springframework.orm.ObjectOptimisticLockingFailureException` under `@Transactional` | Q3 | If wrong: TEST-12 may pass against one form but not the other. Mitigation: catch BOTH in `MutationErrorTranslator` (recommended in answer). |
+| A2 | Jmix 2.8 + Spring Boot 3.x consistently translates `jakarta.persistence.OptimisticLockException` into `org.springframework.orm.ObjectOptimisticLockingFailureException` under `@Transactional` | Q3 | If wrong: translator coverage may pass against one form but not the other. Mitigation: catch BOTH in `MutationErrorTranslator` (recommended in answer). |
 | A3 | `@EnableScheduling` is NOT currently in this codebase | Q6 | Verified via Bash grep (no `@EnableScheduling` found). If wrong: planner skips re-adding it. Cost: zero. |
 | A4 | Spring AI 1.1.4 does NOT truncate `@Tool` description strings, even at ~150 lines | Q10 | If wrong: descriptions get cut at some boundary, breaking 5-section template. Mitigation: jmix-crm `JpqlExecutorTool` ships 230-line description in production — strong production evidence. |
 | A5 | The `aiMutation_AiMutationIntent` metaClass name aligns with project conventions | Open Question 1 | If wrong: planner picks `ai_AiMutationIntent` instead. Cost: rename in 3 places (entity annotation, Liquibase changeset comment, `AiInternalEntityNames`). Trivial. |

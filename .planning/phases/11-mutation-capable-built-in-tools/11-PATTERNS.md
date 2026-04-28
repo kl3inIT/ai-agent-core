@@ -745,7 +745,7 @@ src/test/java/com/vn/agent/tools/mutation/
 
 **Differs from analog:**
 - `BuiltInDataToolsReadOnlyTest` is bytecode/ASM — pure static check.
-- TEST-10..12 are `@SpringBootTest` integration tests with `AccessManager` / `DataManager.save` mocking.
+- TEST-10..12 are `@SpringBootTest` integration tests with focused mocks: AccessManager for gating, MutationIntentRepository finalization failure for COMMIT_FAILED, and a separate save-rollback case for stable ERROR behavior.
 - TEST-13 is `@SpringBootTest` with property-driven bean assembly.
 
 ---

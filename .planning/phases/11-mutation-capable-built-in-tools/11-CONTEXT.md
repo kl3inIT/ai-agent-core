@@ -10,7 +10,8 @@ Hosts can opt in to LLM-driven create/update/related-write operations against
 host entities. All mutations go through Jmix `DataManager` and are gated
 fail-closed by a layered chain: `LlmExposurePolicy.canModify` (Phase 10
 boundary) → `AccessManager` `CrudEntityContext` + per-attribute
-`EntityAttributeContext.canModify` → optional `MutationGuard` SPI →
+`EntityAttributeContext.canModify` → pre-host-save idempotency reservation →
+type coercion + writable-property validation → optional `MutationGuard` SPI →
 `@Transactional` `DataManager.save`. Calls are idempotent via mandatory
 `idempotencyKey`, audited end-to-end through the existing `AuditWriter.writeToolCall`
 REQUIRES_NEW boundary, and never leak user-supplied PII through error strings.
@@ -68,8 +69,9 @@ to any entity surfaced by `find_records` / `get_record`.
   never called; structured `access_denied` returned.
 - TEST-11: idempotency replay — same key returns same result with
   `outcome=IDEMPOTENT_REPLAY`; only one row created.
-- TEST-12: post-flush save throws → audit row written with `outcome=COMMIT_FAILED`
-  (REQUIRES_NEW boundary intact).
+- TEST-12: known save rollback writes a durable `ERROR` audit row; post-host-save
+  idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the
+  intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`).
 - TEST-13: default-config boot test — zero mutation tool callbacks present in
   `AgentToolCallbacks.forCurrentUser`.
 
@@ -452,8 +454,9 @@ to any entity surfaced by `find_records` / `get_record`.
 - `jmix-i18n` — message bundles for all 4 mutation tool names + 6 error
   codes + denial reasons in both locales.
 - `jmix-liquibase` — changelog conventions for `070-ai-mutation-intent.xml`.
-- `jmix-testing` — `@SpringBootTest` for TEST-10..13; mocking `DataManager.save`
-  to throw `OptimisticLockException` for TEST-12.
+- `jmix-testing` — `@SpringBootTest` for TEST-10..13; TEST-12 uses a real host
+  save plus a mocked idempotency finalization failure for the `COMMIT_FAILED`
+  path, and a separate save-rollback case for `ERROR`.
 
 ### Spring AI primitives to verify in research
 - Spring AI 1.1.4 `@Tool` + `@ToolParam` Map<String,Object> coercion behavior
