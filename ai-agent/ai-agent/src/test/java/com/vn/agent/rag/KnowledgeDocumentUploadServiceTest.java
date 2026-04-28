@@ -211,6 +211,24 @@ class KnowledgeDocumentUploadServiceTest {
     }
 
     @Test
+    void rejects_classpath_uri_with_path_traversal_before_allowlist_match() {
+        assertThatThrownBy(() -> service.upload(
+                "classpath:ai-kb/../application.properties", "text/plain", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("path traversal");
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    }
+
+    @Test
+    void rejects_bare_filename_with_path_traversal_before_implicit_classpath_rewrite() {
+        assertThatThrownBy(() -> service.upload(
+                "../application.properties", "text/plain", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("path traversal");
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    }
+
+    @Test
     void rejects_other_schemes() {
         assertThatThrownBy(() -> service.upload(
                 "ftp://example.com/foo.md", "text/markdown", List.of()))

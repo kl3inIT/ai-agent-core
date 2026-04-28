@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -213,15 +214,8 @@ public class KnowledgeDocumentUploadService {
             throw new IllegalArgumentException("sourceUri must not be blank");
         }
         if (trimmed.startsWith(CLASSPATH_PREFIX)) {
-            List<String> prefixes = effectiveClasspathAllowedPrefixes();
-            for (String prefix : prefixes) {
-                if (trimmed.startsWith(prefix)) {
-                    return;
-                }
-            }
-            throw new IllegalArgumentException(
-                    "sourceUri classpath location is not allowed: " + trimmed
-                            + " (allowed prefixes: " + prefixes + ")");
+            validateClasspathUri(trimmed);
+            return;
         }
         if (trimmed.startsWith(FILE_PREFIX)) {
             String stagingRoot = effectiveFileStagingRoot();
@@ -249,15 +243,26 @@ public class KnowledgeDocumentUploadService {
         }
         // Bare filename — defer to AsyncIngestionWorker's default classpath:ai-kb/ root
         // which must also be in the allowlist for this call to succeed.
-        String implied = "classpath:ai-kb/" + trimmed;
-        List<String> prefixes = effectiveClasspathAllowedPrefixes();
-        for (String prefix : prefixes) {
-            if (implied.startsWith(prefix)) {
-                return;
-            }
+        validateClasspathUri("classpath:ai-kb/" + trimmed);
+    }
+
+    private void validateClasspathUri(String location) {
+        if (containsPathTraversal(location)) {
+            throw new IllegalArgumentException("classpath sourceUri must not contain path traversal: " + location);
         }
-        throw new IllegalArgumentException(
-                "sourceUri bare filename resolves outside allowed classpath prefixes: " + trimmed);
+        String normalized = StringUtils.cleanPath(location);
+        if (containsPathTraversal(normalized)) {
+            throw new IllegalArgumentException("classpath sourceUri must not contain path traversal: " + location);
+        }
+        List<String> prefixes = effectiveClasspathAllowedPrefixes();
+        boolean allowed = prefixes.stream()
+                .map(StringUtils::cleanPath)
+                .anyMatch(normalized::startsWith);
+        if (!allowed) {
+            throw new IllegalArgumentException(
+                    "sourceUri classpath location is not allowed: " + location
+                            + " (allowed prefixes: " + prefixes + ")");
+        }
     }
 
     private List<String> effectiveClasspathAllowedPrefixes() {
@@ -274,6 +279,17 @@ public class KnowledgeDocumentUploadService {
             return null;
         }
         return ragProperties.upload().fileStagingRoot();
+    }
+
+    private static boolean containsPathTraversal(String location) {
+        String path = location.startsWith(CLASSPATH_PREFIX)
+                ? location.substring(CLASSPATH_PREFIX.length())
+                : location;
+        String normalizedSeparators = path.replace('\\', '/');
+        return normalizedSeparators.equals("..")
+                || normalizedSeparators.startsWith("../")
+                || normalizedSeparators.endsWith("/..")
+                || normalizedSeparators.contains("/../");
     }
 
     private static boolean isUnder(File root, File candidate) {
