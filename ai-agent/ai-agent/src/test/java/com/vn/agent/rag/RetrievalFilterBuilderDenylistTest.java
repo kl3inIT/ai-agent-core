@@ -4,7 +4,6 @@ import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.security.AiAgentAdminRole;
-import com.vn.agent.security.AiAgentUserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,7 +25,7 @@ import static org.mockito.Mockito.when;
  * shape produced by {@link RetrievalFilterBuilder#buildFor(Authentication)} when
  * {@link LlmExposurePolicy#getDenylistedEntityNames()} returns a non-empty set,
  * complementing the four-path Spring-boot integration suite in
- * {@link com.vn.agent.exposure.LlmExposurePolicyIntegrationTest}.
+ * {@code LlmExposurePolicyIntegrationTest}.
  *
  * <p>Four assertions:
  * <ol>
