@@ -93,17 +93,17 @@ public class AiExposureRuleListView extends StandardListView<AiExposureRule> {
         return new ComponentRenderer<>(rule -> {
             Button btn = new Button();
             if (Boolean.TRUE.equals(rule.getEnabled())) {
-                btn.setText(messages.getMessage(getClass(), "exposureRulesList.action.hideFromAi"));
+                btn.setText(messages.getMessage("exposureRulesList.action.hideFromAi"));
                 btn.setIcon(VaadinIcon.EYE_SLASH.create());
                 btn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
                 btn.getElement().setAttribute("title",
-                        messages.getMessage(getClass(), "exposureRulesList.action.hideFromAi.tooltip"));
+                        messages.getMessage("exposureRulesList.action.hideFromAi.tooltip"));
             } else {
-                btn.setText(messages.getMessage(getClass(), "exposureRulesList.action.visibleToAi"));
+                btn.setText(messages.getMessage("exposureRulesList.action.visibleToAi"));
                 btn.setIcon(VaadinIcon.EYE.create());
                 btn.addThemeVariants(ButtonVariant.LUMO_SUCCESS);
                 btn.getElement().setAttribute("title",
-                        messages.getMessage(getClass(), "exposureRulesList.action.visibleToAi.tooltip"));
+                        messages.getMessage("exposureRulesList.action.visibleToAi.tooltip"));
             }
             btn.addClickListener(e -> toggleEnabled(rule));
             return btn;
@@ -129,7 +129,7 @@ public class AiExposureRuleListView extends StandardListView<AiExposureRule> {
             // re-save against a stale @Version and trigger OptimisticLockException.
             AiExposureRule saved = unconstrainedDataManager.save(rule);
             exposureRulesDl.load();
-            notifications.create(messages.getMessage(getClass(),
+            notifications.create(messages.getMessage(
                             Boolean.TRUE.equals(saved.getEnabled())
                                     ? "exposureRulesList.action.hideFromAi"
                                     : "exposureRulesList.action.visibleToAi"))

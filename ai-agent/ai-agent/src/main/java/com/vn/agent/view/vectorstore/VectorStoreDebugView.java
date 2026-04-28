@@ -93,13 +93,13 @@ public class VectorStoreDebugView extends StandardView {
     public void onInit(final InitEvent event) {
         // Accessibility: aria labels for icon-only buttons (UI-SPEC Surface 4 requirement).
         filterClearBtn.setAriaLabel(
-                messages.getMessage(getClass(), "vectorStoreDebug.filter.clear"));
+                messages.getMessage("vectorStoreDebug.filter.clear"));
         filterHelpBtn.setAriaLabel(
-                messages.getMessage(getClass(), "vectorStoreDebug.filter.help"));
+                messages.getMessage("vectorStoreDebug.filter.help"));
         // Help button surfaces the filter syntax hint as a tooltip rather than opening a dialog
         // — keeps the read-only debug surface lightweight.
         filterHelpBtn.getElement().setAttribute("title",
-                messages.getMessage(getClass(), "vectorStoreDebug.filter.help.tooltip"));
+                messages.getMessage("vectorStoreDebug.filter.help.tooltip"));
 
         // Fix R7: programmatic Grid<Document> — columns added programmatically, no metaclass binding.
         chunksGrid = new Grid<>(Document.class, false);
@@ -110,7 +110,7 @@ public class VectorStoreDebugView extends StandardView {
         // Column 1: chunk id (value column).
         chunksGrid.addColumn(Document::getId)
                 .setKey("id")
-                .setHeader(messages.getMessage(getClass(), "vectorStoreDebug.column.id"))
+                .setHeader(messages.getMessage("vectorStoreDebug.column.id"))
                 .setWidth("260px")
                 .setFlexGrow(0)
                 .setResizable(true);
@@ -118,13 +118,13 @@ public class VectorStoreDebugView extends StandardView {
         // Column 2: content preview + expand button when truncated (component column).
         chunksGrid.addColumn(new ComponentRenderer<>(this::buildContentCell))
                 .setKey("content")
-                .setHeader(messages.getMessage(getClass(), "vectorStoreDebug.column.content"))
+                .setHeader(messages.getMessage("vectorStoreDebug.column.content"))
                 .setResizable(true);
 
         // Column 3: metadata preview + expand button when truncated (component column).
         chunksGrid.addColumn(new ComponentRenderer<>(this::buildMetadataCell))
                 .setKey("metadata")
-                .setHeader(messages.getMessage(getClass(), "vectorStoreDebug.column.metadata"))
+                .setHeader(messages.getMessage("vectorStoreDebug.column.metadata"))
                 .setResizable(true);
 
         chunksContainer.add(chunksGrid);
@@ -152,7 +152,7 @@ public class VectorStoreDebugView extends StandardView {
             } catch (Exception ex) {
                 log.debug("Vector store debug filter parse failed for input '{}'", filterText, ex);
                 metadataFilterField.setErrorMessage(
-                        messages.getMessage(getClass(), "vectorStoreDebug.error.filterParse"));
+                        messages.getMessage("vectorStoreDebug.error.filterParse"));
                 return;
             }
         }
@@ -186,7 +186,7 @@ public class VectorStoreDebugView extends StandardView {
             return span;
         }
         Button expand = new Button(
-                messages.getMessage(getClass(), "vectorStoreDebug.action.expand"));
+                messages.getMessage("vectorStoreDebug.action.expand"));
         expand.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_SMALL);
         expand.addClickListener(e -> openChunkDetail(doc));
         HorizontalLayout layout = new HorizontalLayout(span, expand);
@@ -203,11 +203,11 @@ public class VectorStoreDebugView extends StandardView {
     private void openChunkDetail(Document doc) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(
-                messages.getMessage(getClass(), "vectorStoreDebug.detail.title"));
+                messages.getMessage("vectorStoreDebug.detail.title"));
         dialog.setWidth("640px");
 
         TextArea contentArea = new TextArea(
-                messages.getMessage(getClass(), "vectorStoreDebug.column.content"));
+                messages.getMessage("vectorStoreDebug.column.content"));
         contentArea.setValue(doc.getText() != null ? doc.getText() : "");
         contentArea.setMinRows(5);
         contentArea.setMaxRows(20);
@@ -215,7 +215,7 @@ public class VectorStoreDebugView extends StandardView {
         contentArea.setWidthFull();
 
         TextArea metaArea = new TextArea(
-                messages.getMessage(getClass(), "vectorStoreDebug.column.metadata"));
+                messages.getMessage("vectorStoreDebug.column.metadata"));
         metaArea.setValue(doc.getMetadata() != null ? doc.getMetadata().toString() : "{}");
         metaArea.setMinRows(5);
         metaArea.setMaxRows(10);
@@ -229,7 +229,7 @@ public class VectorStoreDebugView extends StandardView {
         dialog.add(content);
 
         Button closeBtn = new Button(
-                messages.getMessage(getClass(), "vectorStoreDebug.detail.close"),
+                messages.getMessage("vectorStoreDebug.detail.close"),
                 e -> dialog.close());
         dialog.getFooter().add(closeBtn);
         dialog.open();
