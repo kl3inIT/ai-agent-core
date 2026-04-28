@@ -24,6 +24,7 @@ must_haves:
     - "BuiltInMutationTools is a @Component gated by @ConditionalOnProperty(prefix=\"ai-agent.tools.mutation\", name=\"enabled\", havingValue=\"true\") and remains absent by default."
     - "11-07A exposes only create_record and update_record initially, with the exact D-01 signatures and mandatory idempotencyKey; delete_record must not exist."
     - "Both tools enforce AiAgentMutationRole.CODE before entity resolution, idempotency reservation, MutationGuard, or MutationSaveExecutor."
+    - "Task 0 is mandatory: verify actual Jmix 2.8/project metadata APIs for scalar/to-one mutation before implementing mass-assignment validation, then record findings and sources in 11-07A-SUMMARY.md."
     - "create_record uses ToolEntityResolver.resolveCreatableEntityOrThrow; update_record uses resolveUpdatableEntityOrThrow. Create visibility is intentionally conservative: the entity must be LLM-visible and create-permitted, not write-only hidden."
     - "Every expected ToolUserError path flows through MutationErrorTranslator before ToolResultFormatter.error; malformed ids and converter failures normalize to parameter_conversion_error."
     - "Idempotency reservation happens before any host save and only RESERVED may proceed. REPLAY/VIOLATION/PENDING short-circuit without host mutation."
@@ -41,10 +42,29 @@ Implement the create/update mutation core only. This splits the former 11-07 mon
 
 <tasks>
 <task type="auto" tdd="false">
+  <name>Task 0: Verify scalar/to-one metadata APIs before coding validators</name>
+  <action>
+Before implementing `validateWritableProperty`, `coerceAttributeValue`, or to-one assignment, inspect actual Jmix 2.8 APIs and local source/Javadocs for:
+- `MetaClass.findProperty(...)` behavior for unknown attributes
+- primary key lookup via `MetadataTools`
+- version/audit/system field detection
+- read-only/transient/non-JPA/calculated property detection
+- `MetaProperty.getRange()` and cardinality helpers for scalar, to-one, and collection properties
+- `EntityValues.setValue(...)` behavior for typed scalar values, enum-backed fields, and loaded entity references
+- annotated-element/property annotation access needed by the validator
+
+Record the exact source of each fact in `11-07A-SUMMARY.md`. Use Context7 `/jmix-framework/jmix-context7`, local Jmix source/Javadocs, and existing project usages; do not guess method names from memory. If an API differs from the 11-07 reference snippet, stop and repair this plan before coding.
+  </action>
+  <verify>
+    <automated>./gradlew :ai-agent:compileJava</automated>
+  </verify>
+</task>
+
+<task type="auto" tdd="false">
   <name>Task 1: DiffSerializer, MutationRequestHasher, and MutationSaveExecutor</name>
   <action>
 1. Create `DiffSerializer` with PII hashing via `AiAgentAuditProperties.resolvedSensitiveFields()`. Null sensitive values must hash safely instead of throwing.
-2. Extract request hashing into package-private `MutationRequestHasher`; both tools and tests use this class directly. Canonical JSON sorts map keys and preserves value types.
+2. Extract request hashing into package-private `MutationRequestHasher`; both tools and tests use this class directly. Canonical JSON sorts map keys, preserves value types, and hashes the raw LLM call shape before type coercion.
 3. Create `MutationSaveExecutor` with public `@Transactional save(Object)` and `saveAll(Object...)`; no remove method in v1.1.
 4. Keep `@Transactional` off `BuiltInMutationTools`; the tool bean must cross the Spring proxy by calling `MutationSaveExecutor`.
   </action>
@@ -70,6 +90,7 @@ Implement the create/update mutation core only. This splits the former 11-07 mon
 </tasks>
 
 <success_criteria>
+- `11-07A-SUMMARY.md` records the verified Jmix metadata/EntityValues APIs used by scalar and to-one mutation validators.
 - `create_record` and `update_record` compile and expose stable error JSON for expected failures.
 - Users without `AiAgentMutationRole.CODE` receive `access_denied` before idempotency reservation or host save; users still need normal Jmix create/update policies after the marker passes.
 - `MutationRequestHasher` is production code, not a private method hidden from tests.

@@ -21,7 +21,7 @@ must_haves:
     - "After 11-07C, BuiltInMutationTools exposes exactly four mutation tools and no delete_record."
     - "Every success/failure/replay path writes audit only through safeWriteAudit; auditWriter.writeToolCall must appear nowhere else in BuiltInMutationTools."
     - "safeWriteAudit catches/logs RuntimeException, never changes MutationCommitState, and never causes expected in-method failures to throw through MutationToolCallbackBoundaryDecorator."
-    - "Replay is live: use resultEntityName/resultEntityId with FetchPlan.INSTANCE_NAME and current security/locale; do not store or replay full result JSON."
+    - "Replay is live: use resultEntityName/resultEntityId with FetchPlan.INSTANCE_NAME and current security/locale; if current read/exposure denies loading, return IDEMPOTENT_REPLAY with entityId and omitted/null instanceName only; do not store or replay full result JSON."
     - "COMMIT_FAILED means commit outcome unknown after host save returned, not a known database rollback. Locale captions must not say database commit failed."
     - "Known save-time rollback failures map to stable error JSON and ERROR audit; post-host-save finalization failures use COMMIT_FAILED and leave the intent non-reclaimable."
     - "markCommitUnknown is defensive: it re-reads the current AiMutationIntent row and never downgrades COMMITTED to COMMIT_UNKNOWN after a transaction-completion exception."
@@ -70,6 +70,7 @@ Harden the final mutation boundary: commit-state handling, idempotent replay fet
 - `COMMIT_FAILED` captions do not say "database commit failed".
 - Boundary-decorator tests can rely on mutation tools not throwing for expected in-method failures.
 - Replay loads use `FetchPlan.INSTANCE_NAME` and returns fresh `instanceName` from `resultEntityId/resultEntityName` without storing full result JSON.
+- Replay permission behavior is explicit: current read/exposure denial suppresses instanceName/record fields but does not duplicate the host write or turn an exact replay into a fresh mutation.
 - Success/failure audit arguments include the full tool argument envelope with sensitive values hashed.
 - `safeWriteAudit` catches/logs `RuntimeException` and must not alter `MutationCommitState`.
 - `safeWriteAudit` failure logging contains `AI_AGENT_MUTATION_AUDIT_WRITE_FAILED` and intentionally avoids raw arguments/PII.

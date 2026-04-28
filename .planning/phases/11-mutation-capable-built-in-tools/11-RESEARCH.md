@@ -576,24 +576,24 @@ public class MutationErrorTranslator {
         if (thrown instanceof org.springframework.dao.OptimisticLockingFailureException
                 || thrown instanceof javax.persistence.OptimisticLockException) {
             return new ToolUserError("concurrent_modification",
-                    metaClass.getName() + " was modified concurrently",
+                    "record was modified concurrently",
                     List.of("call get_record to fetch current state, then retry with a fresh idempotencyKey"));
         }
         if (thrown instanceof org.springframework.security.access.AccessDeniedException
                 || thrown instanceof io.jmix.security.AccessDeniedException) {
             return new ToolUserError("access_denied",
-                    "operation not permitted on " + metaClass.getName(),
+                    "operation not permitted",
                     List.of("do not retry; surface to user"));
         }
         if (thrown instanceof javax.validation.ConstraintViolationException
                 || thrown instanceof org.springframework.dao.DataIntegrityViolationException) {
             return new ToolUserError("validation_failed",
-                    "value validation failed for " + metaClass.getName(),
+                    "value validation failed",
                     List.of("call describe_entity to inspect mandatory and constraint fields; if you change values, retry with a fresh idempotencyKey"));
         }
         if (thrown instanceof ToolUserError tue) {
             // already typed, but mutation boundary still rebuilds safe prose
-            // from stable code + entity name; do not pass through raw messages.
+            // from stable code + generic wording; do not pass through raw messages or internal entity names.
             return sanitizeStableToolUserError(tue.toDto().error(), metaClass);
         }
         // Default: do NOT echo exception message into LLM result string (P-22)

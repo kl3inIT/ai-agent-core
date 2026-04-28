@@ -168,13 +168,13 @@ public class MutationErrorTranslator {
         if (thrown instanceof org.springframework.dao.OptimisticLockingFailureException
                 || thrown instanceof jakarta.persistence.OptimisticLockException) {
             return new ToolUserError("concurrent_modification",
-                    metaClass.getName() + " was modified concurrently",
+                    "record was modified concurrently",
                     List.of("call get_record to fetch current state, then retry with a fresh idempotencyKey"));
         }
         if (thrown instanceof org.springframework.security.access.AccessDeniedException
                 || thrown instanceof io.jmix.security.AccessDeniedException) {
             return new ToolUserError("access_denied",
-                    "operation not permitted on " + metaClass.getName(),
+                    "operation not permitted",
                     List.of("do not retry; surface to user"));
         }
         if (thrown instanceof jakarta.validation.ConstraintViolationException
