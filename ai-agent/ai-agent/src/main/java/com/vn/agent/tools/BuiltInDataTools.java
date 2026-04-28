@@ -23,9 +23,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * The six read-only @Tool methods the LLM can call (TOOL-03). A single {@link Component} so
@@ -154,13 +156,14 @@ public class BuiltInDataTools {
             String entityName) {
         try {
             MetaClass metaClass = resolveReadableEntityOrThrow(entityName);
-            Set<String> readableAttributeNames = llmExposurePolicy.getReadableSchema().get(metaClass);
-            if (readableAttributeNames == null) {
+            Set<String> schemaAttributeNames = llmExposurePolicy.getReadableSchema().get(metaClass);
+            if (schemaAttributeNames == null) {
                 // Phase 10 EXP-09 uniform opacity: denial paths surface as unknown_entity (Fix R4).
                 // The defensive null guard hits if canReadEntity passed but the schema map omits
                 // this key (e.g. denylist races); treat as opaque-not-found.
                 throw new ToolUserError("unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
             }
+            Set<String> readableAttributeNames = llmReadableAttributes(metaClass, schemaAttributeNames);
             return toolResultFormatter.describe(metaClass, readableAttributeNames);
         } catch (ToolUserError toolUserError) {
             return toolResultFormatter.error(toolUserError);
@@ -284,10 +287,10 @@ public class BuiltInDataTools {
 
             MetaClass targetMetaClass = relationshipProperty.getRange().asClass();
             if (!llmExposurePolicy.canReadEntity(targetMetaClass)) {
-                // Phase 10 EXP-09 uniform opacity (Fix R4): denied target entity surfaces as
-                // unknown_entity for the target name — same opacity as resolveReadableEntityOrThrow.
-                throw new ToolUserError("unknown_entity",
-                        "no entity named " + targetMetaClass.getName(), UnknownEntityHints.AS_LIST);
+                // Phase 10 EXP-09 uniform opacity: if the relationship target entity is hidden,
+                // the relationship itself is hidden. Do not disclose the target entity name.
+                throw new ToolUserError("unknown_attribute",
+                        "no attribute " + relationship + " on " + rootMetaClass.getName());
             }
 
             // D-13: SPI overrides the data fetch plan only; INSTANCE_NAME on the relationship
@@ -326,6 +329,17 @@ public class BuiltInDataTools {
     }
 
     // -------- helpers --------
+
+    private Set<String> llmReadableAttributes(MetaClass metaClass, Set<String> readableAttributeNames) {
+        return readableAttributeNames.stream()
+                .filter(attributeName -> {
+                    MetaProperty property = metaClass.findProperty(attributeName);
+                    return property == null
+                            || !property.getRange().isClass()
+                            || llmExposurePolicy.canReadEntity(property.getRange().asClass());
+                })
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
 
     /**
      * Resolve an LLM-supplied entity name to a {@link MetaClass}, verifying read access against
