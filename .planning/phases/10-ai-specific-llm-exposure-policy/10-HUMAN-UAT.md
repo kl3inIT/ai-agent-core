@@ -1,18 +1,18 @@
 ---
-status: partial
+status: complete
 phase: 10-ai-specific-llm-exposure-policy
 source: [10-VERIFICATION.md]
 started: 2026-04-28T02:47:51Z
-updated: 2026-04-28T08:21:28Z
+updated: 2026-04-28T09:45:00Z
 ---
 
 ## Current Test
 
 number: 5
-name: Visual verification of AiExposureRuleListView + AiExposureRuleDetailView admin workflow
+name: Visual verification of AiConfigurationView exposure-rule workflow
 expected: |
-  Admin can list, filter (genericFilter+propertyFilter), create, edit, toggle, and delete exposure rules. Toggle action flips `enabled` and persists. Detail view enforces required fields and unique entityName constraint. Both EN and VI message bundles render correctly.
-awaiting: user response
+  Admin can open AI > AI configuration/Cấu hình AI, switch to Control rules/Quy tắc kiểm soát, select one or more entities in the chip-style multiSelectComboBox, save, refresh, and see the same selected entities remain hidden from AI. Unselecting an entity and saving makes that entity visible to AI again. The Parameters and Outgoing context tabs remain available from the same view, EN/VI message bundles render correctly, and the Outgoing context must not include AI internal entities or sensitive fields such as User.password.
+result: pass
 
 ## Tests
 
@@ -32,9 +32,9 @@ result: pass
 expected: If reingest fails after permission save commits, stale chunks remain visible with new permissions until manually reingested. Edge-case RAG leak. Confirm acceptable risk or schedule mitigation.
 result: pass
 
-### 5. Visual verification of AiExposureRuleListView + AiExposureRuleDetailView admin workflow
-expected: Admin can list, filter (genericFilter+propertyFilter), create, edit, toggle, and delete exposure rules. Toggle action flips `enabled` and persists. Detail view enforces required fields and unique entityName constraint. Both EN and VI message bundles render correctly.
-result: [pending]
+### 5. Visual verification of AiConfigurationView exposure-rule workflow
+expected: Admin can open AI > AI configuration/Cấu hình AI, switch to Control rules/Quy tắc kiểm soát, select one or more entities in the chip-style multiSelectComboBox, save, refresh, and see the same selected entities remain hidden from AI. Unselecting an entity and saving makes that entity visible to AI again. The Parameters and Outgoing context tabs remain available from the same view, EN/VI message bundles render correctly, and the Outgoing context must not include AI internal entities or sensitive fields such as User.password.
+result: pass
 
 ### 6. Visual verification of VectorStoreDebugView pagination + FilterExpressionTextParser UX
 expected: Admin-only access enforced. Empty-string similaritySearch returns chunk preview. Metadata filter input parses via FilterExpressionTextParser; invalid syntax shows readable error. Read-only — no row mutation actions exposed.
@@ -44,9 +44,9 @@ reason: Removed by product decision; Knowledge Document Detail view now replaces
 ## Summary
 
 total: 6
-passed: 4
+passed: 5
 issues: 0
-pending: 1
+pending: 0
 skipped: 1
 blocked: 0
 

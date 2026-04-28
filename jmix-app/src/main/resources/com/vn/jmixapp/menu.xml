@@ -11,13 +11,10 @@
         <item view="AiAgent_Chat" id="aiAgent.chat" title="msg://com.vn.agent/menu.chat"/>
         <item view="AiAgent_Conversation.list" id="aiAgent.conversations"
               title="msg://com.vn.agent/menu.conversations"/>
-        <item view="AiAgent_Parameters.list" id="aiAgent.parameters.list" title="msg://com.vn.agent/menu.parameters"/>
+        <item view="AiAgent_Configuration" id="aiAgent.configuration"
+              title="msg://com.vn.agent/menu.configuration"/>
         <item view="AiAgent_KnowledgeBase.list" id="aiAgent.knowledge.list" title="msg://com.vn.agent/menu.knowledge"/>
         <item view="AiAgent_AiAuditEvent.list" id="aiAgent.audit.list" title="msg://com.vn.agent/menu.audit"/>
-        <item view="AiAgent_BaselineContext" id="aiAgent.baselineContext"
-              title="msg://com.vn.agent/menu.baselineContext"/>
-        <item view="AiAgent_AiExposureRule.list" id="aiAgent.exposureRules.list"
-              title="msg://com.vn.agent/menu.exposureRules"/>
     </menu>
     <menu id="security" title="msg://com.vn.agent/menu.security.title">
         <item view="sec_ResourceRoleModel.list"

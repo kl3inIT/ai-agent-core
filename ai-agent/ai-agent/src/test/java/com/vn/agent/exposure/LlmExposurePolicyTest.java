@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
  *     <li>{@code canReadEntity()} = {@code delegate.canReadEntity AND NOT denied}</li>
  *     <li>{@code canReadAttribute()} = pure pass-through to delegate</li>
  *     <li>{@code canModify()} = {@code AccessManager.isUpdatePermitted AND NOT denied}</li>
- *     <li>{@code getDenylistedEntityNames()} = repository.findEnabledExcludedEntityNames()</li>
+ *     <li>{@code getDenylistedEntityNames()} = built-in AI internals + repository rules</li>
  * </ul>
  */
 class LlmExposurePolicyTest {
@@ -83,6 +83,28 @@ class LlmExposurePolicyTest {
         Map<MetaClass, Set<String>> out = policy.getReadableSchema();
 
         assertThat(out.keySet()).extracting(MetaClass::getName).containsExactly("entityA");
+    }
+
+    @Test
+    void getReadableSchemaRemovesAiInternalEntitiesByDefault() {
+        CurrentUserSchemaAccess delegate = mock(CurrentUserSchemaAccess.class);
+        LlmExposureRuleRepository ruleRepository = mock(LlmExposureRuleRepository.class);
+        AccessManager accessManager = mock(AccessManager.class);
+
+        MetaClass businessEntity = entityMock("jmixapp_Product");
+        MetaClass internalEntity = entityMock("aiExposure_AiExposureRule");
+        Map<MetaClass, Set<String>> base = new LinkedHashMap<>();
+        base.put(businessEntity, Set.of("name"));
+        base.put(internalEntity, Set.of("entityName"));
+        when(delegate.getReadableSchema()).thenReturn(base);
+        when(ruleRepository.findEnabledExcludedEntityNames()).thenReturn(Set.of());
+
+        LlmExposurePolicy policy = new LlmExposurePolicy(delegate, ruleRepository, accessManager);
+        Map<MetaClass, Set<String>> out = policy.getReadableSchema();
+
+        assertThat(out.keySet()).extracting(MetaClass::getName)
+                .containsExactly("jmixapp_Product")
+                .doesNotContain("aiExposure_AiExposureRule");
     }
 
     @Test
@@ -145,6 +167,20 @@ class LlmExposurePolicyTest {
 
         LlmExposurePolicy policy = new LlmExposurePolicy(delegate, ruleRepository, accessManager);
         assertThat(policy.canReadEntity(mc)).isTrue();
+    }
+
+    @Test
+    void canReadEntityIsFalseForAiInternalEntityEvenWhenDelegateAllows() {
+        CurrentUserSchemaAccess delegate = mock(CurrentUserSchemaAccess.class);
+        LlmExposureRuleRepository ruleRepository = mock(LlmExposureRuleRepository.class);
+        AccessManager accessManager = mock(AccessManager.class);
+
+        MetaClass mc = entityMock("ai_AiParameters");
+        when(delegate.canReadEntity(mc)).thenReturn(true);
+        when(ruleRepository.findEnabledExcludedEntityNames()).thenReturn(Set.of());
+
+        LlmExposurePolicy policy = new LlmExposurePolicy(delegate, ruleRepository, accessManager);
+        assertThat(policy.canReadEntity(mc)).isFalse();
     }
 
     @Test
@@ -219,7 +255,7 @@ class LlmExposurePolicyTest {
     }
 
     @Test
-    void getDenylistedEntityNamesReturnsRepositoryResult() {
+    void getDenylistedEntityNamesReturnsInternalAndRepositoryResult() {
         CurrentUserSchemaAccess delegate = mock(CurrentUserSchemaAccess.class);
         LlmExposureRuleRepository ruleRepository = mock(LlmExposureRuleRepository.class);
         AccessManager accessManager = mock(AccessManager.class);
@@ -228,11 +264,13 @@ class LlmExposurePolicyTest {
         when(ruleRepository.findEnabledExcludedEntityNames()).thenReturn(denied);
 
         LlmExposurePolicy policy = new LlmExposurePolicy(delegate, ruleRepository, accessManager);
-        assertThat(policy.getDenylistedEntityNames()).containsExactlyInAnyOrder("entityA", "entityB");
+        assertThat(policy.getDenylistedEntityNames())
+                .contains("entityA", "entityB")
+                .containsAll(AiInternalEntityNames.all());
     }
 
     @Test
-    void getDenylistedEntityNamesReturnsEmptyWhenNoRules() {
+    void getDenylistedEntityNamesReturnsInternalEntitiesWhenNoRules() {
         CurrentUserSchemaAccess delegate = mock(CurrentUserSchemaAccess.class);
         LlmExposureRuleRepository ruleRepository = mock(LlmExposureRuleRepository.class);
         AccessManager accessManager = mock(AccessManager.class);
@@ -240,6 +278,7 @@ class LlmExposurePolicyTest {
         when(ruleRepository.findEnabledExcludedEntityNames()).thenReturn(Set.of());
 
         LlmExposurePolicy policy = new LlmExposurePolicy(delegate, ruleRepository, accessManager);
-        assertThat(policy.getDenylistedEntityNames()).isEmpty();
+        assertThat(policy.getDenylistedEntityNames())
+                .containsExactlyInAnyOrderElementsOf(AiInternalEntityNames.all());
     }
 }

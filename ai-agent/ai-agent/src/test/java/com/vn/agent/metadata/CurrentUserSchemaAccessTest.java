@@ -2,8 +2,10 @@ package com.vn.agent.metadata;
 
 import io.jmix.core.AccessManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.annotation.Secret;
 import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.accesscontext.EntityAttributeContext;
+import io.jmix.core.entity.annotation.SystemLevel;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Session;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 
+import java.lang.reflect.AnnotatedElement;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +44,29 @@ class CurrentUserSchemaAccessTest {
         }
         lenient().when(mc.getProperties()).thenReturn(props);
         return mc;
+    }
+
+    private static MetaClass entityMockWithProperties(String name, MetaProperty... properties) {
+        MetaClass mc = mock(MetaClass.class);
+        lenient().when(mc.getName()).thenReturn(name);
+        lenient().when(mc.getJavaClass()).thenReturn((Class) Object.class);
+        lenient().when(mc.getProperties()).thenReturn(List.of(properties));
+        return mc;
+    }
+
+    private static MetaProperty propertyMock(String name) {
+        MetaProperty property = mock(MetaProperty.class);
+        lenient().when(property.getName()).thenReturn(name);
+        return property;
+    }
+
+    private static MetaProperty sensitivePropertyMock(
+            String name, Class<? extends java.lang.annotation.Annotation> annotationClass) {
+        MetaProperty property = propertyMock(name);
+        AnnotatedElement annotatedElement = mock(AnnotatedElement.class);
+        lenient().when(annotatedElement.isAnnotationPresent(annotationClass)).thenReturn(true);
+        lenient().when(property.getAnnotatedElement()).thenReturn(annotatedElement);
+        return property;
     }
 
     private static Metadata metadataWith(MetaClass... classes) {
@@ -114,6 +140,32 @@ class CurrentUserSchemaAccessTest {
             assertThat(out).hasSize(1);
             Set<String> visible = out.values().iterator().next();
             assertThat(visible).containsExactly("visible").doesNotContain("hidden");
+        }
+    }
+
+    @Test
+    void systemLevelAndSecretAttributesAreFilteredBeforePromptSchema() {
+        AccessManager accessManager = mock(AccessManager.class);
+        MetaProperty username = propertyMock("username");
+        MetaProperty password = sensitivePropertyMock("password", SystemLevel.class);
+        MetaProperty apiToken = sensitivePropertyMock("apiToken", Secret.class);
+        MetaClass mc = entityMockWithProperties("jmixapp_User", username, password, apiToken);
+        Metadata metadata = metadataWith(mc);
+
+        try (MockedConstruction<CrudEntityContext> crud = Mockito.mockConstruction(
+                CrudEntityContext.class,
+                (mockCtx, ctx) -> when(mockCtx.isReadPermitted()).thenReturn(true));
+             MockedConstruction<EntityAttributeContext> attr = Mockito.mockConstruction(
+                     EntityAttributeContext.class,
+                     (mockCtx, ctx) -> when(mockCtx.canView()).thenReturn(true))) {
+
+            CurrentUserSchemaAccess currentUserSchemaAccess = new CurrentUserSchemaAccess(accessManager, metadata);
+            Map<MetaClass, Set<String>> out = currentUserSchemaAccess.getReadableSchema();
+
+            assertThat(out).hasSize(1);
+            assertThat(out.values().iterator().next())
+                    .containsExactly("username")
+                    .doesNotContain("password", "apiToken");
         }
     }
 

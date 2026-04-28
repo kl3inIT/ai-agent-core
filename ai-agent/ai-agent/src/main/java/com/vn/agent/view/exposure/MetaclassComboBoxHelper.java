@@ -1,5 +1,6 @@
 package com.vn.agent.view.exposure;
 
+import com.vn.agent.exposure.AiInternalEntityNames;
 import io.jmix.core.MessageTools;
 import io.jmix.core.Metadata;
 import io.jmix.core.entity.annotation.SystemLevel;
@@ -8,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,19 +35,6 @@ import java.util.stream.Collectors;
 @Component
 public class MetaclassComboBoxHelper {
 
-    /**
-     * AI-* internal entity names (the {@code @Entity(name=...)} values, not Java class
-     * simple names). Excluded from the dropdown to keep the governance UI usable.
-     */
-    private static final Set<String> AI_INTERNAL_ENTITY_NAMES = Set.of(
-            "ai_AiAuditEvent",
-            "ai_AiConversation",
-            "ai_AiMessage",
-            "ai_AiKnowledgeDocument",
-            "ai_AiParameters",
-            "aiExposure_AiExposureRule"
-    );
-
     private final Metadata metadata;
     private final MessageTools messageTools;
 
@@ -64,7 +51,7 @@ public class MetaclassComboBoxHelper {
     public List<MetaClass> buildFilteredList() {
         return metadata.getSession().getClasses().stream()
                 .filter(mc -> !mc.getJavaClass().isAnnotationPresent(SystemLevel.class))
-                .filter(mc -> !AI_INTERNAL_ENTITY_NAMES.contains(mc.getName()))
+                .filter(mc -> !AiInternalEntityNames.contains(mc.getName()))
                 .sorted(Comparator.comparing(messageTools::getEntityCaption))
                 .collect(Collectors.toList());
     }

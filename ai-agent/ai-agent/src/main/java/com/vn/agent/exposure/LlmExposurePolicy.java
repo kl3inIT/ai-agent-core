@@ -6,14 +6,15 @@ import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.metamodel.model.MetaClass;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * Phase 10 LLM visibility boundary. Wraps {@link CurrentUserSchemaAccess} (delegate-and-narrow):
- * composition is {@code userVisible AND NOT excluded}. Rules can only narrow visibility, never
- * widen it.
+ * composition is {@code userVisible AND NOT excluded}. The built-in AI internal entities are
+ * always excluded; admin rules can only narrow visibility further, never widen it.
  *
  * <p>Stateless {@link Component} — reads rules per-call via {@link LlmExposureRuleRepository}
  * (no cache, per D-14). Expected rule count &lt;50; per-call latency is negligible compared to
@@ -44,7 +45,7 @@ public class LlmExposurePolicy {
      * in the loop (avoids N-query hot-path per Pitfall #1 in RESEARCH.md).
      */
     public Map<MetaClass, Set<String>> getReadableSchema() {
-        Set<String> denied = ruleRepository.findEnabledExcludedEntityNames();
+        Set<String> denied = hiddenEntityNames();
         Map<MetaClass, Set<String>> base = delegate.getReadableSchema();
         if (denied.isEmpty()) {
             return base;
@@ -60,7 +61,7 @@ public class LlmExposurePolicy {
      */
     public boolean canReadEntity(MetaClass mc) {
         return delegate.canReadEntity(mc)
-                && !ruleRepository.findEnabledExcludedEntityNames().contains(mc.getName());
+                && !hiddenEntityNames().contains(mc.getName());
     }
 
     /**
@@ -81,16 +82,22 @@ public class LlmExposurePolicy {
         CrudEntityContext ctx = new CrudEntityContext(mc);
         accessManager.applyRegisteredConstraints(ctx);
         return ctx.isUpdatePermitted()
-                && !ruleRepository.findEnabledExcludedEntityNames().contains(mc.getName());
+                && !hiddenEntityNames().contains(mc.getName());
     }
 
     /**
-     * Returns the set of {@link MetaClass#getName()} strings whose {@link AiExposureRule}
-     * has {@code enabled=true}. Empty set when no rules exist; never null.
+     * Returns the set of {@link MetaClass#getName()} strings hidden from the LLM surface:
+     * built-in AI internal entities plus enabled admin denylist rules. Never null.
      * Public because {@code RetrievalFilterBuilder} (cross-package, rag package) consumes it
      * for EXP-05 source_entity NOT IN filter. Do NOT cache — see D-14.
      */
     public Set<String> getDenylistedEntityNames() {
-        return ruleRepository.findEnabledExcludedEntityNames();
+        return hiddenEntityNames();
+    }
+
+    private Set<String> hiddenEntityNames() {
+        Set<String> hidden = new LinkedHashSet<>(AiInternalEntityNames.all());
+        hidden.addAll(ruleRepository.findEnabledExcludedEntityNames());
+        return hidden;
     }
 }

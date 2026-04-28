@@ -33,14 +33,13 @@ public interface AiAgentAdminRole {
 
     @MenuPolicy(menuIds = {
             "aiAgent.chat",
-            "aiAgent.baselineContext",
             "aiAgent.conversations",
-            "aiAgent.parameters.list",
+            "aiAgent.configuration",
             "aiAgent.knowledge.list",
-            "aiAgent.audit.list",
-            "aiAgent.exposureRules.list"})
+            "aiAgent.audit.list"})
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
+            "AiAgent_Configuration",
             "AiAgent_BaselineContext",
             "AiAgent_Conversation.list", "AiAgent_Conversation.detail",
             "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
