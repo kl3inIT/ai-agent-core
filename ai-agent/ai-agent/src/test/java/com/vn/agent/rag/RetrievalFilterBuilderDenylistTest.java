@@ -35,8 +35,8 @@ import static org.mockito.Mockito.when;
  *       record {@code toString}).</li>
  *   <li>Empty denylist → expression contains no {@code source_entity} reference (zero-overhead
  *       short-circuit, EXP-05).</li>
- *   <li>Admin user → {@code buildFor} returns {@code null} regardless of denylist contents
- *       (admin bypass is structurally above the policy lookup).</li>
+ *   <li>Admin user → admin bypass skips role-overlap filtering only; denylist filtering still
+ *       applies when denylist contents are present.</li>
  *   <li><b>Fix R6 / D-06 legacy-doc carve-out:</b> a chunk with NO {@code source_entity}
  *       metadata key remains visible. Plan 10-05 chose the defensive
  *       {@code OR(isNull(source_entity), nin(source_entity, denied))} form to guarantee this
@@ -126,14 +126,12 @@ class RetrievalFilterBuilderDenylistTest {
     }
 
     /**
-     * Test 3 — Admin user with bypass enabled: {@code buildFor} returns {@code null} so the
-     * caller (DefaultChatServiceImpl) omits the FILTER_EXPRESSION advisor param and admins
-     * see all chunks. The denylist lookup must not be consulted; a non-empty denylist mock
-     * still yields a {@code null} return because the bypass branch is structurally above
-     * the {@code getDenylistedEntityNames()} call (RetrievalFilterBuilder.java line ~74).
+     * Test 3 — Admin user with bypass enabled still receives exposure denylist filtering.
+     * Admin bypass only skips role-overlap checks; it must not widen the LLM-visible surface
+     * beyond the exposure policy.
      */
     @Test
-    void whenAdminUser_thenBuildForReturnsNull() {
+    void whenAdminUserAndDenylistNonEmpty_thenBuildForReturnsExposureFilter() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(
                 ragProps(true), embeddingProps(),
                 exposurePolicyWithDenylist("OrderEntity"));
@@ -142,8 +140,15 @@ class RetrievalFilterBuilderDenylistTest {
         Filter.Expression expr = builder.buildFor(auth);
 
         assertThat(expr)
-                .as("Admin bypass must return null even when denylist is non-empty (RAG D-06 admin bypass)")
-                .isNull();
+                .as("Admin bypass must not skip exposure denylist filtering")
+                .isNotNull();
+        String rendered = expr.toString();
+        assertThat(rendered).contains(ChunkMetadata.EMBEDDING_MODEL);
+        assertThat(rendered).contains(ChunkMetadata.SOURCE_ENTITY);
+        assertThat(rendered).contains("OrderEntity");
+        assertThat(rendered)
+                .as("Admin exposure filter must bypass role-overlap metadata")
+                .doesNotContain(ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE));
     }
 
     /**

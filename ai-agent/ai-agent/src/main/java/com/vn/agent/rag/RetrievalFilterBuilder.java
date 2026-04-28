@@ -20,10 +20,11 @@ import java.util.stream.Collectors;
  *
  * <ul>
  *   <li><b>Admin bypass (D-06)</b> — when {@code admin-bypass=true} (default) AND the caller
- *       holds {@link AiAgentAdminRole#CODE} or Jmix's {@code system-full-access}, returns
- *       {@code null}. The caller (DefaultChatServiceImpl) MUST skip setting the
- *       {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param when this returns
- *       {@code null}; the retriever then runs without any filter.</li>
+ *       holds {@link AiAgentAdminRole#CODE} or Jmix's {@code system-full-access}, role-overlap
+ *       filtering is bypassed. Exposure denylist filtering still applies, because exposure rules
+ *       narrow the LLM-visible surface for every user. If no denylist exists, the method returns
+ *       {@code null} and the caller skips setting the
+ *       {@code VectorStoreDocumentRetriever.FILTER_EXPRESSION} advisor param.</li>
  *   <li><b>Non-admin</b> — returns {@code OR over (eq(embeddingModel,current) AND role_* flag)}
  *       (D-03 embedding-model drift clause + D-09 ANY role-overlap semantics).</li>
  *   <li><b>Empty roles / null authentication</b> — returns a fail-closed filter that matches
@@ -80,16 +81,41 @@ public class RetrievalFilterBuilder {
                         .map(RetrievalFilterBuilder::toRoleCode)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        // D-06: admin bypass returns null so caller omits the FILTER_EXPRESSION param entirely.
-        if (ragProps.isAdminBypass()
-                && (roles.contains(AiAgentAdminRole.CODE)
-                || roles.contains(JMIX_SYSTEM_FULL_ACCESS_ROLE_CODE))) {
-            return null;
-        }
-
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         String currentModel = embeddingProps.resolvedModel();
         FilterExpressionBuilder.Op modelPin = b.eq(ChunkMetadata.EMBEDDING_MODEL, currentModel);
+
+        // EXP-05 / D-05: entity denylist NOT IN clause. Admin bypass must not bypass this
+        // clause; exposure rules are "current user visibility AND NOT excluded".
+        //
+        // D-06 (legacy-doc carve-out, Fix R6): chunks WITHOUT a SOURCE_ENTITY metadata key MUST
+        // remain visible regardless of denylist contents. The pgvector backend stores chunk
+        // metadata as JSONB and translates filter expressions into JSONPath predicates; with a
+        // bare nin predicate the missing-key case is converter-dependent and Spring AI's
+        // pgvector converter has historically excluded such rows (the JSONPath predicate
+        // evaluates to NULL → filtered out). To guarantee D-06 is satisfied across all current
+        // and future Spring AI 1.1.x converters, we use the defensive nullable form:
+        //
+        //     (source_entity IS NULL) OR (source_entity NOT IN <denied>)
+        //
+        // FilterExpressionBuilder.isNull() and nin() are both confirmed present on the generic
+        // builder (Spring AI 1.1.4) and pgvector implements both predicates.
+        Set<String> denied = llmExposurePolicy.getDenylistedEntityNames();
+        FilterExpressionBuilder.Op exposureClause = null;
+        if (!denied.isEmpty()) {
+            exposureClause = b.or(
+                    b.isNull(ChunkMetadata.SOURCE_ENTITY),
+                    b.nin(ChunkMetadata.SOURCE_ENTITY, new ArrayList<>(denied)));
+        }
+
+        // D-06: admin bypass bypasses role-overlap checks only. If a denylist exists, keep the
+        // model pin plus exposure clause; if no denylist exists, preserve the historical null
+        // return so the caller omits FILTER_EXPRESSION entirely.
+        if (ragProps.isAdminBypass()
+                && (roles.contains(AiAgentAdminRole.CODE)
+                || roles.contains(JMIX_SYSTEM_FULL_ACCESS_ROLE_CODE))) {
+            return exposureClause == null ? null : b.and(modelPin, exposureClause).build();
+        }
 
         // D-05 fail-closed: empty role set (anonymous or unauthenticated) → impossible match.
         if (roles.isEmpty()) {
@@ -110,29 +136,10 @@ public class RetrievalFilterBuilder {
                     : b.or(scopedAnyRole, modelAndRole);
         }
 
-        // EXP-05 / D-05: entity denylist NOT IN clause. Admin bypass (above) already returned
-        // null so this code only runs for authenticated non-admin users.
-        //
-        // D-06 (legacy-doc carve-out, Fix R6): chunks WITHOUT a SOURCE_ENTITY metadata key MUST
-        // remain visible regardless of denylist contents. The pgvector backend stores chunk
-        // metadata as JSONB and translates filter expressions into JSONPath predicates; with a
-        // bare nin predicate the missing-key case is converter-dependent and Spring AI's
-        // pgvector converter has historically excluded such rows (the JSONPath predicate
-        // evaluates to NULL → filtered out). To guarantee D-06 is satisfied across all current
-        // and future Spring AI 1.1.x converters, we use the defensive nullable form:
-        //
-        //     (source_entity IS NULL) OR (source_entity NOT IN <denied>)
-        //
-        // FilterExpressionBuilder.isNull() and nin() are both confirmed present on the generic
-        // builder (Spring AI 1.1.4) and pgvector implements both predicates.
-        Set<String> denied = llmExposurePolicy.getDenylistedEntityNames();
-        if (!denied.isEmpty()) {
-            FilterExpressionBuilder.Op notInClause = b.or(
-                    b.isNull(ChunkMetadata.SOURCE_ENTITY),
-                    b.nin(ChunkMetadata.SOURCE_ENTITY, new ArrayList<>(denied)));
+        if (exposureClause != null) {
             scopedAnyRole = (scopedAnyRole == null)
-                    ? notInClause
-                    : b.and(scopedAnyRole, notInClause);
+                    ? exposureClause
+                    : b.and(scopedAnyRole, exposureClause);
         }
 
         return scopedAnyRole.build();
