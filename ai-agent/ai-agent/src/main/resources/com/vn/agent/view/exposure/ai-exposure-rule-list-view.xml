@@ -19,7 +19,7 @@
         <genericFilter id="exposureRulesFilter" dataLoader="exposureRulesDl">
             <properties include=".*"/>
             <configurations>
-                <configuration default="true" name="default">
+                <configuration id="default" default="true" name="default">
                     <propertyFilter property="entityName" operation="CONTAINS"/>
                     <propertyFilter property="enabled" operation="EQUAL"/>
                 </configuration>
