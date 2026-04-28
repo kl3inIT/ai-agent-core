@@ -51,7 +51,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
   4. `@Transactional` (REQUIRED, propagation default) `DataManager.save(...)` — regular `DataManager` (NOT `UnconstrainedDataManager`).
 - [x] **MUT-04**: Mandatory `@ToolParam idempotencyKey` (UUID string) on every mutation tool. Server-side `AiMutationIntent` dedup table records `(toolName, idempotencyKey, userId, conversationId, resultEntityId, createdAt)`. Replay returns the original result with `outcome=IDEMPOTENT_REPLAY`. TTL 24h default, configurable.
 - [ ] **MUT-05**: `MutationGuard` SPI defined: `interface MutationGuard { void check(MutationIntent intent) throws ToolVetoedException; }`. Default no-op bean. Mirrors `ToolGuard`.
-- [ ] **MUT-06**: `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`): `enabled` (default false), `allowDelete` (default false; reserved for v1.2), `confirmationRequired` (default true; UX hint, not enforcement), `idempotencyTtl` (default 24h).
+- [x] **MUT-06**: `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`): `enabled` (default false), `allowDelete` (default false; reserved for v1.2), `confirmationRequired` (default true; UX hint, not enforcement), `idempotencyTtl` (default 24h).
 - [ ] **MUT-07**: `MutationErrorTranslator` translates JPA / `AccessDeniedException` into stable error codes (`access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`) — never echoes user-supplied PII or constraint message text into the LLM result string (P-22 mitigation).
 - [ ] **MUT-08**: Audit reuses `AuditWriter.writeToolCall` with `eventName` ∈ {`create_record`, `update_record`, `add_related_record`, `remove_related_record`}. `argumentsJson` carries LLM JSON; `resultSummary` carries new entity id (create), or compact diff summary (update). New `outcome` values: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED` (`COMMIT_FAILED` means host save returned but idempotency finalization failed, so commit outcome must be verified). Existing REQUIRES_NEW boundary keeps audit durable across mutation rollback.
 - [ ] **MUT-09**: `ToolEntityResolver` shared `@Component` consumed by both `BuiltInDataTools` and `BuiltInMutationTools` — extracted from existing helpers (`resolveReadableEntityOrThrow`, `parseEntityId`, new `resolveWritableEntityOrThrow`).
@@ -123,7 +123,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ### Audit Extensions
 
-- [ ] **AUD-06**: `AuditWriter.writeToolCall` `outcome` enum extended: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`. New `eventName` strings: `create_record`, `update_record`, `add_related_record`, `remove_related_record`, `prepare_form_draft`, `STT_TRANSCRIPTION`. No new audit kind.
+- [x] **AUD-06**: `AuditWriter.writeToolCall` `outcome` enum extended: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`. New `eventName` strings: `create_record`, `update_record`, `add_related_record`, `remove_related_record`, `prepare_form_draft`, `STT_TRANSCRIPTION`. No new audit kind.
 - [x] **AUD-07**: Mutation audit row carries pre-image + post-image diff summary in `resultSummary`; PII-bearing fields hashed if `ai-agent.audit.hashSensitiveFields=true` (default true). Field-set configurable.
 
 ### Security Extensions
