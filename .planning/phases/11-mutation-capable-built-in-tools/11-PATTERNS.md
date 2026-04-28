@@ -75,11 +75,11 @@ public String createRecord(
         // ① resolve (Phase 10 R4 opacity preserved)
         MetaClass metaClass = toolEntityResolver.resolveWritableEntityOrThrow(entityName);
         // ② AccessManager + per-attribute canModify (Research Pattern 1)
-        // ③ idempotency lookup
+        // ③ pre-host-save idempotency reservation + request hash
         // ④ MutationGuard.check
         // ⑤ FilterLiteralValueConverter coercion per attribute
         // ⑥ DataManager.save inside @Transactional helper
-        // ⑦ MutationIntentRepository.create via afterCommit
+        // ⑦ MutationIntentRepository.markCommitted / markFailed / markCommitUnknown
         // ⑧ AuditWriter.writeToolCall (REQUIRES_NEW — survives ⑥ rollback)
         return toolResultFormatter.toJson(Map.of(
                 "outcome", AiToolCallOutcome.SUCCESS.getId(),
@@ -180,7 +180,9 @@ public class MutationErrorTranslator {
                 || thrown instanceof org.springframework.dao.DataIntegrityViolationException) {
             return new ToolUserError("validation_failed", ...);
         }
-        if (thrown instanceof ToolUserError tue) return tue;          // pass through
+        if (thrown instanceof ToolUserError tue) {
+            return sanitizeStableToolUserError(tue.toDto().error(), metaClass);
+        }
         // Default: never echo exception message into LLM result string (P-22)
         return new ToolUserError("validation_failed", "operation failed", ...);
     }
@@ -308,8 +310,8 @@ public class MutationIntentRepository {
 ```
 
 **Differs from analog:**
-- Adds `create(...)` and `deleteExpired(...)` methods (analog is read-only).
-- Per RESEARCH Open Question 4: `create(...)` is invoked from `TransactionSynchronization.afterCommit` so dedup row only persists when host save committed (mirrors `AuditWriter.registerAfterCommit` line 187).
+- Adds `reserveOrReplay(...)`, `markCommitted(...)`, `markFailed(...)`, `markCommitUnknown(...)`, and cleanup/diagnostic methods (analog is read-only).
+- Per Phase 11 review resolution: reserve PENDING before host save so the unique index prevents duplicate concurrent host writes. After host save returns, finalize to COMMITTED; if finalization fails after host save returned, use COMMIT_UNKNOWN or leave PENDING, never FAILED/reclaimable.
 - Store routing auto-resolved from `@Store(name="agentstore")` — fluent `dataManager.load(Class)` does NOT need explicit `.store(...)` per analog Javadoc lines 14-18; only raw-JPQL `loadValue/loadValues` needs it (MEMORY `feedback_jmix_loadvalue_store`).
 
 ---
@@ -326,25 +328,26 @@ public class MutationIntentRepository {
 public class MutationIntentCleanupJob {
 
     private final MutationIntentRepository repository;
-    private final AiAgentMutationProperties properties;
 
-    public MutationIntentCleanupJob(MutationIntentRepository repository,
-                                    AiAgentMutationProperties properties) {
+    public MutationIntentCleanupJob(MutationIntentRepository repository) {
         this.repository = repository;
-        this.properties = properties;
     }
 
     @Scheduled(cron = "0 0 * * * *")  // hourly
     @Transactional("agentstoreTransactionManager")
     public void deleteExpiredIntents() {
-        repository.deleteExpired(OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        int removed = repository.deleteExpired(now);
+        int staleInFlight = repository.countExpiredInFlight(now);
+        // log removed rows at debug and stale PENDING/COMMIT_UNKNOWN at warn
     }
 }
 ```
 
 **Differs from analog:**
-- Requires `@EnableScheduling` activation. Per RESEARCH Q6 finding: `@EnableScheduling` is NOT yet present (only `@EnableAsync` on `AIConfiguration` line 34). Planner adds either to `AIConfiguration` directly or to a new `AiAgentSchedulingConfiguration` so hosts can disable.
+- Requires `@EnableScheduling` activation. Per RESEARCH Q6 finding: `@EnableScheduling` is NOT yet present (only `@EnableAsync` on `AIConfiguration` line 34). Plan 11-02 adds it directly to `AIConfiguration`.
 - Multi-store transaction manager: `@Transactional("agentstoreTransactionManager")` — `AiMutationIntent` lives in `agentstore`, NOT default store.
+- `repository.deleteExpired(...)` deletes expired `COMMITTED`/`FAILED` rows only. `repository.countExpiredInFlight(...)` reports stale `PENDING`/`COMMIT_UNKNOWN` rows without deleting them.
 
 ---
 
@@ -471,21 +474,13 @@ public MetaClass resolveWritableEntityOrThrow(String entityName) {
 public interface AiAgentMutationRole {
 
     String CODE = "ai-agent-mutation";
-
-    /**
-     * Empty by default — host applications compose this role with their own
-     * @EntityPolicy declarations on host entities the LLM may mutate.
-     * Optionally grant READ on AiMutationIntent so the role can see its own dedup table:
-     */
-    @EntityPolicy(entityClass = AiMutationIntent.class,
-            actions = {EntityPolicyAction.READ})
-    void mutationAccess();
 }
 ```
 
 **Differs from analog:**
 - No `@MenuPolicy/@ViewPolicy` (CONTEXT.md "Deferred Ideas" — no admin list view in v1.1).
 - No host-entity policies — host composes (SEC-07 mandate).
+- No `AiMutationIntent` READ policy — replay uses `UnconstrainedDataManager`, and exposing dedup rows would leak keys/usernames/conversation IDs/result IDs.
 
 ---
 

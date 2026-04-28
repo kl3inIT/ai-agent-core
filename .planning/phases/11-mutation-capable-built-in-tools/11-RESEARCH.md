@@ -24,7 +24,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 - **D-02:** `AiMutationIntent` unique constraint `(tool_name, idempotency_key, user_username)`; row stores `resultEntityId`+`resultEntityName` only (NOT full result JSON); replay re-resolves `instanceName` live; TTL default 24h.
 - **D-03:** `MutationGuard.check(MutationIntent intent)` SPI with minimal record shape (toolName + metaClass + entityId + attributes Map). `entityId` null on create. `MutationGuard` mirrors `ToolGuard`. Default no-op bean.
 - **D-04:** 6 stable error codes: `access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`, `parameter_conversion_error`, `not_found`. Each carries `ToolErrorDto.expected` hint. `unknown_entity` is reserved for the entity-resolution path (Phase 10 R4 opacity), distinct from `access_denied`.
-- **D-05:** `BuiltInLinkTools` always-on (independent of `mutation.enabled`). 2 `@Tool`: `generate_entity_list_link`, `generate_entity_detail_link`. Both gated by `LlmExposurePolicy.canReadEntity` with uniform `unknown_entity` opacity. Returns raw URL strings.
+- **D-05:** `BuiltInLinkTools` always-on (independent of `mutation.enabled`). 2 `@Tool`: `generate_entity_list_link`, `generate_entity_detail_link`. Both gated by `LlmExposurePolicy.canReadEntity` with uniform `unknown_entity` opacity. Returns a JSON object with a single `url` property; detail links validate and URL-encode UUID path segments.
 - **D-06:** All 6 new tools (4 mutation + 2 link) use the 5-section description pattern from MEMORY `feedback_rich_tool_descriptions`. Mutation tools especially need ~50–150 line descriptions covering idempotency contract, per-attribute denial recovery, and type-conversion rules. `BuiltInDataTools` is NOT retrofitted in Phase 11.
 - **D-07:** `delete_record` NOT shipped. `allowDelete=true` is forward-signal only. TEST-13 explicitly asserts no `delete_record` callback under any flag combination.
 - **D-08:** No new `AuditKind`. All 6 events reuse `AuditKind.TOOL`. `AiToolCallOutcome` gains `IDEMPOTENT_REPLAY` + `COMMIT_FAILED` (no schema migration; column is already a String-backed `EnumClass<String>`).
@@ -38,8 +38,8 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 - `AiInternalEntityNames` extension: add `aiMutation_AiMutationIntent` (or whatever metaClass name lands).
 - Cleanup job: `@Scheduled` `MutationIntentCleanupJob` `@Component` (simpler than JmixApp scheduled-task entity).
 - MUT-10 system-prompt wording: bullet list inserted into `AgentSystemPromptRules` only when `mutation.enabled=true`; must NOT mention `prepare_form_draft` (Phase 14).
-- `AiAgentMutationRole` shape: empty marker `@ResourceRole` interface OR concrete with `@EntityPolicy(entityClass=AiMutationIntent.class, actions=ALL)` so role can read its own dedup table for replay.
-- `AiAgentAdminRole` extension: add `AiMutationIntent` CRUD + view + menu policies.
+- `AiAgentMutationRole` shape: empty marker `@ResourceRole` interface; do not grant dedup-table read by default.
+- `AiAgentAdminRole` extension: add `AiMutationIntent` CRUD only; no view/menu policies in v1.1.
 - `MutationGuard` `SpiDefaultsAutoConfiguration` registration: match `ToolFetchPlanCustomizer` pattern (Phase 9 SPI-09).
 - `BuiltInLinkTools` route resolution: per-call (cached `ViewRegistry` is in-memory).
 - `AuditWriter.writeToolCall` payload: JSON serialization of `attributes` Map verbatim, with PII fields hashed via `AuditFieldHasher` when attribute name appears in `AiAgentAuditProperties.sensitiveFields`. `resultSummary` shapes per CONTEXT.md.
@@ -198,7 +198,7 @@ com.vn.agent/
 │   └── AiInternalEntityNames.java          # MODIFIED — add AiMutationIntent metaClass name
 ├── security/
 │   ├── AiAgentMutationRole.java            # NEW @ResourceRole
-│   └── AiAgentAdminRole.java               # MODIFIED — +@EntityPolicy(AiMutationIntent), +ViewPolicy/MenuPolicy if list view ships
+│   └── AiAgentAdminRole.java               # MODIFIED — +@EntityPolicy(AiMutationIntent), no view/menu policies in v1.1
 └── orchestration/
     └── AgentSystemPromptRules.java         # MODIFIED — bullet list when mutation.enabled
 ```
@@ -240,11 +240,11 @@ private void enforceAttributeWriteAccess(MetaClass metaClass, Set<String> attrib
 
 ### Pattern 2: Idempotent replay path
 
-**What:** Before any save, look up `(toolName, idempotencyKey, userUsername)` in `AiMutationIntent`. On hit, re-load the original entity by stored `resultEntityId` + `resultEntityName`, return its FRESH `instanceName` (locale + security re-evaluated), tag outcome as `IDEMPOTENT_REPLAY`. On miss, proceed; save the dedup row inside the same `@Transactional` boundary as the host save so a rollback removes the dedup record (next call is a fresh attempt, NOT a permanent collision).
+**What:** Before any host save, reserve `(toolName, idempotencyKey, userUsername)` in `AiMutationIntent` with a canonical request hash. On COMMITTED hit with the same hash, re-load the original entity by stored `resultEntityId` + `resultEntityName`, return its FRESH `instanceName` (locale + security re-evaluated), tag outcome as `IDEMPOTENT_REPLAY`. On same-key/different-hash, return `idempotency_violation`. On PENDING/COMMIT_UNKNOWN, return `concurrent_modification` and never run a duplicate host write.
 
 **When to use:** Step 3 of every mutation call.
 
-**Pitfall:** The dedup row write uses the `agentstore` transaction manager; the host entity write uses the default. Two distinct transactions. Recommend committing the dedup row only AFTER the host save succeeds (call sequence: host save → dedup record save → audit write). On host save rollback, NO dedup row is created, so the LLM can retry the same `idempotencyKey`. Do NOT save dedup row pre-flight ("reserved" pattern) — that creates orphan dedup rows when host save rolls back, manifesting as false `idempotency_violation` on retry.
+**Pitfall:** The dedup row write uses the `agentstore` transaction manager; the host entity write uses the default. Two distinct transactions. The Phase 11 plan uses a pre-host-save reservation because it is the only way to stop concurrent duplicate host writes across nodes. If host save fails before commit, mark FAILED and allow same-hash retry. If host save returned but dedup finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because that can duplicate a committed host write.
 
 **Example:**
 ```java
@@ -305,7 +305,7 @@ private String serializeDiff(MetaClass metaClass,
 - **DO NOT cache `idempotencyKey` lookups in memory (e.g. `ConcurrentHashMap`).** The dedup table IS the cache; in-memory caching breaks across instances and after restart. The hot-path latency is one indexed `(tool_name, idempotency_key, user_username)` lookup — cheap.
 - **DO NOT reload the parent entity's `@Composition` children fetch plan when handling `add_related_record` / `remove_related_record`.** The children may be re-saved by Jmix with bumped `@Version` — same Pitfall #1 from `AuditWriter`. Load parent with a projection that omits the relationship collection, manipulate via a fresh `DataContext`, save the parent.
 - **DO NOT swallow `ToolVetoedException` to surface as `access_denied`.** Per CONTEXT.md, `ToolVetoedException` is reused as-is and produces a BLOCKED audit row with `denialReason=exception.getMessage()`. The error code surfaced to the LLM is `access_denied` (with the `expected` hint "do not retry"); the audit row preserves the original exception message for operator diagnostics.
-- **DO NOT include the dedup row save in the host transaction boundary IF the dedup table lives in a different store.** Cross-store transactions are not atomic in Jmix (separate `EntityManagerFactory`). Either: (a) accept that the dedup row may be inserted but the host save then fails (dedup row becomes a "completed" record pointing at no entity — handled by replay re-loading and getting null `entity`, which the formatter accepts), or (b) explicitly write dedup row AFTER host save commits using `TransactionSynchronization.afterCommit` (mirror `AuditWriter` pattern). Option (b) is cleaner — the dedup row's existence then proves the host write committed.
+- **DO NOT use afterCommit-only idempotency insertion.** It cannot stop two concurrent callers from both writing host data before the dedup row exists. Reserve first in `agentstore`, then finalize to COMMITTED/FAILED/COMMIT_UNKNOWN according to the host save outcome.
 
 ## Don't Hand-Roll
 
@@ -316,7 +316,7 @@ private String serializeDiff(MetaClass metaClass,
 | Determining sensitive-field set | Hardcoded constant in `MutationErrorTranslator` | `AiAgentAuditProperties.resolvedSensitiveFields()` — Phase 9 plumbing | `@ConfigurationProperties("jmix.ai-agent.audit")` host-tunable. Phase 11 is first consumer. |
 | Audit row write surviving rollback | Manual `TransactionSynchronization` registration | `AuditWriter.writeToolCall` (REQUIRES_NEW) | Already correct — REQUIRES_NEW boundary survives caller rollback. TEST-12 directly exercises this. |
 | Entity resolution + read-access check | New `getMetaClass` + `accessManager.canRead` per tool | `ToolEntityResolver.resolveReadableEntityOrThrow` (extracting from `BuiltInDataTools`) | Phase 10 R4 uniform-opacity contract baked in. Adding `resolveWritableEntityOrThrow` reuses the same opacity path for unknown entity, then layers `canModify` for `access_denied`. |
-| ID parsing (string → UUID/Long/etc.) | `UUID.fromString` per tool | `ToolEntityResolver.parseEntityId(id, metaClass)` (extract from `BuiltInDataTools`) | Already supports any `MetaProperty` PK type via `FilterLiteralValueConverter`. |
+| ID parsing (string → UUID/Long/etc.) | `UUID.fromString` per tool | `ToolEntityResolver.parseEntityId(id, metaClass)` followed by a mutation-tool `requireUuidId(...)` check | Phase 11 tool contract accepts UUID id strings; keeping resolver typed avoids breaking read tools while mutation tools fail fast with `parameter_conversion_error` for non-UUID ids. |
 | Tool guard SPI shape | New `interface` + new exception type | `MutationGuard` mirrors `ToolGuard`; reuse `ToolVetoedException` (per CONTEXT.md) | Pattern already proven; one less exception class for hosts to import. |
 | Liquibase audit columns + UUID PK | Hand-typed SQL | `${uuid.type}` token + `defaultValueNumeric` for `VERSION` per `060-ai-exposure-rule.xml` template | Convention already established; copy the existing changeset shape. |
 | Spring AI tool callback discovery | Manual `MethodToolCallback.builder()` per tool | `MethodToolCallbackProvider.builder().toolObjects(bean).build().getToolCallbacks()` per `AgentToolCallbacks.fromBean` (in-repo) | Already proven; `@ConditionalOnProperty` gated bean is simply absent from the constructor list when disabled — see Q5. |
@@ -587,17 +587,17 @@ public class MutationErrorTranslator {
                 || thrown instanceof org.springframework.dao.DataIntegrityViolationException) {
             return new ToolUserError("validation_failed",
                     "value validation failed for " + metaClass.getName(),
-                    List.of("call describe_entity to inspect mandatory and constraint fields, then retry with same idempotencyKey"));
+                    List.of("call describe_entity to inspect mandatory and constraint fields; if you change values, retry with a fresh idempotencyKey"));
         }
         if (thrown instanceof ToolUserError tue) {
-            // already typed (e.g. parameter_conversion_error from FilterLiteralValueConverter,
-            // unknown_entity from resolver, not_found from explicit check) — pass through
-            return tue;
+            // already typed, but mutation boundary still rebuilds safe prose
+            // from stable code + entity name; do not pass through raw messages.
+            return sanitizeStableToolUserError(tue.toDto().error(), metaClass);
         }
         // Default: do NOT echo exception message into LLM result string (P-22)
         return new ToolUserError("validation_failed",
                 "operation failed",
-                List.of("call describe_entity to inspect required fields, then retry with same idempotencyKey"));
+                List.of("call describe_entity to inspect required fields; if you change values, retry with a fresh idempotencyKey"));
     }
 }
 ```
@@ -719,26 +719,22 @@ mutationTools.ifPresent(b -> all.addAll(Arrays.asList(fromBean(b))));  // 4 muta
 ```java
 @Component
 public class MutationIntentCleanupJob {
-    private final UnconstrainedDataManager dataManager;
-    private final AiAgentMutationProperties properties;
+    private final MutationIntentRepository repository;
 
     @Scheduled(cron = "0 0 * * * *")  // hourly
     @Transactional("agentstoreTransactionManager")
     public void deleteExpiredIntents() {
         OffsetDateTime now = OffsetDateTime.now();
-        // Bulk delete via JPQL — no per-row entity load
-        dataManager.load(AiMutationIntent.class)
-                .query("select e from aiMutation_AiMutationIntent e where e.expiresAt < :now")
-                .parameter("now", now)
-                .list()
-                .forEach(dataManager::remove);
+        int removed = repository.deleteExpired(now);       // COMMITTED/FAILED only
+        int stale = repository.countExpiredInFlight(now);  // PENDING/COMMIT_UNKNOWN only
+        // log removed/stale counts; never auto-delete in-flight rows
     }
 }
 ```
 
-`UnconstrainedDataManager` + explicit `@Transactional("agentstoreTransactionManager")` is the canonical multi-store pattern. **MEMORY `feedback_jmix_unconstrained_for_system_writes`** mandates `UnconstrainedDataManager` for system-internal writes regardless. Per CLAUDE.md, `@EnableScheduling` must be active — verify via `grep -rn "@EnableScheduling" ai-agent/`.
+`MutationIntentRepository` uses `UnconstrainedDataManager`; the scheduled job keeps an explicit `@Transactional("agentstoreTransactionManager")` boundary for the agentstore table. **MEMORY `feedback_jmix_unconstrained_for_system_writes`** mandates `UnconstrainedDataManager` for system-internal writes regardless. Per CLAUDE.md, `@EnableScheduling` must be active — verify via `grep -rn "@EnableScheduling" ai-agent/`.
 
-**Verified above:** `@EnableAsync` is on `AIConfiguration` but `@EnableScheduling` is NOT — planner must add it (one annotation on `AIConfiguration` or a new `@Configuration` bearing `@EnableScheduling`). Recommend the latter (separate `AiAgentSchedulingConfiguration`) to avoid contaminating `AIConfiguration` and to allow hosts to disable scheduling by excluding the configuration if they have their own scheduler.
+**Verified above:** `@EnableAsync` is on `AIConfiguration` but `@EnableScheduling` is NOT — planner adds `@EnableScheduling` to `AIConfiguration` in Plan 11-02 to keep configuration changes centralized with the existing async/configuration-properties annotations.
 
 **Confidence:** HIGH.
 
@@ -829,12 +825,12 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 3. **`AiAgentMutationRole` initial population.**
    - What we know: CONTEXT.md says "empty default role". SEC-07 says "host composes with their own roles".
    - What's unclear: Should the role have ANY policies? An empty `@ResourceRole` interface compiles but does nothing.
-   - RESOLVED: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Optional concrete: `@EntityPolicy(entityClass=AiMutationIntent.class, actions=READ)` so the role CAN see its own dedup table for replay (planner picks).
+   - RESOLVED: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Do not grant `AiMutationIntent` READ by default; replay uses `UnconstrainedDataManager`, and a blanket READ grant exposes idempotency keys/usernames/conversation IDs/result IDs.
 
 4. **Dedup row write before vs after host save.**
    - What we know: Cross-store transactions are not atomic; CONTEXT.md says "REQUIRES_NEW boundary keeps audit durable".
    - What's unclear: Should `MutationIntentRepository.create` be called inside the host `@Transactional` (rolls back together) or via `TransactionSynchronization.afterCommit`?
-   - RESOLVED: Use `afterCommit` — same pattern as `AuditWriter.registerAfterCommit`. Dedup row's existence then proves host save committed. On commit failure, no dedup row, replay safely retries. This means `IDEMPOTENT_REPLAY` only triggers for previously-COMMITTED operations — exactly the desired semantic.
+   - RESOLVED: Reserve a PENDING row before host save in `agentstore` via `UnconstrainedDataManager`; the unique index is the distributed idempotency lock. After host save returns, mark COMMITTED. If host save returned but finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because retrying could duplicate a committed host write.
 
 ## Project Constraints (from CLAUDE.md)
 
@@ -900,7 +896,7 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 - Standard stack: HIGH — all libraries already on classpath; versions verified.
 - Architecture (gating chain, transaction boundaries): HIGH — every step has in-repo or Context7 evidence.
 - Pitfalls: HIGH — Pitfalls 1, 4, 6 have documented in-repo precedent (Phase 7.2 children-fetch-plan, `BuiltInDataTools` instance-name fetch); Pitfalls 2, 3, 5 derived from Spring AI / Spring framework docs.
-- Idempotency design: HIGH — Open Question 4 has a recommended resolution (`afterCommit` pattern) with strong precedent.
+- Idempotency design: HIGH — Open Question 4 was superseded by review feedback; the safe resolution is pre-host-save reservation plus non-reclaimable COMMIT_UNKNOWN on post-host-save finalization failure.
 - Spring AI `Map<String,Object>` reliability: HIGH — production evidence in jmix-crm.
 
 **Research date:** 2026-04-28
@@ -908,4 +904,4 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 
 ## RESEARCH COMPLETE
 
-**TL;DR for the planner:** Phase 11 is composition-heavy: every primitive is already in the codebase (Phase 9 + 10 plumbing). New code is ~1200 LOC across ~10 files plus one Liquibase changeset. Hard chain of plans: (1) entity + enum + Liquibase first, (2) `ToolEntityResolver` extraction + `MutationGuard` SPI + default no-op, (3) `MutationErrorTranslator` + `BuiltInLinkTools`, (4) `BuiltInMutationTools` + properties + `AgentToolCallbacks` wiring with `ObjectProvider<BuiltInMutationTools>` for the conditional bean, (5) cleanup job (`@Scheduled` + `@Transactional("agentstoreTransactionManager")` + add `@EnableScheduling`) + admin role + system-prompt rules + locales (both `messages_en.properties` AND `messages_vi.properties`), (6) tests TEST-10..13. Catch BOTH `jakarta.persistence.OptimisticLockException` and `org.springframework.orm.ObjectOptimisticLockingFailureException` in the translator. Dedup row writes via `TransactionSynchronization.afterCommit` so rollback leaves no dedup ghost. Use a fresh `EntityAttributeContext` per LLM-supplied attribute key. `BuiltInLinkTools` mirrors jmix-crm `ViewsDiscoveryTool` pattern verbatim. Map<String,Object> tool param shape is production-proven via jmix-crm; no fallback needed.
+**TL;DR for the planner:** Phase 11 is composition-heavy: every primitive is already in the codebase (Phase 9 + 10 plumbing). New code is ~1200 LOC across ~10 files plus one Liquibase changeset. Hard chain of plans: (1) entity + enum + Liquibase first, (2) `ToolEntityResolver` extraction + `MutationGuard` SPI + default no-op, (3) `MutationErrorTranslator` + `BuiltInLinkTools`, (4) `BuiltInMutationTools` + properties + `AgentToolCallbacks` wiring with `ObjectProvider<BuiltInMutationTools>` for the conditional bean, (5) cleanup job (`@Scheduled` + `@Transactional("agentstoreTransactionManager")` + add `@EnableScheduling`) + admin role + system-prompt rules + locales (both `messages_en.properties` AND `messages_vi.properties`), (6) tests TEST-10..13. Catch BOTH `jakarta.persistence.OptimisticLockException` and `org.springframework.orm.ObjectOptimisticLockingFailureException` in the translator. Dedup row writes reserve before host mutation, then finalize to COMMITTED/FAILED/COMMIT_UNKNOWN. Use a fresh `EntityAttributeContext` per LLM-supplied attribute key. `BuiltInLinkTools` returns a single-property `{url}` object and URL-encodes UUID path segments. Map<String,Object> tool param shape is production-proven via jmix-crm; no fallback needed.

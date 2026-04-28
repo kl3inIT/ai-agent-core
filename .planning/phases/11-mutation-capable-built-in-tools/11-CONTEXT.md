@@ -158,8 +158,11 @@ to any entity surfaced by `find_records` / `get_record`.
     `access_denied` is reached only when the LLM passed a *visible* entity
     that lacks per-attribute or per-CRUD-op permission.
   - `validation_failed` — JPA constraint violation, `dataContext.validate`
-    failure, mandatory-attribute missing on create. Hint: "fix the value(s)
-    and retry with same idempotencyKey".
+    failure, mandatory-attribute missing on create. Hint: "call
+    describe_entity to inspect mandatory and constraint fields; if you change
+    any values, retry with a fresh idempotencyKey". Exact retries with the same
+    call shape may reuse the same key; corrected values change the request hash
+    and therefore need a new key.
   - `idempotency_violation` — `(toolName, idempotencyKey, userUsername)` row
     exists but its semantics conflict (e.g. different `attributes` map for
     same key — currently we treat any collision as violation; replay only
@@ -249,21 +252,21 @@ to any entity surfaced by `find_records` / `get_record`.
   style if any exists.
 - `MUT-10` system-prompt mutation rules wording — bullet list inserted into
   `AgentSystemPromptRules` only when `mutation.enabled=true`. Suggested text:
-  "When you call a mutation tool, generate a fresh UUID idempotencyKey per
-  logical operation. To retry a failed mutation, reuse the SAME
-  idempotencyKey. On `access_denied` do NOT retry — surface to the user. On
-  `parameter_conversion_error` re-read describe_entity attributeType and
-  retry with corrected types. On `concurrent_modification` call get_record,
+  "When you call a mutation tool, generate a fresh UUID idempotencyKey for
+  each exact call shape. Reuse it only for an exact retry of the same
+  arguments. If you change any field values after `validation_failed` or
+  `parameter_conversion_error`, use a fresh idempotencyKey. On `access_denied`
+  do NOT retry — surface to the user. On `concurrent_modification` call get_record,
   then retry with a fresh idempotencyKey. On success, you may call
   generate_entity_detail_link to render a verify-link." Planner refines text;
   must NOT mention `prepare_form_draft` (Phase 14 forward reference).
-- `AiAgentMutationRole` shape — empty marker `@ResourceRole` interface OR
-  one concrete `@EntityPolicy(entityClass = AiMutationIntent.class, actions =
-  ALL)` so the role can read its own dedup table for replay. Planner picks;
-  REQUIREMENTS SEC-07 just says "host composes with their own roles".
-- `AiAgentAdminRole` extension — add `AiMutationIntent` CRUD + view + menu
-  policies (mirror `AiExposureRule` extension Phase 10) so admins can inspect
-  the dedup table.
+- `AiAgentMutationRole` shape — empty marker `@ResourceRole` interface. Do
+  not grant `AiMutationIntent` READ by default: replay uses
+  `UnconstrainedDataManager`, and a blanket READ grant exposes idempotency
+  keys/usernames/conversation IDs/result IDs. REQUIREMENTS SEC-07 says "host
+  composes with their own roles".
+- `AiAgentAdminRole` extension — add `AiMutationIntent` CRUD only. Do NOT add
+  view/menu policies because no admin list view ships in v1.1.
 - `MutationGuard` `SpiDefaultsAutoConfiguration` `@ConditionalOnMissingBean`
   registration vs `@Component` no-op — match existing `ToolFetchPlanCustomizer`
   pattern (Phase 9 SPI-09).
@@ -363,8 +366,8 @@ to any entity surfaced by `find_records` / `get_record`.
   TEST-13 asserts callback count under default config.
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/security/AiAgentAdminRole.java` —
   extend with `@EntityPolicy(entityClass=AiMutationIntent.class, actions=ALL)`,
-  `@MenuPolicy/@ViewPolicy` for the mutation-intent admin list view if planner
-  ships one.
+  with no `@MenuPolicy/@ViewPolicy` in v1.1 because no mutation-intent admin
+  list view ships.
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/exposure/AiInternalEntityNames.java` —
   add `AiMutationIntent` to the always-excluded set (Phase 10 D-11 mirror).
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/orchestration/RunContext.java` —
@@ -530,14 +533,15 @@ to any entity surfaced by `find_records` / `get_record`.
   `mutation.enabled=true`. Each call: `ToolEntityResolver.resolveWritableEntityOrThrow`
   → `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` +
   per-attribute `EntityAttributeContext.canModify` per attribute the LLM
-  writes → `MutationGuard.check` → `MutationIntentRepository.findOrCreate`
-  (idempotency check) → `@Transactional DataManager.save` → audit via
-  `writeToolCall` → return result.
+  writes → `MutationGuard.check` → `MutationIntentRepository.reserveOrReplay`
+  (pre-host-save idempotency reservation) → `@Transactional DataManager.save`
+  → intent finalization → audit via `writeToolCall` → return result.
 - `BuiltInLinkTools` is on every chat turn (always-on, ~5ms route lookup
   per call against in-memory `ViewRegistry`). LlmExposurePolicy lookup is
   the same hot-path call BuiltInDataTools already pays.
-- `AiMutationIntent` cleanup job runs hourly; deletes rows where
-  `expiresAt < now()`. Idempotent.
+- `AiMutationIntent` cleanup job runs hourly; deletes expired `COMMITTED` and
+  `FAILED` rows only. Expired `PENDING` and `COMMIT_UNKNOWN` rows are logged
+  for manual investigation and are never deleted automatically.
 - `AgentToolCallbacks.forCurrentUser` callback count varies by property:
   - default (mutation off): 6 data + 2 link = 8 callbacks.
   - mutation on: 6 + 2 + 4 = 12 callbacks.
