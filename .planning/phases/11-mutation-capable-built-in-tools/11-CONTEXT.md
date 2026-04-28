@@ -60,8 +60,9 @@ to any entity surfaced by `find_records` / `get_record`.
   user requests. `confirmationRequired=true` remains UX hint metadata only.
 - Locale message keys for every denial / success / idempotency / error path
   in `messages.properties` AND `messages_vi.properties`.
-- New `AiAgentMutationRole` resource role (empty default — host composes with
-  their own roles to grant CRUD on entities the LLM may mutate).
+- New `AiAgentMutationRole` resource role is an enforced marker gate for AI
+  mutation tool calls. It grants no entity CRUD by itself; users need both this
+  marker and ordinary Jmix create/update policies on target host entities.
 - `BuiltInLinkTools` `@Component` (always-on, independent of `mutation.enabled`).
   2 `@Tool`: `generate_entity_list_link`, `generate_entity_detail_link`.
   `LlmExposurePolicy.canReadEntity` opacity gate (returns `unknown_entity` not
@@ -270,11 +271,12 @@ to any entity surfaced by `find_records` / `get_record`.
   mutation. On success, you may call
   generate_entity_detail_link to render a verify-link." Planner refines text;
   must NOT mention `prepare_form_draft` (Phase 14 forward reference).
-- `AiAgentMutationRole` shape — empty marker `@ResourceRole` interface. Do
+- `AiAgentMutationRole` shape — empty marker `@ResourceRole` interface, but
+  enforced by `BuiltInMutationTools` before any mutation reservation/save. Do
   not grant `AiMutationIntent` READ by default: replay uses
   `UnconstrainedDataManager`, and a blanket READ grant exposes idempotency
-  keys/usernames/conversation IDs/result IDs. REQUIREMENTS SEC-07 says "host
-  composes with their own roles".
+  keys/usernames/conversation IDs/result IDs. REQUIREMENTS SEC-07 says hosts
+  compose this marker with their own host-entity CRUD roles.
 - `AiAgentAdminRole` extension — add `AiMutationIntent` CRUD only. Do NOT add
   view/menu policies because no admin list view ships in v1.1.
 - `MutationGuard` `SpiDefaultsAutoConfiguration` `@ConditionalOnMissingBean`
@@ -413,7 +415,8 @@ to any entity surfaced by `find_records` / `get_record`.
   vs persistence dedup row).
 - `com.vn.agent.tools.ToolEntityResolver` — shared `@Component` (D-09 of MUT-09).
 - `com.vn.agent.tools.link.BuiltInLinkTools` — 2 `@Tool` methods (D-05).
-- `com.vn.agent.security.AiAgentMutationRole` — empty marker resource role.
+- `com.vn.agent.security.AiAgentMutationRole` — empty marker resource role
+  enforced at mutation tool entry.
 
 ### Reference implementation (pattern-learning, NOT a dependency)
 - `D:/DTH/jmix-crm/src/main/java/com/company/crm/ai/tool/JpqlExecutorTool.java` —

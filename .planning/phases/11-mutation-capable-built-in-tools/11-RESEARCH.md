@@ -38,7 +38,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 - `AiInternalEntityNames` extension: add `aiMutation_AiMutationIntent` (or whatever metaClass name lands).
 - Cleanup job: `@Scheduled` `MutationIntentCleanupJob` `@Component` (simpler than JmixApp scheduled-task entity).
 - MUT-10 system-prompt wording: bullet list inserted into `AgentSystemPromptRules` only when `mutation.enabled=true`; must NOT mention `prepare_form_draft` (Phase 14).
-- `AiAgentMutationRole` shape: empty marker `@ResourceRole` interface; do not grant dedup-table read by default.
+- `AiAgentMutationRole` shape: empty marker `@ResourceRole` interface enforced by mutation tools; do not grant dedup-table read by default.
 - `AiAgentAdminRole` extension: add `AiMutationIntent` CRUD only; no view/menu policies in v1.1.
 - `MutationGuard` `SpiDefaultsAutoConfiguration` registration: match `ToolFetchPlanCustomizer` pattern (Phase 9 SPI-09).
 - `BuiltInLinkTools` route resolution: per-call (cached `ViewRegistry` is in-memory).
@@ -75,7 +75,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 | ENT-09 | `AiMutationIntent` Jmix entity in `agentstore` | UUID + `@Version` + `@InstanceName` per CLAUDE.md. Liquibase 070. |
 | AUD-06 | Outcome enum `IDEMPOTENT_REPLAY` + `COMMIT_FAILED`; new `eventName` strings | `AiToolCallOutcome` extension only — string-backed `EnumClass<String>`, no migration. |
 | AUD-07 | Pre/post-image diff with optional PII hashing | `AiAgentAuditProperties` (Phase 9) + `AuditFieldHasher` (Phase 9) — Phase 11 is first consumer. |
-| SEC-07 | `AiAgentMutationRole` resource role; default empty | Host composes with own roles. |
+| SEC-07 | `AiAgentMutationRole` resource role; default empty but enforced marker | Host composes with own entity CRUD roles; mutation tools require marker + normal Jmix write permission. |
 | SPI-10 | `MutationGuard` SPI | See MUT-05. |
 | TEST-10 | Per-attribute denial → `access_denied`, `DataManager.save` never called | `@SpringBootTest`. Mock `AccessManager` to deny one attribute; assert tool returns structured `access_denied`. |
 | TEST-11 | Same `idempotencyKey` → same result, `outcome=IDEMPOTENT_REPLAY`, only one row | `@SpringBootTest`. Run tool twice; assert dedup row count = 1, second call audit `outcome=IDEMPOTENT_REPLAY`. |
@@ -827,7 +827,7 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 3. **`AiAgentMutationRole` initial population.**
    - What we know: CONTEXT.md says "empty default role". SEC-07 says "host composes with their own roles".
    - What's unclear: Should the role have ANY policies? An empty `@ResourceRole` interface compiles but does nothing.
-   - RESOLVED: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Do not grant `AiMutationIntent` READ by default; replay uses `UnconstrainedDataManager`, and a blanket READ grant exposes idempotency keys/usernames/conversation IDs/result IDs.
+   - RESOLVED: Empty marker interface with just `@ResourceRole(name="AI Agent Mutation", code="ai-agent-mutation")` and a Javadoc explaining the host adds `@EntityPolicy`s. Mutation tools enforce this marker before reservation/save, then normal Jmix policies decide host entity writes. Do not grant `AiMutationIntent` READ by default; replay uses `UnconstrainedDataManager`, and a blanket READ grant exposes idempotency keys/usernames/conversation IDs/result IDs.
 
 4. **Dedup row write before vs after host save.**
    - What we know: Cross-store transactions are not atomic; CONTEXT.md says "REQUIRES_NEW boundary keeps audit durable".

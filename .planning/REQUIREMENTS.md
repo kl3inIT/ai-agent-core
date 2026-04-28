@@ -130,7 +130,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 - [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — pending Phase 12).
 - [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
-- [ ] **SEC-07**: New `AiAgentMutationRole` resource role granting CRUD on entities the LLM may mutate (host composes it with their own roles). Default role catalog ships empty mutation set; hosts opt in.
+- [ ] **SEC-07**: New `AiAgentMutationRole` resource role is an explicit AI-mutation marker gate. It grants no entity CRUD by itself; mutation tools require the marker role AND normal Jmix create/update policies. Hosts opt users in by assigning/composing this marker with their own entity roles.
 
 ### Testing
 

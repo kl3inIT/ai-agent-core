@@ -474,7 +474,7 @@ public MetaClass resolveWritableEntityOrThrow(String entityName) {
 
 **Analog:** `ai-agent/ai-agent/src/main/java/com/vn/agent/security/AiAgentUserRole.java` (narrow role) + `AiAgentAdminRole.java` (full-CRUD precedent)
 
-**Pattern** (analog `AiAgentUserRole` lines 21-31, plus empty marker form per CONTEXT.md Claude's Discretion):
+**Pattern** (analog `AiAgentUserRole` lines 21-31, plus empty marker form per CONTEXT.md Claude's Discretion). The marker is enforced by `BuiltInMutationTools`; it still grants no entity access by itself:
 ```java
 @ResourceRole(name = "AI Agent Mutation", code = AiAgentMutationRole.CODE)
 public interface AiAgentMutationRole {
@@ -844,7 +844,7 @@ REQUIRES_NEW boundary at AuditWriter line 87 survives caller rollback (TEST-12 d
 - **All AI agentstore entities follow `AiExposureRule` shape:** `@Store(name="agentstore") + @JmixEntity + @Entity(name="<prefix>_<Name>") + @Table + @JmixGeneratedValue UUID + @Version + @InstanceName + @Index unique=true (NOT column-level unique)`. `AiMutationIntent` adopts this precedent with composite unique index.
 - **All system-internal repositories use `UnconstrainedDataManager`** (per `LlmExposureRuleRepository` + MEMORY `feedback_jmix_unconstrained_for_system_writes`); host-data tools use regular `DataManager`. The mutation save path uses regular `DataManager` so user-level row policies and entity listeners fire.
 - **All SPIs follow `ToolGuard`/`ToolFetchPlanCustomizer` shape:** single-method interface + reused `ToolVetoedException` + default no-op bean via `@ConditionalOnMissingBean` (precedent: `AIConfiguration.aiAgentIngestExecutor` line 79). `MutationGuard` mirrors this verbatim with typed `MutationIntent` record argument.
-- **All security roles follow `AiAgentUserRole`/`AiAgentAdminRole` shape:** `@ResourceRole(name, code) interface` + `@EntityPolicy` per entity + optional `@MenuPolicy/@ViewPolicy`. `AiAgentMutationRole` is empty marker (host composes); `AiAgentAdminRole` extension mirrors line 31 `AiExposureRule` precedent.
+- **All security roles follow `AiAgentUserRole`/`AiAgentAdminRole` shape:** `@ResourceRole(name, code) interface` + `@EntityPolicy` per entity + optional `@MenuPolicy/@ViewPolicy`. `AiAgentMutationRole` is an empty marker enforced by mutation tools (host composes with CRUD roles); `AiAgentAdminRole` extension mirrors line 31 `AiExposureRule` precedent.
 - **All `@Tool` callback wiring goes through `AgentToolCallbacks.forCurrentUser`** with `MethodToolCallbackProvider.builder().toolObjects(bean)` reflection (line 87-90). Conditional beans flow via `ObjectProvider<...>` constructor injection per RESEARCH Q5 (NOT `@Autowired(required=false)` — proxy/eager-init brittle).
 - **All audit rows reuse `AuditWriter.writeToolCall` REQUIRES_NEW boundary** — no new `AuditKind` (D-08); only new `eventName` strings + 2 new `AiToolCallOutcome` enum values.
 - **All `@ConfigurationProperties` records follow `AiAgentAuditProperties` shape** — `record(...) { resolved*() }` with null-tolerant accessors and conservative defaults; auto-discovered by `@ConfigurationPropertiesScan` on `AIConfiguration` line 33.
