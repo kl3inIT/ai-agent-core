@@ -44,9 +44,9 @@ import java.util.UUID;
  *   <li>{@link ChunkMetadata#DOCUMENT_ID} — {@code document.id.toString()} (used by D-21 delete)</li>
  *   <li>{@link ChunkMetadata#EMBEDDING_MODEL} — current configured model (D-03 drift filter)</li>
  *   <li>{@link ChunkMetadata#ALLOWED_ROLES} — JSON-parsed list of role codes from the entity</li>
- *   <li>{@code role_<normalized-code>} = {@code true} — Option A flattened role flags,
- *       normalized via {@link ChunkMetadata#normalizeRoleCode(String)} so filter keys are valid
- *       JSONPath member names (threat T-05-03-08 mitigation).</li>
+ *   <li>{@code role_<hex-encoded-role-code>} = {@code true} — Option A flattened role flags,
+ *       encoded via {@link ChunkMetadata#roleFlagKey(String)} so filter keys are valid JSONPath
+ *       member names without collapsing distinct role codes (threat T-05-03-08 mitigation).</li>
  * </ul>
  *
  * <p><b>RAG-03 atomicity</b>: on any failure, the catch block deletes all chunks already written

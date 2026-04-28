@@ -32,9 +32,10 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>Role flags use Option A flattening per PATTERNS.md — each role code becomes a
- * normalized {@code role_<normalized-code>} boolean-true metadata key. This is portable across Spring AI
- * vector-store adapters (RESEARCH Pitfall #1). The ingestion worker (Plan 05-03) MUST mirror this
- * flattening when writing {@code Document.metadata}.</p>
+ * {@code role_<hex-encoded-role-code>} boolean-true metadata key. This is portable across
+ * Spring AI vector-store adapters (RESEARCH Pitfall #1) without collapsing distinct role codes
+ * such as {@code sales-admin} and {@code sales_admin}. The ingestion worker (Plan 05-03) MUST
+ * mirror this flattening when writing {@code Document.metadata}.</p>
  *
  * <p>Jmix exposes role assignments to Spring Security as authorities like
  * {@code ROLE_AI_AGENT_USER}. Ingestion stores the underlying Jmix role code

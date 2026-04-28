@@ -143,7 +143,7 @@ class RetrievalFilterBuilderTest {
         assertThat(exp).isNotNull();
         String rendered = exp.toString();
         assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
-        assertThat(rendered).doesNotContain(ChunkMetadata.ROLE_FLAG_PREFIX + "role_ai_agent_user");
+        assertThat(rendered).doesNotContain("role_ai_agent_user");
     }
 
     // Test D — D-05 empty roles fail-closed
@@ -174,11 +174,21 @@ class RetrievalFilterBuilderTest {
         String rendered = exp.toString();
         assertThat(rendered).contains(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
         assertThat(rendered).contains(ChunkMetadata.roleFlagKey("custom-host-role"));
-        assertThat(rendered).doesNotContain(ChunkMetadata.ROLE_FLAG_PREFIX + "custom-host-role");
+        assertThat(rendered).doesNotContain("role_custom_host_role");
         // Guard precedence sensitivity in SQL/JSONPath converters: model pin is repeated per role.
         assertThat(countOccurrences(rendered, ChunkMetadata.EMBEDDING_MODEL)).isGreaterThanOrEqualTo(2);
         // The two role clauses must be OR-ed (D-09 ANY), not AND-ed.
         assertThat(rendered).contains("OR");
+    }
+
+    @Test
+    void roleFlagKeys_hexEncodeExactRoleCodesWithoutCollisions() {
+        assertThat(ChunkMetadata.roleFlagKey("sales-admin"))
+                .isEqualTo("role_73616c65732d61646d696e");
+        assertThat(ChunkMetadata.roleFlagKey("sales_admin"))
+                .isEqualTo("role_73616c65735f61646d696e");
+        assertThat(ChunkMetadata.roleFlagKey("sales-admin"))
+                .isNotEqualTo(ChunkMetadata.roleFlagKey("sales_admin"));
     }
 
     @Test

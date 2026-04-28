@@ -1,7 +1,7 @@
 package com.vn.agent.rag;
 
-import java.util.Locale;
-import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 
 /**
  * Chunk-metadata key constants. Single source of truth for the ingestion writer
@@ -35,34 +35,22 @@ public final class ChunkMetadata {
     /** Prefix for flattened per-role boolean flags (Option A / Pitfall #1 mitigation). */
     public static final String ROLE_FLAG_PREFIX = "role_";
 
-    /**
-     * Normalized role-code charset for metadata keys and vector-store filter fields.
-     *
-     * <p>PostgreSQL JSONPath member access in Spring AI's generated predicate uses dot-form
-     * accessor (for example {@code $.role_code}). Keys that contain punctuation like {@code -}
-     * can produce invalid JSONPath and fail at runtime. We therefore normalize role codes to
-     * lowercase {@code [a-z0-9_]} and replace all other characters with underscore.
-     */
-    private static final Pattern NON_KEY_CHAR_PATTERN = Pattern.compile("[^a-z0-9_]");
-
     private ChunkMetadata() {
     }
 
     /**
      * Build a stable per-role flattened metadata key used by both ingestion and retrieval.
+     *
+     * <p>The role code is UTF-8 hex encoded instead of normalized by character replacement so
+     * distinct valid Jmix role codes such as {@code sales-admin} and {@code sales_admin} cannot
+     * collapse to the same metadata key. Hex output is still safe for Spring AI vector-store
+     * metadata filter fields and PostgreSQL JSONPath member access.</p>
      */
     public static String roleFlagKey(String roleCode) {
-        return ROLE_FLAG_PREFIX + normalizeRoleCode(roleCode);
-    }
-
-    /**
-     * Normalize a role code for JSON metadata key usage.
-     */
-    public static String normalizeRoleCode(String roleCode) {
         if (roleCode == null || roleCode.isBlank()) {
-            return "";
+            return ROLE_FLAG_PREFIX;
         }
-        String lowered = roleCode.toLowerCase(Locale.ROOT);
-        return NON_KEY_CHAR_PATTERN.matcher(lowered).replaceAll("_");
+        byte[] bytes = roleCode.getBytes(StandardCharsets.UTF_8);
+        return ROLE_FLAG_PREFIX + HexFormat.of().formatHex(bytes);
     }
 }
