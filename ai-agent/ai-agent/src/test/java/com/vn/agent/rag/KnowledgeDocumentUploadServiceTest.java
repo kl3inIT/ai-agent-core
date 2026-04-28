@@ -5,12 +5,16 @@ import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.DataManager;
 import io.jmix.core.Metadata;
+import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.security.model.ResourceRole;
 import io.jmix.security.role.ResourceRoleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -35,228 +39,287 @@ import static org.mockito.Mockito.when;
  */
 class KnowledgeDocumentUploadServiceTest {
 
-    private Metadata metadata;
-    private DataManager dataManager;
-    private ResourceRoleRepository roleRepository;
-    private AsyncIngestionWorker asyncIngestionWorker;
+  private Metadata metadata;
+  private DataManager dataManager;
+  private ResourceRoleRepository roleRepository;
+  private AsyncIngestionWorker asyncIngestionWorker;
+  private CurrentAuthentication currentAuthentication;
+  private ResourceLoader resourceLoader;
 
-    private KnowledgeDocumentUploadService service;
+  private KnowledgeDocumentUploadService service;
 
-    @BeforeEach
-    void setUp() {
-        metadata = mock(Metadata.class);
-        dataManager = mock(DataManager.class);
-        roleRepository = mock(ResourceRoleRepository.class);
-        asyncIngestionWorker = mock(AsyncIngestionWorker.class);
+  @BeforeEach
+  void setUp() {
+    metadata = mock(Metadata.class);
+    dataManager = mock(DataManager.class);
+    roleRepository = mock(ResourceRoleRepository.class);
+    asyncIngestionWorker = mock(AsyncIngestionWorker.class);
+    currentAuthentication = mock(CurrentAuthentication.class);
+    resourceLoader = new DefaultResourceLoader();
+    when(currentAuthentication.getUser())
+        .thenReturn(User.withUsername("admin").password("n/a").authorities("ROLE_ADMIN").build());
 
-        // Metadata.create returns a fresh AiKnowledgeDocument (bypasses @JmixGeneratedValue).
-        when(metadata.create(AiKnowledgeDocument.class)).thenAnswer(inv -> new AiKnowledgeDocument());
+    // Metadata.create returns a fresh AiKnowledgeDocument (bypasses @JmixGeneratedValue).
+    when(metadata.create(AiKnowledgeDocument.class)).thenAnswer(inv -> new AiKnowledgeDocument());
 
-        // DataManager.save assigns an id and returns the saved instance.
-        when(dataManager.save(any(AiKnowledgeDocument.class))).thenAnswer(inv -> {
-            AiKnowledgeDocument doc = inv.getArgument(0);
-            if (doc.getId() == null) {
+    // DataManager.save assigns an id and returns the saved instance.
+    when(dataManager.save(any(AiKnowledgeDocument.class)))
+        .thenAnswer(
+            inv -> {
+              AiKnowledgeDocument doc = inv.getArgument(0);
+              if (doc.getId() == null) {
                 setField(doc, "id", UUID.randomUUID());
-            }
-            return doc;
-        });
+              }
+              return doc;
+            });
 
-        // Simulate a live transaction so registerSynchronization works.
-        TransactionSynchronizationManager.initSynchronization();
-        TransactionSynchronizationManager.setActualTransactionActive(true);
+    // Simulate a live transaction so registerSynchronization works.
+    TransactionSynchronizationManager.initSynchronization();
+    TransactionSynchronizationManager.setActualTransactionActive(true);
 
-        // CR-01: AiAgentRagProperties is required so the allowlist validator can resolve
-        // the default classpath:ai-kb/ prefix used by every fixture URI in this suite.
-        AiAgentRagProperties ragProperties = new AiAgentRagProperties(
-                null, null, null, null, null, null, null, null, null);
+    // CR-01: AiAgentRagProperties is required so the allowlist validator can resolve
+    // the default classpath:ai-kb/ prefix used by every fixture URI in this suite.
+    AiAgentRagProperties ragProperties =
+        new AiAgentRagProperties(null, null, null, null, null, null, null, null, null);
 
-        service = new KnowledgeDocumentUploadService(
-                metadata, dataManager, roleRepository, asyncIngestionWorker, ragProperties);
+    service =
+        new KnowledgeDocumentUploadService(
+            metadata,
+            dataManager,
+            roleRepository,
+            asyncIngestionWorker,
+            ragProperties,
+            currentAuthentication,
+            resourceLoader);
+  }
+
+  @AfterEach
+  void tearDown() {
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.clearSynchronization();
     }
+    TransactionSynchronizationManager.setActualTransactionActive(false);
+  }
 
-    @AfterEach
-    void tearDown() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-        TransactionSynchronizationManager.setActualTransactionActive(false);
+  // --- Helpers -------------------------------------------------------------
+
+  private void stubRoleKnown(String code) {
+    ResourceRole role = mock(ResourceRole.class);
+    lenient().when(roleRepository.findRoleByCode(code)).thenReturn(role);
+  }
+
+  private void stubRoleUnknown(String code) {
+    lenient().when(roleRepository.findRoleByCode(code)).thenReturn(null);
+  }
+
+  private static void setField(Object target, String name, Object value) {
+    try {
+      Field f = target.getClass().getDeclaredField(name);
+      f.setAccessible(true);
+      f.set(target, value);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(e);
     }
+  }
 
-    // --- Helpers -------------------------------------------------------------
+  private static TransactionSynchronization captureOnlySynchronization() {
+    List<TransactionSynchronization> syncs =
+        TransactionSynchronizationManager.getSynchronizations();
+    assertThat(syncs).hasSize(1);
+    return syncs.getFirst();
+  }
 
-    private void stubRoleKnown(String code) {
-        ResourceRole role = mock(ResourceRole.class);
-        lenient().when(roleRepository.findRoleByCode(code)).thenReturn(role);
+  // --- Tests ---------------------------------------------------------------
+
+  @Test
+  void happy_path_persists_PENDING_and_schedules_worker_afterCommit() {
+    stubRoleKnown("ai-agent-user");
+
+    AiKnowledgeDocument saved =
+        service.upload(
+            "classpath:ai-kb/fixture-alpha.md", "text/markdown", List.of("ai-agent-user"));
+
+    ArgumentCaptor<AiKnowledgeDocument> captor = ArgumentCaptor.forClass(AiKnowledgeDocument.class);
+    verify(dataManager).save(captor.capture());
+    AiKnowledgeDocument persisted = captor.getValue();
+    assertThat(persisted.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
+    assertThat(persisted.getMimeType()).isEqualTo("text/markdown");
+    assertThat(persisted.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PENDING);
+    assertThat(persisted.getCreatedDate()).isNotNull();
+    assertThat(persisted.getCreatedBy()).isEqualTo("admin");
+    assertThat(persisted.getSizeBytes()).isPositive();
+    assertThat(persisted.getAllowedRolesJson()).contains("ai-agent-user");
+    assertThat(saved.getId()).isNotNull();
+
+    // worker NOT invoked yet — only afterCommit schedules it.
+    verify(asyncIngestionWorker, never()).ingest(any());
+    captureOnlySynchronization().afterCommit();
+    verify(asyncIngestionWorker, times(1)).ingest(saved.getId());
+  }
+
+  @Test
+  void upload_persists_trimmed_sourceUri_that_was_validated() {
+    AiKnowledgeDocument saved =
+        service.upload("  classpath:ai-kb/fixture-alpha.md  ", "text/markdown", List.of());
+
+    ArgumentCaptor<AiKnowledgeDocument> captor = ArgumentCaptor.forClass(AiKnowledgeDocument.class);
+    verify(dataManager).save(captor.capture());
+    AiKnowledgeDocument persisted = captor.getValue();
+    assertThat(persisted.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
+    assertThat(saved.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
+  }
+
+  @Test
+  void upload_persists_size_for_staged_file_uri() throws Exception {
+    java.nio.file.Path stagedFile = java.nio.file.Files.createTempFile("ai-upload-", ".pdf");
+    try {
+      byte[] bytes = "fake pdf bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+      java.nio.file.Files.write(stagedFile, bytes);
+      AiAgentRagProperties ragProperties =
+          new AiAgentRagProperties(
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              new AiAgentRagProperties.Upload(
+                  null, stagedFile.getParent().toAbsolutePath().toString(), null));
+      service =
+          new KnowledgeDocumentUploadService(
+              metadata,
+              dataManager,
+              roleRepository,
+              asyncIngestionWorker,
+              ragProperties,
+              currentAuthentication,
+              resourceLoader);
+
+      AiKnowledgeDocument saved =
+          service.upload(stagedFile.toUri().toString(), "application/pdf", List.of());
+
+      assertThat(saved.getSizeBytes()).isEqualTo(Long.valueOf(bytes.length));
+      assertThat(saved.getCreatedBy()).isEqualTo("admin");
+    } finally {
+      java.nio.file.Files.deleteIfExists(stagedFile);
     }
+  }
 
-    private void stubRoleUnknown(String code) {
-        lenient().when(roleRepository.findRoleByCode(code)).thenReturn(null);
-    }
+  @Test
+  void unknown_role_code_throws_and_does_not_persist_or_schedule() {
+    stubRoleUnknown("phantom-role");
 
-    private static void setField(Object target, String name, Object value) {
-        try {
-            Field f = target.getClass().getDeclaredField(name);
-            f.setAccessible(true);
-            f.set(target, value);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError(e);
-        }
-    }
+    assertThatThrownBy(
+            () ->
+                service.upload(
+                    "classpath:ai-kb/fixture.md", "text/markdown", List.of("phantom-role")))
+        .isInstanceOf(UnknownRoleCodeException.class)
+        .matches(e -> "phantom-role".equals(((UnknownRoleCodeException) e).getCode()));
 
-    private static TransactionSynchronization captureOnlySynchronization() {
-        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
-        assertThat(syncs).hasSize(1);
-        return syncs.get(0);
-    }
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+    verify(asyncIngestionWorker, never()).ingest(any());
+    assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
+  }
 
-    // --- Tests ---------------------------------------------------------------
+  @Test
+  void empty_allowedRoles_succeeds_and_persists_empty_list() {
+    AiKnowledgeDocument saved =
+        service.upload("classpath:ai-kb/fixture.md", "text/markdown", List.of());
 
-    @Test
-    void happy_path_persists_PENDING_and_schedules_worker_afterCommit() {
-        stubRoleKnown("ai-agent-user");
+    assertThat(saved.getAllowedRolesJson()).isEqualTo("[]");
+    verify(roleRepository, never()).findRoleByCode(any());
+    verify(dataManager).save(any(AiKnowledgeDocument.class));
+  }
 
-        AiKnowledgeDocument saved = service.upload(
-                "classpath:ai-kb/fixture-alpha.md", "text/markdown", List.of("ai-agent-user"));
+  @Test
+  void null_allowedRoles_is_treated_as_empty() {
+    AiKnowledgeDocument saved = service.upload("classpath:ai-kb/fixture.md", "text/markdown", null);
 
-        ArgumentCaptor<AiKnowledgeDocument> captor = ArgumentCaptor.forClass(AiKnowledgeDocument.class);
-        verify(dataManager).save(captor.capture());
-        AiKnowledgeDocument persisted = captor.getValue();
-        assertThat(persisted.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
-        assertThat(persisted.getMimeType()).isEqualTo("text/markdown");
-        assertThat(persisted.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PENDING);
-        assertThat(persisted.getAllowedRolesJson()).contains("ai-agent-user");
-        assertThat(saved.getId()).isNotNull();
+    assertThat(saved.getAllowedRolesJson()).isEqualTo("[]");
+    verify(roleRepository, never()).findRoleByCode(any());
+  }
 
-        // worker NOT invoked yet — only afterCommit schedules it.
-        verify(asyncIngestionWorker, never()).ingest(any());
-        captureOnlySynchronization().afterCommit();
-        verify(asyncIngestionWorker, times(1)).ingest(saved.getId());
-    }
+  @Test
+  void worker_not_invoked_before_afterCommit_hook_runs() {
+    stubRoleKnown("ai-agent-user");
 
-    @Test
-    void upload_persists_trimmed_sourceUri_that_was_validated() {
-        AiKnowledgeDocument saved = service.upload(
-                "  classpath:ai-kb/fixture-alpha.md  ", "text/markdown", List.of());
+    service.upload("classpath:ai-kb/a.md", "text/markdown", List.of("ai-agent-user"));
 
-        ArgumentCaptor<AiKnowledgeDocument> captor = ArgumentCaptor.forClass(AiKnowledgeDocument.class);
-        verify(dataManager).save(captor.capture());
-        AiKnowledgeDocument persisted = captor.getValue();
-        assertThat(persisted.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
-        assertThat(saved.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
-    }
+    verify(asyncIngestionWorker, never()).ingest(any());
+    // Now run the registered synchronization — this is the moment the worker should fire.
+    captureOnlySynchronization().afterCommit();
+    verify(asyncIngestionWorker, times(1)).ingest(any());
+  }
 
-    @Test
-    void unknown_role_code_throws_and_does_not_persist_or_schedule() {
-        stubRoleUnknown("phantom-role");
+  // --- CR-01 sourceUri allowlist tests --------------------------------------
 
-        assertThatThrownBy(() -> service.upload(
-                "classpath:ai-kb/fixture.md", "text/markdown", List.of("phantom-role")))
-                .isInstanceOf(UnknownRoleCodeException.class)
-                .matches(e -> "phantom-role".equals(((UnknownRoleCodeException) e).getCode()));
+  @Test
+  void rejects_file_uri_pointing_outside_staging_root_by_default() {
+    // No staging root configured → all file: URIs must be rejected before persistence.
+    assertThatThrownBy(() -> service.upload("file:/etc/passwd", "text/plain", List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-        verify(asyncIngestionWorker, never()).ingest(any());
-        assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
-    }
+  @Test
+  void rejects_file_uri_even_to_application_properties_form() {
+    assertThatThrownBy(
+            () -> service.upload("file:/tmp/application.properties", "text/plain", List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-    @Test
-    void empty_allowedRoles_succeeds_and_persists_empty_list() {
-        AiKnowledgeDocument saved = service.upload(
-                "classpath:ai-kb/fixture.md", "text/markdown", List.of());
+  @Test
+  void rejects_classpath_uri_outside_default_ai_kb_allowlist() {
+    // An ai-kb-adjacent secret / internal resource must NOT be ingestible.
+    assertThatThrownBy(
+            () -> service.upload("classpath:application.properties", "text/plain", List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-        assertThat(saved.getAllowedRolesJson()).isEqualTo("[]");
-        verify(roleRepository, never()).findRoleByCode(any());
-        verify(dataManager).save(any(AiKnowledgeDocument.class));
-    }
+  @Test
+  void rejects_classpath_uri_with_path_traversal_before_allowlist_match() {
+    assertThatThrownBy(
+            () ->
+                service.upload(
+                    "classpath:ai-kb/../application.properties", "text/plain", List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("path traversal");
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-    @Test
-    void null_allowedRoles_is_treated_as_empty() {
-        AiKnowledgeDocument saved = service.upload(
-                "classpath:ai-kb/fixture.md", "text/markdown", null);
+  @Test
+  void rejects_bare_filename_with_path_traversal_before_implicit_classpath_rewrite() {
+    assertThatThrownBy(() -> service.upload("../application.properties", "text/plain", List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("path traversal");
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-        assertThat(saved.getAllowedRolesJson()).isEqualTo("[]");
-        verify(roleRepository, never()).findRoleByCode(any());
-    }
+  @Test
+  void rejects_other_schemes() {
+    assertThatThrownBy(() -> service.upload("ftp://example.com/foo.md", "text/markdown", List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () -> service.upload("http://example.com/foo.md", "text/markdown", List.of()))
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 
-    @Test
-    void worker_not_invoked_before_afterCommit_hook_runs() {
-        stubRoleKnown("ai-agent-user");
+  @Test
+  void admin_code_is_validated_via_RoleRepository_not_allowlisted() {
+    // Even the admin role code must resolve via the repository — no hardcoded allowlist.
+    stubRoleUnknown("ai-agent-admin");
 
-        service.upload("classpath:ai-kb/a.md", "text/markdown", List.of("ai-agent-user"));
+    assertThatThrownBy(
+            () ->
+                service.upload("classpath:ai-kb/a.md", "text/markdown", List.of("ai-agent-admin")))
+        .isInstanceOf(UnknownRoleCodeException.class);
 
-        verify(asyncIngestionWorker, never()).ingest(any());
-        // Now run the registered synchronization — this is the moment the worker should fire.
-        captureOnlySynchronization().afterCommit();
-        verify(asyncIngestionWorker, times(1)).ingest(any());
-    }
-
-    // --- CR-01 sourceUri allowlist tests --------------------------------------
-
-    @Test
-    void rejects_file_uri_pointing_outside_staging_root_by_default() {
-        // No staging root configured → all file: URIs must be rejected before persistence.
-        assertThatThrownBy(() -> service.upload(
-                "file:/etc/passwd", "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void rejects_file_uri_even_to_application_properties_form() {
-        assertThatThrownBy(() -> service.upload(
-                "file:/tmp/application.properties", "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void rejects_classpath_uri_outside_default_ai_kb_allowlist() {
-        // An ai-kb-adjacent secret / internal resource must NOT be ingestible.
-        assertThatThrownBy(() -> service.upload(
-                "classpath:application.properties", "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void rejects_classpath_uri_with_path_traversal_before_allowlist_match() {
-        assertThatThrownBy(() -> service.upload(
-                "classpath:ai-kb/../application.properties", "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("path traversal");
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void rejects_bare_filename_with_path_traversal_before_implicit_classpath_rewrite() {
-        assertThatThrownBy(() -> service.upload(
-                "../application.properties", "text/plain", List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("path traversal");
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void rejects_other_schemes() {
-        assertThatThrownBy(() -> service.upload(
-                "ftp://example.com/foo.md", "text/markdown", List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.upload(
-                "http://example.com/foo.md", "text/markdown", List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
-
-    @Test
-    void admin_code_is_validated_via_RoleRepository_not_allowlisted() {
-        // Even the admin role code must resolve via the repository — no hardcoded allowlist.
-        stubRoleUnknown("ai-agent-admin");
-
-        assertThatThrownBy(() -> service.upload(
-                "classpath:ai-kb/a.md", "text/markdown", List.of("ai-agent-admin")))
-                .isInstanceOf(UnknownRoleCodeException.class);
-
-        verify(roleRepository).findRoleByCode("ai-agent-admin");
-        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
-    }
+    verify(roleRepository).findRoleByCode("ai-agent-admin");
+    verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+  }
 }

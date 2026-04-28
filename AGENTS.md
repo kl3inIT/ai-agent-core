@@ -84,6 +84,9 @@ Refer to the relevant skills for detailed implementation patterns.
 - Data access: Use `DataManager` (NOT `EntityManager`) and its fluent data loading interface for queries (see jmix-services skill))
 - Fetch plans: Build optimized fetch plans to avoid N+1 queries (see jmix-fetch-plans skill))
 - Transactions: Annotate with `@Transactional` when needed
+- **`UnconstrainedDataManager` for system-internal writes under `jmix-security-data`.** Audit, seed, and ingestion writes use `UnconstrainedDataManager` — NOT `runWithSystem`. The "system" user is still policy-gated by Jmix security; only `UnconstrainedDataManager` truly bypasses entity policies for trusted system code.
+- **Raw-JPQL `loadValue` / `loadValues` needs explicit `.store("agentstore")` for `agentstore` entities.** Unlike fluent `dataManager.load(EntityClass)`, the raw-JPQL paths do NOT infer the store from the entity name. Required for `AiAuditEvent`, `AiConversation`, `AiMessage`, `AiKnowledgeDocument`, `AiParameters`, `AiExposureRule`. Forgetting `.store(...)` silently routes the query to `main` and returns empty results.
+- **KB chunk metadata changes via reingest.** Post-ingest changes to `AiKnowledgeDocument` permission or `sourceEntityName` fields MUST trigger a reingest — never mutate pgvector chunk metadata directly. Use `KnowledgeDocumentService.updatePermissionsAndReingest` (or equivalent) so chunk metadata is rebuilt from the canonical document state.
 
 ### Working with Views
 
@@ -199,6 +202,30 @@ Distilled standing preferences for this project. Apply by default; deviate only 
 5. `jmix-ai-backend` for analogous screens (chat, parameters, knowledge-base, audit, dialogs, navigation, data loading) — generalize patterns, don't copy domain details blindly.
 
 Never guess annotation parameters, event class names, or XML element names from memory. If you can't cite where the event type is documented, you haven't verified it yet.
+
+### Jmix UI — Concrete patterns (must-follow)
+
+These are the specific patterns that have repeatedly tripped up implementations. Apply by default; deviation requires explicit justification.
+
+**DataGrid column renderers.** Use `@Supply(to = "grid.col", subject = "renderer")` paired with `UiComponents.create(...)` — NOT programmatic `getColumnByKey().setRenderer()` in `onInit`. `@Supply` integrates with the view lifecycle; programmatic registration in `onInit` runs before the metamodel binds and silently no-ops on some columns.
+
+**Per-row action columns.** XML `<column key="actions">` + `@Supply` renderer → `DataGridRenderers.buildActionsColumn(...)` with `EnumSet<ActionColumnType>`. Reuse built-in list actions by calling `grid.select(row)` then `.execute()` on the action — do NOT duplicate action logic into ad-hoc click listeners.
+
+**Row-action buttons (toolbar buttons enabled when a row is selected).** Declare a `list_itemTracking` action inside `<dataGrid>` and bind the button via `action="grid.actionId"`. Never `addSelectionListener` + `setEnabled` by hand — that bypasses the action lifecycle and breaks keyboard/screen-reader contracts.
+
+**No `property=` on dual-typed grid columns.** When a column is backed by a String field but exposed via an enum getter (or vice versa), use `<column key="foo">` + `@Supply` renderer ONLY. Adding `property=` triggers a metamodel resolution crash that silently empties the grid body — no exception, no log line, just a blank grid.
+
+**Filter UI.** Use `<genericFilter>` + `<propertyFilter>` children for list-view filtering — NOT a hand-built `<hbox>` with manual JPQL composition. `genericFilter` provides type-aware widgets, locale-aware labels, timezone handling, and parameterized JPQL automatically.
+
+**Data-loader events.** Use `@Subscribe(id = "loaderId", target = Target.DATA_LOADER)` with the typed event (`PostLoadEvent`, `PreLoadEvent`) — NOT `loader.addPostLoadListener(...)` in `onInit`. The annotated form participates in the view lifecycle and survives view re-attachment.
+
+**Query-param reading.** Use `@Subscribe View.QueryParametersChangeEvent` + `event.getQueryParameters().getSingleParameter(...)` — NOT Vaadin's `BeforeEnterObserver`. Vaadin's observer fires before Jmix's view binding completes, so injected components are still null.
+
+**`CollectionContainer` lookup.** Use `container.getItemOrNull(id)` / `container.getItem(id)` — NOT `container.getItems().stream().filter(...).findFirst()`. The container indexes by id; the stream form is O(n) and breaks if the collection is later swapped.
+
+**Upload component — `receiverType` is deprecated under the hood.** Keep `UploadHandler.toFile(...)` as the receiver. Vaadin 24.8 marks `Upload.getReceiver` / `setReceiver` `forRemoval` — only `FileRejectedEvent` is safe to migrate to `@Subscribe`. Do NOT eagerly switch to programmatic `setReceiver` without a Jmix-side replacement landing first.
+
+**i18n in views — use `io.jmix.core.Messages`, not Spring `MessageSource`.** Inject `Messages` (`@NonNull`, locale-aware) for any code that feeds `Notifications`, `Dialogs`, or rendered captions. Spring's `MessageSource` returns nullable Strings, which trips IntelliJ nullability warnings throughout the call chain. Keep keys in the **root** message bundle (per-view bundles trip the IntelliJ Jmix-plugin's stale-index bug); add to BOTH `messages_en.properties` and `messages_vi.properties`.
 
 ### Workflow — JetBrains MCP after Java work
 

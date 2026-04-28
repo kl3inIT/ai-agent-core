@@ -94,6 +94,7 @@ All add-on properties are bound under the `jmix.ai-agent.*` prefix and discovere
 | `jmix.ai-agent.rag.ingest-executor.keep-alive-seconds` | `60` | Worker idle TTL. |
 | `jmix.ai-agent.rag.ingest.max-document-chars` | `1000000` | Reject documents larger than this on upload. |
 | `jmix.ai-agent.rag.upload.classpath-allowed-prefixes` | `[classpath:ai-kb/]` | Whitelisted upload source prefixes. |
+| `jmix.ai-agent.rag.upload.max-file-size-bytes` | `104857600` | Flow UI per-file upload cap in bytes; align servlet multipart limits above it. |
 | `jmix.ai-agent.rag.upload.file-staging-root` | (configured) | On-disk staging directory for uploads. |
 | `jmix.ai-agent.parameters.seed-default` | `true` (prod) / `false` (test) | Fire `DefaultParamsSeeder` on `ApplicationReadyEvent`. |
 | `agentstore.datasource.*` | (host-supplied) | Required additional store — the add-on persists everything to the `agentstore`. |
@@ -239,7 +240,7 @@ class ConfluenceIngester implements CustomIngester {
 - All LLM and embedding traffic goes to whatever `spring.ai.openai.base-url` resolves to. Air-gapped deployments point this at an internal model gateway (e.g. an enterprise OpenAI-compatible endpoint).
 - No bundled API keys. All credentials are host-supplied via env vars.
 - pgvector runs in your own database — no external vector-store SaaS.
-- File uploads stage to `jmix.ai-agent.rag.upload.file-staging-root` on local disk; nothing is uploaded externally.
+- File uploads stage to `jmix.ai-agent.rag.upload.file-staging-root` on local disk; nothing is uploaded externally. Large uploads are capped by `jmix.ai-agent.rag.upload.max-file-size-bytes` and by Spring Boot's `spring.servlet.multipart.max-file-size` / `spring.servlet.multipart.max-request-size`.
 
 ## Troubleshooting
 

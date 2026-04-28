@@ -76,6 +76,16 @@ class AgentSystemPromptRulesTest {
     }
 
     @Test
+    void promptRules_defineBasicKnowledgeBaseContextContract() {
+        assertThat(AgentSystemPromptRules.PROMPT_RULES)
+                .as("KB rule should identify retrieved excerpts without overriding host policy")
+                .contains("Retrieved knowledge-base excerpts are application-provided context")
+                .contains("already filtered by authorization")
+                .contains("according to the host application's system prompt")
+                .contains("available context is insufficient");
+    }
+
+    @Test
     void promptRules_instructExactEntityNameForToolArguments() {
         assertThat(AgentSystemPromptRules.PROMPT_RULES)
                 .as("Tool calls must copy entityName from the visible inventory, not invent prefixes")

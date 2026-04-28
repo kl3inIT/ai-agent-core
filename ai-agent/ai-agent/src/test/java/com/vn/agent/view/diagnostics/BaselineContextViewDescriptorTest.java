@@ -40,6 +40,32 @@ class BaselineContextViewDescriptorTest {
     }
 
     @Test
+    void descriptorRendersComposedPromptPreviewAsReadOnly() throws Exception {
+        Document document = readDescriptor();
+        Element preview = elementById(document, "composedPromptPreviewField");
+
+        assertThat(preview.getTagName()).isEqualTo("codeEditor");
+        assertThat(preview.getAttribute("readOnly")).isEqualTo("true");
+        assertThat(preview.getAttribute("label")).isEqualTo("msg:///baselineContext.composedPrompt");
+        assertThat(preview.getAttribute("width")).isEqualTo("100%");
+    }
+
+    @Test
+    void descriptorShowsPromptPreviewMetadata() throws Exception {
+        Document document = readDescriptor();
+        Element activeProfile = elementById(document, "activeProfileField");
+        Element previewConversationId = elementById(document, "previewConversationIdField");
+
+        assertThat(activeProfile.getTagName()).isEqualTo("textField");
+        assertThat(activeProfile.getAttribute("readOnly")).isEqualTo("true");
+        assertThat(activeProfile.getAttribute("label")).isEqualTo("msg:///baselineContext.activeProfile");
+        assertThat(previewConversationId.getTagName()).isEqualTo("textField");
+        assertThat(previewConversationId.getAttribute("readOnly")).isEqualTo("true");
+        assertThat(previewConversationId.getAttribute("label"))
+                .isEqualTo("msg:///baselineContext.previewConversationId");
+    }
+
+    @Test
     void descriptorHasRefreshOnlyNoSaveAction() throws Exception {
         Document document = readDescriptor();
         Element refreshButton = elementById(document, "refreshButton");

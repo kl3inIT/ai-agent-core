@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///knowledgeBase.detail.title"
+      focusComponent="backButton">
+    <layout padding="true" spacing="true">
+        <hbox id="headerBar" width="100%" alignItems="CENTER" justifyContent="BETWEEN">
+            <hbox alignItems="CENTER" spacing="true">
+                <button id="backButton"
+                        icon="vaadin:arrow-left"
+                        text="msg:///knowledgeBase.detail.back"/>
+                <span id="documentTitle" text="msg:///knowledgeBase.detail.title"/>
+            </hbox>
+            <span id="statusBadge"/>
+        </hbox>
+
+        <details id="documentGroup"
+                 summaryText="msg:///knowledgeBase.detail.documentGroup"
+                 opened="true"
+                 width="100%">
+            <formLayout id="documentForm" width="100%">
+                <responsiveSteps>
+                    <responsiveStep minWidth="0" columns="1"/>
+                    <responsiveStep minWidth="40em" columns="2"/>
+                </responsiveSteps>
+                <textField id="documentIdField"
+                           label="msg:///knowledgeBase.detail.documentId"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="fileNameField"
+                           label="msg:///knowledgeBase.detail.fileName"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="mimeTypeField"
+                           label="msg:///knowledgeBase.detail.mimeType"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="sizeBytesField"
+                           label="msg:///knowledgeBase.detail.sizeBytes"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="uploadedAtField"
+                           label="msg:///knowledgeBase.detail.uploadedAt"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="ingestedAtField"
+                           label="msg:///knowledgeBase.detail.ingestedAt"
+                           readOnly="true"
+                           width="100%"/>
+                <textField id="createdByField"
+                           label="msg:///knowledgeBase.detail.createdBy"
+                           readOnly="true"
+                           width="100%"/>
+                <textArea id="errorMessageField"
+                          label="msg:///knowledgeBase.detail.errorMessage"
+                          readOnly="true"
+                          width="100%"
+                          minHeight="6em"/>
+            </formLayout>
+        </details>
+
+        <details id="accessPolicyGroup"
+                 summaryText="msg:///knowledgeBase.detail.accessPolicyGroup"
+                 opened="true"
+                 width="100%">
+            <formLayout id="accessPolicyForm" width="100%">
+                <responsiveSteps>
+                    <responsiveStep minWidth="0" columns="1"/>
+                    <responsiveStep minWidth="40em" columns="2"/>
+                </responsiveSteps>
+                <textField id="sourceEntityField"
+                           label="msg:///knowledgeBase.detail.sourceEntity"
+                           readOnly="true"
+                           width="100%"/>
+                <textArea id="allowedRolesField"
+                          label="msg:///knowledgeBase.detail.allowedRoles"
+                          readOnly="true"
+                          width="100%"
+                          minHeight="5em"/>
+            </formLayout>
+        </details>
+
+        <details id="vectorChunksGroup"
+                 summaryText="msg:///knowledgeBase.detail.vectorGroup"
+                 opened="true"
+                 width="100%">
+            <vbox width="100%" spacing="true">
+                <span id="chunksHeading"/>
+                <vbox id="chunksContainer" width="100%" minHeight="18em"/>
+                <textArea id="chunkContentField"
+                          label="msg:///knowledgeBase.detail.chunk.selectedContent"
+                          readOnly="true"
+                          width="100%"
+                          minHeight="10em"/>
+                <textArea id="chunkMetadataField"
+                          label="msg:///knowledgeBase.detail.chunk.selectedMetadata"
+                          readOnly="true"
+                          width="100%"
+                          minHeight="8em"/>
+            </vbox>
+        </details>
+    </layout>
+</view>

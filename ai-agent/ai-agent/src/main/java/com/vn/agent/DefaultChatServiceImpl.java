@@ -5,7 +5,6 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.vn.agent.guard.AgentSystemPromptRules;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
 import com.vn.agent.guard.IterationCounter;
@@ -22,6 +21,7 @@ import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.orchestration.StreamingSinkHolder;
+import com.vn.agent.orchestration.SystemPromptComposer;
 import com.vn.agent.parameters.Overrides;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.rag.RetrievalFilterBuilder;
@@ -207,11 +207,7 @@ public class DefaultChatServiceImpl implements ChatService {
             // configured a profile prompt and even when the LLM has not yet seen any tool error
             // in the current conversation.
             String baselineText = baselineContextProvider.renderAsText(convId);
-            String composedSystemPrompt = baselineText
-                    + AgentSystemPromptRules.PROMPT_RULES
-                    + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
-                            ? "\n\n" + profileSystemPrompt
-                            : "");
+            String composedSystemPrompt = SystemPromptComposer.compose(baselineText, profileSystemPrompt);
 
             // Phase 5 role-scoped retrieval (RAG-04/RAG-05). Null filter = admin-bypass; skip
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
@@ -329,11 +325,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     // Phase 9 PROMPT-03 + D-15: same composition seam as the blocking ask(...)
                     // path; rules apply on every streaming turn so the vocabulary + retry
                     // contract is enforced regardless of transport mode.
-                    String composedSystemPrompt = baselineText
-                            + AgentSystemPromptRules.PROMPT_RULES
-                            + (profileSystemPrompt != null && !profileSystemPrompt.isBlank()
-                                    ? "\n\n" + profileSystemPrompt
-                                    : "");
+                    String composedSystemPrompt = SystemPromptComposer.compose(baselineText, profileSystemPrompt);
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
