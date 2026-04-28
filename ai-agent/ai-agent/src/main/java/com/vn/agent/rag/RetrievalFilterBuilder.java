@@ -39,6 +39,19 @@ import java.util.stream.Collectors;
  * {@code ROLE_AI_AGENT_USER}. Ingestion stores the underlying Jmix role code
  * ({@code ai-agent-user}), so authorities are normalised back to role codes before filter
  * construction.</p>
+ *
+ * <p><b>WARNING-11 / Scaling note:</b> the role clause is composed as
+ * {@code (model AND roleA) OR (model AND roleB) OR ...} rather than the algebraically
+ * equivalent {@code model AND (roleA OR roleB OR ...)}. This duplication of the
+ * model-pin clause is intentional — it avoids relying on Spring AI converter
+ * parenthesization for the {@code OR} subgroup (a quirk that has bitten previous
+ * Spring AI 1.x versions). The trade-off is linear growth in expression size: a user
+ * with N roles produces N copies of the model-pin clause. Phase 10's expected role
+ * count per user is &lt;10 so JSONPath converter token limits are not a concern; the
+ * unit-level guard test {@code RetrievalFilterBuilderRoleScalingGuardTest} pins the
+ * clause shape and the per-role multiplication so a future flatten-the-OR refactor
+ * is detected immediately. Users with very large role sets (50+) may wish to
+ * benchmark before relying on this branch.</p>
  */
 @Component
 public class RetrievalFilterBuilder {
