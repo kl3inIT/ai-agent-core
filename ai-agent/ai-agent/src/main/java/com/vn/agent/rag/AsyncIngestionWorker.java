@@ -279,9 +279,15 @@ public class AsyncIngestionWorker {
         merged.put(ChunkMetadata.SOURCE, doc.getFileName());
         merged.put(ChunkMetadata.DOCUMENT_ID, doc.getId().toString());
         merged.put(ChunkMetadata.EMBEDDING_MODEL, embeddingModel);
-        merged.put(ChunkMetadata.ALLOWED_ROLES, List.copyOf(allowedRoles));
-        for (String role : allowedRoles) {
-            if (role == null || role.isBlank()) continue;
+        // BLOCKER-01: filter null/blank roles BEFORE List.copyOf — that method throws NPE on
+        // any null element. The role-flag loop below already skips null/blank entries, so the
+        // canonical ALLOWED_ROLES list MUST mirror the same shape (otherwise downstream
+        // consumers that scan ALLOWED_ROLES would see a different set than the role flags).
+        List<String> safeAllowedRoles = allowedRoles.stream()
+                .filter(r -> r != null && !r.isBlank())
+                .toList();
+        merged.put(ChunkMetadata.ALLOWED_ROLES, safeAllowedRoles);
+        for (String role : safeAllowedRoles) {
             merged.put(ChunkMetadata.roleFlagKey(role), true);
         }
         // EXP-05 / D-07: Mirror sourceEntityName to chunk metadata so RetrievalFilterBuilder
