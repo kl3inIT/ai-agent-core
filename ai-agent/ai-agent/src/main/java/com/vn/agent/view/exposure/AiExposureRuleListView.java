@@ -12,6 +12,7 @@ import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.NotificationUtils;
 import io.jmix.core.Messages;
 import io.jmix.core.UnconstrainedDataManager;
+import jakarta.persistence.OptimisticLockException;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.component.grid.DataGrid;
@@ -121,14 +122,26 @@ public class AiExposureRuleListView extends StandardListView<AiExposureRule> {
     private void toggleEnabled(AiExposureRule rule) {
         try {
             rule.setEnabled(!Boolean.TRUE.equals(rule.getEnabled()));
-            unconstrainedDataManager.save(rule);
+            // WARNING-04: capture the freshly-persisted entity so the post-save notification
+            // reflects the durable state, and reload the grid so the action-button renderer
+            // rebinds against a non-stale row. The renderer captures `rule` by reference; if
+            // the user double-clicks before reload finishes the second click would otherwise
+            // re-save against a stale @Version and trigger OptimisticLockException.
+            AiExposureRule saved = unconstrainedDataManager.save(rule);
             exposureRulesDl.load();
             notifications.create(messages.getMessage(getClass(),
-                            Boolean.TRUE.equals(rule.getEnabled())
+                            Boolean.TRUE.equals(saved.getEnabled())
                                     ? "exposureRulesList.action.hideFromAi"
                                     : "exposureRulesList.action.visibleToAi"))
                     .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
                     .show();
+        } catch (OptimisticLockException ex) {
+            // The grid row was modified concurrently (another tab, or rapid double-click before
+            // the renderer rebound). Reload so the user sees the current state and can retry.
+            log.info("Optimistic lock on toggle for entity {} — reloading grid", rule.getEntityName());
+            exposureRulesDl.load();
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "exposureRulesList.error.toggle", ex);
         } catch (Exception ex) {
             log.warn("Toggle exposure rule failed for entity {}", rule.getEntityName(), ex);
             NotificationUtils.errorWithDetail(notifications, messages,
