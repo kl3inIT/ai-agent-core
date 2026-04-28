@@ -132,13 +132,13 @@ public class KnowledgeDocumentUploadService {
         // inside the configured staging root. Anything else — including raw classpath:
         // or file: targeting application config, secrets, or arbitrary filesystem paths —
         // is refused before persistence.
-        validateSourceUri(sourceUri);
+        String normalizedSourceUri = validateSourceUri(sourceUri);
 
         List<String> roles = KnowledgeDocumentRoleValidator.validateRoleCodes(allowedRoles, roleRepository);
 
         // PATTERNS: entity instantiation via Metadata.create (constructor path is forbidden).
         AiKnowledgeDocument document = metadata.create(AiKnowledgeDocument.class);
-        document.setFileName(sourceUri);
+        document.setFileName(normalizedSourceUri);
         document.setMimeType(sourceKind);
         document.setAllowedRolesJson(writeRolesJson(roles));
         // Plan 10-08 / D-07: persist sourceEntityName BEFORE dataManager.save so the
@@ -180,14 +180,14 @@ public class KnowledgeDocumentUploadService {
      * are treated as an implicit {@code classpath:ai-kb/<name>} which must also fall
      * inside the allowlist to succeed.
      */
-    private void validateSourceUri(String sourceUri) {
+    private String validateSourceUri(String sourceUri) {
         String trimmed = sourceUri.trim();
         if (trimmed.isEmpty()) {
             throw new IllegalArgumentException("sourceUri must not be blank");
         }
         if (trimmed.startsWith(CLASSPATH_PREFIX)) {
             validateClasspathUri(trimmed);
-            return;
+            return trimmed;
         }
         if (trimmed.startsWith(FILE_PREFIX)) {
             String stagingRoot = effectiveFileStagingRoot();
@@ -208,7 +208,7 @@ public class KnowledgeDocumentUploadService {
                 throw new IllegalArgumentException(
                         "file: sourceUri must resolve inside configured staging root (" + stagingRoot + "): " + trimmed);
             }
-            return;
+            return trimmed;
         }
         if (trimmed.contains("://")) {
             throw new IllegalArgumentException("Unsupported sourceUri scheme: " + trimmed);
@@ -216,6 +216,7 @@ public class KnowledgeDocumentUploadService {
         // Bare filename — defer to AsyncIngestionWorker's default classpath:ai-kb/ root
         // which must also be in the allowlist for this call to succeed.
         validateClasspathUri("classpath:ai-kb/" + trimmed);
+        return trimmed;
     }
 
     private void validateClasspathUri(String location) {

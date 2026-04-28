@@ -134,6 +134,18 @@ class KnowledgeDocumentUploadServiceTest {
     }
 
     @Test
+    void upload_persists_trimmed_sourceUri_that_was_validated() {
+        AiKnowledgeDocument saved = service.upload(
+                "  classpath:ai-kb/fixture-alpha.md  ", "text/markdown", List.of());
+
+        ArgumentCaptor<AiKnowledgeDocument> captor = ArgumentCaptor.forClass(AiKnowledgeDocument.class);
+        verify(dataManager).save(captor.capture());
+        AiKnowledgeDocument persisted = captor.getValue();
+        assertThat(persisted.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
+        assertThat(saved.getFileName()).isEqualTo("classpath:ai-kb/fixture-alpha.md");
+    }
+
+    @Test
     void unknown_role_code_throws_and_does_not_persist_or_schedule() {
         stubRoleUnknown("phantom-role");
 
