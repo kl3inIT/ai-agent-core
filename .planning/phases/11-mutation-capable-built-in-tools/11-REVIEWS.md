@@ -1,113 +1,91 @@
 ---
 phase: 11
 reviewers: [codex]
-reviewed_at: 2026-04-28T17:41:42Z
-plans_reviewed:
-  - 11-01-PLAN.md
-  - 11-02-PLAN.md
-  - 11-03-PLAN.md
-  - 11-04-PLAN.md
-  - 11-05-PLAN.md
-  - 11-06-PLAN.md
-  - 11-07-PLAN.md
-  - 11-08-PLAN.md
-  - 11-09-PLAN.md
-  - 11-10-PLAN.md
-  - 11-11-PLAN.md
+reviewed_at: 2026-04-28T17:51:55Z
+plans_reviewed: [11-01-PLAN.md, 11-02-PLAN.md, 11-03-PLAN.md, 11-04-PLAN.md, 11-05-PLAN.md, 11-06-PLAN.md, 11-07-PLAN.md, 11-08-PLAN.md, 11-09-PLAN.md, 11-10-PLAN.md, 11-11-PLAN.md]
 ---
 
-# Cross-AI Plan Review - Phase 11
+# Cross-AI Plan Review — Phase 11
 
 ## Codex Review
 
 ## Summary
 
-The plan set is stronger than the prior review cycle and now addresses several major design gaps: default-off callback wiring, single audit ownership, request-hash idempotency, operation-specific create/update exposure gates, prompt-rule wiring, and a more credible TEST-12 strategy. I would still block execution. The remaining risks are concentrated in `11-07`: the mutation implementation plan still has compile/API hazards, relationship mutation is too broad for the concrete design provided, idempotency finalization can still produce duplicate host writes after partial failure, and the tests do not yet prove all of the most dangerous paths.
+The plans are unusually thorough and cover the right Phase 11 surfaces: default-off mutation tools, layered authorization, idempotency, audit durability, prompt rules, callback wiring, and regression tests. The main weakness is that the hardest parts are still under-specified or internally inconsistent: idempotency retry semantics, cross-store finalization failure, direct-tool test setup, and related-write behavior. I would treat this as a strong draft, but not execution-ready until the HIGH concerns below are resolved.
 
 ## Strengths
 
-- `11-01` now explicitly adds `AiMutationIntentStatus` and enum-style accessors, resolving a prior compile/API ambiguity.
-- `11-04` correctly separates `canCreate` and `canUpdate`, which avoids treating create-only users as update-denied.
-- `11-05` improves idempotency materially with `REQUEST_HASH`, `PENDING/COMMITTED/FAILED`, and unique-index reservation.
-- `11-09` correctly avoids wrapping mutation tools in `ToolCallbackAuditDecorator` while preserving streaming events via a separate decorator.
-- `11-09` explicitly wires prompt rules through both blocking and streaming `DefaultChatServiceImpl` paths.
-- `11-10` addresses the prior fixture-registration issue with metadata smoke assertions.
-- `11-11` gives TEST-12 a much better proof shape by using a real transactional test executor instead of a spy-thrown exception.
+- Clear build order: entity/config/SPI first, resolver/repository/translator next, tools and wiring later, tests last.
+- Strong security posture: regular `DataManager` for host mutations, `AccessManager` per CRUD and attribute, LLM exposure gate above Jmix permissions, no `delete_record`.
+- Good default-off contract with callback-level testing at `AgentToolCallbacks.forCurrentUser`.
+- Audit ownership is explicitly handled to avoid duplicate audit rows for self-audited mutation tools.
+- Good recognition of Spring proxy boundaries by moving `@Transactional` save/remove into `MutationSaveExecutor`.
+- Tests target the right regressions: callback shape, access denial before save, idempotency replay, commit-failed audit, prompt-rule gating, scanner coverage.
 
 ## Concerns
 
-- **HIGH: `11-07` still has compile and type-contract risk around IDs.** `ToolEntityResolver.parseEntityId(String, MetaClass)` returns `Object`, but the `11-07` snippets assign it to `UUID parsedId` / `UUID parsedRelatedId` and cast `EntityValues.getId(saved)` to `UUID`. This contradicts the resolver's typed-PK design and may fail to compile unless casts are added, then fail at runtime for non-UUID host entities.
+- **HIGH: Parallel wave conflicts.** Wave 1 plans edit overlapping files: `AIConfiguration.java` in 11-02 and 11-03, message bundles in 11-01 and 11-02. Later waves also overlap message files. If these are executed in parallel, merge conflicts are likely.
 
-- **HIGH: Relationship attributes inside `create_record` / `update_record` are not actually handled.** D-01 allows FK UUID strings inside `attributes`, but `applyAttributes()` calls `filterLiteralValueConverter.convertValue(...)` and then `EntityValues.setValue(entity, attr, coerced)`. For class-valued Jmix attributes, the entity property usually expects an entity instance, not a UUID. The plan needs explicit relationship detection, target entity load, target read check, and `not_found` behavior.
+- **HIGH: Idempotency retry semantics conflict.** 11-05 treats same key + different request hash as `idempotency_violation` even for `FAILED` rows. But D-04 says `validation_failed` should be retried with the same `idempotencyKey` after fixing values, which usually changes the request hash.
 
-- **HIGH: Idempotency finalization can still allow duplicate host writes.** `11-07` says if `markCommitted` fails after the host mutation returned, mark the reservation `FAILED`. But `11-05` reclaims `FAILED` rows for retry, so the same idempotency key can execute the host mutation again even though the first host write may already be committed. `FAILED` needs to distinguish "failed before host commit" from "host commit outcome unknown/committed but finalization failed."
+- **HIGH: Finalization failure can cause duplicate mutations.** 11-07 says if `markCommitted` fails after the host save commits, mark the reservation `FAILED`. A retry can then run the host mutation again, defeating idempotency.
 
-- **HIGH: Related-write implementation remains too underspecified.** `wireInverseReference`, `clearInverseReference`, `childBelongsToParent`, and composition/orphan detection are still described as helper behavior rather than a concrete supported relationship matrix. `11-10` only creates a simple fixture with `name` and `secret`; `11-11` needs concrete parent/child fixtures and Liquibase to make related-write tests meaningful.
+- **HIGH: `AiAgentMutationRole` grants READ on all `AiMutationIntent` rows.** Replay uses `UnconstrainedDataManager`, so user READ is not needed. Without row-level scoping, this can expose idempotency keys, usernames, conversation IDs, and result entity IDs to mutation-role users.
 
-- **HIGH: Related-write security matrix is inconsistent with the snippets.** `add_related_record` enforces child update but not child read. `remove_related_record` enforces child read and inverse attribute modify, but not child update for non-composition unlink. The must-have says child read/update/delete are covered, but the planned code path does not consistently enforce that.
+- **HIGH: Relationship attribute assignment is under-specified.** `applyAttributes` appears to set relationship properties from UUID strings directly. Jmix entity references generally need loaded entity instances, not raw UUIDs. This is central to D-01.
 
-- **HIGH: Stable error-code mapping still allows unsafe messages through.** `MutationErrorTranslator` passes through stable `ToolUserError`s unchanged. But `11-07` creates `validation_failed` errors that interpolate LLM-supplied invalid attribute/relationship names into LLM-visible messages. That violates the PII/no-raw-user-input error-string goal. The translator should sanitize/rebuild messages for mutation boundaries, not pass through arbitrary stable-code messages.
+- **HIGH: Related-write implementation is too vague for a security-sensitive feature.** Helpers like `wireInverseReference`, `clearInverseReference`, `childBelongsToParent`, and composition handling are sketched but not concretely specified. Many-to-many, inverse collections, composition children, and ownership detection are high-risk.
 
-- **HIGH: Direct mutation-tool tests may fail without `RunContext` setup.** `BuiltInMutationTools` uses static `RunContext` accessors for conversation/run/root audit IDs, but `11-10` and `11-11` only mention `SystemAuthenticator.withUser(...)`. If `RunContext` is not initialized in direct tool tests, audit/idempotency calls may fail or produce null audit linkage.
+- **HIGH: Direct tool integration tests likely need `RunContext`.** Plans use `SystemAuthenticator.withUser(...)`, but `BuiltInMutationTools` also depends on static `RunContext` values for audit/conversation. Tests may fail or silently miss audit paths unless they set/clear `RunContext`.
 
-- **MEDIUM: `MutationIntentCleanupJob` does not implement its stated stale-PENDING diagnostic.** `11-05` must-have says cleanup logs PENDING rows older than TTL, but the planned code only deletes expired rows.
+- **HIGH: Related-write tests need concrete relationship fixtures.** 11-10’s fixture only guarantees `name` and `secret`, while 11-11 requires parent/child relationship coverage. The fixture design is not sufficient.
 
-- **MEDIUM: `MutationErrorTranslator` may catch the wrong Jmix access-denied type.** The plan uses `io.jmix.security.AccessDeniedException`; verify against the actual codebase/Jmix 2.8 imports. If the real type is `io.jmix.core.AccessDeniedException` or only Spring Security's type, this is a compile blocker.
+- **MEDIUM: Mandatory `idempotencyKey` validation is missing.** Tools accept `String idempotencyKey`, but plans do not explicitly validate nonblank UUID format before reservation.
 
-- **MEDIUM: TEST-13 count assertions are weakened.** `11-10` says assert size 8/12 "only if no local contributors are present." The requirement is specifically about `AgentToolCallbacks.forCurrentUser()` shape. Name assertions are useful, but exact count should be enforced in this controlled test context.
+- **MEDIUM: Stale `PENDING` rows block until cleanup.** `reserveOrReplay` returns `PENDING` even if the row has expired but the hourly job has not yet deleted it.
 
-- **LOW: Link tool result contract is inconsistent.** D-05 says raw URL string, while `11-08` returns JSON `{ "url": ... }`. Either is workable, but the contract and tests should choose one.
+- **MEDIUM: Link tools return JSON object, while D-05 says raw URL string.** Either is fine, but the contract should be consistent.
+
+- **MEDIUM: URL path segments are not encoded or validated.** `generate_entity_detail_link` appends arbitrary `entityId`; it should validate/encode to avoid malformed links.
+
+- **LOW: Plans are very prescriptive.** 11-07 in particular contains large pseudo-code blocks that may not compile against actual APIs. The executor should be allowed to adapt while preserving behavioral invariants.
 
 ## Suggestions
 
-- Change mutation ID handling to one consistent model: either explicitly support only UUID host IDs everywhere, or store/replay IDs as strings plus entity name and keep `parseEntityId` returning `Object`.
-- Add a dedicated `coerceAttributeValue(MetaProperty, Object)` path that loads class-valued relationship targets via `DataManager` and returns `not_found` for valid UUIDs with no row.
-- Add a terminal idempotency status such as `COMMIT_UNKNOWN` or `FINALIZATION_FAILED` and never reclaim it for automatic re-execution.
-- Narrow related-write support for v1.1 to a documented subset, for example child-side to-one inverse only, plus composition remove only when metadata proves orphan removal. Fail closed for everything else.
-- Add concrete `MutationParentFixture` / `MutationChildFixture` entities and Liquibase before writing related-write tests.
-- Make `MutationErrorTranslator` rebuild all mutation-boundary `ToolUserError` messages from code + metaClass, preserving only safe `expected` hints.
-- Add a test helper that establishes both authentication and `RunContext` before direct calls to `BuiltInMutationTools`.
-- Make TEST-13 exact in the base context: 8 default callbacks, 12 enabled callbacks, zero `delete_record`.
+- Serialize overlapping plans or split shared-file edits into one foundation plan, especially `AIConfiguration.java` and message bundles.
+- Decide idempotency recovery rules explicitly:
+  - If a mutation never committed, allow same key with corrected request hash for selected error codes, or change the recovery hint to require a fresh key.
+  - If commit state is unknown after host save, do not mark the intent `FAILED` in a way that permits duplicate writes.
+- Make `AiAgentMutationRole` an empty marker role, or add row-level “own rows only” policy before granting READ.
+- Add explicit idempotency key validation: nonblank UUID, stable `parameter_conversion_error` on malformed input, before repository reservation.
+- For relationship attributes in `create_record` / `update_record`, explicitly load referenced entities by ID and set the entity instance, with read/write checks on the target.
+- Narrow v1.1 related-write support to well-defined relationship shapes. For unsupported metadata shapes, fail closed with `validation_failed`.
+- Expand the test fixture to include concrete parent/child entities and at least one supported relationship type before writing related-write tests.
+- Add a reusable test helper for authenticated `RunContext` setup/cleanup, and require every direct tool-call test to use it.
+- Make link-tool output contract consistent: either raw string or `{ "url": "..." }`, then update descriptions/tests accordingly.
+- Use bulk delete for cleanup if volume may be high, or at least document row-count expectations.
 
 ## Risk Assessment
 
-**Overall risk: HIGH.** The architecture is close, but the implementation plan still leaves the hardest part, generalized safe mutation, with too much ambiguity. The biggest risks are duplicate writes after idempotency finalization failure, relationship mutation correctness, unsafe relationship attribute coercion, and tests that may not initialize the same runtime context as chat execution. I would revise before autonomous execution.
+**Overall risk: HIGH** before revision. The plans cover the right goals, but the remaining gaps are in the most failure-sensitive areas: idempotency under failure, mutation finalization, related-write security, and test realism. Once those are corrected, the risk drops to **MEDIUM** because the broader architecture and sequencing are sound.
 
-## Prior HIGH Disposition
 
-| Prior HIGH | Disposition | Reason |
-|---|---:|---|
-| `11-07` likely compile blockers | **PARTIALLY RESOLVED** | Parse argument order and status accessors are addressed, but `Object` -> `UUID` ID handling and several helper/API assumptions remain risky. |
-| Stable mutation error-code mapping not enforced | **PARTIALLY RESOLVED** | Translator exists and tool catches route through it, but pass-through stable `ToolUserError` messages can still leak raw invalid attribute/relationship strings. |
-| Idempotency finalization fragile | **PARTIALLY RESOLVED** | Reservation/hash/status improves concurrency, but post-host-commit `markCommitted` failure can still become `FAILED` and allow duplicate retry. |
-| Related-write execution under-specified | **UNRESOLVED** | The plan adds desired behavior text, but no concrete supported relationship matrix or parent/child fixture exists. |
-| TEST-12 does not prove rollback/audit guarantee | **FULLY RESOLVED** | `11-11` uses a real transactional test executor that saves then throws, which can prove rollback plus durable REQUIRES_NEW audit. |
-| Mutation test fixture may not be registered in Jmix metadata | **FULLY RESOLVED** | `11-10` explicitly requires test module registration and `metadata.getClass("test_MutationTestFixture")` smoke assertion. |
 ---
 
 ## Consensus Summary
 
-Only the Codex reviewer was invoked for this run because the command was `--codex`. A cross-reviewer consensus cannot be computed from a single reviewer.
-
-This cycle leaves seven unresolved HIGH-severity concerns. Four are carried forward from the prior review cycle as unresolved or partially resolved, and three are newly raised or newly split out from the current plan review.
+Single-reviewer run with --codex; no cross-reviewer consensus can be computed. Treat the Codex HIGH concerns as the current priority feedback for replanning.
 
 ### Agreed Strengths
 
-- Single-reviewer run; no multi-reviewer agreement threshold is available.
-- Codex found the revised plan set stronger than the prior cycle, especially around default-off callback wiring, single audit ownership, request-hash idempotency, operation-specific create/update exposure gates, prompt-rule wiring, and TEST-12's transactional proof shape.
+- Not applicable for a single-reviewer run.
 
 ### Agreed Concerns
 
-- Single-reviewer run; no multi-reviewer agreement threshold is available.
-- Current unresolved HIGH concerns:
-  - `11-07` still has compile and type-contract risk around ID handling.
-  - Relationship attributes inside `create_record` / `update_record` are not actually handled.
-  - Idempotency finalization can still allow duplicate host writes after partial failure.
-  - Related-write implementation remains too underspecified.
-  - Related-write security enforcement is inconsistent with the stated matrix.
-  - Stable error-code mapping can still pass unsafe mutation-boundary messages through.
-  - Direct mutation-tool tests may fail or prove the wrong thing without `RunContext` setup.
+- Idempotency finalization and retry semantics still need a deterministic no-duplicate contract.
+- Relationship attributes and related-write behavior need concrete, security-aware implementation rules.
+- Test fixtures and direct tool-call test setup need to prove the planned mutation paths under realistic Jmix context.
 
 ### Divergent Views
 
-None. Only Codex was invoked in this cycle.
+- Not applicable for a single-reviewer run.
