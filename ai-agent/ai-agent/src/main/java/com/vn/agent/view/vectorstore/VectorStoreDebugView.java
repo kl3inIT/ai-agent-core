@@ -35,9 +35,9 @@ import java.util.List;
 /**
  * EXP-07 / D-09 admin-only Vector Store debug view. Read-only paginated grid over
  * vector-store chunks using {@link VectorStore#similaritySearch(SearchRequest)} with
- * an empty-string query, similarity threshold 0.0, and topK 100. Filter input is
- * parsed via Spring AI's {@link FilterExpressionTextParser}; parse errors surface
- * as inline field validation, NOT as a toast or 500.
+ * an empty-string query, similarity threshold 0.0, and a load-more {@code topK}
+ * window. Filter input is parsed via Spring AI's {@link FilterExpressionTextParser};
+ * parse errors surface as inline field validation, NOT as a toast or 500.
  *
  * <p>Gated to {@code AiAgentAdminRole} via {@code @ViewPolicy("AiAgent_VectorStoreDebug")}
  * (Plan 10-03). Admin bypass in {@code RetrievalFilterBuilder} returns null for admin
@@ -67,7 +67,7 @@ public class VectorStoreDebugView extends StandardView {
 
     private static final Logger log = LoggerFactory.getLogger(VectorStoreDebugView.class);
 
-    private static final int DEFAULT_TOP_K = 100;
+    private static final int PAGE_SIZE = 100;
     private static final int CONTENT_PREVIEW_LIMIT = 120;
     private static final int METADATA_PREVIEW_LIMIT = 80;
 
@@ -84,10 +84,13 @@ public class VectorStoreDebugView extends StandardView {
     @ViewComponent
     private Button filterHelpBtn;
     @ViewComponent
+    private Button loadMoreBtn;
+    @ViewComponent
     private VerticalLayout chunksContainer;
 
     // Fix R7: plain Vaadin Grid<Document>, not the Jmix metamodel-driven grid.
     private Grid<Document> chunksGrid;
+    private int loadedLimit = PAGE_SIZE;
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -137,18 +140,29 @@ public class VectorStoreDebugView extends StandardView {
      */
     @Subscribe("searchBtn")
     public void onSearchBtnClick(final ClickEvent<Button> event) {
+        loadedLimit = PAGE_SIZE;
+        loadChunks();
+    }
+
+    @Subscribe("loadMoreBtn")
+    public void onLoadMoreBtnClick(final ClickEvent<Button> event) {
+        loadedLimit += PAGE_SIZE;
+        loadChunks();
+    }
+
+    private void loadChunks() {
         metadataFilterField.setErrorMessage(null);
         String filterText = metadataFilterField.getValue();
 
-        SearchRequest.Builder req = SearchRequest.builder()
+        SearchRequest.Builder requestBuilder = SearchRequest.builder()
                 .query("")
-                .topK(DEFAULT_TOP_K)
+                .topK(loadedLimit)
                 .similarityThreshold(0.0);
 
         if (filterText != null && !filterText.isBlank()) {
             try {
-                Filter.Expression expr = new FilterExpressionTextParser().parse(filterText);
-                req.filterExpression(expr);
+                Filter.Expression expression = new FilterExpressionTextParser().parse(filterText);
+                requestBuilder.filterExpression(expression);
             } catch (Exception ex) {
                 log.debug("Vector store debug filter parse failed for input '{}'", filterText, ex);
                 metadataFilterField.setErrorMessage(
@@ -157,8 +171,10 @@ public class VectorStoreDebugView extends StandardView {
             }
         }
 
-        List<Document> docs = vectorStore.similaritySearch(req.build());
-        chunksGrid.setItems(docs != null ? docs : List.of());
+        List<Document> documents = vectorStore.similaritySearch(requestBuilder.build());
+        List<Document> safeDocuments = documents != null ? documents : List.of();
+        chunksGrid.setItems(safeDocuments);
+        loadMoreBtn.setEnabled(safeDocuments.size() >= loadedLimit);
     }
 
     @Subscribe("filterClearBtn")

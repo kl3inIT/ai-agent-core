@@ -29,6 +29,8 @@
             <button id="searchBtn"
                     text="msg:///vectorStoreDebug.action.search"
                     themeNames="primary"/>
+            <button id="loadMoreBtn"
+                    text="msg:///vectorStoreDebug.action.loadMore"/>
         </hbox>
         <!-- chunksContainer: programmatic Grid<Document> added here in controller onInit -->
         <vbox id="chunksContainer" width="100%" minHeight="20em"/>
