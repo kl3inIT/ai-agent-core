@@ -56,7 +56,8 @@ to any entity surfaced by `find_records` / `get_record`.
   per existing `AiAgentAuditProperties` plumbing (Phase 9 D-18).
 - System-prompt rule additions (via `AgentSystemPromptRules` Phase 9 extension
   point): rule about idempotencyKey freshness; rule "do not retry on
-  access_denied"; rule "preview when `confirmationRequired=true`".
+  access_denied"; rule that direct mutations are only for simple, confirmed
+  user requests. `confirmationRequired=true` remains UX hint metadata only.
 - Locale message keys for every denial / success / idempotency / error path
   in `messages.properties` AND `messages_vi.properties`.
 - New `AiAgentMutationRole` resource role (empty default — host composes with
@@ -455,8 +456,8 @@ to any entity surfaced by `find_records` / `get_record`.
   codes + denial reasons in both locales.
 - `jmix-liquibase` — changelog conventions for `070-ai-mutation-intent.xml`.
 - `jmix-testing` — `@SpringBootTest` for TEST-10..13; TEST-12 uses a real host
-  save plus a mocked idempotency finalization failure for the `COMMIT_FAILED`
-  path, and a separate save-rollback case for `ERROR`.
+  save plus the package-private `MutationIntentFailureProbe` test seam for the
+  `COMMIT_FAILED` path, and a separate save-rollback case for `ERROR`.
 
 ### Spring AI primitives to verify in research
 - Spring AI 1.1.4 `@Tool` + `@ToolParam` Map<String,Object> coercion behavior

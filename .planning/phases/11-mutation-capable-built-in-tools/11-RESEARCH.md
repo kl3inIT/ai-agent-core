@@ -79,7 +79,7 @@ All decisions in CONTEXT.md (D-01..D-09, plus Claude's Discretion items) are hon
 | SPI-10 | `MutationGuard` SPI | See MUT-05. |
 | TEST-10 | Per-attribute denial → `access_denied`, `DataManager.save` never called | `@SpringBootTest`. Mock `AccessManager` to deny one attribute; assert tool returns structured `access_denied`. |
 | TEST-11 | Same `idempotencyKey` → same result, `outcome=IDEMPOTENT_REPLAY`, only one row | `@SpringBootTest`. Run tool twice; assert dedup row count = 1, second call audit `outcome=IDEMPOTENT_REPLAY`. |
-| TEST-12 | Durable audit across both rollback and commit-unknown paths | `@SpringBootTest`. Use a real host save plus mocked `MutationIntentRepository.markCommitted(...)` failure for the `COMMIT_FAILED` path; assert the host row persisted once, audit outcome is `COMMIT_FAILED`, and the intent is `COMMIT_UNKNOWN`/`PENDING`, never `FAILED`. Add a separate known save-rollback case (`DataIntegrityViolationException`/`ConstraintViolationException`) that maps to stable `ERROR` audit + `FAILED` intent, not `COMMIT_FAILED`. |
+| TEST-12 | Durable audit across both rollback and commit-unknown paths | `@SpringBootTest`. Use a real host save plus the Plan 11-05 `MutationIntentFailureProbe` test bean for the `COMMIT_FAILED` path; do not mock the whole repository. Assert the host row persisted once, audit outcome is `COMMIT_FAILED`, and the intent is `COMMIT_UNKNOWN`/`PENDING`, never `FAILED`. Add a separate known save-rollback case (`DataIntegrityViolationException`/`ConstraintViolationException`) that maps to stable `ERROR` audit + `FAILED` intent, not `COMMIT_FAILED`. |
 | TEST-13 | Default-config boot: zero mutation callbacks in `forCurrentUser()` | `@SpringBootTest`. Default property `mutation.enabled=false`. Assert callback array length = 8 (6 data + 2 link), no callback name matches `create_record|update_record|add_related_record|remove_related_record|delete_record`. |
 
 ## Architectural Responsibility Map
@@ -246,7 +246,7 @@ private void enforceAttributeWriteAccess(MetaClass metaClass, Set<String> attrib
 
 **When to use:** Step 3 of every mutation call.
 
-**Pitfall:** The dedup row write uses the `agentstore` transaction manager; the host entity write uses the default. Two distinct transactions. The Phase 11 plan uses a pre-host-save reservation because it is the only way to stop concurrent duplicate host writes across nodes. If host save fails before commit, mark FAILED and allow same-hash retry. If host save returned but dedup finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because that can duplicate a committed host write.
+**Pitfall:** The dedup row write uses the `agentstore` transaction manager; the host entity write uses the default. Two distinct transactions. The Phase 11 plan uses a pre-host-save reservation because it is the only way to stop concurrent duplicate host writes across nodes. The reservation method must catch duplicate-key/commit failures around `TransactionTemplate.execute(...)`, not only around `dataManager.save(...)` inside the transaction body, because unique-index races can surface during transaction commit. If host save fails before commit, mark FAILED and allow same-hash retry. If host save returned but dedup finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because that can duplicate a committed host write.
 
 **Example:**
 ```java
@@ -832,7 +832,7 @@ String url = contextPath + "/" + trimmed + "/" + entityId;
 4. **Dedup row write before vs after host save.**
    - What we know: Cross-store transactions are not atomic; CONTEXT.md says "REQUIRES_NEW boundary keeps audit durable".
    - What's unclear: Should `MutationIntentRepository.create` be called inside the host `@Transactional` (rolls back together) or via `TransactionSynchronization.afterCommit`?
-   - RESOLVED: Reserve a PENDING row before host save in `agentstore` via `UnconstrainedDataManager`; the unique index is the distributed idempotency lock. After host save returns, mark COMMITTED. If host save returned but finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because retrying could duplicate a committed host write.
+   - RESOLVED: Reserve a PENDING row before host save in `agentstore` via `UnconstrainedDataManager`; the unique index is the distributed idempotency lock. `reserveOrReplay` uses an agentstore `TransactionTemplate` so duplicate-key failures raised at commit are caught and re-read/classified. After host save returns, mark COMMITTED. If host save returned but finalization fails, mark COMMIT_UNKNOWN if possible or leave PENDING; never mark FAILED/reclaimable because retrying could duplicate a committed host write.
 
 ## Project Constraints (from CLAUDE.md)
 

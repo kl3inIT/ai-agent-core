@@ -289,6 +289,7 @@ public class AiMutationIntent {
 public class MutationIntentRepository {
 
     private final UnconstrainedDataManager dataManager;   // MEMORY feedback_jmix_unconstrained_for_system_writes
+    private final TransactionTemplate agentstoreRequiresNew;
 
     public MutationIntentRepository(UnconstrainedDataManager dataManager) {
         this.dataManager = dataManager;
@@ -304,7 +305,10 @@ public class MutationIntentRepository {
                 .optional();
     }
 
-    public AiMutationIntent create(...) { /* metadata.create + dataManager.save */ }
+    public ReservationResult reserveOrReplay(...) {
+        // wrap transactionTemplate.execute(...) in try/catch so duplicate-key
+        // failures raised at commit time are caught by this outer method
+    }
 
     public int deleteExpired(OffsetDateTime now) { /* loop + dataManager.remove or bulk JPQL */ }
 }
@@ -312,7 +316,8 @@ public class MutationIntentRepository {
 
 **Differs from analog:**
 - Adds `reserveOrReplay(...)`, `markCommitted(...)`, `markFailed(...)`, `markCommitUnknown(...)`, and cleanup/diagnostic methods (analog is read-only).
-- Per Phase 11 review resolution: reserve PENDING before host save so the unique index prevents duplicate concurrent host writes. After host save returns, finalize to COMMITTED; if finalization fails after host save returned, use COMMIT_UNKNOWN or leave PENDING, never FAILED/reclaimable.
+- Per Phase 11 review resolution: reserve PENDING before host save so the unique index prevents duplicate concurrent host writes. `reserveOrReplay` uses an agentstore `TransactionTemplate` and catches around `execute(...)` because unique-index races can surface at transaction commit, after the callback body returns. After host save returns, finalize to COMMITTED; if finalization fails after host save returned, use COMMIT_UNKNOWN or leave PENDING, never FAILED/reclaimable.
+- TEST-12 uses a package-private `MutationIntentFailureProbe` test seam, not a mocked repository, so reservation/replay rows remain real while `markCommitted(...)` can be made to fail before COMMITTED.
 - Store routing auto-resolved from `@Store(name="agentstore")` — fluent `dataManager.load(Class)` does NOT need explicit `.store(...)` per analog Javadoc lines 14-18; only raw-JPQL `loadValue/loadValues` needs it (MEMORY `feedback_jmix_loadvalue_store`).
 
 ---
@@ -745,7 +750,7 @@ src/test/java/com/vn/agent/tools/mutation/
 
 **Differs from analog:**
 - `BuiltInDataToolsReadOnlyTest` is bytecode/ASM — pure static check.
-- TEST-10..12 are `@SpringBootTest` integration tests with focused mocks: AccessManager for gating, MutationIntentRepository finalization failure for COMMIT_FAILED, and a separate save-rollback case for stable ERROR behavior.
+- TEST-10..12 are `@SpringBootTest` integration tests with focused test seams: AccessManager for gating, `MutationIntentFailureProbe` for COMMIT_FAILED finalization failure, and a separate save-rollback case for stable ERROR behavior.
 - TEST-13 is `@SpringBootTest` with property-driven bean assembly.
 
 ---
