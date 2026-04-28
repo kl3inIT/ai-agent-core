@@ -1,6 +1,6 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
@@ -24,8 +24,8 @@ import java.util.Locale;
  *       raw-JPQL escape hatch in v1. The negation flag XORs through
  *       {@code AND}/{@code OR} and flips leaf operators where a mirror exists.</li>
  *   <li>Every attribute path validated per-hop against
- *       {@link CurrentUserSchemaAccess#canReadAttribute}/{@link
- *       CurrentUserSchemaAccess#canReadEntity} — denied hop ⇒ rejected filter (D-08).</li>
+ *       {@link LlmExposurePolicy#canReadAttribute}/{@link LlmExposurePolicy#canReadEntity}
+ *       — denied hop ⇒ rejected filter (D-08 + Phase 10 exposure opacity).</li>
  *   <li>Depth cap from {@code jmix.ai-agent.tools.max-filter-depth} (default 3).</li>
  *   <li>Literal values converted via {@link FilterLiteralValueConverter}; failure ⇒ structured
  *       {@link ToolUserError} (D-07). JPQL/SQL injection is impossible by construction —
@@ -38,14 +38,14 @@ import java.util.Locale;
 public class StructuredFilterConditionMapper {
 
     private final FilterLiteralValueConverter filterLiteralValueConverter;
-    private final CurrentUserSchemaAccess currentUserSchemaAccess;
+    private final LlmExposurePolicy llmExposurePolicy;
     private final int maxFilterDepth;
 
     public StructuredFilterConditionMapper(FilterLiteralValueConverter filterLiteralValueConverter,
-                                           CurrentUserSchemaAccess currentUserSchemaAccess,
+                                           LlmExposurePolicy llmExposurePolicy,
                                            @Value("${jmix.ai-agent.tools.max-filter-depth:3}") int maxFilterDepth) {
         this.filterLiteralValueConverter = filterLiteralValueConverter;
-        this.currentUserSchemaAccess = currentUserSchemaAccess;
+        this.llmExposurePolicy = llmExposurePolicy;
         this.maxFilterDepth = maxFilterDepth;
     }
 
@@ -167,8 +167,8 @@ public class StructuredFilterConditionMapper {
 
     /**
      * Walk the dotted attribute path against {@code rootMetaClass}, enforcing the depth cap
-     * (D-08) and per-hop {@link CurrentUserSchemaAccess#canReadAttribute}/{@link
-     * CurrentUserSchemaAccess#canReadEntity} checks. Returns the terminal
+     * (D-08) and per-hop {@link LlmExposurePolicy#canReadAttribute}/{@link
+     * LlmExposurePolicy#canReadEntity} checks. Returns the terminal
      * {@link MetaProperty} which the caller needs for literal coercion.
      */
     private MetaProperty validatePath(String path, MetaClass rootMetaClass) {
@@ -186,15 +186,18 @@ public class StructuredFilterConditionMapper {
                 throw new ToolUserError("unknown_attribute",
                         "no attribute " + segment + " on " + currentMetaClass.getName());
             }
-            if (!currentUserSchemaAccess.canReadAttribute(currentMetaClass, segment)) {
-                throw new ToolUserError("access_denied",
-                        "attribute not readable: " + currentMetaClass.getName() + "." + segment);
+            if (!llmExposurePolicy.canReadAttribute(currentMetaClass, segment)) {
+                throw new ToolUserError("unknown_attribute",
+                        "no attribute " + segment + " on " + currentMetaClass.getName());
             }
-            if (currentProperty.getRange().isClass() && i < segments.length - 1) {
-                currentMetaClass = currentProperty.getRange().asClass();
-                if (!currentUserSchemaAccess.canReadEntity(currentMetaClass)) {
-                    throw new ToolUserError("access_denied",
-                            "entity not readable along path: " + currentMetaClass.getName());
+            if (currentProperty.getRange().isClass()) {
+                MetaClass nextMetaClass = currentProperty.getRange().asClass();
+                if (!llmExposurePolicy.canReadEntity(nextMetaClass)) {
+                    throw new ToolUserError("unknown_attribute",
+                            "no attribute " + segment + " on " + currentMetaClass.getName());
+                }
+                if (i < segments.length - 1) {
+                    currentMetaClass = nextMetaClass;
                 }
             }
         }

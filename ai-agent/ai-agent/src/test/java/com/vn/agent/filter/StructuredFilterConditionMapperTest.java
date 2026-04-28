@@ -1,6 +1,6 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.datatype.Datatype;
 import io.jmix.core.metamodel.model.MetaClass;
@@ -28,12 +28,12 @@ import static org.mockito.Mockito.when;
  * Pins every branch of {@link StructuredFilterConditionMapper}: all 13 D-05 operators, DeMorgan NOT
  * expansion over AND/OR and leaves, depth-cap rejection, denied-attribute rejection,
  * unknown-op rejection, NOT-over-STARTS_WITH/ENDS_WITH rejection. Mocks
- * {@link CurrentUserSchemaAccess} to exercise access-denied paths without Spring.
+ * {@link LlmExposurePolicy} to exercise denied paths without Spring.
  */
 class StructuredFilterConditionMapperTest {
 
     private FilterLiteralValueConverter filterLiteralValueConverter;
-    private CurrentUserSchemaAccess currentUserSchemaAccess;
+    private LlmExposurePolicy llmExposurePolicy;
     private StructuredFilterConditionMapper mapper;
     private MetaClass orderMc;
     private MetaProperty nameProp;
@@ -43,14 +43,14 @@ class StructuredFilterConditionMapperTest {
     @BeforeEach
     void setUp() {
         filterLiteralValueConverter = new FilterLiteralValueConverter();
-        currentUserSchemaAccess = mock(CurrentUserSchemaAccess.class);
+        llmExposurePolicy = mock(LlmExposurePolicy.class);
         // Default: every attribute is readable. Individual tests override.
-        lenient().when(currentUserSchemaAccess.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))
+        lenient().when(llmExposurePolicy.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))
                 .thenReturn(true);
-        lenient().when(currentUserSchemaAccess.canReadEntity(org.mockito.ArgumentMatchers.any()))
+        lenient().when(llmExposurePolicy.canReadEntity(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(true);
 
-        mapper = new StructuredFilterConditionMapper(filterLiteralValueConverter, currentUserSchemaAccess, 3);
+        mapper = new StructuredFilterConditionMapper(filterLiteralValueConverter, llmExposurePolicy, 3);
 
         orderMc = mock(MetaClass.class);
         lenient().when(orderMc.getName()).thenReturn("Order");
@@ -95,6 +95,16 @@ class StructuredFilterConditionMapperTest {
             throw new AssertionError(e);
         }
         return mp;
+    }
+
+    private static MetaProperty classProp(String name, MetaClass targetMetaClass) {
+        MetaProperty metaProperty = mock(MetaProperty.class);
+        Range range = mock(Range.class);
+        lenient().when(metaProperty.getName()).thenReturn(name);
+        lenient().when(metaProperty.getRange()).thenReturn(range);
+        lenient().when(range.isClass()).thenReturn(true);
+        lenient().when(range.asClass()).thenReturn(targetMetaClass);
+        return metaProperty;
     }
 
     private static PropertyCondition asProperty(Condition c) {
@@ -252,12 +262,34 @@ class StructuredFilterConditionMapperTest {
 
     @Test
     void deniedAttributeRejects() {
-        when(currentUserSchemaAccess.canReadAttribute(eq(orderMc), eq("name"))).thenReturn(false);
+        when(llmExposurePolicy.canReadAttribute(eq(orderMc), eq("name"))).thenReturn(false);
         LeafNode leaf = new LeafNode("name", "EQUAL", "alice");
         assertThatThrownBy(() -> mapper.map(leaf, orderMc))
                 .isInstanceOf(ToolUserError.class)
                 .satisfies(e -> assertThat(((ToolUserError) e).toDto().error())
-                        .isEqualTo("access_denied"));
+                        .isEqualTo("unknown_attribute"));
+    }
+
+    @Test
+    void denylistedRelationshipTargetRejectsDottedPathOpaquely() {
+        MetaClass customerMetaClass = mock(MetaClass.class);
+        lenient().when(customerMetaClass.getName()).thenReturn("Customer");
+        MetaProperty customerProp = classProp("customer", customerMetaClass);
+        lenient().when(orderMc.findProperty("customer")).thenReturn(customerProp);
+        lenient().when(customerMetaClass.findProperty("name")).thenReturn(nameProp);
+        when(llmExposurePolicy.canReadEntity(customerMetaClass)).thenReturn(false);
+
+        LeafNode leaf = new LeafNode("customer.name", "EQUAL", "alice");
+
+        assertThatThrownBy(() -> mapper.map(leaf, orderMc))
+                .isInstanceOf(ToolUserError.class)
+                .satisfies(e -> {
+                    ToolUserError toolUserError = (ToolUserError) e;
+                    assertThat(toolUserError.toDto().error()).isEqualTo("unknown_attribute");
+                    assertThat(toolUserError.toDto().reason())
+                            .isEqualTo("no attribute customer on Order")
+                            .doesNotContain("Customer");
+                });
     }
 
     @Test
