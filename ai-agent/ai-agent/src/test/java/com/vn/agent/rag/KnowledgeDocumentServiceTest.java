@@ -203,4 +203,24 @@ class KnowledgeDocumentServiceTest {
         verify(ingestionStatusWriter, never()).markPending(any());
         verify(asyncIngestionWorker, never()).ingest(any());
     }
+
+    @Test
+    void updatePermissionsAndReingest_propagates_reingest_failure_to_roll_back_metadata_edit() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        stubLoad(id, document);
+        doThrow(new RuntimeException("pgvector down"))
+                .when(vectorStore).delete(any(Filter.Expression.class));
+
+        assertThatThrownBy(() -> service.updatePermissionsAndReingest(
+                id, List.of("ai-agent-user"), "sales_Order"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("pgvector down");
+
+        assertThat(document.getAllowedRolesJson()).contains("ai-agent-user");
+        assertThat(document.getSourceEntityName()).isEqualTo("sales_Order");
+        verify(dataManager).save(document);
+        verify(ingestionStatusWriter, never()).markFailed(any(), any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+    }
 }

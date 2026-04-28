@@ -471,13 +471,9 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
                                         UpdatePermissionsResult result = documentService
                                                 .updatePermissionsAndReingest(doc.getId(), roles, sourceEntityName);
 
-                                        switch (result.status()) {
-                                            case SAVED_AND_REINGESTING ->
-                                                    notifications.create(messages.getMessage(
-                                                            "knowledgeBase.notification.reingestStarted")).show();
-                                            case SAVED_REINGEST_FAILED ->
-                                                    notifyError(messages.getMessage(
-                                                            "knowledgeBase.error.editPermissionsReingest"));
+                                        if (result.status() == UpdatePermissionsResult.Status.SAVED_AND_REINGESTING) {
+                                            notifications.create(messages.getMessage(
+                                                    "knowledgeBase.notification.reingestStarted")).show();
                                         }
                                     } catch (Exception ex) {
                                         // WARNING-07: catch DocumentNotFoundException (or any service-layer

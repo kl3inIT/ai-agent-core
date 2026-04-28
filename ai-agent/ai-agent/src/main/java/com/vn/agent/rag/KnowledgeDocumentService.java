@@ -146,17 +146,17 @@ public class KnowledgeDocumentService {
      * reingest. Save runs first; reingest enqueue runs second (Plan 10-08, Fix W3
      * orchestration extracted from {@code KnowledgeBaseView}).
      *
-     * <p>On reingest enqueue failure the save is NOT rolled back — the document
-     * metadata is correct and the admin can retry via the "Reingest" row action
-     * (Phase 10 D-08, threat T-10-08 accepted). The view consumes only the typed
-     * {@link UpdatePermissionsResult} and routes a localized notification.
+     * <p>On reingest enqueue or purge failure the exception is propagated so the
+     * surrounding transaction rolls back the metadata edit. If chunks were already
+     * purged before a later failure, retrieval fails closed; if the purge failed,
+     * old chunks still match old document metadata.
      *
      * @param documentId       id of the document to update
      * @param allowedRoles     new set of allowed role codes (serialized to JSON)
      * @param sourceEntityName Jmix entity name link; nullable (clears the link)
      * @return result with {@link UpdatePermissionsResult.Status#SAVED_AND_REINGESTING}
-     *         or {@link UpdatePermissionsResult.Status#SAVED_REINGEST_FAILED}
      * @throws DocumentNotFoundException if no document exists with the given id
+     * @throws RuntimeException if reingest scheduling fails; the metadata edit is rolled back
      */
     public UpdatePermissionsResult updatePermissionsAndReingest(UUID documentId,
                                                                 Collection<String> allowedRoles,
@@ -169,36 +169,13 @@ public class KnowledgeDocumentService {
         // null clears the link — chunks reingested without source_entity (D-06 contract).
         doc.setSourceEntityName(sourceEntityName);
 
-        // FIRST: persist metadata changes. Runs under the class-level @Transactional
-        // boundary so save + reingest's REQUIRES_NEW status reset are coordinated.
+        // FIRST: persist metadata changes under the class-level @Transactional boundary.
         dataManager.save(doc);
 
-        // SECOND: schedule reingest. On failure the save is intentionally NOT rolled back —
-        // doc row is correct; admin retries via row action.
-        try {
-            reingest(documentId);
-            return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
-        } catch (Exception e) {
-            log.warn("updatePermissionsAndReingest: save committed but reingest enqueue failed for {}",
-                    documentId, e);
-            // WARNING-01: the metadata update has committed but the chunk purge / status reset
-            // path threw partway through. The document row now carries new sourceEntityName /
-            // allowedRolesJson while pgvector chunks may still hold the OLD metadata, partially
-            // defeating the EXP-05 NIN denylist filter. Mark the document FAILED via a
-            // REQUIRES_NEW transaction so the admin UI flags the row and the
-            // DocumentStatusChangedEvent listener triggers a push refresh. The admin's remedy
-            // remains "Reingest" — same as the user-facing notification — but the failed
-            // status makes the dangerous mid-state observable instead of silent.
-            try {
-                ingestionStatusWriter.markFailed(documentId,
-                        "Reingest enqueue failed after permissions save; chunks may be stale. "
-                                + "Use the Reingest action to retry.");
-            } catch (Exception inner) {
-                log.warn("updatePermissionsAndReingest: markFailed fallback also failed for {}",
-                        documentId, inner);
-            }
-            return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_REINGEST_FAILED);
-        }
+        // SECOND: schedule reingest. Propagate any failure so the document metadata update
+        // rolls back instead of committing stricter metadata while stale chunks remain.
+        reingest(documentId);
+        return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
     }
 
     private AiKnowledgeDocument loadOrThrow(UUID documentId) {
