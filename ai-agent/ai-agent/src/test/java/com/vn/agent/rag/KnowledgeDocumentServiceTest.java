@@ -22,7 +22,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -273,6 +275,26 @@ class KnowledgeDocumentServiceTest {
         assertThat(syncs).hasSize(1);
         syncs.get(0).afterCommit();
         verify(asyncIngestionWorker).ingest(id);
+    }
+
+    @Test
+    void updatePermissionsAndReingest_afterCommitSchedulingFailureMarksDocumentFailed() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
+        doThrow(new RuntimeException("executor down")).when(asyncIngestionWorker).ingest(id);
+
+        service.updatePermissionsAndReingest(id, List.of("ai-agent-user"), "sales_Order");
+
+        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(syncs).hasSize(1);
+
+        syncs.get(0).afterCommit();
+
+        verify(ingestionStatusWriter).markFailed(
+                eq(id),
+                contains("Reingest could not be scheduled: executor down"));
     }
 
     @Test

@@ -139,17 +139,19 @@ public class KnowledgeDocumentService {
      * resets status through a nested {@code REQUIRES_NEW} writer. Instead, the metadata update,
      * status reset, and optimistic-lock version update happen in one transaction.
      *
-     * <p>On reingest enqueue or purge failure the exception is propagated so the
-     * surrounding transaction rolls back the metadata edit. If chunks were already
-     * purged before a later failure, retrieval fails closed; if the purge failed,
-     * old chunks still match old document metadata.
+     * <p>On purge or save failure the exception is propagated so the surrounding
+     * transaction rolls back the metadata edit. If chunks were already purged before
+     * a later save failure, retrieval fails closed; if the purge failed, old chunks
+     * still match old document metadata. Scheduling happens after commit, so an
+     * executor failure cannot roll back the committed row; that path marks the
+     * document {@code FAILED} for operator visibility.
      *
      * @param documentId       id of the document to update
      * @param allowedRoles     new set of allowed role codes (serialized to JSON)
      * @param sourceEntityName Jmix entity name link; nullable (clears the link)
      * @return result with {@link UpdatePermissionsResult.Status#SAVED_AND_REINGESTING}
      * @throws DocumentNotFoundException if no document exists with the given id
-     * @throws RuntimeException if reingest scheduling fails; the metadata edit is rolled back
+     * @throws RuntimeException if purge or save fails before transaction commit
      */
     public UpdatePermissionsResult updatePermissionsAndReingest(UUID documentId,
                                                                 Collection<String> allowedRoles,
@@ -200,7 +202,19 @@ public class KnowledgeDocumentService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    asyncIngestionWorker.ingest(documentId);
+                    try {
+                        asyncIngestionWorker.ingest(documentId);
+                    } catch (RuntimeException e) {
+                        log.warn("{}: reingest scheduling failed after commit for {}",
+                                operationName, documentId, e);
+                        try {
+                            ingestionStatusWriter.markFailed(documentId,
+                                    "Reingest could not be scheduled: " + e.getMessage());
+                        } catch (RuntimeException inner) {
+                            log.warn("{}: failed to mark document {} after scheduling failure",
+                                    operationName, documentId, inner);
+                        }
+                    }
                 }
             });
         } else {
