@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_10_shipped
-stopped_at: Phase 11 context gathered
-last_updated: "2026-04-28T16:13:32.168Z"
+status: phase_11_ready_to_execute
+stopped_at: Phase 11 planning complete
+last_updated: "2026-04-28T17:04:34.893Z"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 27
+  total_plans: 28
   completed_plans: 17
-  percent: 63
+  percent: 61
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 10 — ai-specific-llm-exposure-policy
+**Current focus:** Phase 11 — Mutation-Capable Built-In Tools
 
 ## Current Position
 
-Phase: 10 (ai-specific-llm-exposure-policy) — SHIPPED
-Plan: 10 of 10
+Phase: 11 (Mutation-Capable Built-In Tools) — READY TO EXECUTE
+Plan: 0 of 11
 | Field | Value |
 |-------|-------|
-| Phase | Phase 10 |
-| Plan | 10 of 10 complete |
-| Status | Phase 10 shipped - PR #18 |
-| Last activity | 2026-04-28 — Shipped Phase 10 PR #18 and prepared v1.0.1 Maven release |
+| Phase | Phase 11 |
+| Plan | 0 of 11 complete |
+| Status | Ready to execute |
+| Last activity | 2026-04-28 — Phase 11 plans revised with review feedback |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 10 of 10
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
+| 11. Mutation-Capable Built-In Tools | Ready to execute | 0/11 | 2026-04-28 | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -164,7 +164,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-04-28T15:04:41.258Z
-**Stopped at:** Phase 11 context gathered
-**Resume file:** .planning/phases/11-mutation-capable-built-in-tools/11-CONTEXT.md
+**Stopped at:** Phase 11 planning complete
+**Resume file:** .planning/phases/11-mutation-capable-built-in-tools/11-01-PLAN.md
 **Blockers:** None.
-**Next action:** Review/merge PR #18, confirm v1.0.1 publish workflow, then start Phase 11.
+**Next action:** Execute Phase 11.

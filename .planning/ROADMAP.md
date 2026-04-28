@@ -81,17 +81,36 @@
   3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); when `DataManager.save` throws post-flush, the audit row is still committed with `outcome=COMMIT_FAILED` thanks to the existing REQUIRES_NEW boundary (TEST-12).
   4. The layered fail-closed gating chain runs in order on every mutation call: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
   5. Locale message keys for every denial / success / idempotency / error path are present in all locale bundles; new audit `eventName` strings (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) and new `outcome` values (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`) are observable on `AiAuditEvent` rows; `AiMutationIntent` dedup table honors a 24h TTL by default.
-**Plans:** 10 plans
-- [ ] 11-01-PLAN.md — Foundation: AiMutationIntent entity + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
+**Plans:** 11 plans
+
+**Wave 1**
+- [ ] 11-01-PLAN.md — Foundation: AiMutationIntent entity/status + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
 - [ ] 11-02-PLAN.md — AiAgentMutationProperties @ConfigurationProperties + AiToolCallOutcome enum extension + @EnableScheduling
 - [ ] 11-03-PLAN.md — MutationGuard SPI + MutationIntent record + default no-op bean
-- [ ] 11-04-PLAN.md — ToolEntityResolver shared @Component (extracted from BuiltInDataTools) + resolveWritableEntityOrThrow
-- [ ] 11-05-PLAN.md — MutationIntentRepository (UnconstrainedDataManager + afterCommit) + MutationIntentCleanupJob @Scheduled hourly
-- [ ] 11-06-PLAN.md — MutationErrorTranslator (6 stable error codes) + locale captions
-- [ ] 11-07-PLAN.md — BuiltInMutationTools @ConditionalOnProperty: 4 @Tool methods with full gating chain + DiffSerializer + locale captions
+
+**Wave 2 (blocked on Wave 1 completion)**
+- [ ] 11-04-PLAN.md — ToolEntityResolver shared @Component + operation-specific LlmExposurePolicy canCreate/canUpdate gates + BuiltInDataTools delegation
+- [ ] 11-05-PLAN.md — MutationIntentRepository reservation/replay with requestHash/status + MutationIntentCleanupJob @Scheduled hourly
+- [ ] 11-06-PLAN.md — MutationErrorTranslator (6 stable error codes, converter-code remapping) + locale captions
+
+**Wave 3 (blocked on Wave 2 completion)**
+- [ ] 11-07-PLAN.md — BuiltInMutationTools @ConditionalOnProperty: 4 @Tool methods with full gating chain + DiffSerializer + MutationSaveExecutor transactional boundary
 - [ ] 11-08-PLAN.md — BuiltInLinkTools always-on: 2 @Tool methods over ViewRegistry + ServerProperties
-- [ ] 11-09-PLAN.md — AgentToolCallbacks wiring (ObjectProvider) + AgentSystemPromptRules MUTATION_PROMPT_RULES gated injection
-- [ ] 11-10-PLAN.md — Tests TEST-10..13 + BuiltInLinkToolsOpacityTest + MutationErrorTranslatorTest
+
+**Wave 4 (blocked on Wave 3 completion)**
+- [ ] 11-09-PLAN.md — AgentToolCallbacks wiring without duplicate mutation audit + conditional AgentSystemPromptRulesComposer + ToolNamePatternProvider built-in scanner coverage
+
+**Wave 5 (blocked on Wave 4 completion)**
+- [ ] 11-10-PLAN.md — Core tests: fixture Liquibase, TEST-10 access gating, TEST-11 idempotency replay/violation/reservation, TEST-13 callback shape, mutation audit ownership
+
+**Wave 6 (blocked on Wave 5 completion)**
+- [ ] 11-11-PLAN.md — Supporting tests: TEST-12 commit-failed audit, related-write security, link opacity, translator coverage, prompt rules, tool-name scanner coverage
+
+**Cross-cutting constraints:**
+- Mutation tools remain default-off and `delete_record` remains absent under every property combination.
+- Host mutations use regular `DataManager` through `MutationSaveExecutor`; system-internal idempotency rows use `UnconstrainedDataManager`.
+- Idempotency uses pre-save reservation with `REQUEST_HASH`/`STATUS_`; `AiMutationIntent` does not store full result JSON.
+- Mutation callbacks are self-audited exactly once and are not wrapped by `ToolCallbackAuditDecorator`.
 
 ### Phase 12: Configurable Chat Surfaces
 **Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
