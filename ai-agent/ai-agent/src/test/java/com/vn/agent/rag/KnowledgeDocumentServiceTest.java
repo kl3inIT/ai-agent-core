@@ -1,6 +1,7 @@
 package com.vn.agent.rag;
 
 import com.vn.agent.entity.AiKnowledgeDocument;
+import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
 import io.jmix.security.model.ResourceRole;
@@ -218,7 +219,7 @@ class KnowledgeDocumentServiceTest {
     }
 
     @Test
-    void updatePermissionsAndReingest_propagates_reingest_failure_to_roll_back_metadata_edit() {
+    void updatePermissionsAndReingest_propagates_purge_failure_before_metadata_save() {
         UUID id = UUID.randomUUID();
         AiKnowledgeDocument document = doc(id);
         stubLoad(id, document);
@@ -231,11 +232,47 @@ class KnowledgeDocumentServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("pgvector down");
 
-        assertThat(document.getAllowedRolesJson()).contains("ai-agent-user");
-        assertThat(document.getSourceEntityName()).isEqualTo("sales_Order");
-        verify(dataManager).save(document);
+        assertThat(document.getAllowedRolesJson()).isNull();
+        assertThat(document.getSourceEntityName()).isNull();
+        verify(dataManager, never()).save(any(AiKnowledgeDocument.class));
+        verify(ingestionStatusWriter, never()).markPending(any());
         verify(ingestionStatusWriter, never()).markFailed(any(), any());
         verify(asyncIngestionWorker, never()).ingest(any());
+    }
+
+    @Test
+    void updatePermissionsAndReingest_resets_status_and_schedules_afterCommit_without_statusWriter() {
+        UUID id = UUID.randomUUID();
+        AiKnowledgeDocument document = doc(id);
+        document.setStatus(AiKnowledgeDocumentStatus.FAILED);
+        document.setErrorMessage("stale failure");
+        document.setIngestedAt(java.time.OffsetDateTime.now());
+        stubLoad(id, document);
+        stubRoleKnown("ai-agent-user");
+
+        UpdatePermissionsResult result = service.updatePermissionsAndReingest(
+                id, List.of("ai-agent-user"), "sales_Order");
+
+        assertThat(result.status()).isEqualTo(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
+        assertThat(document.getAllowedRolesJson()).contains("ai-agent-user");
+        assertThat(document.getSourceEntityName()).isEqualTo("sales_Order");
+        assertThat(document.getStatus()).isEqualTo(AiKnowledgeDocumentStatus.PENDING);
+        assertThat(document.getErrorMessage()).isNull();
+        assertThat(document.getIngestedAt()).isNull();
+
+        InOrder order = inOrder(cancellationRegistry, vectorStore, dataManager);
+        order.verify(cancellationRegistry).bumpGeneration(id);
+        order.verify(cancellationRegistry).clear(id);
+        order.verify(vectorStore).delete(any(Filter.Expression.class));
+        order.verify(dataManager).save(document);
+
+        verify(ingestionStatusWriter, never()).markPending(any());
+        verify(asyncIngestionWorker, never()).ingest(any());
+
+        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(syncs).hasSize(1);
+        syncs.get(0).afterCommit();
+        verify(asyncIngestionWorker).ingest(id);
     }
 
     @Test

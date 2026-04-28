@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiKnowledgeDocument;
+import com.vn.agent.entity.AiKnowledgeDocumentStatus;
 import io.jmix.core.DataManager;
 import io.jmix.security.role.ResourceRoleRepository;
 import org.slf4j.Logger;
@@ -129,25 +130,14 @@ public class KnowledgeDocumentService {
         // outer transaction rolls back (D-15).
         ingestionStatusWriter.markPending(documentId);
 
-        // Dispatch async worker AFTER commit so it observes the reset row.
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    asyncIngestionWorker.ingest(documentId);
-                }
-            });
-        } else {
-            log.warn("reingest: no active transaction synchronization; dispatching ingest inline for {}",
-                    documentId);
-            asyncIngestionWorker.ingest(documentId);
-        }
+        registerAfterCommit(documentId, "reingest");
     }
 
     /**
      * Persist permission and source-entity changes to the document row, then schedule
-     * reingest. Save runs first; reingest enqueue runs second (Plan 10-08, Fix W3
-     * orchestration extracted from {@code KnowledgeBaseView}).
+     * reingest. This path does not self-invoke {@link #reingest(UUID)} because that method
+     * resets status through a nested {@code REQUIRES_NEW} writer. Instead, the metadata update,
+     * status reset, and optimistic-lock version update happen in one transaction.
      *
      * <p>On reingest enqueue or purge failure the exception is propagated so the
      * surrounding transaction rolls back the metadata edit. If chunks were already
@@ -168,16 +158,27 @@ public class KnowledgeDocumentService {
 
         AiKnowledgeDocument doc = loadOrThrow(documentId);
         List<String> roles = KnowledgeDocumentRoleValidator.validateRoleCodes(allowedRoles, roleRepository);
+
+        // Reingests are a fresh generation. Bump before purge so any in-flight worker from a
+        // prior generation cannot write chunks after this update path has deleted old chunks.
+        cancellationRegistry.bumpGeneration(documentId);
+        cancellationRegistry.clear(documentId);
+
+        // Purge old chunks before saving stricter metadata. If this throws, the document row is
+        // untouched and old chunks still match old metadata; if a later JPA save fails, chunks are
+        // already gone and retrieval fails closed.
+        vectorStore.delete(documentIdFilter(documentId));
+
         doc.setAllowedRolesJson(writeRolesJson(roles));
         // null clears the link — chunks reingested without source_entity (D-06 contract).
         doc.setSourceEntityName(sourceEntityName);
+        doc.setStatus(AiKnowledgeDocumentStatus.PENDING);
+        doc.setErrorMessage(null);
+        doc.setIngestedAt(null);
 
-        // FIRST: persist metadata changes under the class-level @Transactional boundary.
         dataManager.save(doc);
 
-        // SECOND: schedule reingest. Propagate any failure so the document metadata update
-        // rolls back instead of committing stricter metadata while stale chunks remain.
-        reingest(documentId);
+        registerAfterCommit(documentId, "updatePermissionsAndReingest");
         return new UpdatePermissionsResult(UpdatePermissionsResult.Status.SAVED_AND_REINGESTING);
     }
 
@@ -192,6 +193,21 @@ public class KnowledgeDocumentService {
         return new FilterExpressionBuilder()
                 .eq(ChunkMetadata.DOCUMENT_ID, id.toString())
                 .build();
+    }
+
+    private void registerAfterCommit(UUID documentId, String operationName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    asyncIngestionWorker.ingest(documentId);
+                }
+            });
+        } else {
+            log.warn("{}: no active transaction synchronization; dispatching ingest inline for {}",
+                    operationName, documentId);
+            asyncIngestionWorker.ingest(documentId);
+        }
     }
 
     private static String writeRolesJson(List<String> roles) {
