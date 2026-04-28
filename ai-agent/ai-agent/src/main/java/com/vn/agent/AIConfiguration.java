@@ -2,6 +2,7 @@ package com.vn.agent;
 
 import com.vn.agent.rag.MdcPropagatingTaskDecorator;
 import com.vn.agent.rag.config.AiAgentRagProperties;
+import com.vn.agent.spi.MutationGuard;
 import io.jmix.core.annotation.JmixModule;
 import io.jmix.core.impl.scanning.AnnotationScanMetadataReaderFactory;
 import io.jmix.data.DataConfiguration;
@@ -96,6 +97,18 @@ public class AIConfiguration {
     }
 
 
+
+    /**
+     * Default no-op {@link MutationGuard} (Phase 11 SPI-10). Hosts opt in to mutation
+     * policy enforcement by declaring their own {@code @Component MutationGuard};
+     * otherwise this no-op preserves the SPI's "no-op when host hasn't customized"
+     * contract that Phase 9 established with {@code ToolFetchPlanCustomizer}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(MutationGuard.class)
+    public MutationGuard noopMutationGuard() {
+        return intent -> { /* no-op default; hosts override via own @Component */ };
+    }
 
     private static int resolveInt(Integer value, int defaultValue) {
         return value == null ? defaultValue : value;
