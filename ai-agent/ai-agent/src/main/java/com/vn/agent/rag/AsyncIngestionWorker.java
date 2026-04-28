@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -273,6 +274,11 @@ public class AsyncIngestionWorker {
 
     private Document enrich(Document chunk, AiKnowledgeDocument doc,
                             List<String> allowedRoles, String embeddingModel) {
+        // WARNING-10: defensive guard — current dispatch paths always pass a managed
+        // entity loaded by id, but a future test or alternate dispatch path could pass a
+        // transient AiKnowledgeDocument with a null id. The DOCUMENT_ID chunk metadata
+        // is the join key for delete/reingest; a null here would silently break those.
+        Objects.requireNonNull(doc.getId(), "document id must not be null");
         // Copy into a fresh mutable map — splitter-produced Documents may have unmodifiable metadata.
         Map<String, Object> merged = new HashMap<>();
         merged.putAll(chunk.getMetadata());
