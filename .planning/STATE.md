@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
-stopped_at: Phase 11 planning complete
-last_updated: "2026-04-28T17:33:04.474Z"
+stopped_at: Plan 11-01 complete; ready for Plan 11-02
+last_updated: "2026-04-28T20:09:07.868Z"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 28
-  completed_plans: 17
-  percent: 61
+  total_plans: 31
+  completed_plans: 18
+  percent: 58
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 11 (Mutation-Capable Built-In Tools) — READY TO EXECUTE
-Plan: 0 of 11
+Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
+Plan: 2 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
@@ -132,6 +132,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-09: VectorStoreDebugView shipped — plain Vaadin Grid<Document> (Fix R7) over VectorStore.similaritySearch (empty query, topK=100, threshold=0.0); FilterExpressionTextParser with inline setErrorMessage on parse error; metadataFilterField is TypedTextField<String> (Fix W2); 3 programmatic addColumn calls; expand uses standard Vaadin Dialog (Document is Spring AI POJO, no Jmix metaclass); read-only — no edit/delete per CONTEXT D-09
 - [Phase ?]: Plan 10-08: KB upload sourceEntityName persisted BEFORE dataManager.save (D-07 invariant); KnowledgeDocumentService.updatePermissionsAndReingest returns UpdatePermissionsResult enum so view has zero business logic (CLAUDE.md compliant); 3-arg upload overload preserved for backward compatibility with IngesterManager + tests
 - [Phase ?]: Plan 10-10: TEST-09 four-path uniform-opacity gate landed (RetrievalFilterBuilderDenylistTest unit + LlmExposurePolicyIntegrationTest integration). Two-tier RAG filter coverage. Phase 10 complete (10/10 plans).
+- [Phase ?]: Plan 11-01: AiMutationIntent agentstore entity ships with composite unique index on (TOOL_NAME, IDEMPOTENCY_KEY, USER_USERNAME) + REQUEST_HASH + STATUS_ enum (PENDING/COMMITTED/FAILED/COMMIT_UNKNOWN). PENDING reserved before host save so DB unique index serializes duplicates. COMMIT_UNKNOWN parks post-save finalization failures. AiAgentMutationRole is empty marker (no AiMutationIntent READ to avoid leaking idempotency keys); AiAgentAdminRole gains @EntityPolicy(AiMutationIntent, ALL); both locale bundles updated. IDX_AI_MUT_INTENT_STATUS added beyond plan baseline for cleanup-job diagnostics.
 
 ### Performance Metrics
 
@@ -154,6 +155,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase Phase 10 PP10-09 | 8 | 2 tasks | 2 files |
 | Phase Phase 10 PP10-08 | 25 | 2 tasks | 7 files |
 | Phase Phase 10 PP10-10 | 5 | 2 tasks | 2 files |
+| Phase Phase 11 PP11-01 | 2min | 2 tasks | 8 files |
 
 ### Quick Tasks Completed
 
@@ -163,8 +165,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T15:04:41.258Z
-**Stopped at:** Phase 11 planning complete
-**Resume file:** .planning/phases/11-mutation-capable-built-in-tools/11-01-PLAN.md
+**Last session:** 2026-04-28T20:09:07.852Z
+**Stopped at:** Plan 11-01 complete; ready for Plan 11-02
+**Resume file:** .planning/phases/11-mutation-capable-built-in-tools/11-02-PLAN.md
 **Blockers:** None.
 **Next action:** Execute Phase 11.
