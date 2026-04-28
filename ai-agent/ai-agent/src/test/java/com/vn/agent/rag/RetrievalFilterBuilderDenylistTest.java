@@ -135,7 +135,7 @@ class RetrievalFilterBuilderDenylistTest {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(
                 ragProps(true), embeddingProps(),
                 exposurePolicyWithDenylist("OrderEntity"));
-        Authentication auth = authWith(AiAgentAdminRole.CODE);
+        Authentication auth = authWith("ROLE_AI_AGENT_ADMIN");
 
         Filter.Expression expr = builder.buildFor(auth);
 
@@ -178,7 +178,7 @@ class RetrievalFilterBuilderDenylistTest {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(
                 ragProps(true), embeddingProps(),
                 exposurePolicyWithDenylist("OrderEntity"));
-        Authentication auth = authWith(AiAgentUserRole.CODE);
+        Authentication auth = authWith("ROLE_AI_AGENT_USER");
 
         Filter.Expression expr = builder.buildFor(auth);
 

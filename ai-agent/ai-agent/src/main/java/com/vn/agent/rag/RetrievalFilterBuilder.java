@@ -78,7 +78,8 @@ public class RetrievalFilterBuilder {
                 ? Set.of()
                 : auth.getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority)
-                        .map(RetrievalFilterBuilder::toRoleCode)
+                        .map(RetrievalFilterBuilder::toResourceRoleCode)
+                        .filter(roleCode -> !roleCode.isBlank())
                         .collect(Collectors.toCollection(LinkedHashSet::new));
 
         FilterExpressionBuilder b = new FilterExpressionBuilder();
@@ -145,20 +146,18 @@ public class RetrievalFilterBuilder {
         return scopedAnyRole.build();
     }
 
-    private static String toRoleCode(String authority) {
+    private static String toResourceRoleCode(String authority) {
         if (authority == null || authority.isBlank()) {
             return "";
         }
         if (authority.startsWith(JMIX_ROW_LEVEL_ROLE_AUTHORITY_PREFIX)) {
-            return authority.substring(JMIX_ROW_LEVEL_ROLE_AUTHORITY_PREFIX.length())
-                    .toLowerCase(java.util.Locale.ROOT)
-                    .replace('_', '-');
+            return "";
         }
         if (authority.startsWith(JMIX_RESOURCE_ROLE_AUTHORITY_PREFIX)) {
             return authority.substring(JMIX_RESOURCE_ROLE_AUTHORITY_PREFIX.length())
                     .toLowerCase(java.util.Locale.ROOT)
                     .replace('_', '-');
         }
-        return authority;
+        return "";
     }
 }

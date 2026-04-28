@@ -80,7 +80,7 @@ class RetrievalFilterBuilderTest {
     @Test
     void admin_with_bypass_on_returns_null() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
-        Authentication auth = authWith(AiAgentAdminRole.CODE);
+        Authentication auth = authWith("ROLE_AI_AGENT_ADMIN");
 
         assertThat(builder.buildFor(auth)).isNull();
     }
@@ -105,7 +105,7 @@ class RetrievalFilterBuilderTest {
     @Test
     void admin_with_bypass_off_gets_role_overlap_filter() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(false), embeddingProps(), emptyExposurePolicy());
-        Authentication auth = authWith(AiAgentAdminRole.CODE);
+        Authentication auth = authWith("ROLE_AI_AGENT_ADMIN");
 
         Filter.Expression exp = builder.buildFor(auth);
 
@@ -120,7 +120,7 @@ class RetrievalFilterBuilderTest {
     @Test
     void non_admin_gets_embedding_pin_and_role_flag() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
-        Authentication auth = authWith(AiAgentUserRole.CODE);
+        Authentication auth = authWith("ROLE_AI_AGENT_USER");
 
         Filter.Expression exp = builder.buildFor(auth);
 
@@ -166,7 +166,7 @@ class RetrievalFilterBuilderTest {
     @Test
     void multi_role_produces_or_of_role_flags() {
         RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
-        Authentication auth = authWith(AiAgentUserRole.CODE, "custom-host-role");
+        Authentication auth = authWith("ROLE_AI_AGENT_USER", "ROLE_CUSTOM_HOST_ROLE");
 
         Filter.Expression exp = builder.buildFor(auth);
 
@@ -179,6 +179,32 @@ class RetrievalFilterBuilderTest {
         assertThat(countOccurrences(rendered, ChunkMetadata.EMBEDDING_MODEL)).isGreaterThanOrEqualTo(2);
         // The two role clauses must be OR-ed (D-09 ANY), not AND-ed.
         assertThat(rendered).contains("OR");
+    }
+
+    @Test
+    void row_level_admin_role_does_not_trigger_admin_bypass() {
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
+        Authentication auth = authWith("ROW_LEVEL_ROLE_AI_AGENT_ADMIN");
+
+        Filter.Expression exp = builder.buildFor(auth);
+
+        assertThat(exp).isNotNull();
+        String rendered = exp.toString();
+        assertThat(rendered).contains("__none__");
+        assertThat(rendered).doesNotContain(ChunkMetadata.roleFlagKey(AiAgentAdminRole.CODE));
+    }
+
+    @Test
+    void row_level_role_collision_does_not_match_resource_role_flag() {
+        RetrievalFilterBuilder builder = new RetrievalFilterBuilder(ragProps(true), embeddingProps(), emptyExposurePolicy());
+        Authentication auth = authWith("ROW_LEVEL_ROLE_AI_AGENT_USER");
+
+        Filter.Expression exp = builder.buildFor(auth);
+
+        assertThat(exp).isNotNull();
+        String rendered = exp.toString();
+        assertThat(rendered).contains("__none__");
+        assertThat(rendered).doesNotContain(ChunkMetadata.roleFlagKey(AiAgentUserRole.CODE));
     }
 
     // Test F — defensive: null Authentication → fail-closed empty-roles path
