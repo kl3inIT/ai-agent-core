@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * LLM-facing structured error (D-07 fail-closed). Emitted as JSON by {@code ToolResultFormatter}
  * (Plan 03). {@code expected} carries hints the LLM can use to retry — e.g. a list of valid
- * operator names, or the expected literal shape ({@code "UUID string, e.g. '4f2b...'"}).
+ * operator names, or the expected literal shape ({@code "hyphenated UUID string"}).
  *
  * <p>Never exposes stack traces or Java-internal detail. The {@code error} code is a short
  * machine-readable token (e.g. {@code "unknown_attribute"}, {@code "invalid_literal"}).</p>

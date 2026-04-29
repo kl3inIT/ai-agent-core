@@ -35,10 +35,15 @@ class AgentSystemPromptRulesComposerTest {
         assertThat(rules).contains(AgentSystemPromptRules.MUTATION_PROMPT_RULES);
         assertThat(rules)
                 .contains("idempotencyKey")
+                .contains("fresh random UUID v4")
+                .contains("third group is '4'")
+                .contains("fourth group is one of '8', '9', 'a', or 'b'")
+                .contains("Never copy UUID-looking values")
                 .contains("access_denied")
                 .contains("parameter_conversion_error")
                 .contains("concurrent_modification")
                 .contains("generate_entity_detail_link")
+                .contains("immediately call generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
     }
 }

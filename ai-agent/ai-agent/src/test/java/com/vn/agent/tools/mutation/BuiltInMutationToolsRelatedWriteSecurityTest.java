@@ -237,6 +237,30 @@ class BuiltInMutationToolsRelatedWriteSecurityTest {
     }
 
     @Test
+    void addRelatedRecord_childAlreadyLinkedToDifferentParent_returnsValidationFailed()
+            throws Exception {
+        ReparentFixtureIds ids = seedChildLinkedToDifferentParent();
+        String key = rememberKey();
+        clearInvocations(mutationSaveExecutor);
+
+        String json = mutationToolTestContext.withMutationRun(USERNAME, () ->
+                builtInMutationTools.addRelatedRecord(
+                        LINKED_PARENT_ENTITY,
+                        ids.targetParentId().toString(),
+                        RELATIONSHIP,
+                        ids.childId().toString(),
+                        key));
+
+        assertThat(objectMapper.readTree(json).path("error").asText())
+                .as("add_related_record must not silently reparent a child; raw=%s", json)
+                .isEqualTo("validation_failed");
+        MutationLinkedChildFixture child = loadLinkedChild(ids.childId());
+        assertThat(child.getLinkedParent()).isNotNull();
+        assertThat(child.getLinkedParent().getId()).isEqualTo(ids.originalParentId());
+        verifyExecutorNotCalled();
+    }
+
+    @Test
     void removeRelatedRecord_supportedNonCompositionRelationship_succeedsAndClearsInverse()
             throws Exception {
         FixtureIds ids = seedLinkedFixtures(true);
@@ -388,6 +412,29 @@ class BuiltInMutationToolsRelatedWriteSecurityTest {
         });
     }
 
+    private ReparentFixtureIds seedChildLinkedToDifferentParent() {
+        return systemAuthenticator.withSystem(() -> {
+            MutationLinkedParentFixture originalParent = unconstrainedDataManager.create(MutationLinkedParentFixture.class);
+            originalParent.setName("original-parent-" + UUID.randomUUID());
+            MutationLinkedParentFixture savedOriginalParent = unconstrainedDataManager.save(originalParent);
+            linkedParentIds.add(savedOriginalParent.getId());
+
+            MutationLinkedParentFixture targetParent = unconstrainedDataManager.create(MutationLinkedParentFixture.class);
+            targetParent.setName("target-parent-" + UUID.randomUUID());
+            MutationLinkedParentFixture savedTargetParent = unconstrainedDataManager.save(targetParent);
+            linkedParentIds.add(savedTargetParent.getId());
+
+            MutationLinkedChildFixture child = unconstrainedDataManager.create(MutationLinkedChildFixture.class);
+            child.setLabel("already-linked-child-" + UUID.randomUUID());
+            child.setLinkedParent(savedOriginalParent);
+            MutationLinkedChildFixture savedChild = unconstrainedDataManager.save(child);
+            linkedChildIds.add(savedChild.getId());
+
+            return new ReparentFixtureIds(
+                    savedOriginalParent.getId(), savedTargetParent.getId(), savedChild.getId());
+        });
+    }
+
     private CompositionFixtureIds seedCompositionFixtures() {
         return systemAuthenticator.withSystem(() -> {
             MutationParentFixture parent = unconstrainedDataManager.create(MutationParentFixture.class);
@@ -434,6 +481,9 @@ class BuiltInMutationToolsRelatedWriteSecurityTest {
     }
 
     private record FixtureIds(UUID parentId, UUID childId) {
+    }
+
+    private record ReparentFixtureIds(UUID originalParentId, UUID targetParentId, UUID childId) {
     }
 
     private record CompositionFixtureIds(UUID parentId, UUID childId) {

@@ -6,6 +6,7 @@ import com.vn.agent.tools.ToolResultFormatter;
 import com.vn.agent.tools.ToolUserError;
 import com.vn.agent.tools.UnknownEntityHints;
 import io.jmix.core.metamodel.model.MetaClass;
+import io.jmix.flowui.exception.NoSuchViewException;
 import io.jmix.flowui.view.ViewInfo;
 import io.jmix.flowui.view.ViewRegistry;
 import org.apache.commons.lang3.StringUtils;
@@ -21,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -41,7 +41,7 @@ import java.util.UUID;
  * job). The id is URL-encoded before being appended to the route.
  *
  * <p>Mutation result schema stays clean ({@code {outcome, entityId, instanceName, ...}});
- * the LLM calls these tools separately when it wants to surface a verify-link.
+ * after a successful create/update the LLM calls this tool separately to surface a verify-link.
  */
 @Component
 public class BuiltInLinkTools {
@@ -66,7 +66,7 @@ public class BuiltInLinkTools {
 
             MANDATORY WORKFLOW:
             1. Call list_entities first to confirm the entity name is visible to you.
-            2. Pass the EXACT entity name (e.g. 'sample_Customer'), never a display label
+            2. Pass the EXACT entity name returned by list_entities, never a display label
                such as 'Customer' and never a route fragment such as 'customers'.
             3. Render the returned URL as a Markdown link in your reply to the user.
 
@@ -74,16 +74,16 @@ public class BuiltInLinkTools {
             - entityName: exact internal name from list_entities / agent.entities.
 
             PARAMETER FORMATS:
-            - entityName: String, Jmix metaClass name (host-prefixed, e.g. 'sample_Customer').
+            - entityName: String, exact Jmix metaClass name returned by list_entities.
 
             ERROR HANDLING:
             - unknown_entity: entity is hidden, unknown to the metamodel, OR has no list view
-              registered with the host. Recovery: call list_entities once, retry with the
-              corrected name; if the result is still unknown_entity, tell the user the entity
-              is not browsable and do NOT guess.
+              registered with the host. Recovery: call list_entities once, retry only with an
+              exact returned name; if the result is still unknown_entity, tell the user the
+              entity is not browsable and do NOT guess.
 
             STRICTNESS + EXAMPLES:
-            CORRECT: generate_entity_list_link("sample_Customer") -> {"url":"/sample-app/customers"}
+            CORRECT SHAPE: generate_entity_list_link("<entity-name-from-list_entities>") -> {"url":"<relative-host-url>"}
             INCORRECT: generate_entity_list_link("Customer")        (display label, not entity name)
             INCORRECT: generate_entity_list_link("customers")       (route fragment, not entity name)
             INCORRECT: generate_entity_list_link("")                (blank — returns unknown_entity)
@@ -93,8 +93,8 @@ public class BuiltInLinkTools {
             String entityName) {
         try {
             MetaClass metaClass = toolEntityResolver.resolveReadableEntityOrThrow(entityName);
-            String listViewId = viewRegistry.getListViewId(metaClass);
-            String route = findRouteForViewId(listViewId);
+            ViewInfo listViewInfo = viewRegistry.getListViewInfo(metaClass);
+            String route = findRouteForViewInfo(listViewInfo);
             if (StringUtils.isEmpty(route)) {
                 // No registered list view OR no @Route on the controller — collapse to
                 // unknown_entity per D-05 (uniform-opacity for "not browsable").
@@ -105,6 +105,8 @@ public class BuiltInLinkTools {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("url", contextPath() + "/" + route);
             return toolResultFormatter.toJson(payload);
+        } catch (NoSuchViewException noSuchViewException) {
+            return unknownEntity(entityName);
         } catch (ToolUserError err) {
             return toolResultFormatter.error(err);
         }
@@ -115,19 +117,23 @@ public class BuiltInLinkTools {
             entity row. Does NOT verify the row exists — call get_record for that.
 
             MANDATORY WORKFLOW:
-            1. Call list_entities to confirm the entity name is visible to you.
+            1. Call list_entities to confirm the entity name is visible to you, unless the
+               immediately preceding successful create_record / update_record / get_record /
+               find_records call already used this exact entityName.
             2. Use an entityId returned by create_record / update_record / get_record /
                find_records.
             3. This tool does NOT verify the id exists; the URL may still 404 in the host
                shell. Call get_record first if you must confirm existence.
+            4. After successful create_record or update_record, call this tool before the
+               user-facing reply so the user gets a verify-link to the saved record.
 
             INPUT CONTRACT:
             - entityName: exact internal name from list_entities.
             - entityId: 36-character hyphenated UUID string from a prior tool call.
 
             PARAMETER FORMATS:
-            - entityName: String, Jmix metaClass name (host-prefixed).
-            - entityId: hyphenated UUID, e.g. 'f1a2b3c4-5d6e-7890-abcd-ef0123456789'.
+            - entityName: String, exact Jmix metaClass name returned by list_entities or reused from a successful prior tool call.
+            - entityId: hyphenated UUID copied from a prior tool result for the same entity.
 
             ERROR HANDLING:
             - unknown_entity: entity hidden, unknown, OR has no detail view route.
@@ -136,10 +142,10 @@ public class BuiltInLinkTools {
               Recovery: re-read the id from the prior tool call; do not invent an id.
 
             STRICTNESS + EXAMPLES:
-            CORRECT: generate_entity_detail_link("sample_Customer", "f1a2b3c4-5d6e-7890-abcd-ef0123456789")
-            INCORRECT: generate_entity_detail_link("sample_Customer", "Alice")  (label, not id)
-            INCORRECT: generate_entity_detail_link("Customer", "<uuid>")        (label, not entity name)
-            INCORRECT: generate_entity_detail_link("sample_Customer", "")       (blank id)
+            CORRECT SHAPE: generate_entity_detail_link("<entity-name-from-list_entities>", "<uuid-from-get_record-or-create_record>")
+            INCORRECT: generate_entity_detail_link("<entity-name-from-list_entities>", "Alice")  (label, not id)
+            INCORRECT: generate_entity_detail_link("Customer", "<uuid>")                       (label, not entity name)
+            INCORRECT: generate_entity_detail_link("<entity-name-from-list_entities>", "")      (blank id)
             """)
     public String generateEntityDetailLink(
             @ToolParam(description = "Exact entity name from list_entities; never a display label")
@@ -148,12 +154,10 @@ public class BuiltInLinkTools {
             String entityId) {
         try {
             MetaClass metaClass = toolEntityResolver.resolveReadableEntityOrThrow(entityName);
-            String detailViewId = viewRegistry.getDetailViewId(metaClass);
-            String route = findRouteForViewId(detailViewId);
+            ViewInfo detailViewInfo = viewRegistry.getDetailViewInfo(metaClass);
+            String route = findRouteForViewInfo(detailViewInfo);
             if (StringUtils.isEmpty(route)) {
-                throw new ToolUserError("unknown_entity",
-                        "no entity named " + entityName,
-                        UnknownEntityHints.AS_LIST);
+                return unknownEntity(entityName);
             }
 
             // Detail routes typically end in "/:id" — strip the placeholder segment.
@@ -182,28 +186,33 @@ public class BuiltInLinkTools {
                     "parameter_conversion_error",
                     "entityId must not be null",
                     List.of("pass the UUID string returned by get_record / create_record / update_record / find_records")));
+        } catch (NoSuchViewException noSuchViewException) {
+            return unknownEntity(entityName);
         } catch (ToolUserError err) {
             return toolResultFormatter.error(err);
         }
     }
 
     /**
-     * Resolves a {@link ViewRegistry}-known view id to the {@link Route#value()} declared on
-     * the controller class. Returns {@code null} when the view id is not registered or the
-     * controller carries no {@link Route} annotation.
+     * Resolves a {@link ViewRegistry}-known view to the {@link Route#value()} declared on the
+     * controller class. Returns {@code null} when the controller carries no {@link Route}
+     * annotation.
      */
     @Nullable
-    private String findRouteForViewId(@Nullable String viewId) {
-        if (StringUtils.isEmpty(viewId)) {
-            return null;
-        }
-        Optional<ViewInfo> viewInfo = viewRegistry.findViewInfo(viewId);
-        if (viewInfo.isEmpty()) {
+    private String findRouteForViewInfo(@Nullable ViewInfo viewInfo) {
+        if (viewInfo == null) {
             return null;
         }
         Route routeAnnotation = AnnotationUtils.findAnnotation(
-                viewInfo.get().getControllerClass(), Route.class);
+                viewInfo.getControllerClass(), Route.class);
         return routeAnnotation != null ? routeAnnotation.value() : null;
+    }
+
+    private String unknownEntity(String entityName) {
+        return toolResultFormatter.error(new ToolUserError(
+                "unknown_entity",
+                "no entity named " + entityName,
+                UnknownEntityHints.AS_LIST));
     }
 
     private String contextPath() {

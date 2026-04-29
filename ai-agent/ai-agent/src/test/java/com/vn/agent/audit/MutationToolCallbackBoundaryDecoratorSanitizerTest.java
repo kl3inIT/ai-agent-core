@@ -27,6 +27,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Sinks;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -107,11 +108,18 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
         }
         if (isolatedRunId != null) {
             systemAuthenticator.runWithSystem(() -> {
-                List<AiAuditEvent> rows = unconstrainedDataManager.load(AiAuditEvent.class)
-                        .query("select a from ai_AiAuditEvent a where a.runId = :rid")
+                List<AiAuditEvent> children = unconstrainedDataManager.load(AiAuditEvent.class)
+                        .query("select a from ai_AiAuditEvent a where a.runId = :rid and a.parent is not null")
                         .parameter("rid", isolatedRunId)
                         .list();
-                for (AiAuditEvent row : rows) {
+                for (AiAuditEvent row : children) {
+                    unconstrainedDataManager.remove(row);
+                }
+                List<AiAuditEvent> roots = unconstrainedDataManager.load(AiAuditEvent.class)
+                        .query("select a from ai_AiAuditEvent a where a.runId = :rid and a.parent is null")
+                        .parameter("rid", isolatedRunId)
+                        .list();
+                for (AiAuditEvent row : roots) {
                     unconstrainedDataManager.remove(row);
                 }
             });
@@ -175,6 +183,25 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
                 AuditFieldHasher.sha256Hex("[\"raw-secret-value\"]"));
     }
 
+    @Test
+    void toolContextInstallsRunContextSoSelfAuditIsNestedUnderChatRoot() {
+        UUID rootAuditId = systemAuthenticator.withSystem(() ->
+                auditWriter.writeChatStart(isolatedRunId, USERNAME, null, "prompt-hash"));
+        ToolCallback wrapper = wrapSelfAuditingCreateRecordDelegate();
+
+        String result = systemAuthenticator.withUser(USERNAME, () ->
+                wrapper.call("{}", new ToolContext(Map.of(
+                        RunContext.TOOL_CONTEXT_RUN_ID_KEY, isolatedRunId,
+                        RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY, isolatedConversationId))));
+
+        assertThat(result).contains("\"outcome\":\"SUCCESS\"");
+        assertThat(RunContext.get()).isNull();
+        AiAuditEvent row = onlyAuditRow();
+        assertThat(row.getRunId()).isEqualTo(isolatedRunId);
+        assertThat(row.getResultSummary()).contains("\"outcome\":\"SUCCESS\"");
+        assertThat(parentIdOfOnlyAuditRow()).isEqualTo(rootAuditId);
+    }
+
     private MutationToolCallbackBoundaryDecorator wrapThrowingCreateRecordDelegate(
             AtomicReference<String> delegateInput) {
         ToolCallback delegate = new ToolCallback() {
@@ -200,6 +227,47 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
             public String call(@NonNull String toolInput, ToolContext toolContext) {
                 delegateInput.set(toolInput);
                 throw new IllegalArgumentException("binding failed before method body");
+            }
+        };
+        return new MutationToolCallbackBoundaryDecorator(delegate, streamingSinkHolder, auditWriter,
+                currentAuthentication, mutationArgumentSanitizer);
+    }
+
+    private MutationToolCallbackBoundaryDecorator wrapSelfAuditingCreateRecordDelegate() {
+        ToolCallback delegate = new ToolCallback() {
+            @Override
+            @NonNull
+            public ToolDefinition getToolDefinition() {
+                return ToolDefinition.builder()
+                        .name("create_record")
+                        .description("Self-audits like BuiltInMutationTools")
+                        .inputSchema("{}")
+                        .build();
+            }
+
+            @Override
+            @NonNull
+            public String call(@NonNull String toolInput) {
+                return call(toolInput, new ToolContext(Map.of()));
+            }
+
+            @Override
+            @NonNull
+            public String call(@NonNull String toolInput, ToolContext toolContext) {
+                String summary = "{\"outcome\":\"SUCCESS\"}";
+                auditWriter.writeToolCall(
+                        RunContext.getRootAuditId(),
+                        RunContext.get(),
+                        USERNAME,
+                        RunContext.getConversationId(),
+                        "create_record",
+                        toolInput,
+                        summary,
+                        1L,
+                        AiToolCallOutcome.SUCCESS,
+                        null,
+                        null);
+                return summary;
             }
         };
         return new MutationToolCallbackBoundaryDecorator(delegate, streamingSinkHolder, auditWriter,
@@ -257,5 +325,16 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
                         .list());
         assertThat(rows).hasSize(1);
         return rows.get(0);
+    }
+
+    private UUID parentIdOfOnlyAuditRow() {
+        return systemAuthenticator.withSystem(() ->
+                unconstrainedDataManager.loadValue(
+                                "select a.parent.id from ai_AiAuditEvent a where a.runId = :rid and a.eventName = :n",
+                                UUID.class)
+                        .store("agentstore")
+                        .parameter("rid", isolatedRunId)
+                        .parameter("n", "create_record")
+                        .one());
     }
 }

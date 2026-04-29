@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 // (Concurrency primitives are used by the FAILED-reclaim race test below.)
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Plan 11-10 Task 2 — repository-level reservation/race tests.
@@ -73,6 +74,20 @@ class MutationIntentRepositoryReservationTest {
             }
         });
         reservedIntentIds.clear();
+    }
+
+    @Test
+    void nonVersionFourUuidKey_isRejectedBeforeReservation() {
+        assertThatThrownBy(() -> systemAuthenticator.withSystem(() ->
+                mutationIntentRepository.reserveOrReplay(
+                        "create_record",
+                        "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+                        "copying-example-user",
+                        null,
+                        "hash-example",
+                        Duration.ofHours(1))))
+                .isInstanceOf(com.vn.agent.tools.ToolUserError.class)
+                .hasMessageContaining("idempotencyKey must be a UUID v4");
     }
 
     @Test

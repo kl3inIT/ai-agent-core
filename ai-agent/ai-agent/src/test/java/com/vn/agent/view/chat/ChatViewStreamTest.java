@@ -68,9 +68,9 @@ class ChatViewStreamTest {
 
         String out = acc.toString();
         assertThat(out).startsWith("Hello world");
-        assertThat(out).contains("**find_records**");
-        assertThat(out).contains("done");
-        assertThat(out).contains("3 rows");
+        assertThat(out).doesNotContain("find_records");
+        assertThat(out).doesNotContain("done");
+        assertThat(out).doesNotContain("3 rows");
     }
 
     @Test

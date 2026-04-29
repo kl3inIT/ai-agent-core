@@ -116,6 +116,8 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
         String userUsername = resolveUserUsername();
         String toolName = delegate.getToolDefinition().name();
         String safeInput = cap(mutationArgumentSanitizer.sanitize(toolName, toolInput), ARGUMENTS_JSON_MAX_CHARS);
+        RunContextSnapshot previousContext = RunContextSnapshot.capture();
+        installRunContext(runId, conversationId);
 
         // Streaming pair-id correlation (mirrors ToolCallbackAuditDecorator).
         final UUID toolCallId = UUID.randomUUID();
@@ -159,6 +161,22 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
             AiToolCallOutcome outcome = output != null ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
             String emittedSummary = output != null ? cap(output, RESULT_SUMMARY_MAX_CHARS) : null;
             emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
+            previousContext.restore();
+        }
+    }
+
+    private void installRunContext(UUID runId, UUID conversationId) {
+        if (runId != null) {
+            RunContext.set(runId);
+            try {
+                RunContext.setRootAuditId(auditWriter.findChatRootId(runId));
+            } catch (RuntimeException lookupFailure) {
+                log.debug("Failed to resolve chat root audit id for mutation tool runId={}", runId, lookupFailure);
+                RunContext.setRootAuditId(null);
+            }
+        }
+        if (conversationId != null) {
+            RunContext.setConversationId(conversationId);
         }
     }
 
@@ -204,9 +222,48 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
     private String resolveUserUsername() {
         try {
             UserDetails user = currentAuthentication.getUser();
-            return user != null ? user.getUsername() : "anonymous";
+            return user.getUsername();
         } catch (RuntimeException anon) {
             return "anonymous";
+        }
+    }
+
+    private record RunContextSnapshot(UUID runId,
+                                      UUID rootAuditId,
+                                      UUID conversationId,
+                                      Integer retrievalTopK,
+                                      Double retrievalSimilarityThreshold,
+                                      String retrievalFiltersJson) {
+        private static RunContextSnapshot capture() {
+            return new RunContextSnapshot(
+                    RunContext.get(),
+                    RunContext.getRootAuditId(),
+                    RunContext.getConversationId(),
+                    RunContext.getRetrievalTopK(),
+                    RunContext.getRetrievalSimilarityThreshold(),
+                    RunContext.getRetrievalFiltersJson());
+        }
+
+        private void restore() {
+            RunContext.clear();
+            if (runId != null) {
+                RunContext.set(runId);
+            }
+            if (rootAuditId != null) {
+                RunContext.setRootAuditId(rootAuditId);
+            }
+            if (conversationId != null) {
+                RunContext.setConversationId(conversationId);
+            }
+            if (retrievalTopK != null) {
+                RunContext.setRetrievalTopK(retrievalTopK);
+            }
+            if (retrievalSimilarityThreshold != null) {
+                RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
+            }
+            if (retrievalFiltersJson != null) {
+                RunContext.setRetrievalFiltersJson(retrievalFiltersJson);
+            }
         }
     }
 }

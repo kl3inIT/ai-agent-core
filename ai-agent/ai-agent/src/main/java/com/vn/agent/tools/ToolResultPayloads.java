@@ -32,7 +32,7 @@ record AttributeDescription(String name,
 }
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-record EnumValueDescription(String name, String label) {
+record EnumValueDescription(String name, Object id, String label) {
 }
 
 @JsonInclude(JsonInclude.Include.NON_NULL)

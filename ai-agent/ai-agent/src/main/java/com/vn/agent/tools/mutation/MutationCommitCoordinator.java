@@ -11,6 +11,8 @@ import io.jmix.core.FetchPlan;
 import io.jmix.core.Metadata;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.metamodel.model.MetaClass;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -117,22 +119,22 @@ public class MutationCommitCoordinator {
                 return replayResult(intent, toolName, startedAt, userUsername, argumentsJson);
             }
             case VIOLATION -> {
-                MetaClass mc = resolveMetaClassOrNull(intent.getResultEntityName());
-                ToolUserError err = mutationErrorTranslator.idempotencyViolation(mc);
-                safeWriteAudit(toolName, argumentsJson, null,
+                MetaClass metaClass = resolveMetaClassOrNull(intent.getResultEntityName());
+                ToolUserError error = mutationErrorTranslator.idempotencyViolation(metaClass);
+                safeWriteErrorAudit(toolName, argumentsJson, error,
                         System.currentTimeMillis() - startedAt,
-                        AiToolCallOutcome.ERROR, null, err.getClass().getName(), userUsername);
-                return toolResultFormatter.error(err);
+                        AiToolCallOutcome.ERROR, null, error.getClass().getName(), userUsername);
+                return toolResultFormatter.error(error);
             }
             case PENDING -> {
                 // In-flight on the same key OR row sits in COMMIT_UNKNOWN. Either way the LLM
                 // must not retry automatically — verify state first via get_record/find_records.
-                MetaClass mc = resolveMetaClassOrNull(intent.getResultEntityName());
-                ToolUserError err = mutationErrorTranslator.commitFailed(mc);
-                safeWriteAudit(toolName, argumentsJson, null,
+                MetaClass metaClass = resolveMetaClassOrNull(intent.getResultEntityName());
+                ToolUserError error = mutationErrorTranslator.commitFailed(metaClass);
+                safeWriteErrorAudit(toolName, argumentsJson, error,
                         System.currentTimeMillis() - startedAt,
-                        AiToolCallOutcome.ERROR, null, err.getClass().getName(), userUsername);
-                return toolResultFormatter.error(err);
+                        AiToolCallOutcome.ERROR, null, error.getClass().getName(), userUsername);
+                return toolResultFormatter.error(error);
             }
             default ->
                     throw new IllegalStateException(
@@ -242,11 +244,55 @@ public class MutationCommitCoordinator {
      * {@code commitState=NO_HOST_WRITE} and surface as {@code ERROR}. Post-host-save
      * finalization failures surface as {@code COMMIT_FAILED} per AUD-06.
      */
-    public AiToolCallOutcome auditOutcome(Throwable thrown, MutationCommitState commitState) {
+    public AiToolCallOutcome auditOutcome(MutationCommitState commitState) {
         if (commitState == MutationCommitState.HOST_SAVE_RETURNED) {
             return AiToolCallOutcome.COMMIT_FAILED;
         }
         return AiToolCallOutcome.ERROR;
+    }
+
+    /**
+     * Writes a mutation failure audit row whose result summary mirrors the sanitized JSON
+     * returned to the LLM. This keeps operators from seeing a blank audit summary while
+     * preserving the P-22 rule that raw exception messages and user values are never echoed.
+     */
+    public void safeWriteErrorAudit(String eventName,
+                                    String argumentsJson,
+                                    ToolUserError translated,
+                                    long latencyMs,
+                                    AiToolCallOutcome outcome,
+                                    String denialReason,
+                                    String errorClass,
+                                    String userUsername) {
+        safeWriteAudit(eventName, argumentsJson, errorResultSummary(translated), latencyMs,
+                outcome, denialReason, errorClass, userUsername);
+    }
+
+    /**
+     * Logs catch-all failures that are not part of the expected mutation error taxonomy.
+     * The marker includes only identifiers, exception class, stable error code, and stack
+     * frames. It deliberately omits {@code Throwable#getMessage()} and does not pass the
+     * Throwable to SLF4J, because database and validation exception messages may contain
+     * host data or LLM-supplied values.
+     */
+    public void logUnexpectedThrowable(String toolName,
+                                       Throwable thrown,
+                                       ToolUserError translated,
+                                       AiToolCallOutcome outcome,
+                                       MutationCommitState commitState) {
+        if (commitState == MutationCommitState.NO_HOST_WRITE && isExpectedMutationThrowable(thrown)) {
+            return;
+        }
+        log.error("AI_AGENT_MUTATION_TOOL_UNEXPECTED_FAILURE toolName={} outcome={} commitState={} runId={} rootAuditId={} conversationId={} exceptionClass={} errorCode={} stackFrames={}",
+                toolName,
+                outcome,
+                commitState,
+                RunContext.get(),
+                RunContext.getRootAuditId(),
+                RunContext.getConversationId(),
+                thrown.getClass().getName(),
+                translated.toDto().error(),
+                sanitizedStackFrames(thrown));
     }
 
     /**
@@ -284,6 +330,53 @@ public class MutationCommitCoordinator {
                     RunContext.getRootAuditId(),
                     auditFailure.getClass().getName());
         }
+    }
+
+    private String errorResultSummary(ToolUserError translated) {
+        try {
+            return toolResultFormatter.error(translated);
+        } catch (RuntimeException formattingFailure) {
+            log.error("AI_AGENT_MUTATION_ERROR_SUMMARY_FORMAT_FAILED errorCode={} runId={} rootAuditId={} exceptionClass={}",
+                    translated.toDto().error(),
+                    RunContext.get(),
+                    RunContext.getRootAuditId(),
+                    formattingFailure.getClass().getName());
+            return "{\"error\":\"" + escapeJsonString(translated.toDto().error()) + "\"}";
+        }
+    }
+
+    private static boolean isExpectedMutationThrowable(Throwable thrown) {
+        return thrown instanceof OptimisticLockingFailureException
+                || thrown instanceof jakarta.persistence.OptimisticLockException
+                || thrown instanceof org.springframework.security.access.AccessDeniedException
+                || thrown instanceof io.jmix.core.security.AccessDeniedException
+                || thrown instanceof jakarta.validation.ConstraintViolationException
+                || thrown instanceof DataIntegrityViolationException;
+    }
+
+    private static String sanitizedStackFrames(Throwable thrown) {
+        StackTraceElement[] stackTrace = thrown.getStackTrace();
+        if (stackTrace == null || stackTrace.length == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        int frameCount = Math.min(stackTrace.length, 12);
+        for (int index = 0; index < frameCount; index++) {
+            if (index > 0) {
+                builder.append(" | ");
+            }
+            builder.append(stackTrace[index]);
+        }
+        if (stackTrace.length > frameCount) {
+            builder.append(" | ...");
+        }
+        return builder.toString();
+    }
+
+    private static String escapeJsonString(String value) {
+        return value == null ? "" : value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
     }
 
     /**

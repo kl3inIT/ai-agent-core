@@ -32,6 +32,10 @@ public class MutationErrorTranslator {
     public ToolUserError translate(Throwable thrown, String toolName, MetaClass metaClass) {
         if (thrown instanceof ToolUserError tue) {
             String code = tue.toDto().error();
+            if ("parameter_conversion_error".equals(code)
+                    && "idempotencyKey must be a UUID v4".equals(tue.toDto().reason())) {
+                return invalidIdempotencyKey();
+            }
             if ("invalid_literal".equals(code)
                     || "unsupported_type".equals(code)
                     || "invalid_id".equals(code)) {
@@ -119,6 +123,12 @@ public class MutationErrorTranslator {
         return new ToolUserError("parameter_conversion_error",
                 "parameter value could not be converted",
                 List.of("call describe_entity to inspect attribute types, then retry with corrected values"));
+    }
+
+    public ToolUserError invalidIdempotencyKey() {
+        return new ToolUserError("parameter_conversion_error",
+                "idempotencyKey must be a UUID v4",
+                List.of("generate a fresh random UUID v4 idempotencyKey: third group starts with 4, fourth group starts with 8, 9, a, or b"));
     }
 
     public ToolUserError commitFailed(MetaClass metaClass) {

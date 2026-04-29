@@ -282,6 +282,24 @@ public class RelatedWriteMetadataResolver {
     }
 
     /**
+     * Return true when an add-related operation would move the child from a different parent
+     * to the requested parent. v1.1 exposes add/remove semantics only; it does not expose a
+     * "move/reparent" operation because that can silently detach the child from another
+     * aggregate/list the user did not mention.
+     */
+    public boolean childBelongsToDifferentParent(SupportedRelatedRelationship relationship,
+                                                 Object parent,
+                                                 Object child) {
+        Object current = EntityValues.getValue(child, relationship.childInverseProperty().getName());
+        if (current == null) {
+            return false;
+        }
+        Object currentId = EntityValues.getId(current);
+        Object parentId = EntityValues.getId(parent);
+        return parentId == null || !parentId.equals(currentId);
+    }
+
+    /**
      * Fail-closed canned error. P-22-safe: contains no LLM-supplied attribute values, no
      * raw exception text, and no entity name leak (the entity name has already been
      * acknowledged as visible by the caller, so omitting it here keeps the message stable).

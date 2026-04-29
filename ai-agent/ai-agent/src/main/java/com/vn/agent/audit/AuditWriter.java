@@ -241,7 +241,7 @@ public class AuditWriter {
         return auditId;
     }
 
-    private UUID findChatRootId(UUID runId) {
+    UUID findChatRootId(UUID runId) {
         if (runId == null) {
             return null;
         }

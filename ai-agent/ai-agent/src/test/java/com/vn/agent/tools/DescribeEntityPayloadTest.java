@@ -8,12 +8,14 @@ import io.jmix.core.Messages;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.metamodel.annotation.Comment;
 import io.jmix.core.metamodel.datatype.Datatype;
+import io.jmix.core.metamodel.datatype.EnumClass;
 import io.jmix.core.metamodel.datatype.Enumeration;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.lang.NonNull;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -102,7 +104,7 @@ class DescribeEntityPayloadTest {
         assertThat(attribute.has("nullable")).isFalse();
     }
 
-    // ---- Test 3: enum attribute renders [{name, label}] with locale-resolved labels ----
+    // ---- Test 3: enum attribute renders [{name, id, label}] with locale-resolved labels ----
 
     @Test
     void enumAttributeRendersEnumValuesWithLocaleResolvedLabels_Vietnamese() throws Exception {
@@ -131,7 +133,7 @@ class DescribeEntityPayloadTest {
         when(range.isDatatype()).thenReturn(false);
         when(range.getCardinality()).thenReturn(Range.Cardinality.NONE);
         Enumeration<Status> enumeration = mock(Enumeration.class);
-        when(enumeration.getValues()).thenReturn(List.<Enum>of(Status.ACTIVE, Status.INACTIVE));
+        when(enumeration.getValues()).thenReturn(List.of(Status.ACTIVE, Status.INACTIVE));
         when(enumeration.getJavaClass()).thenReturn(Status.class);
         when(range.asEnumeration()).thenReturn(enumeration);
         when(statusProperty.getRange()).thenReturn(range);
@@ -150,8 +152,10 @@ class DescribeEntityPayloadTest {
         assertThat(enumValues.isArray()).isTrue();
         assertThat(enumValues.size()).isEqualTo(2);
         assertThat(enumValues.get(0).path("name").asText()).isEqualTo("ACTIVE");
+        assertThat(enumValues.get(0).path("id").asText()).isEqualTo("A");
         assertThat(enumValues.get(0).path("label").asText()).isEqualTo(expectedActiveLabel);
         assertThat(enumValues.get(1).path("name").asText()).isEqualTo("INACTIVE");
+        assertThat(enumValues.get(1).path("id").asText()).isEqualTo("I");
         assertThat(enumValues.get(1).path("label").asText()).isEqualTo("Inactive-" + locale.getLanguage());
     }
 
@@ -272,7 +276,20 @@ class DescribeEntityPayloadTest {
     }
 
     /** Sample enum used to drive the enumValues test. */
-    public enum Status {
-        ACTIVE, INACTIVE
+    public enum Status implements EnumClass<String> {
+        ACTIVE("A"),
+        INACTIVE("I");
+
+        private final String id;
+
+        Status(String id) {
+            this.id = id;
+        }
+
+        @Override
+        @NonNull
+        public String getId() {
+            return id;
+        }
     }
 }

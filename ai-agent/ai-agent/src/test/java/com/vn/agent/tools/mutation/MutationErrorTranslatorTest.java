@@ -57,6 +57,22 @@ class MutationErrorTranslatorTest {
     }
 
     @Test
+    void preservesSafeIdempotencyKeyUuidV4Guidance() {
+        ToolUserError translated = translator.translate(
+                new ToolUserError("parameter_conversion_error",
+                        "idempotencyKey must be a UUID v4",
+                        List.of("raw hint is intentionally replaced")),
+                "create_record",
+                null);
+
+        ToolErrorDto dto = translated.toDto();
+        assertThat(dto.error()).isEqualTo("parameter_conversion_error");
+        assertThat(dto.reason()).isEqualTo("idempotencyKey must be a UUID v4");
+        assertThat(dto.expected()).containsExactly(
+                "generate a fresh random UUID v4 idempotencyKey: third group starts with 4, fourth group starts with 8, 9, a, or b");
+    }
+
+    @Test
     void unknownExceptionFallbackIsValidationFailedAndDoesNotEchoRawExceptionTextOrPii() {
         ToolUserError translated = translator.translate(
                 new IllegalStateException("database blew up for ssn-111-22-3333"),

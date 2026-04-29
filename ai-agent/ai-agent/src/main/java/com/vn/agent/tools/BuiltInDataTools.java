@@ -110,7 +110,7 @@ public class BuiltInDataTools {
      * <p>Returns Jmix-{@link MetadataTools}-derived attribute fields: {@code comment},
      * {@code attributeType}, {@code cardinality}, {@code mandatory}, {@code readOnly},
      * {@code persistent}, {@code transientProperty}, {@code primaryKey}, {@code enumValues}
-     * (each as {@code [{name, label}]} with locale-resolved labels via {@link io.jmix.core.Messages}),
+     * (each as {@code [{name, id, label}]} with locale-resolved labels via {@link io.jmix.core.Messages}),
      * {@code relationshipTarget} ({@code {name, label}} mirroring the {@code agent.entities}
      * shape), and {@code maxLength}. Top-level {@code comment} carries any entity-level
      * {@link io.jmix.core.metamodel.annotation.Comment}.
@@ -164,8 +164,20 @@ public class BuiltInDataTools {
     // -------- Tool 3: find_records (TOOL-05, TOOL-06, D-12, D-14) --------
 
     @Tool(name = "find_records",
-            description = "Find records matching a structured filter object. Default limit 20, max 100. "
-                    + "When results exceed the limit, response includes truncated=true and a hint to use count_records.")
+            description = """
+                    Find records matching a structured filter object. Default limit 20, max 100.
+                    Filter shapes: {"and":[...]}, {"or":[...]}, {"not":{...}}, or
+                    {"property":"attributeOr.path","operation":"EQUAL","value":...}.
+                    Supported operations: EQUAL, NOT_EQUAL, GREATER, GREATER_OR_EQUAL, LESS,
+                    LESS_OR_EQUAL, CONTAINS, DOES_NOT_CONTAIN, STARTS_WITH, ENDS_WITH,
+                    IN_LIST, NOT_IN_LIST, IS_SET. IN_LIST/NOT_IN_LIST require a non-empty JSON array.
+                    IS_SET requires a boolean value: true means the attribute is not null, false means null.
+                    NOT over STARTS_WITH or ENDS_WITH is not supported; use a positive filter instead.
+                    Use exact attribute names from describe_entity; dotted paths are allowed only through
+                    readable relationships and are depth-limited. Enum values should use enumValues[].id
+                    from describe_entity; enumValues[].name is also accepted. Never use localized labels as values.
+                    When results exceed the limit, response includes truncated=true and a hint to use count_records.
+                    """)
     public String findRecords(
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,
@@ -207,7 +219,11 @@ public class BuiltInDataTools {
     // -------- Tool 4: count_records (D-14 hint target) --------
 
     @Tool(name = "count_records",
-            description = "Count records matching a filter. Use when find_records returned truncated=true.")
+            description = """
+                    Count records matching a structured filter. Use the same filter shape and operation
+                    names as find_records. Use when find_records returned truncated=true or when the
+                    user asks for a total count instead of row details.
+                    """)
     public String countRecords(
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,
@@ -225,7 +241,12 @@ public class BuiltInDataTools {
     // -------- Tool 5: get_record (D-12) --------
 
     @Tool(name = "get_record",
-            description = "Load a single record by id. Returns the entity's _instance_name attributes.")
+            description = """
+                    Load a single record by id. Use an id returned by find_records, create_record, or
+                    update_record. Returns authorized fields according to the configured fetch plan;
+                    unfetched fields are null. Does not load collection contents; use get_related_records
+                    for relationship drill-down.
+                    """)
     public String getRecord(
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,
@@ -251,7 +272,11 @@ public class BuiltInDataTools {
     // -------- Tool 6: get_related_records (D-12) --------
 
     @Tool(name = "get_related_records",
-            description = "Load related records via a relationship attribute. Returns related rows' _instance_name attributes.")
+            description = """
+                    Load related records via a relationship attribute from describe_entity. Use only when
+                    the parent row id is known and the relationship attribute is readable. This is a read-only
+                    drill-down; it never creates, links, unlinks, or deletes records.
+                    """)
     public String getRelatedRecords(
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,

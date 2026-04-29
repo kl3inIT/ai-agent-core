@@ -226,4 +226,23 @@ class RelatedWriteMetadataResolverTest {
         assertThat(resolver.childBelongsToParent(rel, parent, orphan)).isFalse();
         assertThat(resolver.childBelongsToParent(rel, parent, otherChild)).isFalse();
     }
+
+    @Test
+    void childBelongsToDifferentParent_detectsReparentAttemptOnly() {
+        MetaClass parentMetaClass = metadata.getClass(MutationLinkedParentFixture.class);
+        RelatedWriteMetadataResolver.SupportedRelatedRelationship rel =
+                resolver.resolveSupportedRelatedWriteRelationship(parentMetaClass, "linkedChildren");
+
+        MutationLinkedParentFixture parent = metadata.create(MutationLinkedParentFixture.class);
+        MutationLinkedParentFixture otherParent = metadata.create(MutationLinkedParentFixture.class);
+        MutationLinkedChildFixture orphan = metadata.create(MutationLinkedChildFixture.class);
+        MutationLinkedChildFixture sameParentChild = metadata.create(MutationLinkedChildFixture.class);
+        sameParentChild.setLinkedParent(parent);
+        MutationLinkedChildFixture otherParentChild = metadata.create(MutationLinkedChildFixture.class);
+        otherParentChild.setLinkedParent(otherParent);
+
+        assertThat(resolver.childBelongsToDifferentParent(rel, parent, orphan)).isFalse();
+        assertThat(resolver.childBelongsToDifferentParent(rel, parent, sameParentChild)).isFalse();
+        assertThat(resolver.childBelongsToDifferentParent(rel, parent, otherParentChild)).isTrue();
+    }
 }

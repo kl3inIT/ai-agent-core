@@ -37,7 +37,7 @@ import static org.mockito.Mockito.doAnswer;
  * {@link MutationCommitState#NO_HOST_WRITE}. The intent may be marked FAILED, the audit outcome
  * is ERROR, and an exact same-hash retry can reclaim the row and proceed.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",
@@ -136,9 +136,18 @@ class BuiltInMutationToolsKnownRollbackTest {
 
         AiMutationIntent failedIntent = loadIntent();
         assertThat(failedIntent.getStatus()).isEqualTo(AiMutationIntentStatus.FAILED);
-        assertThat(loadAuditRows(AiToolCallOutcome.ERROR))
+        List<AiAuditEvent> errorRows = loadAuditRows(AiToolCallOutcome.ERROR);
+        assertThat(errorRows)
                 .as("known rollback writes ERROR, not COMMIT_FAILED")
                 .hasSize(1);
+        String errorResultSummary = errorRows.stream()
+                .map(AiAuditEvent::getResultSummary)
+                .findFirst()
+                .orElseThrow();
+        assertThat(errorResultSummary)
+                .as("audit ERROR row carries the same sanitized error envelope returned to the tool caller")
+                .contains("\"error\":\"validation_failed\"")
+                .doesNotContain("synthetic constraint violation");
         assertThat(loadAuditRows(AiToolCallOutcome.COMMIT_FAILED))
                 .as("save-time rollback happened before host save returned")
                 .isEmpty();

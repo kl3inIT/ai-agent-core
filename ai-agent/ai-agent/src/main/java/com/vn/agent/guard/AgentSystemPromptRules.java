@@ -88,7 +88,10 @@ public final class AgentSystemPromptRules {
     public static final String MUTATION_PROMPT_RULES = String.join("\n",
             "",
             "Mutation tool rules (active when mutation tools are enabled):",
-            "- When you call a mutation tool, generate a fresh UUID idempotencyKey per logical operation.",
+            "- When you call a mutation tool, generate a fresh random UUID v4 idempotencyKey per logical operation.",
+            "- UUID v4 means the first character of the third group is '4' and the first character"
+                    + " of the fourth group is one of '8', '9', 'a', or 'b'. Do not fabricate patterned UUID-looking strings.",
+            "- Never copy UUID-looking values from examples, previous tool calls, or prior messages for a new operation.",
             "- Reuse an idempotencyKey ONLY for an exact retry with identical arguments.",
             "- If you change any values after validation_failed or parameter_conversion_error,"
                     + " use a fresh idempotencyKey.",
@@ -98,7 +101,9 @@ public final class AgentSystemPromptRules {
             "- On 'concurrent_modification' call get_record or find_records to verify state."
                     + " If the tool result says the commit outcome is unknown, do not retry automatically;"
                     + " ask the user before any further mutation.",
-            "- On success, you may call generate_entity_detail_link to render a verify-link.",
+            "- After successful create_record or update_record, immediately call generate_entity_detail_link"
+                    + " with the same entityName and returned entityId before replying to the user."
+                    + " If link generation returns unknown_entity, say the record was saved but no detail link is available.",
             ""
     );
 

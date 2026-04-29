@@ -10,5 +10,6 @@ import io.jmix.flowui.view.*;
 @ViewDescriptor(path = "customer-list-view.xml")
 @LookupComponent("customersDataGrid")
 @DialogMode(width = "64em")
+@PrimaryListView(Customer.class)
 public class CustomerListView extends StandardListView<Customer> {
 }

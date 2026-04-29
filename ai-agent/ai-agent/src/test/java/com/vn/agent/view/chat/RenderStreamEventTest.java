@@ -56,30 +56,21 @@ class RenderStreamEventTest {
     }
 
     @Test
-    void toolCall_rendersMarkdownHeader_withToolNameAndShortArgs() {
+    void toolCall_returnsEmptyString_soRawArgumentsAreNotShownToUser() {
         StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
         String out = StreamEventRenderer.renderStreamEvent(
                 new StreamingEvent.ToolCall(TOOL_CALL_ID, "find_records", "{\"entity\":\"Order\"}"),
                 labels(), state);
-        assertThat(out)
-                .contains("**find_records**")
-                .contains("{\"entity\":\"Order\"}");
-        // Short args: ≤80 chars after whitespace collapse. Verify no ellipsis
-        // for this small payload.
-        assertThat(out).doesNotContain("...");
+        assertThat(out).isEqualTo("");
     }
 
     @Test
-    void toolResult_rendersItalicBlock_withOutcomeLabel_andTrailingSeparator() {
+    void toolResult_returnsEmptyString_soRawToolJsonIsNotShownToUser() {
         StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
         String out = StreamEventRenderer.renderStreamEvent(
                 new StreamingEvent.ToolResult(TOOL_CALL_ID, "3 rows", AiToolCallOutcome.SUCCESS),
                 labels(), state);
-        assertThat(out)
-                .contains("_")          // italicised block
-                .contains("done")       // outcome label looked up from labels
-                .contains("3 rows")
-                .contains("---");       // trailing separator
+        assertThat(out).isEqualTo("");
     }
 
     @Test
