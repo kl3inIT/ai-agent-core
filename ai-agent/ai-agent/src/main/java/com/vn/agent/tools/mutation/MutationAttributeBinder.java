@@ -231,6 +231,13 @@ public class MutationAttributeBinder {
                     .orElseThrow(() -> mutationErrorTranslator.notFound(targetMetaClass, rawValue.toString()));
         }
         // scalar/datatype/enum — delegate to existing structured filter converter.
+        // Rule 1 fix (Plan 11-10 Task 3): scalar null is a legitimate optional-field clear in
+        // mutation context (MUT-03 / Plan 11-03 contract). FilterLiteralValueConverter is a
+        // structured-filter converter and rejects null with "value must not be null"; that
+        // semantic does not apply to attribute writes where null = clear-to-null.
+        if (rawValue == null) {
+            return null;
+        }
         return filterLiteralValueConverter.convertValue(rawValue, property);
     }
 

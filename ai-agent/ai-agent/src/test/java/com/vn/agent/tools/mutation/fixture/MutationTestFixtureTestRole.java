@@ -1,6 +1,8 @@
 package com.vn.agent.tools.mutation.fixture;
 
+import io.jmix.security.model.EntityAttributePolicyAction;
 import io.jmix.security.model.EntityPolicyAction;
+import io.jmix.security.role.annotation.EntityAttributePolicy;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
 
@@ -32,5 +34,18 @@ public interface MutationTestFixtureTestRole {
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
     @EntityPolicy(entityClass = MutationLinkedChildFixture.class,
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
+    // Jmix attribute policies are positive-grant only: absence == denied. MODIFY includes
+    // VIEW, so a single wildcard MODIFY policy both makes attributes readable and lets the
+    // per-attribute access gate pass for legitimate writes.
+    @EntityAttributePolicy(entityClass = MutationTestFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationParentFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationChildFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationLinkedParentFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationLinkedChildFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
     void fixtureAccess();
 }

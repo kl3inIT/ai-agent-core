@@ -74,8 +74,15 @@ public class MutationToolTestUsersConfiguration {
             if (!(userRepository instanceof InMemoryUserRepository repo)) {
                 return;
             }
+            // mutation-admin must hold the fixture CRUD role so Jmix policies grant
+            // create/read/update on the test fixture host entities. AiAgentAdminRole alone
+            // does NOT grant policies on the fixture entities (it covers only the AI internal
+            // entities). Without the fixture role, LlmExposurePolicy.canReadEntity / canCreate
+            // returns false and the resolver returns unknown_entity before any mutation runs.
             repo.addUser(buildUser("mutation-admin",
-                    List.of(AiAgentAdminRole.CODE, AiAgentMutationRole.CODE),
+                    List.of(AiAgentAdminRole.CODE,
+                            MutationTestFixtureTestRole.CODE,
+                            AiAgentMutationRole.CODE),
                     List.of()));
             repo.addUser(buildUser("mutation-user",
                     List.of(MutationTestFixtureTestRole.CODE, AiAgentMutationRole.CODE),
