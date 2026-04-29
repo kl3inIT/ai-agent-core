@@ -74,9 +74,9 @@ public class MutationArgumentSanitizer {
         ObjectNode copy = objectMapper.createObjectNode();
         for (Map.Entry<String, JsonNode> field : objectNode.properties()) {
             JsonNode value = field.getValue();
-            if (hashSensitiveFields && sensitiveFields.contains(field.getKey())
-                    && value.isValueNode() && !value.isNull()) {
-                copy.set(field.getKey(), TextNode.valueOf(AuditFieldHasher.sha256Hex(value.asText())));
+            if (hashSensitiveFields && sensitiveFields.contains(field.getKey()) && !value.isNull()) {
+                String hashInput = value.isValueNode() ? value.asText() : value.toString();
+                copy.set(field.getKey(), TextNode.valueOf(AuditFieldHasher.sha256Hex(hashInput)));
             } else {
                 copy.set(field.getKey(), sanitizeNode(value, sensitiveFields, hashSensitiveFields));
             }

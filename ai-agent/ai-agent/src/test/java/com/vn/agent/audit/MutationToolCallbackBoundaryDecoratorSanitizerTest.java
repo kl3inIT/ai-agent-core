@@ -53,6 +53,12 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
     private static final String RAW_JSON_INPUT = "{\"entityName\":\"mutationTest_MutationTestFixture\","
             + "\"attributes\":{\"name\":\"Alice\",\"secret\":\"raw-secret-value\"},"
             + "\"idempotencyKey\":\"00000000-0000-0000-0000-000000000001\"}";
+    private static final String RAW_OBJECT_SECRET_INPUT = "{\"entityName\":\"mutationTest_MutationTestFixture\","
+            + "\"attributes\":{\"name\":\"Alice\",\"secret\":{\"nested\":\"raw-secret-value\"}},"
+            + "\"idempotencyKey\":\"00000000-0000-0000-0000-000000000001\"}";
+    private static final String RAW_ARRAY_SECRET_INPUT = "{\"entityName\":\"mutationTest_MutationTestFixture\","
+            + "\"attributes\":{\"name\":\"Alice\",\"secret\":[\"raw-secret-value\"]},"
+            + "\"idempotencyKey\":\"00000000-0000-0000-0000-000000000001\"}";
     private static final String INVALID_INPUT = "secret=raw-secret-value";
     private static final String UNPARSEABLE_PLACEHOLDER =
             "{\"sanitized\":true,\"reason\":\"unparseable_mutation_arguments\"}";
@@ -155,6 +161,20 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
         assertThat(row.getArgumentsJson()).doesNotContain(RAW_SECRET);
     }
 
+    @Test
+    void objectSensitiveField_hashesWholeJsonValueForStreamingAndFallbackAudit() {
+        assertSensitiveJsonValueIsHashed(
+                RAW_OBJECT_SECRET_INPUT,
+                AuditFieldHasher.sha256Hex("{\"nested\":\"raw-secret-value\"}"));
+    }
+
+    @Test
+    void arraySensitiveField_hashesWholeJsonValueForStreamingAndFallbackAudit() {
+        assertSensitiveJsonValueIsHashed(
+                RAW_ARRAY_SECRET_INPUT,
+                AuditFieldHasher.sha256Hex("[\"raw-secret-value\"]"));
+    }
+
     private MutationToolCallbackBoundaryDecorator wrapThrowingCreateRecordDelegate(
             AtomicReference<String> delegateInput) {
         ToolCallback delegate = new ToolCallback() {
@@ -198,6 +218,25 @@ class MutationToolCallbackBoundaryDecoratorSanitizerTest {
                 RunContext.clear();
             }
         }));
+    }
+
+    private void assertSensitiveJsonValueIsHashed(String rawInput, String expectedHash) {
+        AtomicReference<String> delegateInput = new AtomicReference<>();
+        ToolCallback wrapper = wrapThrowingCreateRecordDelegate(delegateInput);
+
+        Throwable thrown = invokeAsMutationUser(wrapper, rawInput);
+
+        assertThat(thrown).isInstanceOf(IllegalArgumentException.class);
+        assertThat(delegateInput).hasValue(rawInput);
+
+        StreamingEvent.ToolCall toolCall = onlyToolCall();
+        assertThat(toolCall.argsJson()).contains(expectedHash);
+        assertThat(toolCall.argsJson()).doesNotContain(RAW_SECRET);
+
+        AiAuditEvent row = onlyAuditRow();
+        assertThat(row.getOutcome()).isEqualTo(AiToolCallOutcome.ERROR);
+        assertThat(row.getArgumentsJson()).contains(expectedHash);
+        assertThat(row.getArgumentsJson()).doesNotContain(RAW_SECRET);
     }
 
     private StreamingEvent.ToolCall onlyToolCall() {
