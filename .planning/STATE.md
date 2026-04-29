@@ -4,7 +4,7 @@ milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
 stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-29T03:20:11.700Z"
+last_updated: "2026-04-29T04:56:50.592Z"
 progress:
   total_phases: 6
   completed_phases: 2
@@ -23,12 +23,12 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 11 — Mutation-Capable Built-In Tools
+**Current focus:** Phase 11 — mutation-capable-built-in-tools
 
 ## Current Position
 
-Phase: 11 (Mutation-Capable Built-In Tools) — EXECUTING
-Plan: 11 of 14
+Phase: 11 (mutation-capable-built-in-tools) — EXECUTING
+Plan: 1 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
