@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_11_ready_for_verification
-stopped_at: Completed 11-11-PLAN.md
-last_updated: "2026-04-29T06:18:57.322Z"
+status: phase_11_gaps_found
+stopped_at: Phase 11 verification found 2 blocking gaps
+last_updated: "2026-04-29T06:44:12.000Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 31
   completed_plans: 31
   percent: 100
@@ -27,14 +27,14 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 11 (mutation-capable-built-in-tools) — EXECUTING
+Phase: 11 (mutation-capable-built-in-tools) — GAPS FOUND
 Plan: 14 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
 | Plan | 14 of 14 complete |
-| Status | Phase 11 ready for verification |
-| Last activity | 2026-04-29 — Plan 11-11 complete; TEST-12 and supporting mutation regressions closed |
+| Status | Phase 11 verification gaps found |
+| Last activity | 2026-04-29 — Verification found replay-audit durability and mutation-boundary PII gaps |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 14 of 14
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Complete | 14/14 | 2026-04-28 | 2026-04-29 |
+| 11. Mutation-Capable Built-In Tools | Gaps found | 14/14 | 2026-04-28 | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -199,8 +199,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T06:18:57.306Z
-**Stopped at:** Completed 11-11-PLAN.md
+**Last session:** 2026-04-29T06:44:12.000Z
+**Stopped at:** Phase 11 verification found 2 blocking gaps
 **Resume file:** None
-**Blockers:** None.
-**Next action:** Verify Phase 11.
+**Blockers:** Replay audit durability and mutation-boundary PII leakage.
+**Next action:** Plan Phase 11 gap closure with `$gsd-plan-phase 11 --gaps`.
