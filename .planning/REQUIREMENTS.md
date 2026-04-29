@@ -42,7 +42,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Mutation-Capable Built-In Tools
 
-- [ ] **MUT-01**: `BuiltInMutationTools` separate `@Component` (NOT methods on `BuiltInDataTools` — preserves the v1.0 ASM read-only test). Conditional via `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled", havingValue="true")` — **default OFF**.
+- [x] **MUT-01**: `BuiltInMutationTools` separate `@Component` (NOT methods on `BuiltInDataTools` — preserves the v1.0 ASM read-only test). Conditional via `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled", havingValue="true")` — **default OFF**.
 - [x] **MUT-02**: Mutation tool depth for v1.1: `create_record`, `update_record`, `add_related_record`, `remove_related_record`. `delete_record` deferred to v1.2 (destructive ops need separate UX — confirmation, undo).
 - [x] **MUT-03**: Layered gating per call, fail-closed, in order:
   1. `LlmExposurePolicy.canModify(entity, attribute)` (admin can deny mutation even where user can mutate).

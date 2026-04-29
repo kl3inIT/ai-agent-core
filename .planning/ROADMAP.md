@@ -23,7 +23,7 @@
 
 - [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
-- [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (gap closure planned 2026-04-29) (completed 2026-04-29)
+- [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
 - [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
 - [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
@@ -119,7 +119,7 @@
 - Idempotency uses pre-save reservation with `REQUEST_HASH`/`STATUS_`; `AiMutationIntent` does not store full result JSON.
 - Mutation callbacks are self-audited exactly once and are not wrapped by `ToolCallbackAuditDecorator`.
 
-**Verification status:** gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md` executed on 2026-04-29. Phase 11 verification must be re-run against `11-VERIFICATION.md` criteria before completion routing.
+**Verification status:** passed in `11-VERIFICATION.md` on 2026-04-29 after gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md`.
 
 ### Phase 12: Configurable Chat Surfaces
 **Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
@@ -177,7 +177,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | 16/16 | Complete   | 2026-04-29 |
+| 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |

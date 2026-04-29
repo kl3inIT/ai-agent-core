@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_11_gap_closure_complete_verification_pending
-stopped_at: Completed 11-13-PLAN.md; Phase 11 verification pending
-last_updated: "2026-04-29T07:21:58.758Z"
+status: ready_to_plan
+stopped_at: Phase 11 complete; ready to plan Phase 12
+last_updated: "2026-04-29T07:54:03.087Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 33
   completed_plans: 33
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 11 — mutation-capable-built-in-tools
+**Current focus:** Phase 12 — configurable-chat-surfaces
 
 ## Current Position
 
-Phase: 11 (mutation-capable-built-in-tools) — GAP CLOSURE COMPLETE; VERIFICATION PENDING
-Plan: 16 of 16 complete
+Phase: 12
+Plan: Not started
 | Field | Value |
 |-------|-------|
-| Phase | Phase 11 |
-| Plan | 16 of 16 complete; gap closure plans complete |
-| Status | Phase 11 gap closure complete; verification pending |
-| Last activity | 2026-04-29 — Completed 11-13 mutation-boundary sanitizer gap closure |
+| Phase | Phase 12 |
+| Plan | Not started |
+| Status | Ready to plan |
+| Last activity | 2026-04-29 — Phase 11 completed after passed verification |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 16 of 16 complete
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Verification pending | 16/16 | 2026-04-28 | - |
+| 11. Mutation-Capable Built-In Tools | Complete | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -202,7 +202,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-04-29T07:21:58.486Z
-**Stopped at:** Completed 11-13-PLAN.md; Phase 11 verification pending
+**Stopped at:** Phase 11 complete; ready to plan Phase 12
 **Resume file:** None
-**Blockers:** None. Phase 11 verification needs to be re-run after gap closure.
-**Next action:** Verify Phase 11 goal achievement.
+**Blockers:** None.
+**Next action:** Plan Phase 12 configurable chat surfaces.

@@ -5,11 +5,11 @@ status: passed
 score: "5/5 must-haves verified"
 overrides_applied: 0
 re_verification:
-  previous_status: gaps_found
+  prior_status: failed
   previous_score: "4/5"
-  gaps_closed:
+  issues_closed:
     - "Mutation-boundary PII: MutationArgumentSanitizer now hashes every non-null configured sensitive field value, including object and array values using compact JSON hash input; streaming and fallback audit regressions cover scalar, object, array, and invalid input cases."
-  gaps_remaining: []
+  remaining_issues: []
   regressions: []
 ---
 
@@ -130,9 +130,9 @@ The `UNPARSEABLE_PLACEHOLDER` test constant is intentional fail-closed behavior,
 
 None. The remaining verification surface is source/test-level and was checked programmatically.
 
-### Gaps Summary
+### Closure Summary
 
-No blocking gaps remain. The previous replay durability blocker was already closed, and the follow-up mutation sanitizer fix closes the remaining PII boundary blocker: scalar, object, and array values under configured sensitive field names are hashed before leaving through streaming or fallback audit paths, while invalid mutation input fails closed to a canned placeholder.
+No blocking issues remain. The previous replay durability blocker was already closed, and the follow-up mutation sanitizer fix closes the remaining PII boundary blocker: scalar, object, and array values under configured sensitive field names are hashed before leaving through streaming or fallback audit paths, while invalid mutation input fails closed to a canned placeholder.
 
 Two prior review warnings remain non-blocking: UUID idempotency key canonicalization and unknown-attribute error classification order. They are tracked above as warnings and do not prevent Phase 11 goal achievement.
 
