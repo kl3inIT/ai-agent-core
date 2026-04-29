@@ -1,6 +1,7 @@
 package com.vn.agent.tools;
 
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.audit.MutationArgumentSanitizer;
 import com.vn.agent.audit.MutationToolCallbackBoundaryDecorator;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
 import com.vn.agent.orchestration.StreamingSinkHolder;
@@ -66,6 +67,7 @@ public class AgentToolCallbacks {
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
     private final StreamingSinkHolder streamingSinkHolder;
+    private final MutationArgumentSanitizer mutationArgumentSanitizer;
 
     public AgentToolCallbacks(BuiltInDataTools builtIns,
                               BuiltInLinkTools builtInLinkTools,
@@ -73,7 +75,8 @@ public class AgentToolCallbacks {
                               List<ToolContributor> contributors,
                               AuditWriter auditWriter,
                               CurrentAuthentication currentAuthentication,
-                              StreamingSinkHolder streamingSinkHolder) {
+                              StreamingSinkHolder streamingSinkHolder,
+                              MutationArgumentSanitizer mutationArgumentSanitizer) {
         this.builtIns = builtIns;
         this.builtInLinkTools = builtInLinkTools;
         this.mutationToolsProvider = mutationToolsProvider;
@@ -81,6 +84,7 @@ public class AgentToolCallbacks {
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
         this.streamingSinkHolder = streamingSinkHolder;
+        this.mutationArgumentSanitizer = mutationArgumentSanitizer;
     }
 
     /**
@@ -128,7 +132,8 @@ public class AgentToolCallbacks {
         ToolCallback[] mutationBoundaryWrapped = new ToolCallback[rawMutationCallbacks.length];
         for (int i = 0; i < rawMutationCallbacks.length; i++) {
             mutationBoundaryWrapped[i] = new MutationToolCallbackBoundaryDecorator(
-                    rawMutationCallbacks[i], streamingSinkHolder, auditWriter, currentAuthentication);
+                    rawMutationCallbacks[i], streamingSinkHolder, auditWriter, currentAuthentication,
+                    mutationArgumentSanitizer);
         }
 
         // Final array order: [read + link + contributor (audited)] then [mutation (boundary)].

@@ -78,15 +78,18 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
     private final StreamingSinkHolder streamingSinkHolder;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
+    private final MutationArgumentSanitizer mutationArgumentSanitizer;
 
     public MutationToolCallbackBoundaryDecorator(ToolCallback delegate,
                                                  StreamingSinkHolder streamingSinkHolder,
                                                  AuditWriter auditWriter,
-                                                 CurrentAuthentication currentAuthentication) {
+                                                 CurrentAuthentication currentAuthentication,
+                                                 MutationArgumentSanitizer mutationArgumentSanitizer) {
         this.delegate = delegate;
         this.streamingSinkHolder = streamingSinkHolder;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.mutationArgumentSanitizer = mutationArgumentSanitizer;
     }
 
     @Override
@@ -112,11 +115,11 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
         UUID conversationId = resolveConversationId(toolContext);
         String userUsername = resolveUserUsername();
         String toolName = delegate.getToolDefinition().name();
-        String cappedInput = cap(toolInput, ARGUMENTS_JSON_MAX_CHARS);
+        String safeInput = cap(mutationArgumentSanitizer.sanitize(toolName, toolInput), ARGUMENTS_JSON_MAX_CHARS);
 
         // Streaming pair-id correlation (mirrors ToolCallbackAuditDecorator).
         final UUID toolCallId = UUID.randomUUID();
-        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
+        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, safeInput)));
 
         long startNanos = System.nanoTime();
         String output = null;
@@ -136,7 +139,7 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
             UUID parentId = RunContext.getRootAuditId();
             try {
                 auditWriter.writeToolCall(parentId, runId, userUsername, conversationId, toolName,
-                        cappedInput, /* resultSummary */ null, latencyMs,
+                        safeInput, /* resultSummary */ null, latencyMs,
                         AiToolCallOutcome.ERROR,
                         /* denialReason */ null, t.getClass().getName());
             } catch (Throwable t2) {
