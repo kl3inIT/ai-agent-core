@@ -89,7 +89,7 @@ public class AiAuditEvent {
     @Column(name = "RETRIEVAL_HITS_JSON")
     private String retrievalHitsJson;
 
-    @Column(name = "OUTCOME", length = 16)
+    @Column(name = "OUTCOME", length = 32)
     private String outcome;
 
     @Column(name = "DENIAL_REASON", length = 512)

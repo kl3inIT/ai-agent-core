@@ -3,6 +3,7 @@ package com.vn.agent.tools.mutation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.AITestConfiguration;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
@@ -74,6 +75,15 @@ class BuiltInMutationToolsIdempotencyReplayTest {
                         .id(id).optional().ifPresent(unconstrainedDataManager::remove);
             }
             if (idempotencyKey != null) {
+                List<AiAuditEvent> auditRows = unconstrainedDataManager.load(AiAuditEvent.class)
+                        .query("select a from ai_AiAuditEvent a " +
+                                "where a.eventName = :n and a.argumentsJson like :arg")
+                        .parameter("n", "create_record")
+                        .parameter("arg", "%" + idempotencyKey + "%")
+                        .list();
+                for (AiAuditEvent auditRow : auditRows) {
+                    unconstrainedDataManager.remove(auditRow);
+                }
                 List<AiMutationIntent> intents = unconstrainedDataManager.load(AiMutationIntent.class)
                         .query("select e from aiMutation_AiMutationIntent e " +
                                 "where e.toolName = :t and e.idempotencyKey = :k and e.userUsername = :u")
@@ -148,5 +158,24 @@ class BuiltInMutationToolsIdempotencyReplayTest {
         assertThat(fixtureCount)
                 .as("replay must NOT create a second fixture row")
                 .isEqualTo(1L);
+
+        List<AiAuditEvent> auditRows = systemAuthenticator.withSystem(() ->
+                unconstrainedDataManager.load(AiAuditEvent.class)
+                        .query("select a from ai_AiAuditEvent a " +
+                                "where a.eventName = :n and a.argumentsJson like :arg " +
+                                "order by a.startedAt desc")
+                        .parameter("n", "create_record")
+                        .parameter("arg", "%" + idempotencyKey + "%")
+                        .list());
+        assertThat(auditRows)
+                .as("first call and replay must both be durably audited for the idempotency key")
+                .hasSize(2);
+        assertThat(auditRows)
+                .extracting(AiAuditEvent::getOutcome)
+                .containsExactlyInAnyOrder(AiToolCallOutcome.SUCCESS, AiToolCallOutcome.IDEMPOTENT_REPLAY);
+        assertThat(auditRows)
+                .filteredOn(row -> AiToolCallOutcome.IDEMPOTENT_REPLAY.equals(row.getOutcome()))
+                .singleElement()
+                .satisfies(row -> assertThat(row.getOutcomeRaw()).isEqualTo("IDEMPOTENT_REPLAY"));
     }
 }
