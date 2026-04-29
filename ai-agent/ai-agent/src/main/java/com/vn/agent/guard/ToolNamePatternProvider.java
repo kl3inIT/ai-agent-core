@@ -40,10 +40,30 @@ public class ToolNamePatternProvider {
     /** Stable scanner audit key — written into context on hit; never the matched text. */
     public static final String PATTERN_KEY = "TOOL_NAME_LEAK";
 
-    /** Six built-in tool names (D-07). Hard-coded because they are part of the v1.0 contract. */
+    /**
+     * Built-in tool names (D-07 + Phase 11 D-05/D-09). Hard-coded because they are part of the
+     * stable v1.x tool-name contract — leakage of any of these into user-facing assistant text
+     * is a scanner-flagged event regardless of host {@link ToolContributor} state.
+     *
+     * <p>Composition (12 names total):
+     * <ul>
+     *   <li>6 read-only built-ins from {@code BuiltInDataTools} (v1.0).</li>
+     *   <li>2 link tools from {@code BuiltInLinkTools} (Phase 11 Plan 11-08, always-on).</li>
+     *   <li>4 mutation tools from {@code BuiltInMutationTools} (Phase 11 Plans 11-07A/B/C; only
+     *       registered as callbacks when {@code ai-agent.tools.mutation.enabled=true}, but the
+     *       NAMES are scanned unconditionally so leakage in a default-config deployment would
+     *       still flag — closes the tool-name leak gap on a property flip).</li>
+     * </ul>
+     *
+     * <p><b>NEVER include {@code delete_record}</b> — D-07 forbids the destructive tool from
+     * shipping under any property combination in v1.x; including its name in the scanner would
+     * mis-signal a feature that does not exist.
+     */
     static final List<String> BUILT_IN_TOOL_NAMES = List.of(
             "list_entities", "describe_entity", "find_records",
-            "count_records", "get_record", "get_related_records");
+            "count_records", "get_record", "get_related_records",
+            "generate_entity_list_link", "generate_entity_detail_link",
+            "create_record", "update_record", "add_related_record", "remove_related_record");
 
     /** D-07: Spring AI RAG advisor name. */
     static final String RETRIEVAL_ADVISOR = "RETRIEVAL";

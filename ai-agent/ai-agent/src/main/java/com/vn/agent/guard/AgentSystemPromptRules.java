@@ -70,6 +70,38 @@ public final class AgentSystemPromptRules {
             ""
     );
 
+    /**
+     * Phase 11 MUT-10 mutation-tool rules. Appended to the system prompt ONLY when
+     * {@code ai-agent.tools.mutation.enabled=true}; the conditional gate lives in the sibling
+     * top-level {@code @Component AgentSystemPromptRulesComposer} (NOT a nested static class —
+     * the codebase has no precedent for nested {@code @Component}s and sibling top-level matches
+     * existing structure).
+     *
+     * <p>Hardcoded English: model-directed instructions, NOT user-facing UI. Same rationale as
+     * {@link #PROMPT_RULES} (RESEARCH Pitfall 7 — tool-protocol English strings live in Java
+     * constants, NOT {@code messages.properties}).
+     *
+     * <p><b>MUST NOT</b> reference {@code prepare_form_draft} — that is a Phase 14 forward-reference
+     * tool that does not exist in v1.1. Leaking the name into the live system prompt would teach
+     * the LLM to call a non-existent tool and trigger {@code unknown_tool} errors.
+     */
+    public static final String MUTATION_PROMPT_RULES = String.join("\n",
+            "",
+            "Mutation tool rules (active when mutation tools are enabled):",
+            "- When you call a mutation tool, generate a fresh UUID idempotencyKey per logical operation.",
+            "- Reuse an idempotencyKey ONLY for an exact retry with identical arguments.",
+            "- If you change any values after validation_failed or parameter_conversion_error,"
+                    + " use a fresh idempotencyKey.",
+            "- On 'access_denied' do NOT retry — surface to the user.",
+            "- On 'parameter_conversion_error' re-read describe_entity attributeType and retry"
+                    + " with corrected types.",
+            "- On 'concurrent_modification' call get_record or find_records to verify state."
+                    + " If the tool result says the commit outcome is unknown, do not retry automatically;"
+                    + " ask the user before any further mutation.",
+            "- On success, you may call generate_entity_detail_link to render a verify-link.",
+            ""
+    );
+
     private AgentSystemPromptRules() {
         // Constants holder — not intended for instantiation.
     }

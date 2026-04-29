@@ -129,12 +129,20 @@ class ChatServiceFilterParamContractTest {
         com.vn.agent.rag.config.AiAgentRagProperties ragProperties =
                 mock(com.vn.agent.rag.config.AiAgentRagProperties.class);
         when(ragProperties.resolvedTopK()).thenReturn(5);
+        // Phase 11 Plan 11-09: AgentSystemPromptRulesComposer chooses between PROMPT_RULES and
+        // PROMPT_RULES + MUTATION_PROMPT_RULES. RAG-filter contract tests exercise the read-only
+        // path, so a mock returning the baseline rules is sufficient.
+        com.vn.agent.guard.AgentSystemPromptRulesComposer rulesComposer =
+                mock(com.vn.agent.guard.AgentSystemPromptRulesComposer.class);
+        when(rulesComposer.effectiveRules())
+                .thenReturn(com.vn.agent.guard.AgentSystemPromptRules.PROMPT_RULES);
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder, ragProperties,
                 currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
                 reactor.core.scheduler.Schedulers.immediate(),
                 cancellationRegistry,
-                streamingSinkHolder);
+                streamingSinkHolder,
+                rulesComposer);
     }
 
     @Test
