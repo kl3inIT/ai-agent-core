@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_11_ready_to_execute
-stopped_at: Completed 11-10-PLAN.md; ready for 11-11-PLAN.md
-last_updated: "2026-04-29T05:43:47.745Z"
+status: phase_11_ready_for_verification
+stopped_at: Completed 11-11-PLAN.md
+last_updated: "2026-04-29T06:18:57.322Z"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 31
-  completed_plans: 30
-  percent: 97
+  completed_plans: 31
+  percent: 100
 ---
 
 # Project State
@@ -32,9 +32,9 @@ Plan: 14 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
-| Plan | 13 of 14 complete |
-| Status | Ready for Plan 11-11 |
-| Last activity | 2026-04-29 — Plan 11-10 complete; TEST-10, TEST-11, and TEST-13 closed |
+| Plan | 14 of 14 complete |
+| Status | Phase 11 ready for verification |
+| Last activity | 2026-04-29 — Plan 11-11 complete; TEST-12 and supporting mutation regressions closed |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 14 of 14
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | In Progress | 13/14 | 2026-04-28 | - |
+| 11. Mutation-Capable Built-In Tools | Complete | 14/14 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -153,6 +153,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 11]: Use a test-only Jmix module to make mutation fixture persistence win the reverse persistence.xml scan. — Keeps Plan 11-07B fixture ownership intact while making Plan 11-10 integration tests executable.
 - [Phase 11]: Use @MockitoBean for mutation guard capture tests instead of nested @TestConfiguration. — Prevents guard test doubles from leaking into unrelated Spring test contexts.
 - [Phase 11]: Preserve scalar null mutation attributes before structured-filter literal conversion. — Null values represent optional-field clears at the mutation prompt boundary.
+- [Phase 11]: Use @MockitoBean for the commit-unknown failure probe so the failure does not leak into unrelated Spring test contexts.
+- [Phase 11]: Keep Java 17-compatible List.get(0) assertions even when JetBrains suggests List.getFirst().
+- [Phase 11]: Align the existing tool-name scanner baseline test with Phase 11's read, link, and mutation built-in names.
 
 ### Performance Metrics
 
@@ -186,6 +189,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11 P08 | 25min | 1 tasks | 3 files |
 | Phase 11 P09 | 35min | 2 tasks | 9 files |
 | Phase 11 P10 | 25min | 4 tasks | 19 files |
+| Phase 11-mutation-capable-built-in-tools P11 | 20min | 2 tasks | 10 files |
 
 ### Quick Tasks Completed
 
@@ -195,8 +199,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T05:43:47.385Z
-**Stopped at:** Completed 11-10-PLAN.md; ready for 11-11-PLAN.md
+**Last session:** 2026-04-29T06:18:57.306Z
+**Stopped at:** Completed 11-11-PLAN.md
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Execute Phase 11.
+**Next action:** Verify Phase 11.
