@@ -20,11 +20,36 @@ import java.util.Map;
 
 /**
  * Encapsulates reservation-result handling, commit-state transitions, replay-result
- * construction, and the non-throwing {@code safeWriteAudit} for {@code BuiltInMutationTools}
- * (Plan 11-07A). Plan 11-07C will harden the edge cases; Plan 11-07A must not put these
- * helper bodies directly on {@code BuiltInMutationTools}.
+ * construction, and the non-throwing {@code safeWriteAudit} for {@code BuiltInMutationTools}.
+ * Plan 11-07A introduced this collaborator; Plan 11-07B added related-write replay support;
+ * Plan 11-07C is the final hardening pass and locks in the invariants below.
  *
- * <p><b>Commit-state contract (Plan 11-07 reference, must-haves):</b>
+ * <p><b>Plan 11-07C invariants (enforced and must remain green):</b>
+ * <ul>
+ *     <li>{@code auditWriter.writeToolCall} is only invoked from {@link #safeWriteAudit}
+ *         in this class; {@code BuiltInMutationTools} contains zero direct calls. Verified
+ *         by {@code MutationToolInvariantsTest}.</li>
+ *     <li>{@code COMMIT_FAILED} captions must not say "database commit failed". Both
+ *         locales render "Commit outcome unknown" because the host save may or may not
+ *         have committed — see {@link MutationErrorTranslator#commitFailed}.</li>
+ *     <li>{@link #safeWriteAudit} catches {@link RuntimeException}, never alters
+ *         {@link MutationCommitState}, and logs the marker
+ *         {@code AI_AGENT_MUTATION_AUDIT_WRITE_FAILED} with sanitized context only
+ *         (tool name, outcome, runId, rootAuditId, exception class) — never
+ *         {@code argumentsJson} or user-supplied attribute values.</li>
+ *     <li>Replay loads use {@link io.jmix.core.FetchPlan#INSTANCE_NAME} and re-resolve
+ *         {@code instanceName} live under current locale + security; if exposure or read
+ *         denies loading, the row's {@code entityId} is preserved and {@code instanceName}
+ *         is omitted/null. Full result JSON is never stored.</li>
+ *     <li>{@link MutationIntentRepository#markCommitUnknown} re-reads the current dedup
+ *         row inside its own {@code REQUIRES_NEW} transaction and never downgrades a
+ *         {@code COMMITTED} row.</li>
+ *     <li>{@link MutationCommitState#INTENT_COMMITTED} failures (post-success audit /
+ *         result-build failures) never downgrade the idempotency row; the next exact
+ *         retry returns {@code IDEMPOTENT_REPLAY}.</li>
+ * </ul>
+ *
+ * <p><b>Commit-state contract:</b>
  * <ul>
  *     <li>{@link MutationCommitState#NO_HOST_WRITE} → catch ladder may mark
  *         {@code FAILED} (reclaimable for same-hash retry).</li>
@@ -34,12 +59,6 @@ import java.util.Map;
  *     <li>{@link MutationCommitState#INTENT_COMMITTED} → catch ladder must NOT mutate
  *         the dedup row at all (success was already finalized).</li>
  * </ul>
- *
- * <p><b>safeWriteAudit contract:</b> never throws back into the tool catch ladder; logs
- * audit-write failures at ERROR with marker {@code AI_AGENT_MUTATION_AUDIT_WRITE_FAILED}
- * and only sanitized context (no raw {@code argumentsJson}). This prevents recursive audit
- * attempts and keeps callback decorators from seeing in-method audit failures as
- * callback-level failures.
  */
 @Component
 public class MutationCommitCoordinator {
