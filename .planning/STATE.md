@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: phase_11_ready_to_execute
-stopped_at: Plan 11-01 complete; ready for Plan 11-02
-last_updated: "2026-04-29T04:56:50.592Z"
+stopped_at: Completed 11-10-PLAN.md; ready for 11-11-PLAN.md
+last_updated: "2026-04-29T05:43:47.745Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 31
-  completed_plans: 28
-  percent: 90
+  completed_plans: 30
+  percent: 97
 ---
 
 # Project State
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-04-29
 
 ## Project Reference
 
@@ -28,13 +28,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 11 (mutation-capable-built-in-tools) — EXECUTING
-Plan: 1 of 14
+Plan: 14 of 14
 | Field | Value |
 |-------|-------|
 | Phase | Phase 11 |
-| Plan | 0 of 11 complete |
-| Status | Ready to execute |
-| Last activity | 2026-04-28 — Phase 11 plans revised with review feedback |
+| Plan | 13 of 14 complete |
+| Status | Ready for Plan 11-11 |
+| Last activity | 2026-04-29 — Plan 11-10 complete; TEST-10, TEST-11, and TEST-13 closed |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 1 of 14
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Ready to execute | 0/11 | 2026-04-28 | - |
+| 11. Mutation-Capable Built-In Tools | In Progress | 13/14 | 2026-04-28 | - |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -150,6 +150,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 11-09: ObjectProvider.getIfAvailable for BuiltInMutationTools per RESEARCH Q5
 - [Phase ?]: 11-09: Mutation callbacks ride MutationToolCallbackBoundaryDecorator (NOT ToolCallbackAuditDecorator) — single audit owner from Plan 11-07C preserved
 - [Phase ?]: 11-09: Sibling top-level @Component AgentSystemPromptRulesComposer (no nested @Component precedent)
+- [Phase 11]: Use a test-only Jmix module to make mutation fixture persistence win the reverse persistence.xml scan. — Keeps Plan 11-07B fixture ownership intact while making Plan 11-10 integration tests executable.
+- [Phase 11]: Use @MockitoBean for mutation guard capture tests instead of nested @TestConfiguration. — Prevents guard test doubles from leaking into unrelated Spring test contexts.
+- [Phase 11]: Preserve scalar null mutation attributes before structured-filter literal conversion. — Null values represent optional-field clears at the mutation prompt boundary.
 
 ### Performance Metrics
 
@@ -182,6 +185,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11-mutation-capable-built-in-tools P07C | 12m | 2 tasks | 2 files |
 | Phase 11 P08 | 25min | 1 tasks | 3 files |
 | Phase 11 P09 | 35min | 2 tasks | 9 files |
+| Phase 11 P10 | 25min | 4 tasks | 19 files |
 
 ### Quick Tasks Completed
 
@@ -191,8 +195,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T03:19:09.193Z
-**Stopped at:** Plan 11-01 complete; ready for Plan 11-02
+**Last session:** 2026-04-29T05:43:47.385Z
+**Stopped at:** Completed 11-10-PLAN.md; ready for 11-11-PLAN.md
 **Resume file:** None
 **Blockers:** None.
 **Next action:** Execute Phase 11.

@@ -136,10 +136,10 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 - [x] **TEST-08**: Prompt-contract suite (regression-locks PROMPT-03/04/05): chat reply to "có bao nhiêu khách hàng?" must NOT contain the literal substring matching the internal entity-name pattern; reply must NOT contain literal tool names. Runs in Vietnamese AND English locales.
 - [x] **TEST-09**: `LlmExposurePolicy` integration test — entity readable by user but denylisted for LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or surface as `access_denied` (uniform `unknown_entity`).
-- [ ] **TEST-10**: Mutation gating integration test — user with READ but not MODIFY on attribute `X` triggers `update_record(attribute=X)` → blocked at gating step 2; tool returns structured error; `DataManager.save` never called.
-- [ ] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
+- [x] **TEST-10**: Mutation gating integration test — user with READ but not MODIFY on attribute `X` triggers `update_record(attribute=X)` → blocked at gating step 2; tool returns structured error; `DataManager.save` never called.
+- [x] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
 - [ ] **TEST-12**: Mutation audit-vs-transaction test — known host save rollback writes a durable audit row with `outcome=ERROR`; post-host-save idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`); post-COMMITTED audit/result failures leave the intent `COMMITTED` and exact retry replays.
-- [ ] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
+- [x] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
 - [ ] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
 - [ ] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
 - [ ] **TEST-16**: Task file isolation test — `AiTaskFile` upload does NOT trigger `IngesterManager` invocation; `VectorStore` count unchanged after task-file attach.
