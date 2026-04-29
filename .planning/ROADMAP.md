@@ -23,7 +23,7 @@
 
 - [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
-- [ ] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (gap closure planned 2026-04-29)
+- [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (gap closure planned 2026-04-29) (completed 2026-04-29)
 - [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
 - [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
@@ -81,7 +81,7 @@
   3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); known `DataManager.save` rollback failures still write a durable `ERROR` audit row, while post-host-save idempotency finalization failures write `outcome=COMMIT_FAILED` and leave the intent non-reclaimable (TEST-12).
   4. The layered fail-closed gating chain runs in order on every mutation call: `AiAgentMutationRole` marker → `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → pre-host-save idempotency reservation → type coercion + writable-property validation → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
   5. Locale message keys for every denial / success / idempotency / error path are present in all locale bundles; new audit `eventName` strings (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) and new `outcome` values (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`) are observable on `AiAuditEvent` rows; `AiMutationIntent` dedup table honors a 24h TTL by default.
-**Plans:** 15/16 plans executed
+**Plans:** 16/16 plans complete
 
 **Wave 1**
 - [x] 11-01-PLAN.md — Foundation: AiMutationIntent entity/status + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
@@ -111,7 +111,7 @@
 
 **Wave 12 (gap closure; blocked on Wave 6 completion)**
 - [x] 11-12-PLAN.md — Gap closure: widen `AiAuditEvent.OUTCOME` Java/Liquibase metadata and persist `IDEMPOTENT_REPLAY` audit regression
-- [ ] 11-13-PLAN.md — Gap closure: sanitize mutation boundary streaming/fallback audit arguments with sensitive-field hashing
+- [x] 11-13-PLAN.md — Gap closure: sanitize mutation boundary streaming/fallback audit arguments with sensitive-field hashing
 
 **Cross-cutting constraints:**
 - Mutation tools remain default-off and `delete_record` remains absent under every property combination.
@@ -119,7 +119,7 @@
 - Idempotency uses pre-save reservation with `REQUEST_HASH`/`STATUS_`; `AiMutationIntent` does not store full result JSON.
 - Mutation callbacks are self-audited exactly once and are not wrapped by `ToolCallbackAuditDecorator`.
 
-**Verification status:** gaps found in `11-VERIFICATION.md` (2026-04-29). Gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md` are ready to execute; they must fix replay audit outcome persistence (`IDEMPOTENT_REPLAY` vs audit column length) and mutation-boundary raw argument leakage before Phase 11 can be marked complete.
+**Verification status:** gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md` executed on 2026-04-29. Phase 11 verification must be re-run against `11-VERIFICATION.md` criteria before completion routing.
 
 ### Phase 12: Configurable Chat Surfaces
 **Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
@@ -177,7 +177,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | 15/16 | In Progress|  |
+| 11. Mutation-Capable Built-In Tools | 16/16 | Complete   | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
