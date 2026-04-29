@@ -59,6 +59,41 @@ public class DiffSerializer {
     }
 
     /**
+     * Build the {@code argumentsJson} payload for {@code add_related_record} /
+     * {@code remove_related_record} audit rows. Carries the full call shape
+     * ({entityName, id, relationship, relatedId, idempotencyKey}) per AUD-07.
+     * Relationship + ids are not sensitive — there's no attribute map to hash.
+     */
+    public String serializeRelatedArgumentsJson(String entityName,
+                                                 String id,
+                                                 String relationship,
+                                                 String relatedId,
+                                                 String idempotencyKey) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("entityName", entityName);
+        payload.put("id", id);
+        payload.put("relationship", relationship);
+        payload.put("relatedId", relatedId);
+        payload.put("idempotencyKey", idempotencyKey);
+        return writeJson(payload);
+    }
+
+    /**
+     * Build the {@code resultSummary} for {@code add_related_record} /
+     * {@code remove_related_record}. Carries the relationship name, the verified action,
+     * and the relatedId. Aligns with CONTEXT.md "argumentsJson payload format" decision.
+     */
+    public String serializeRelatedActionSummary(String relationship,
+                                                 String action,
+                                                 String relatedId) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("relationship", relationship);
+        summary.put("action", action);
+        summary.put("relatedId", relatedId);
+        return writeJson(summary);
+    }
+
+    /**
      * Build the {@code resultSummary} for create_record (no pre-image). Each post-image
      * value is SHA-256-hashed when its simple name is sensitive.
      */

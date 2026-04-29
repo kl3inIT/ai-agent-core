@@ -10,6 +10,7 @@ import com.vn.agent.tools.ToolEntityResolver;
 import com.vn.agent.tools.ToolResultFormatter;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.DataManager;
+import io.jmix.core.FetchPlan;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
 import io.jmix.core.metamodel.model.MetaClass;
@@ -32,10 +33,14 @@ import java.util.UUID;
  * havingValue="true")} — default OFF. When the bean is absent, no mutation callbacks are
  * registered with {@code AgentToolCallbacks.forCurrentUser} (TEST-13 boot assertion).
  *
- * <p><b>Plan 11-07A scope:</b> exposes ONLY {@code create_record} and {@code update_record}.
- * Plan 11-07B will add the related-write metadata resolver and the {@code add_related_record}
- * / {@code remove_related_record} tools. {@code delete_record} is NOT shipped under any flag
- * combination in v1.1 (D-07).
+ * <p><b>Plan 11-07A/B scope:</b> exposes {@code create_record}, {@code update_record},
+ * {@code add_related_record}, and {@code remove_related_record}. {@code delete_record}
+ * is NOT shipped under any flag combination in v1.1 (D-07). Plan 11-07B added the related
+ * writes which delegate ALL relationship-metadata interpretation to
+ * {@link RelatedWriteMetadataResolver}; this class never reads JPA annotations or walks the
+ * inverse pointer directly. Related writes mutate ONLY the verified child-side inverse and
+ * save through {@link MutationSaveExecutor#saveAll}; they never rewrite parent collections
+ * and never call delete (D-07).
  *
  * <p><b>Thin orchestration only.</b> Authorization, attribute binding, request hashing,
  * commit/replay/audit handling, and host saves are delegated to per-concern collaborators:
@@ -82,6 +87,7 @@ public class BuiltInMutationTools {
     private final MutationCommitCoordinator mutationCommitCoordinator;
     private final MutationIntentRepository mutationIntentRepository;
     private final MutationErrorTranslator mutationErrorTranslator;
+    private final RelatedWriteMetadataResolver relatedWriteMetadataResolver;
     private final DiffSerializer diffSerializer;
     private final ToolResultFormatter toolResultFormatter;
     private final DataManager dataManager;
@@ -98,6 +104,7 @@ public class BuiltInMutationTools {
                                 MutationCommitCoordinator mutationCommitCoordinator,
                                 MutationIntentRepository mutationIntentRepository,
                                 MutationErrorTranslator mutationErrorTranslator,
+                                RelatedWriteMetadataResolver relatedWriteMetadataResolver,
                                 DiffSerializer diffSerializer,
                                 ToolResultFormatter toolResultFormatter,
                                 DataManager dataManager,
@@ -113,6 +120,7 @@ public class BuiltInMutationTools {
         this.mutationCommitCoordinator = mutationCommitCoordinator;
         this.mutationIntentRepository = mutationIntentRepository;
         this.mutationErrorTranslator = mutationErrorTranslator;
+        this.relatedWriteMetadataResolver = relatedWriteMetadataResolver;
         this.diffSerializer = diffSerializer;
         this.toolResultFormatter = toolResultFormatter;
         this.dataManager = dataManager;
@@ -407,6 +415,305 @@ public class BuiltInMutationTools {
             mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
             mutationCommitCoordinator.safeWriteAudit("update_record",
                     diffSerializer.serializeEntityArgumentsJson(entityName, id, safeAttributes, idempotencyKey),
+                    null,
+                    System.currentTimeMillis() - startedAt,
+                    outcome, null, t.getClass().getName(), userUsername);
+            return toolResultFormatter.error(translated);
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // add_related_record
+    // ----------------------------------------------------------------------
+
+    @Tool(name = "add_related_record", description = """
+            MANDATORY WORKFLOW:
+            1. Call describe_entity on the parent entity to confirm the relationship name and that it is supported (non-composition parent @OneToMany(mappedBy) with a child-side @ManyToOne or @OneToOne inverse). Composition, many-to-many, unidirectional, orphanRemoval, or required-inverse relationships are NOT supported in v1.1 and return validation_failed.
+            2. Verify both the parent record (id) and the related child record (relatedId) already exist via get_record or find_records. This tool does NOT create the related record; it only links an existing related record.
+            3. Generate a UUID idempotencyKey for this exact link call.
+
+            INPUT CONTRACT:
+            - entityName: exact internal name of the PARENT entity from list_entities, NEVER a label.
+            - id: 36-char UUID of the PARENT entity.
+            - relationship: parent-side relationship attribute name (e.g. "items"); must be the supported parent collection.
+            - relatedId: 36-char UUID of the EXISTING child to link. The child must already be readable by the agent.
+            - idempotencyKey: UUID. Same key + same call shape -> IDEMPOTENT_REPLAY. Same key + changed shape -> idempotency_violation.
+
+            PARAMETER FORMATS:
+            - All ids: hyphenated 36-char UUID strings.
+            - relationship: exact attribute name from describe_entity, NEVER a label.
+
+            ERROR HANDLING:
+            - access_denied: parent update, parent relationship modify, child read, child update, or child inverse modify denied. Do NOT retry; surface to user.
+            - validation_failed: relationship not supported (composition, many-to-many, unidirectional, orphanRemoval, required-inverse, or ambiguous metadata) OR JPA constraint violated. Re-read describe_entity; do not reuse this relationship.
+            - parameter_conversion_error: id or relatedId did not parse as UUID. Fix client side, retry with a fresh idempotencyKey.
+            - not_found: id or relatedId is a valid UUID but no row exists. Surface to user.
+            - idempotency_violation: same idempotencyKey, different call shape. Use a fresh idempotencyKey.
+            - unknown_entity: parent entity is hidden or unknown.
+            - concurrent_modification: an identical operation is in-flight or commit outcome is unknown. Call get_record to verify current link state; do NOT retry automatically.
+
+            STRICTNESS + EXAMPLES:
+            CORRECT: add_related_record("sample_Order", "9b2f...", "items", "ab12...", "uuid-...")  (existing OrderItem linked to existing Order)
+            INCORRECT: add_related_record on a @Composition parent collection  (validation_failed)
+            INCORRECT: add_related_record with a relatedId that does not yet exist  (use create_record first)
+            INCORRECT: change relationship or relatedId while reusing the same idempotencyKey  (idempotency_violation)
+            """)
+    public String addRelatedRecord(
+            @ToolParam(description = "Exact parent entity name from list_entities") String entityName,
+            @ToolParam(description = "Existing parent entity UUID (hyphenated 36-char)") String id,
+            @ToolParam(description = "Parent-side relationship attribute name from describe_entity") String relationship,
+            @ToolParam(description = "Existing child entity UUID to link (hyphenated 36-char)") String relatedId,
+            @ToolParam(description = "UUID for this exact call shape; use a fresh key if values change") String idempotencyKey) {
+
+        return executeRelatedWrite(
+                "add_related_record", entityName, id, relationship, relatedId, idempotencyKey, false);
+    }
+
+    // ----------------------------------------------------------------------
+    // remove_related_record
+    // ----------------------------------------------------------------------
+
+    @Tool(name = "remove_related_record", description = """
+            MANDATORY WORKFLOW:
+            1. Call describe_entity on the parent entity to confirm the relationship is supported (non-composition parent @OneToMany(mappedBy) with a child-side @ManyToOne or @OneToOne inverse). v1.1 unlinks ONLY by clearing the child-side foreign key; it NEVER deletes the child row. orphanRemoval, composition, required-inverse (NOT NULL FK), many-to-many, and unidirectional relationships return validation_failed.
+            2. Verify the child currently belongs to the parent via get_record or find_records. If the child is not currently linked to this parent, this tool returns not_found.
+            3. Generate a UUID idempotencyKey for this exact unlink call.
+
+            INPUT CONTRACT:
+            - entityName: exact internal name of the PARENT entity from list_entities, NEVER a label.
+            - id: 36-char UUID of the PARENT entity.
+            - relationship: parent-side relationship attribute name (e.g. "items"); must be the supported parent collection.
+            - relatedId: 36-char UUID of the child currently linked to the parent.
+            - idempotencyKey: UUID. Same key + same call shape -> IDEMPOTENT_REPLAY. Same key + changed shape -> idempotency_violation.
+
+            PARAMETER FORMATS:
+            - All ids: hyphenated 36-char UUID strings.
+            - relationship: exact attribute name from describe_entity, NEVER a label.
+
+            ERROR HANDLING:
+            - access_denied: parent update, parent relationship modify, child read, child update, or child inverse modify denied. Do NOT retry; surface to user.
+            - validation_failed: relationship not supported (composition, many-to-many, unidirectional, orphanRemoval, required/NOT-NULL inverse, or ambiguous metadata). v1.1 cannot clear a not-null inverse without deleting the child, and v1.1 does not delete children.
+            - parameter_conversion_error: id or relatedId did not parse as UUID. Fix client side, retry with a fresh idempotencyKey.
+            - not_found: id or relatedId is a valid UUID but no row exists, OR the child is not currently linked to this parent. Call get_record to verify the link state.
+            - idempotency_violation: same idempotencyKey, different call shape. Use a fresh idempotencyKey.
+            - unknown_entity: parent entity is hidden or unknown.
+            - concurrent_modification: an identical operation is in-flight or commit outcome is unknown. Call get_record to verify current link state; do NOT retry automatically.
+
+            STRICTNESS + EXAMPLES:
+            CORRECT: remove_related_record("sample_Order", "9b2f...", "items", "ab12...", "uuid-...")  (clears OrderItem.order; child row preserved)
+            INCORRECT: remove_related_record on a @Composition parent collection  (validation_failed)
+            INCORRECT: remove_related_record on a relationship whose child FK is NOT NULL  (validation_failed; v1.1 cannot clear)
+            INCORRECT: change relationship or relatedId while reusing the same idempotencyKey  (idempotency_violation)
+            """)
+    public String removeRelatedRecord(
+            @ToolParam(description = "Exact parent entity name from list_entities") String entityName,
+            @ToolParam(description = "Existing parent entity UUID (hyphenated 36-char)") String id,
+            @ToolParam(description = "Parent-side relationship attribute name from describe_entity") String relationship,
+            @ToolParam(description = "Currently-linked child entity UUID (hyphenated 36-char)") String relatedId,
+            @ToolParam(description = "UUID for this exact call shape; use a fresh key if values change") String idempotencyKey) {
+
+        return executeRelatedWrite(
+                "remove_related_record", entityName, id, relationship, relatedId, idempotencyKey, true);
+    }
+
+    // ----------------------------------------------------------------------
+    // shared related-write orchestration
+    // ----------------------------------------------------------------------
+
+    /**
+     * Shared orchestration body for {@code add_related_record} and {@code remove_related_record}.
+     *
+     * <p>Gate sequence (fail-closed before host save):
+     * <ol>
+     *     <li>{@link AiAgentMutationRole#CODE} marker-role authority (exact equality).</li>
+     *     <li>Parent entity update-side resolution (LLM exposure + visible-but-denied → access_denied).</li>
+     *     <li>Parent id parse (parameter_conversion_error vs not_found).</li>
+     *     <li>Parent CRUD update + parent relationship attribute {@code canModify}.</li>
+     *     <li>{@link RelatedWriteMetadataResolver#resolveSupportedRelatedWriteRelationship} —
+     *         narrow v1.1 support matrix: non-composition parent {@code @OneToMany(mappedBy)} +
+     *         child-side single-valued {@code @ManyToOne}/{@code @OneToOne} inverse only.</li>
+     *     <li>Child LLM read+modify exposure + Jmix child read+update + child inverse attribute
+     *         {@code canModify}.</li>
+     *     <li>Child id parse (parameter_conversion_error vs not_found).</li>
+     *     <li>For remove: {@link RelatedWriteMetadataResolver#ensureInverseClearable} (validation_failed
+     *         when inverse is required / not-null).</li>
+     *     <li>Idempotency reserve/replay; on RESERVED: load parent (children-free fetch plan,
+     *         Pitfall #1) and child, MutationGuard veto point, mutate the child-side inverse only
+     *         (never rewrite parent collection), saveAll via {@link MutationSaveExecutor#saveAll},
+     *         finalize idempotency, audit success.</li>
+     * </ol>
+     *
+     * <p><b>Pitfall #1 — children-free parent fetch plan:</b> the parent is loaded with
+     * {@link FetchPlan#BASE} so its {@code @OneToMany} children are NOT pulled into the persistence
+     * context. Loading children would re-save them with bumped {@code @Version}, which is exactly
+     * what {@code AuditWriter} hit upstream. Mutating only the child-side inverse keeps the change
+     * narrow and avoids that footgun.
+     *
+     * <p><b>P-22:</b> No path here concatenates {@code relationship}, {@code id}, or
+     * {@code relatedId} into result/error prose; audit payloads flow through {@link DiffSerializer}.
+     */
+    private String executeRelatedWrite(String toolName,
+                                       String entityName,
+                                       String id,
+                                       String relationship,
+                                       String relatedId,
+                                       String idempotencyKey,
+                                       boolean isRemove) {
+
+        long startedAt = System.currentTimeMillis();
+        MetaClass parentMetaClass = null;
+        String userUsername = currentAuthentication.getUser().getUsername();
+        MutationIntentRepository.ReservationResult reservation = null;
+        MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
+
+        try {
+            mutationAuthorizationService.enforceMutationRole(AiAgentMutationRole.CODE);
+
+            // Resolve parent entity (Phase 10 R4 unknown-entity opacity preserved + update-side gate).
+            parentMetaClass = toolEntityResolver.resolveUpdatableEntityOrThrow(entityName);
+
+            // Parent id parse — distinguishes parameter_conversion_error vs not_found.
+            UUID parsedParentId = mutationAttributeBinder.requireUuidId(
+                    toolEntityResolver.parseEntityId(id, parentMetaClass));
+
+            // Jmix per-CRUD update on parent + per-attribute modify on the relationship.
+            mutationAuthorizationService.enforceUpdatePermission(parentMetaClass);
+            mutationAuthorizationService.enforceAttributeWriteAccess(
+                    parentMetaClass, java.util.Set.of(relationship));
+
+            // Verified relationship-metadata authority — narrow v1.1 support matrix.
+            RelatedWriteMetadataResolver.SupportedRelatedRelationship supported =
+                    relatedWriteMetadataResolver.resolveSupportedRelatedWriteRelationship(
+                            parentMetaClass, relationship);
+            MetaClass childMetaClass = supported.childMetaClass();
+
+            // Child-side LLM exposure read+modify (related writes mutate the child inverse).
+            mutationAuthorizationService.enforceLlmRelationshipTargetExposure(childMetaClass, true);
+            // Jmix child read+update + child-side inverse attribute canModify.
+            mutationAuthorizationService.enforceReadPermission(childMetaClass);
+            mutationAuthorizationService.enforceUpdatePermission(childMetaClass);
+            mutationAuthorizationService.enforceAttributeWriteAccess(
+                    childMetaClass, java.util.Set.of(supported.childInverseProperty().getName()));
+
+            // Child id parse (parameter_conversion_error vs not_found).
+            UUID parsedRelatedId = mutationAttributeBinder.requireUuidId(
+                    toolEntityResolver.parseEntityId(relatedId, childMetaClass));
+
+            // remove-time required-inverse check (validation_failed before reservation).
+            if (isRemove) {
+                relatedWriteMetadataResolver.ensureInverseClearable(supported);
+            }
+
+            // Canonical raw-call-shape request hash + pre-save reservation/replay.
+            String requestHash = mutationRequestHasher.hash(
+                    toolName, entityName, id, relationship, relatedId, java.util.Map.of());
+            reservation = mutationIntentRepository.reserveOrReplay(
+                    toolName, idempotencyKey, userUsername, RunContext.getConversationId(),
+                    requestHash, mutationProperties.resolvedIdempotencyTtl());
+            if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
+                return mutationCommitCoordinator.handleReservationResult(
+                        reservation, toolName, startedAt, userUsername,
+                        diffSerializer.serializeRelatedArgumentsJson(
+                                entityName, id, relationship, relatedId, idempotencyKey));
+            }
+
+            // Pitfall #1 — load parent with the children-free FetchPlan.BASE; never pull the
+            // @OneToMany collection into the persistence context (would re-save children with
+            // bumped @Version). Related writes mutate ONLY the child-side inverse.
+            final MetaClass parentMetaClassFinal = parentMetaClass;
+            Object parent = dataManager.load(parentMetaClass.getJavaClass())
+                    .id(parsedParentId)
+                    .fetchPlan(FetchPlan.BASE)
+                    .optional()
+                    .orElseThrow(() -> mutationErrorTranslator.notFound(parentMetaClassFinal, id));
+
+            // Load child by id; the child carries the FK so the child is what we save.
+            final MetaClass childMetaClassFinal = childMetaClass;
+            final String relatedIdForError = relatedId;
+            Object child = dataManager.load(childMetaClass.getJavaClass())
+                    .id(parsedRelatedId)
+                    .optional()
+                    .orElseThrow(() -> mutationErrorTranslator.notFound(childMetaClassFinal, relatedIdForError));
+
+            // Host MutationGuard SPI veto point — guards see typed parent/child via attributes.
+            // attributes map carries the loaded entity references (not raw ids) per D-03 contract.
+            java.util.Map<String, Object> guardAttributes = new LinkedHashMap<>();
+            guardAttributes.put(relationship, child);
+            mutationGuard.check(new MutationIntent(
+                    toolName, parentMetaClass, parsedParentId, java.util.Map.copyOf(guardAttributes)));
+
+            // Mutate ONLY the child-side inverse — never rewrite the parent collection.
+            String action;
+            if (isRemove) {
+                // remove: child must currently belong to this parent; otherwise not_found
+                // (treat non-member like missing-row so the LLM re-reads via get_record).
+                if (!relatedWriteMetadataResolver.childBelongsToParent(supported, parent, child)) {
+                    throw mutationErrorTranslator.notFound(childMetaClass, relatedId);
+                }
+                relatedWriteMetadataResolver.clearInverseReference(supported, child);
+                action = "removed";
+            } else {
+                relatedWriteMetadataResolver.wireInverseReference(supported, parent, child);
+                action = "added";
+            }
+
+            // saveAll within MutationSaveExecutor's @Transactional boundary (proxy-crossed).
+            // Saving both parent and child keeps optimistic-lock parity with the parent.
+            mutationSaveExecutor.saveAll(parent, child);
+            commitState = MutationCommitState.HOST_SAVE_RETURNED;
+
+            String argumentsJson = diffSerializer.serializeRelatedArgumentsJson(
+                    entityName, id, relationship, relatedId, idempotencyKey);
+            String resultSummary = diffSerializer.serializeRelatedActionSummary(
+                    relationship, action, relatedId);
+
+            // Finalize idempotency BEFORE externally reporting success; persist parent id +
+            // parent metaClass so replay re-resolves parent instanceName.
+            mutationIntentRepository.markCommitted(reservation.intent(), parsedParentId, parentMetaClass.getName());
+            commitState = MutationCommitState.INTENT_COMMITTED;
+
+            mutationCommitCoordinator.safeWriteAudit(toolName, argumentsJson, resultSummary,
+                    System.currentTimeMillis() - startedAt,
+                    AiToolCallOutcome.SUCCESS, null, null, userUsername);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("outcome", AiToolCallOutcome.SUCCESS.getId());
+            result.put("parentId", parsedParentId);
+            result.put("relationship", relationship);
+            result.put("relatedId", parsedRelatedId);
+            return toolResultFormatter.toJson(result);
+
+        } catch (ToolVetoedException ve) {
+            ToolUserError translated = mutationErrorTranslator.translate(new ToolUserError("access_denied",
+                    "operation blocked by host policy",
+                    List.of("do not retry; surface to user")), toolName, parentMetaClass);
+            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
+            // P-22 / AUD-07: do NOT echo or audit ve.getMessage().
+            mutationCommitCoordinator.safeWriteAudit(toolName,
+                    diffSerializer.serializeRelatedArgumentsJson(
+                            entityName, id, relationship, relatedId, idempotencyKey),
+                    null,
+                    System.currentTimeMillis() - startedAt,
+                    AiToolCallOutcome.BLOCKED, "mutation_guard_vetoed", ve.getClass().getName(), userUsername);
+            return toolResultFormatter.error(translated);
+        } catch (ToolUserError tue) {
+            ToolUserError translated = mutationErrorTranslator.translate(tue, toolName, parentMetaClass);
+            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
+            mutationCommitCoordinator.safeWriteAudit(toolName,
+                    diffSerializer.serializeRelatedArgumentsJson(
+                            entityName, id, relationship, relatedId, idempotencyKey),
+                    null,
+                    System.currentTimeMillis() - startedAt,
+                    AiToolCallOutcome.ERROR, null, tue.getClass().getName(), userUsername);
+            return toolResultFormatter.error(translated);
+        } catch (Throwable t) {
+            ToolUserError translated = mutationCommitCoordinator
+                    .translateThrowableAfterReservation(t, commitState, toolName, parentMetaClass);
+            AiToolCallOutcome outcome = mutationCommitCoordinator.auditOutcome(t, commitState);
+            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
+            mutationCommitCoordinator.safeWriteAudit(toolName,
+                    diffSerializer.serializeRelatedArgumentsJson(
+                            entityName, id, relationship, relatedId, idempotencyKey),
                     null,
                     System.currentTimeMillis() - startedAt,
                     outcome, null, t.getClass().getName(), userUsername);
