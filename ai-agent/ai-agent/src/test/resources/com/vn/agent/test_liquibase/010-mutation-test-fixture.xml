@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Plan 11-07B fixture tables. MAIN store only — host entities live in the main
+        store; AiMutationIntent stays in agentstore. The five fixture entities here are
+        the single source of truth for Plans 11-07B / 11-10 / 11-11.
+    -->
+
+    <changeSet id="1" author="ai-agent-test">
+        <createTable tableName="MUTATION_TEST_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME_" type="varchar(255)"/>
+            <column name="SECRET" type="varchar(255)"/>
+            <column name="PRIORITY" type="int"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent-test">
+        <createTable tableName="MUTATION_PARENT_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME_" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3" author="ai-agent-test">
+        <createTable tableName="MUTATION_CHILD_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="LABEL_" type="varchar(255)"/>
+            <column name="PARENT_ID" type="${uuid.type}"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="MUTATION_CHILD_FIXTURE" baseColumnNames="PARENT_ID"
+                constraintName="FK_MUT_CHILD_PARENT"
+                referencedTableName="MUTATION_PARENT_FIXTURE" referencedColumnNames="ID"/>
+    </changeSet>
+
+    <changeSet id="4" author="ai-agent-test">
+        <createTable tableName="MUTATION_LINKED_PARENT_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME_" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="5" author="ai-agent-test">
+        <createTable tableName="MUTATION_LINKED_CHILD_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="LABEL_" type="varchar(255)"/>
+            <column name="LINKED_PARENT_ID" type="${uuid.type}"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="MUTATION_LINKED_CHILD_FIXTURE" baseColumnNames="LINKED_PARENT_ID"
+                constraintName="FK_MUT_LINKED_CHILD_PARENT"
+                referencedTableName="MUTATION_LINKED_PARENT_FIXTURE" referencedColumnNames="ID"/>
+    </changeSet>
+
+</databaseChangeLog>
