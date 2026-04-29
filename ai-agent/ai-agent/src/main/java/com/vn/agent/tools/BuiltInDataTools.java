@@ -1,8 +1,11 @@
 package com.vn.agent.tools;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
-import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;
 import com.vn.agent.tools.fetchplan.FetchPlanResolver;
 import io.jmix.core.DataManager;
@@ -61,6 +64,7 @@ public class BuiltInDataTools {
     private final FetchPlanResolver fetchPlanResolver;
     private final FetchPlanIntersector fetchPlanIntersector;
     private final ToolEntityResolver toolEntityResolver;
+    private final ObjectMapper objectMapper;
 
     public BuiltInDataTools(DataManager dataManager,
                             MessageTools messageTools,
@@ -70,7 +74,8 @@ public class BuiltInDataTools {
                             ToolResultFormatter toolResultFormatter,
                             FetchPlanResolver fetchPlanResolver,
                             FetchPlanIntersector fetchPlanIntersector,
-                            ToolEntityResolver toolEntityResolver) {
+                            ToolEntityResolver toolEntityResolver,
+                            ObjectMapper objectMapper) {
         this.dataManager = dataManager;
         this.messageTools = messageTools;
         this.fetchPlans = fetchPlans;
@@ -80,6 +85,7 @@ public class BuiltInDataTools {
         this.fetchPlanResolver = fetchPlanResolver;
         this.fetchPlanIntersector = fetchPlanIntersector;
         this.toolEntityResolver = toolEntityResolver;
+        this.objectMapper = objectMapper;
     }
 
     // -------- Tool 1: list_entities (D-01) --------
@@ -182,9 +188,21 @@ public class BuiltInDataTools {
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,
             @ToolParam(required = false,
-                    description = "Structured filter: {and:[...]} | {or:[...]} | {not:{...}} | {property,operation,value}")
-            FilterNode filter,
+                    description = "Structured filter object. A JSON string containing the same object is also accepted.")
+            Object filter,
             @ToolParam(required = false, description = "Max rows (1..100, default 20)") Integer limit) {
+        try {
+            return findRecordsInternal(entityName, normalizeFilter(filter), limit);
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
+        }
+    }
+
+    public String findRecords(String entityName, FilterNode filter, Integer limit) {
+        return findRecordsInternal(entityName, filter, limit);
+    }
+
+    private String findRecordsInternal(String entityName, FilterNode filter, Integer limit) {
         try {
             MetaClass metaClass = toolEntityResolver.resolveReadableEntityOrThrow(entityName);
             int clampedLimit = ToolLimits.clampLimit(limit);
@@ -227,7 +245,21 @@ public class BuiltInDataTools {
     public String countRecords(
             @ToolParam(description = "Exact entity name from agent.entities or list_entities; do not infer or add prefixes")
             String entityName,
-            @ToolParam(required = false, description = "Same structured filter shape as find_records") FilterNode filter) {
+            @ToolParam(required = false,
+                    description = "Same structured filter shape as find_records. JSON string form is also accepted.")
+            Object filter) {
+        try {
+            return countRecordsInternal(entityName, normalizeFilter(filter));
+        } catch (ToolUserError toolUserError) {
+            return toolResultFormatter.error(toolUserError);
+        }
+    }
+
+    public String countRecords(String entityName, FilterNode filter) {
+        return countRecordsInternal(entityName, filter);
+    }
+
+    private String countRecordsInternal(String entityName, FilterNode filter) {
         try {
             MetaClass metaClass = toolEntityResolver.resolveReadableEntityOrThrow(entityName);
             Condition condition = filter == null ? null : structuredFilterConditionMapper.map(filter, metaClass);
@@ -345,6 +377,61 @@ public class BuiltInDataTools {
     }
 
     // -------- helpers --------
+
+    private FilterNode normalizeFilter(Object rawFilter) {
+        if (rawFilter == null) {
+            return null;
+        }
+        if (rawFilter instanceof FilterNode filterNode) {
+            return filterNode;
+        }
+        if (rawFilter instanceof JsonNode jsonNode) {
+            return normalizeJsonFilter(jsonNode);
+        }
+        if (rawFilter instanceof String text) {
+            return normalizeStringFilter(text);
+        }
+        try {
+            return objectMapper.convertValue(rawFilter, FilterNode.class);
+        } catch (IllegalArgumentException e) {
+            throw invalidFilter();
+        }
+    }
+
+    private FilterNode normalizeStringFilter(String text) {
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return normalizeJsonFilter(objectMapper.readTree(text));
+        } catch (JsonProcessingException e) {
+            throw invalidFilter();
+        }
+    }
+
+    private FilterNode normalizeJsonFilter(JsonNode jsonNode) {
+        if (jsonNode == null || jsonNode.isNull()) {
+            return null;
+        }
+        if (jsonNode.isTextual()) {
+            return normalizeStringFilter(jsonNode.asText());
+        }
+        try {
+            return objectMapper.treeToValue(jsonNode, FilterNode.class);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw invalidFilter();
+        }
+    }
+
+    private ToolUserError invalidFilter() {
+        return new ToolUserError("invalid_filter",
+                "filter must be a structured filter object or a JSON string containing that object",
+                List.of(
+                        "use one of these root shapes: {property,operation,value}, {and:[...]}, {or:[...]}, {not:{...}}",
+                        "call describe_entity for exact attribute names and enum ids",
+                        "do not treat an invalid_filter response as no matching records"
+                ));
+    }
 
     /**
      * Build a {@link LoadContext} suitable for {@link DataManager#getCount(LoadContext)}. Jmix

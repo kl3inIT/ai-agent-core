@@ -87,7 +87,7 @@ class UnknownEntityRetryHintTest {
         tools = new BuiltInDataTools(
                 dataManager, messageTools, fetchPlans,
                 schemaAccess, filterMapper, formatter, fetchPlanResolver,
-                fetchPlanIntersector, toolEntityResolver);
+                fetchPlanIntersector, toolEntityResolver, OBJECT_MAPPER);
     }
 
     // ---- Test 1: Unknown entity name → three D-14 hints in locked order ----

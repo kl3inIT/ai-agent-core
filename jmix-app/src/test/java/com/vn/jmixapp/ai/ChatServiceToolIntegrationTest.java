@@ -1,7 +1,10 @@
 package com.vn.jmixapp.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.tools.AgentToolCallbacks;
 import com.vn.agent.tools.BuiltInDataTools;
+import com.vn.agent.filter.LeafNode;
 import com.vn.jmixapp.entity.Customer;
 import com.vn.jmixapp.entity.Order;
 import com.vn.jmixapp.test_support.AuthenticatedAsAdmin;
@@ -60,6 +63,7 @@ class ChatServiceToolIntegrationTest {
     @Autowired BuiltInDataTools builtInDataTools;
     @Autowired DataManager dataManager;
     @Autowired Metadata metadata;
+    @Autowired ObjectMapper objectMapper;
     @Autowired SystemAuthenticator systemAuthenticator;
 
     @Test
@@ -112,6 +116,87 @@ class ChatServiceToolIntegrationTest {
     }
 
     @Test
+    void findRecordsCustomerByVietnameseNameContains() {
+        String customerName = "Phan Hồng Đạt " + System.currentTimeMillis();
+        systemAuthenticator.runWithSystem(() -> {
+            Customer customer = metadata.create(Customer.class);
+            customer.setName(customerName);
+            dataManager.save(customer);
+        });
+
+        String json = builtInDataTools.findRecords(
+                "Customer",
+                new LeafNode("name", "CONTAINS", customerName),
+                null);
+
+        assertThat(json)
+                .as("find_records should find a saved customer by Vietnamese name; raw=%s", json)
+                .contains(customerName)
+                .contains("\"truncated\":false");
+    }
+
+    @Test
+    void findRecordsToolCallbackFindsCustomerByVietnameseNameContains() {
+        String customerName = "Phan Hồng Đạt Callback " + System.currentTimeMillis();
+        systemAuthenticator.runWithSystem(() -> {
+            Customer customer = metadata.create(Customer.class);
+            customer.setName(customerName);
+            dataManager.save(customer);
+        });
+
+        ToolCallback findRecords = Arrays.stream(agentToolCallbacks.forCurrentUser())
+                .filter(callback -> "find_records".equals(callback.getToolDefinition().name()))
+                .findFirst()
+                .orElseThrow();
+        String input = """
+                {
+                  "entityName": "Customer",
+                  "filter": {
+                    "property": "name",
+                    "operation": "CONTAINS",
+                    "value": "%s"
+                  }
+                }
+                """.formatted(customerName);
+
+        String json = unwrapToolCallbackStringResult(findRecords.call(input));
+
+        assertThat(json)
+                .as("find_records callback should bind structured filter object and find Vietnamese names; raw=%s", json)
+                .contains(customerName)
+                .contains("\"truncated\":false");
+    }
+
+    @Test
+    void findRecordsToolCallbackAcceptsStringifiedFilter() {
+        String customerName = "Phan Hồng Đạt String Filter " + System.currentTimeMillis();
+        systemAuthenticator.runWithSystem(() -> {
+            Customer customer = metadata.create(Customer.class);
+            customer.setName(customerName);
+            dataManager.save(customer);
+        });
+
+        ToolCallback findRecords = Arrays.stream(agentToolCallbacks.forCurrentUser())
+                .filter(callback -> "find_records".equals(callback.getToolDefinition().name()))
+                .findFirst()
+                .orElseThrow();
+        String filterJson = """
+                {"property":"name","operation":"CONTAINS","value":"%s"}
+                """.formatted(customerName).trim();
+        String input = objectMapper.createObjectNode()
+                .put("entityName", "Customer")
+                .put("filter", filterJson)
+                .toString();
+
+        String json = unwrapToolCallbackStringResult(findRecords.call(input));
+
+        assertThat(json)
+                .as("find_records callback should accept stringified filter JSON; raw=%s", json)
+                .contains(customerName)
+                .contains("\"truncated\":false");
+    }
+
+    @Test
     void describeEntityAdminPathSurfacesStructuredJson() {
         // Admin context (from AuthenticatedAsAdmin) should permit Order at the entity level
         // and surface its attributes. This is a smoke assertion that describe_entity plumbing
@@ -122,5 +207,13 @@ class ChatServiceToolIntegrationTest {
         String json = builtInDataTools.describeEntity("jmixapp_Order");
         assertThat(json).contains("jmixapp_Order");
         assertThat(json).containsAnyOf("number", "orderDate", "customer", "status");
+    }
+
+    private String unwrapToolCallbackStringResult(String json) {
+        try {
+            return objectMapper.readValue(json, String.class);
+        } catch (JsonProcessingException ignored) {
+            return json;
+        }
     }
 }
