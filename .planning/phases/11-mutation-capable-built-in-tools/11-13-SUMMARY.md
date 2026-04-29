@@ -28,6 +28,7 @@ key-files:
 key-decisions:
   - "Sanitize only streaming/fallback-audit boundary arguments; delegate calls still receive original raw toolInput."
   - "Known mutation tools with invalid/non-object JSON fail closed to a canned placeholder without raw snippets or parse details."
+  - "Configured sensitive fields hash the whole non-null JSON value, including object and array values, before boundary emission."
   - "Unknown mutation tool names fail closed to a separate canned placeholder because the decorator is mutation-only."
 
 patterns-established:
@@ -57,16 +58,16 @@ completed: 2026-04-29
 - Added `MutationArgumentSanitizer` for the four mutation tool input shapes.
 - Wired `MutationToolCallbackBoundaryDecorator` to use sanitized args for `StreamingEvent.ToolCall` and delegate-thrown fallback `AuditWriter.writeToolCall`.
 - Preserved raw `toolInput` for the delegate so Spring AI binding and mutation method semantics are unchanged.
-- Added regression coverage for valid JSON sensitive-field hashing and invalid non-JSON fail-closed placeholder behavior.
+- Added regression coverage for scalar, object, and array sensitive-field hashing plus invalid non-JSON fail-closed placeholder behavior.
 
 ## Task Commits
 
-1. **Task 1: Add boundary mutation argument sanitizer and wire it into callbacks** - `9c6e65f` (fix)
-2. **Task 2: Boundary streaming and fallback audit sanitizer regressions** - `9c6e65f` (fix)
+1. **Task 1: Add boundary mutation argument sanitizer and wire it into callbacks** - `9c6e65f` (fix), `b3dec31` (fix)
+2. **Task 2: Boundary streaming and fallback audit sanitizer regressions** - `9c6e65f` (fix), `b3dec31` (fix)
 
 ## Files Created/Modified
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/MutationArgumentSanitizer.java` - parses known mutation inputs, hashes configured sensitive scalar fields, and returns canned placeholders on unsafe input.
+- `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/MutationArgumentSanitizer.java` - parses known mutation inputs, hashes configured sensitive non-null values including object/array JSON, and returns canned placeholders on unsafe input.
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/audit/MutationToolCallbackBoundaryDecorator.java` - emits/writes sanitized arguments while still delegating raw input.
 - `ai-agent/ai-agent/src/main/java/com/vn/agent/tools/AgentToolCallbacks.java` - injects and passes the sanitizer into mutation boundary wrappers.
 - `ai-agent/ai-agent/src/test/java/com/vn/agent/audit/MutationToolCallbackBoundaryDecoratorSanitizerTest.java` - proves streaming and fallback audit args never contain `raw-secret-value`.
@@ -82,13 +83,14 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
+- The verifier found that the first sanitizer pass hashed scalar sensitive values but recursively copied object/array values under sensitive keys. Fixed by hashing the whole non-null JSON value for sensitive keys and adding object/array regressions.
 - JetBrains suggested `List.getFirst()` in tests, but the project explicitly keeps Java 17-compatible `get(0)` assertions.
 - JetBrains also reported pre-existing/non-blocking style warnings in touched files: defensive null handling, documented future parameters, duplicate helper shape with the generic decorator, and redundant default column lengths.
 
 ## Validation
 
 - `./gradlew -p ai-agent :ai-agent:compileJava` - passed.
-- `./gradlew -p ai-agent :ai-agent:test --tests "com.vn.agent.audit.MutationToolCallbackBoundaryDecoratorSanitizerTest"` - passed.
+- `./gradlew -p ai-agent :ai-agent:test --tests "com.vn.agent.audit.MutationToolCallbackBoundaryDecoratorSanitizerTest"` - passed after scalar/object/array/invalid-input coverage.
 - `./gradlew -p ai-agent :ai-agent:test --tests "com.vn.agent.tools.mutation.AgentToolCallbacksMutationAuditOwnershipTest"` - passed.
 - `./gradlew -p ai-agent :ai-agent:test` - passed.
 - JetBrains `get_file_problems(errorsOnly=false)` on touched Java files - no blocking findings.

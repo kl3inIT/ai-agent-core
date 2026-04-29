@@ -47,7 +47,7 @@ Two warnings from the prior full Phase 11 review remain. They are not part of th
 
 **Status:** resolved by Plan 11-13.
 
-`MutationToolCallbackBoundaryDecorator` now emits and fallback-audits `safeInput` from `MutationArgumentSanitizer`, while still passing original `toolInput` to the delegate. `MutationToolCallbackBoundaryDecoratorSanitizerTest` covers both JSON sensitive-field hashing and invalid-input fail-closed placeholders.
+`MutationToolCallbackBoundaryDecorator` now emits and fallback-audits `safeInput` from `MutationArgumentSanitizer`, while still passing original `toolInput` to the delegate. `MutationToolCallbackBoundaryDecoratorSanitizerTest` covers scalar, object, and array sensitive-field hashing plus invalid-input fail-closed placeholders.
 
 ## Warnings
 
