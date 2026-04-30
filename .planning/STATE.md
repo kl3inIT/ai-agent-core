@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 11 shipped - PR #19; ready to plan Phase 12
-last_updated: "2026-04-30T10:15:31.663Z"
+stopped_at: Phase 12 context gathered (scope simplified to 2 surfaces)
+last_updated: "2026-04-30T11:20:20.362Z"
 progress:
-  total_phases: 6
-  completed_phases: 4
+  total_phases: 7
+  completed_phases: 3
   total_plans: 33
   completed_plans: 33
-  percent: 67
+  percent: 100
 ---
 
 # Project State
@@ -201,8 +201,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T07:21:58.486Z
-**Stopped at:** Phase 11 shipped — PR #19; ready to plan Phase 12
-**Resume file:** None
+**Last session:** 2026-04-30T11:20:20.331Z
+**Stopped at:** Phase 12 context gathered (scope simplified to 2 surfaces)
+**Resume file:** .planning/phases/12-configurable-chat-surfaces/12-CONTEXT.md
 **Blockers:** None.
 **Next action:** Plan Phase 12 configurable chat surfaces.
