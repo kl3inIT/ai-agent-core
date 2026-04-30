@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 11-mutation-capable-built-in-tools
 source:
   - 11-01-SUMMARY.md
@@ -19,17 +19,12 @@ source:
   - 11-12-SUMMARY.md
   - 11-13-SUMMARY.md
 started: 2026-04-30T00:38:15.8939786+07:00
-updated: 2026-04-30T01:28:24.0057546+07:00
+updated: 2026-04-30T16:31:41.7950389+07:00
 ---
 
 ## Current Test
-<!-- OVERWRITE each test - shows where we are -->
 
-number: 8
-name: Audit Trail Visibility
-expected: |
-  The audit list records mutation tool calls with clear success/error outcomes and sanitized arguments/results, so operators can inspect failures without exposing raw sensitive values to the chat user.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -68,18 +63,18 @@ artifacts:
 
 ### 8. Audit Trail Visibility
 expected: The audit list records mutation tool calls with clear success/error outcomes and sanitized arguments/results, so operators can inspect failures without exposing raw sensitive values to the chat user.
-result: [pending]
+result: pass
 
 ### 9. Loading Indicator While Waiting
 expected: While the AI is processing a request, the chat panel shows the bottom loading/progress bar, disables the input, and hides the loading state again when the stream finishes or is stopped.
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 9
-passed: 7
+passed: 9
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
