@@ -101,7 +101,7 @@ class AgentSystemPromptRulesTest {
                 .contains("Do NOT narrate internal steps")
                 .contains("render it as a Markdown link with a human label")
                 .contains("Do NOT show bare paths or raw URLs")
-                .contains("Avoid decorative emoji");
+                .contains("Emoji are allowed");
     }
 
     @Test

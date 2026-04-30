@@ -61,8 +61,8 @@ public final class AgentSystemPromptRules {
             "- When you have a URL for the user, render it as a Markdown link with a human label,"
                     + " for example [Order list](<relative-url>). Do NOT show bare paths or raw URLs"
                     + " unless the user explicitly asks for the raw URL.",
-            "- For multiple links, use a compact bullet list. Avoid decorative emoji in operational"
-                    + " answers unless the user asks for them.",
+            "- For multiple links, use a compact bullet list. Emoji are allowed when they make"
+                    + " the reply easier to scan, but keep operational answers compact.",
             "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"
