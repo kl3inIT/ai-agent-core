@@ -19,7 +19,7 @@ source:
   - 11-12-SUMMARY.md
   - 11-13-SUMMARY.md
 started: 2026-04-30T00:38:15.8939786+07:00
-updated: 2026-04-30T16:31:41.7950389+07:00
+updated: 2026-04-30T16:51:33.9284081+07:00
 ---
 
 ## Current Test
@@ -69,10 +69,26 @@ result: pass
 expected: While the AI is processing a request, the chat panel shows the bottom loading/progress bar, disables the input, and hides the loading state again when the stream finishes or is stopped.
 result: pass
 
+### 10. Update Existing Record
+expected: When asked to change one field on an existing readable row, the AI first loads or finds that row, calls update_record with a fresh UUID v4 idempotencyKey and only the changed attributes, persists the update without creating a duplicate row, then returns a normal user-facing response with the row detail link.
+result: pass
+
+### 11. Add Related Record
+expected: When asked to link an existing child row to an existing parent through a supported non-composition relationship, the AI verifies both records, calls add_related_record with exact entity and relationship names plus a fresh UUID v4 idempotencyKey, and the child becomes linked to the parent. If the relationship is unsupported, the user sees a clean validation message, not a stack trace.
+result: pass
+
+### 12. Remove Related Record
+expected: When asked to unlink a currently related child row through a supported nullable relationship, the AI verifies the current link, calls remove_related_record with a fresh UUID v4 idempotencyKey, clears the relationship without deleting the child row, and reports a clean result. Unsupported composition or not-null relationships return clean validation_failed guidance.
+result: pass
+
+### 13. Delete Tool Not Exposed
+expected: Asking the AI to delete a record does not call any delete_record tool because v1.1 does not expose one; the row remains in the database and the assistant explains that deletion is not available through the mutation tool surface.
+result: pass
+
 ## Summary
 
-total: 9
-passed: 9
+total: 13
+passed: 13
 issues: 0
 pending: 0
 skipped: 0
