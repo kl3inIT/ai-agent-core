@@ -227,3 +227,14 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 - Exposure policy (Phase 10) is `EXCLUDE`-only at the rule-shape level; UI labels read "Hide from AI" / "Visible to AI"; composition is `userVisible AND NOT excluded`. `attributePath` field omitted in v1.1 per user decision 2026-04-27 (entity-level denylist only).
 - LLM never receives `ViewNavigators` or any UI-mutation primitive (Phase 14): controller renders the confirm card; controller navigates after `AccessManager.isPermitted(ViewContext)`.
 - Audit reuses `AuditWriter.writeToolCall` end-to-end; no new `AuditKind`. New `eventName` strings and two new `outcome` values are the only audit surface changes.
+
+## Backlog
+
+### Phase 999.1: Phase 11 Mutation Hardening Follow-ups (BACKLOG)
+
+**Goal:** Capture post-ship hardening for the mutation tool internals: refactor duplicated mutation gate sequencing, batch-load to-one FK references during mutation binding, and cache related-write metadata resolution where safe.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `$gsd-review-backlog` when ready)
