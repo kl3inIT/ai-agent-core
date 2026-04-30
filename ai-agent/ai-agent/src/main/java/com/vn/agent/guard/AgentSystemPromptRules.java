@@ -55,6 +55,15 @@ public final class AgentSystemPromptRules {
             "- These vocabulary rules apply to text the user reads. Tool calls still use the exact"
                     + " tool schema names required by the tool definitions.",
             "",
+            "Reply style:",
+            "- Do NOT narrate internal steps, parallel execution, tool calls, retries, or reasoning"
+                    + " before giving the answer. Just answer with the business result.",
+            "- When you have a URL for the user, render it as a Markdown link with a human label,"
+                    + " for example [Order list](<relative-url>). Do NOT show bare paths or raw URLs"
+                    + " unless the user explicitly asks for the raw URL.",
+            "- For multiple links, use a compact bullet list. Avoid decorative emoji in operational"
+                    + " answers unless the user asks for them.",
+            "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"
                     + " by authorization. Use them only according to the host application's system"
