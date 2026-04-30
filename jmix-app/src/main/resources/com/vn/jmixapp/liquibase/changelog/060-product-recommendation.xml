@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="jmix-app">
+        <addColumn tableName="PRODUCT">
+            <column name="RECOMMENDED_FOR_CUSTOMER_ID" type="${uuid.type}"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="2" author="jmix-app">
+        <addForeignKeyConstraint baseTableName="PRODUCT"
+                                 baseColumnNames="RECOMMENDED_FOR_CUSTOMER_ID"
+                                 constraintName="FK_PRODUCT__ON_RECOMMENDED_FOR_CUSTOMER"
+                                 referencedTableName="CUSTOMER"
+                                 referencedColumnNames="ID"/>
+        <createIndex indexName="IDX_PRODUCT__ON_RECOMMENDED_FOR_CUSTOMER" tableName="PRODUCT">
+            <column name="RECOMMENDED_FOR_CUSTOMER_ID"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
