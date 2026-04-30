@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vn.agent.guard.AgentSystemPromptRulesComposer;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
 import com.vn.agent.guard.IterationCounter;
@@ -125,6 +126,7 @@ public class DefaultChatServiceImpl implements ChatService {
     private final Scheduler chatStreamingScheduler;
     private final CancellationRegistry cancellationRegistry;
     private final StreamingSinkHolder streamingSinkHolder;
+    private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -140,7 +142,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                   jakarta.validation.Validator validator,
                                   @Qualifier("chatStreamingScheduler") Scheduler chatStreamingScheduler,
                                   CancellationRegistry cancellationRegistry,
-                                  StreamingSinkHolder streamingSinkHolder) {
+                                  StreamingSinkHolder streamingSinkHolder,
+                                  AgentSystemPromptRulesComposer agentSystemPromptRulesComposer) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -156,6 +159,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.chatStreamingScheduler = chatStreamingScheduler;
         this.cancellationRegistry = cancellationRegistry;
         this.streamingSinkHolder = streamingSinkHolder;
+        this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
     }
 
     @Override
@@ -206,8 +210,15 @@ public class DefaultChatServiceImpl implements ChatService {
             // host's profile prompt so they apply on every turn — even when the host has not
             // configured a profile prompt and even when the LLM has not yet seen any tool error
             // in the current conversation.
+            // Phase 11 MUT-10: when ai-agent.tools.mutation.enabled=true the composer additionally
+            // appends MUTATION_PROMPT_RULES (idempotency / access-denied / concurrent-modification
+            // / verify-link guidance). Resolved per-turn so a host config flip lights up on the
+            // very next chat turn without a restart.
             String baselineText = baselineContextProvider.renderAsText(convId);
-            String composedSystemPrompt = SystemPromptComposer.compose(baselineText, profileSystemPrompt);
+            String composedSystemPrompt = SystemPromptComposer.compose(
+                    baselineText,
+                    profileSystemPrompt,
+                    agentSystemPromptRulesComposer.effectiveRules());
 
             // Phase 5 role-scoped retrieval (RAG-04/RAG-05). Null filter = admin-bypass; skip
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
@@ -325,7 +336,12 @@ public class DefaultChatServiceImpl implements ChatService {
                     // Phase 9 PROMPT-03 + D-15: same composition seam as the blocking ask(...)
                     // path; rules apply on every streaming turn so the vocabulary + retry
                     // contract is enforced regardless of transport mode.
-                    String composedSystemPrompt = SystemPromptComposer.compose(baselineText, profileSystemPrompt);
+                    // Phase 11 MUT-10: streaming path also consumes the conditional composer so
+                    // mutation rules are appended on every streaming turn when the property is on.
+                    String composedSystemPrompt = SystemPromptComposer.compose(
+                            baselineText,
+                            profileSystemPrompt,
+                            agentSystemPromptRulesComposer.effectiveRules());
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 

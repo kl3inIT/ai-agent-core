@@ -23,7 +23,7 @@
 
 - [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
-- [ ] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`.
+- [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
 - [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
 - [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
@@ -78,10 +78,48 @@
 **Success Criteria** (what must be TRUE):
   1. With default configuration, the boot test (TEST-13) asserts zero mutation tool callbacks present in `AgentToolCallbacks.forCurrentUser`; setting `ai-agent.tools.mutation.enabled=true` (a `@ConditionalOnProperty` flag) makes `create_record`, `update_record`, `add_related_record`, `remove_related_record` available — `delete_record` is reserved for v1.2 and remains absent even when mutations are enabled.
   2. A user with READ but not MODIFY on attribute `X` triggering `update_record(attribute=X)` is blocked at the per-attribute `EntityAttributeContext.canModify` step (TEST-10); the tool returns a stable structured error code (`access_denied`); `DataManager.save` is never called; the LLM never sees raw constraint or JPA exception text or user-supplied PII.
-  3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); when `DataManager.save` throws post-flush, the audit row is still committed with `outcome=COMMIT_FAILED` thanks to the existing REQUIRES_NEW boundary (TEST-12).
-  4. The layered fail-closed gating chain runs in order on every mutation call: `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
+  3. Calling a mutation tool twice with the same `idempotencyKey` (mandatory `@ToolParam`) returns the original result with `outcome=IDEMPOTENT_REPLAY` (TEST-11); only one row is created/updated in the database; both calls are audited via `AuditWriter.writeToolCall` (no new `AuditKind`); known `DataManager.save` rollback failures still write a durable `ERROR` audit row, while post-host-save idempotency finalization failures write `outcome=COMMIT_FAILED` and leave the intent non-reclaimable (TEST-12).
+  4. The layered fail-closed gating chain runs in order on every mutation call: `AiAgentMutationRole` marker → `LlmExposurePolicy.canModify` → `AccessManager` `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify` → pre-host-save idempotency reservation → type coercion + writable-property validation → optional `MutationGuard` SPI → `@Transactional` `DataManager.save` (regular `DataManager`, never `UnconstrainedDataManager`); a host `MutationGuard` veto raises `ToolVetoedException` and aborts before save.
   5. Locale message keys for every denial / success / idempotency / error path are present in all locale bundles; new audit `eventName` strings (`create_record`, `update_record`, `add_related_record`, `remove_related_record`) and new `outcome` values (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`) are observable on `AiAuditEvent` rows; `AiMutationIntent` dedup table honors a 24h TTL by default.
-**Plans**: TBD
+**Plans:** 16/16 plans complete
+
+**Wave 1**
+- [x] 11-01-PLAN.md — Foundation: AiMutationIntent entity/status + Liquibase 070 + AiInternalEntityNames + AiAgentAdminRole + AiAgentMutationRole + locale captions
+- [x] 11-02-PLAN.md — AiAgentMutationProperties @ConfigurationProperties + AiToolCallOutcome enum extension + @EnableScheduling
+- [x] 11-03-PLAN.md — MutationGuard SPI + MutationIntent record + default no-op bean
+
+**Wave 2 (blocked on Wave 1 completion)**
+- [x] 11-04-PLAN.md — ToolEntityResolver shared @Component + operation-specific LlmExposurePolicy canCreate/canUpdate gates + BuiltInDataTools delegation
+- [x] 11-05-PLAN.md — MutationIntentRepository reservation/replay with requestHash/status + MutationIntentCleanupJob @Scheduled hourly
+- [x] 11-06-PLAN.md — MutationErrorTranslator (6 stable error codes, converter-code remapping) + locale captions
+
+**Wave 3 (blocked on Wave 2 completion)**
+- [x] 11-07-PLAN.md — Reference contract for split BuiltInMutationTools implementation (do not execute as a monolith)
+- [x] 11-07A-PLAN.md — BuiltInMutationTools create/update core + DiffSerializer + MutationRequestHasher + MutationSaveExecutor
+- [x] 11-07B-PLAN.md — Related-write metadata helpers + add_related_record/remove_related_record
+- [x] 11-07C-PLAN.md — Commit-state, replay, non-throwing audit, and locale hardening
+- [x] 11-08-PLAN.md — BuiltInLinkTools always-on: 2 @Tool methods over ViewRegistry + ServerProperties
+
+**Wave 4 (blocked on Wave 3 completion)**
+- [x] 11-09-PLAN.md — AgentToolCallbacks wiring without duplicate mutation audit + conditional AgentSystemPromptRulesComposer + ToolNamePatternProvider built-in scanner coverage
+
+**Wave 5 (blocked on Wave 4 completion)**
+- [x] 11-10-PLAN.md — Core tests: fixture Liquibase, TEST-10 access gating, TEST-11 idempotency replay/violation/reservation, TEST-13 callback shape, mutation audit ownership
+
+**Wave 6 (blocked on Wave 5 completion)**
+- [x] 11-11-PLAN.md — Supporting tests: TEST-12 commit-failed audit, related-write security, link opacity, translator coverage, prompt rules, tool-name scanner coverage
+
+**Wave 12 (gap closure; blocked on Wave 6 completion)**
+- [x] 11-12-PLAN.md — Gap closure: widen `AiAuditEvent.OUTCOME` Java/Liquibase metadata and persist `IDEMPOTENT_REPLAY` audit regression
+- [x] 11-13-PLAN.md — Gap closure: sanitize mutation boundary streaming/fallback audit arguments with sensitive-field hashing
+
+**Cross-cutting constraints:**
+- Mutation tools remain default-off and `delete_record` remains absent under every property combination.
+- Host mutations use regular `DataManager` through `MutationSaveExecutor`; system-internal idempotency rows use `UnconstrainedDataManager`.
+- Idempotency uses pre-save reservation with `REQUEST_HASH`/`STATUS_`; `AiMutationIntent` does not store full result JSON.
+- Mutation callbacks are self-audited exactly once and are not wrapped by `ToolCallbackAuditDecorator`.
+
+**Verification status:** passed in `11-VERIFICATION.md` on 2026-04-29 after gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md`.
 
 ### Phase 12: Configurable Chat Surfaces
 **Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
@@ -139,7 +177,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 |-------|----------------|--------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | 0/0 | Not started | - |
+| 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 0/0 | Not started | - |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
@@ -189,3 +227,14 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 - Exposure policy (Phase 10) is `EXCLUDE`-only at the rule-shape level; UI labels read "Hide from AI" / "Visible to AI"; composition is `userVisible AND NOT excluded`. `attributePath` field omitted in v1.1 per user decision 2026-04-27 (entity-level denylist only).
 - LLM never receives `ViewNavigators` or any UI-mutation primitive (Phase 14): controller renders the confirm card; controller navigates after `AccessManager.isPermitted(ViewContext)`.
 - Audit reuses `AuditWriter.writeToolCall` end-to-end; no new `AuditKind`. New `eventName` strings and two new `outcome` values are the only audit surface changes.
+
+## Backlog
+
+### Phase 999.1: Phase 11 Mutation Hardening Follow-ups (BACKLOG)
+
+**Goal:** Capture post-ship hardening for the mutation tool internals: refactor duplicated mutation gate sequencing, batch-load to-one FK references during mutation binding, and cache related-write metadata resolution where safe.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with `$gsd-review-backlog` when ready)

@@ -8,6 +8,7 @@ import io.jmix.core.Messages;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.entity.EntityValues;
 import io.jmix.core.metamodel.annotation.Comment;
+import io.jmix.core.metamodel.datatype.EnumClass;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
@@ -178,7 +179,10 @@ public class ToolResultFormatter {
             enumValues = new ArrayList<>();
             for (Object enumValue : range.asEnumeration().getValues()) {
                 Enum<?> typedEnum = (Enum<?>) enumValue;
-                enumValues.add(new EnumValueDescription(typedEnum.name(), messages.getMessage(typedEnum)));
+                enumValues.add(new EnumValueDescription(
+                        typedEnum.name(),
+                        enumId(typedEnum),
+                        messages.getMessage(typedEnum)));
             }
         }
 
@@ -217,6 +221,13 @@ public class ToolResultFormatter {
                 relationshipTarget,
                 maxLength
         );
+    }
+
+    private static Object enumId(Enum<?> enumValue) {
+        if (enumValue instanceof EnumClass<?> enumClassValue) {
+            return enumClassValue.getId();
+        }
+        return enumValue.name();
     }
 
     /**

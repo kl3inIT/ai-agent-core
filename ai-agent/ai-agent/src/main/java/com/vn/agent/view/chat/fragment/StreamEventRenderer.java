@@ -74,15 +74,10 @@ public final class StreamEventRenderer {
         return switch (event) {
             case StreamingEvent.Content c ->
                     c.markdownChunk() == null ? "" : c.markdownChunk();
-            case StreamingEvent.ToolCall tc ->
-                    "\n\n**%s**: %s".formatted(tc.toolName(), shortArgs(tc.argsJson()));
-            case StreamingEvent.ToolResult tr -> {
-                String outcomeLabel = labels.getOrDefault(
-                        "chatView.stream.outcome." + tr.outcome().name(),
-                        tr.outcome().name());
-                String summary = tr.summary() == null ? "" : tr.summary();
-                yield "  \n_%s — %s_\n\n---\n".formatted(outcomeLabel, summary);
-            }
+            case StreamingEvent.ToolCall ignoredToolCall ->
+                    "";
+            case StreamingEvent.ToolResult ignoredToolResult ->
+                    "";
             case StreamingEvent.Citation c -> {
                 String prefix = citationState.consumeFirst()
                         ? "\n\n---\n**%s**".formatted(
@@ -100,22 +95,10 @@ public final class StreamEventRenderer {
                 String errorText = labels.getOrDefault(err.messageKey(), err.messageKey());
                 yield "\n\n---\n**%s:** %s".formatted(errorLabel, errorText);
             }
-            case StreamingEvent.Final f ->
+            case StreamingEvent.Final ignoredFinal ->
                     // v1 — skip closing summary per RESEARCH Open Question 2.
                     "";
         };
     }
 
-    /**
-     * Collapse whitespace in an arguments JSON payload and truncate to
-     * 80 characters (77 + "...") so tool-call headers stay compact in the
-     * streaming bubble.
-     */
-    static String shortArgs(String argsJson) {
-        if (argsJson == null) {
-            return "";
-        }
-        String collapsed = argsJson.replaceAll("\\s+", " ").trim();
-        return collapsed.length() <= 80 ? collapsed : collapsed.substring(0, 77) + "...";
-    }
 }

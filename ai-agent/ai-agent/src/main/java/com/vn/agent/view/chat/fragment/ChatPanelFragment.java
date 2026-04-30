@@ -10,6 +10,7 @@ import com.vaadin.flow.component.messages.MessageList;
 import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
@@ -65,6 +66,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private MessageList messageList;
     private MessageInput messageInput;
+    private ProgressBar streamProgressBar;
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
 
@@ -85,7 +87,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageInput = new MessageInput();
         messageInput.setWidthFull();
         messageInput.addSubmitListener(this::onSubmit);
-        messageInputSlot.add(messageInput);
+
+        streamProgressBar = new ProgressBar();
+        streamProgressBar.setWidthFull();
+        streamProgressBar.setIndeterminate(true);
+        streamProgressBar.setVisible(false);
+        streamProgressBar.addClassName("ai-agent-chat-panel__stream-progress");
+        messageInputSlot.add(streamProgressBar, messageInput);
 
         resolveLabels();
         messageList.setItems(items);
@@ -180,6 +188,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         // D-04 — route through the registry when runId is known so CANCELLED is audited.
         if (activeRunId != null) {
             cancellationRegistry.cancel(activeRunId);
+            finishStreamInternal();
             return;
         }
         Disposable streamDisposable = activeStream;
@@ -207,8 +216,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         // Last setItems of the turn — mid-stream mutations use appendText only (Pitfall #5).
         messageList.setItems(new ArrayList<>(items));
 
-        messageInput.setEnabled(false);
-        stopButton.setVisible(true);
+        setStreamingUiState(true);
 
         final String userId = currentAuthentication.getUser().getUsername();
         final UUID targetConversationId = ensureConversationIdForSubmit(userId, text);
@@ -244,12 +252,23 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void finishStreamInternal() {
-        messageInput.setEnabled(true);
-        stopButton.setVisible(false);
+        setStreamingUiState(false);
         if (activeRunId != null) cancellationRegistry.clearDisposable(activeRunId);
         activeRunId = null;
         activeStream = null;
         botMsg = null;
+    }
+
+    void setStreamingUiState(boolean streaming) {
+        if (streamProgressBar != null) {
+            streamProgressBar.setVisible(streaming);
+        }
+        if (messageInput != null) {
+            messageInput.setEnabled(!streaming);
+        }
+        if (stopButton != null) {
+            stopButton.setVisible(streaming);
+        }
     }
 
     // ---- Helpers -----------------------------------------------------------

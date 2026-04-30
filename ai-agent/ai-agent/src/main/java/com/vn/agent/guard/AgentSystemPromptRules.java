@@ -55,6 +55,15 @@ public final class AgentSystemPromptRules {
             "- These vocabulary rules apply to text the user reads. Tool calls still use the exact"
                     + " tool schema names required by the tool definitions.",
             "",
+            "Reply style:",
+            "- Do NOT narrate internal steps, parallel execution, tool calls, retries, or reasoning"
+                    + " before giving the answer. Just answer with the business result.",
+            "- When you have a URL for the user, render it as a Markdown link with a human label,"
+                    + " for example [Order list](<relative-url>). Do NOT show bare paths or raw URLs"
+                    + " unless the user explicitly asks for the raw URL.",
+            "- For multiple links, use a compact bullet list. Emoji are allowed when they make"
+                    + " the reply easier to scan, but keep operational answers compact.",
+            "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"
                     + " by authorization. Use them only according to the host application's system"
@@ -67,6 +76,43 @@ public final class AgentSystemPromptRules {
             "- When a tool returns an 'unknown_entity' error, " + UnknownEntityHints.CALL_ONCE + ".",
             "- " + UnknownEntityHints.RETRY_ON_MATCH + ".",
             "- " + UnknownEntityHints.GIVE_UP_ON_NO_MATCH + ".",
+            ""
+    );
+
+    /**
+     * Phase 11 MUT-10 mutation-tool rules. Appended to the system prompt ONLY when
+     * {@code ai-agent.tools.mutation.enabled=true}; the conditional gate lives in the sibling
+     * top-level {@code @Component AgentSystemPromptRulesComposer} (NOT a nested static class —
+     * the codebase has no precedent for nested {@code @Component}s and sibling top-level matches
+     * existing structure).
+     *
+     * <p>Hardcoded English: model-directed instructions, NOT user-facing UI. Same rationale as
+     * {@link #PROMPT_RULES} (RESEARCH Pitfall 7 — tool-protocol English strings live in Java
+     * constants, NOT {@code messages.properties}).
+     *
+     * <p><b>MUST NOT</b> reference {@code prepare_form_draft} — that is a Phase 14 forward-reference
+     * tool that does not exist in v1.1. Leaking the name into the live system prompt would teach
+     * the LLM to call a non-existent tool and trigger {@code unknown_tool} errors.
+     */
+    public static final String MUTATION_PROMPT_RULES = String.join("\n",
+            "",
+            "Mutation tool rules (active when mutation tools are enabled):",
+            "- When you call a mutation tool, generate a fresh random UUID v4 idempotencyKey per logical operation.",
+            "- UUID v4 means the first character of the third group is '4' and the first character"
+                    + " of the fourth group is one of '8', '9', 'a', or 'b'. Do not fabricate patterned UUID-looking strings.",
+            "- Never copy UUID-looking values from examples, previous tool calls, or prior messages for a new operation.",
+            "- Reuse an idempotencyKey ONLY for an exact retry with identical arguments.",
+            "- If you change any values after validation_failed or parameter_conversion_error,"
+                    + " use a fresh idempotencyKey.",
+            "- On 'access_denied' do NOT retry — surface to the user.",
+            "- On 'parameter_conversion_error' re-read describe_entity attributeType and retry"
+                    + " with corrected types.",
+            "- On 'concurrent_modification' call get_record or find_records to verify state."
+                    + " If the tool result says the commit outcome is unknown, do not retry automatically;"
+                    + " ask the user before any further mutation.",
+            "- After successful create_record or update_record, immediately call generate_entity_detail_link"
+                    + " with the same entityName and returned entityId before replying to the user."
+                    + " If link generation returns unknown_entity, say the record was saved but no detail link is available.",
             ""
     );
 

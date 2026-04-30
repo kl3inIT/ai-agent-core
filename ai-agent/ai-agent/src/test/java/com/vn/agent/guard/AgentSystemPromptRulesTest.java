@@ -95,6 +95,16 @@ class AgentSystemPromptRulesTest {
     }
 
     @Test
+    void promptRules_instructPolishedLinkReplies() {
+        assertThat(AgentSystemPromptRules.PROMPT_RULES)
+                .as("User-facing link replies should be business-readable, not raw tool narration")
+                .contains("Do NOT narrate internal steps")
+                .contains("render it as a Markdown link with a human label")
+                .contains("Do NOT show bare paths or raw URLs")
+                .contains("Emoji are allowed");
+    }
+
+    @Test
     void promptRules_doNotPrimeHardCodedHostPrefixExample() {
         assertThat(AgentSystemPromptRules.PROMPT_RULES)
                 .as("Concrete host-prefix examples bias the model toward invented internal names")

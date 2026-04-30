@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.List;
 import java.util.UUID;
 
 @JmixEntity
@@ -37,6 +38,9 @@ public class Customer {
     @Column(name = "PHONE", length = 32)
     private String phone;
 
+    @OneToMany(mappedBy = "recommendedForCustomer")
+    private List<Product> recommendedProducts;
+
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
     public Integer getVersion() { return version; }
@@ -47,4 +51,6 @@ public class Customer {
     public void setEmail(String email) { this.email = email; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public List<Product> getRecommendedProducts() { return recommendedProducts; }
+    public void setRecommendedProducts(List<Product> recommendedProducts) { this.recommendedProducts = recommendedProducts; }
 }

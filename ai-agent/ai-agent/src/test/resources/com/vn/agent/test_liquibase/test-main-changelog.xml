@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+
+    <property name="uuid.type" value="uuid" dbms="postgresql"/>
+    <property name="uuid.type" value="varchar(36)" dbms="hsqldb"/>
+    <property name="uuid.type" value="uniqueidentifier" dbms="mssql"/>
+
+    <!--
+        Test-only main-store changelog. Plans 11-07B / 11-10 / 11-11 fixtures live in the
+        main store; the production code ships no main-store entities yet. Numeric-prefix
+        includes mirror the agentstore-changelog convention. Future test fixtures add a new
+        010+ file and a matching <include> below; the aggregator is intentionally NOT
+        <includeAll> because it would loop on itself.
+    -->
+    <include file="/com/vn/agent/test_liquibase/010-mutation-test-fixture.xml"/>
+
+</databaseChangeLog>

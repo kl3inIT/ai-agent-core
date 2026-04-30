@@ -10,5 +10,6 @@ import io.jmix.flowui.view.*;
 @ViewDescriptor(path = "order-line-detail-view.xml")
 @EditedEntityContainer("orderLineDc")
 @DialogMode(width = "32em")
+@PrimaryDetailView(OrderLine.class)
 public class OrderLineDetailView extends StandardDetailView<OrderLine> {
 }

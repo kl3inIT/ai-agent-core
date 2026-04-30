@@ -61,6 +61,7 @@ class UnknownEntityRetryHintTest {
     private ToolResultFormatter formatter;
     private FetchPlanResolver fetchPlanResolver;
     private FetchPlanIntersector fetchPlanIntersector;
+    private ToolEntityResolver toolEntityResolver;
     private BuiltInDataTools tools;
 
     @BeforeEach
@@ -77,10 +78,16 @@ class UnknownEntityRetryHintTest {
                 OBJECT_MAPPER, mock(EntityStates.class), metadataTools, messageTools, mock(Messages.class));
         fetchPlanResolver = mock(FetchPlanResolver.class);
         fetchPlanIntersector = mock(FetchPlanIntersector.class);
+        // Plan 11-04: BuiltInDataTools delegates entity resolution + id parsing to a shared
+        // ToolEntityResolver. Construct a real instance wired to the same mocks the test
+        // already drives so the existing behavioral assertions (R4 unknown_entity opacity,
+        // FetchPlanResolver wiring) continue to hold.
+        toolEntityResolver = new ToolEntityResolver(
+                metadata, metadataTools, schemaAccess, literalConverter);
         tools = new BuiltInDataTools(
-                dataManager, metadata, metadataTools, messageTools, fetchPlans,
-                schemaAccess, filterMapper, literalConverter, formatter, fetchPlanResolver,
-                fetchPlanIntersector);
+                dataManager, messageTools, fetchPlans,
+                schemaAccess, filterMapper, formatter, fetchPlanResolver,
+                fetchPlanIntersector, toolEntityResolver, OBJECT_MAPPER);
     }
 
     // ---- Test 1: Unknown entity name → three D-14 hints in locked order ----

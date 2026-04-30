@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_10_shipped
-stopped_at: Phase 10 shipped - PR #18
-last_updated: "2026-04-28T09:47:37.495Z"
+status: ready_to_plan
+stopped_at: Phase 11 shipped - PR #19; ready to plan Phase 12
+last_updated: "2026-04-30T10:15:31.663Z"
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  completed_phases: 4
+  total_plans: 33
+  completed_plans: 33
+  percent: 67
 ---
 
 # Project State
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-04-30
 
 ## Project Reference
 
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 10 — ai-specific-llm-exposure-policy
+**Current focus:** Phase 12 — configurable-chat-surfaces
 
 ## Current Position
 
-Phase: 10 (ai-specific-llm-exposure-policy) — SHIPPED
-Plan: 10 of 10
+Phase: 12
+Plan: Not started
 | Field | Value |
 |-------|-------|
-| Phase | Phase 10 |
-| Plan | 10 of 10 complete |
-| Status | Phase 10 shipped - PR #18 |
-| Last activity | 2026-04-28 — Shipped Phase 10 PR #18 and prepared v1.0.1 Maven release |
+| Phase | Phase 12 |
+| Plan | Not started |
+| Status | Ready to plan |
+| Last activity | 2026-04-30 — Phase 11 shipped — PR #19 |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: 10 of 10
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Not started | 0/0 | - | - |
+| 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -132,6 +132,30 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Plan 10-09: VectorStoreDebugView shipped — plain Vaadin Grid<Document> (Fix R7) over VectorStore.similaritySearch (empty query, topK=100, threshold=0.0); FilterExpressionTextParser with inline setErrorMessage on parse error; metadataFilterField is TypedTextField<String> (Fix W2); 3 programmatic addColumn calls; expand uses standard Vaadin Dialog (Document is Spring AI POJO, no Jmix metaclass); read-only — no edit/delete per CONTEXT D-09
 - [Phase ?]: Plan 10-08: KB upload sourceEntityName persisted BEFORE dataManager.save (D-07 invariant); KnowledgeDocumentService.updatePermissionsAndReingest returns UpdatePermissionsResult enum so view has zero business logic (CLAUDE.md compliant); 3-arg upload overload preserved for backward compatibility with IngesterManager + tests
 - [Phase ?]: Plan 10-10: TEST-09 four-path uniform-opacity gate landed (RetrievalFilterBuilderDenylistTest unit + LlmExposurePolicyIntegrationTest integration). Two-tier RAG filter coverage. Phase 10 complete (10/10 plans).
+- [Phase ?]: Plan 11-01: AiMutationIntent agentstore entity ships with composite unique index on (TOOL_NAME, IDEMPOTENCY_KEY, USER_USERNAME) + REQUEST_HASH + STATUS_ enum (PENDING/COMMITTED/FAILED/COMMIT_UNKNOWN). PENDING reserved before host save so DB unique index serializes duplicates. COMMIT_UNKNOWN parks post-save finalization failures. AiAgentMutationRole is empty marker (no AiMutationIntent READ to avoid leaking idempotency keys); AiAgentAdminRole gains @EntityPolicy(AiMutationIntent, ALL); both locale bundles updated. IDX_AI_MUT_INTENT_STATUS added beyond plan baseline for cleanup-job diagnostics.
+- [Phase ?]: Plan 11-02: AiAgentMutationProperties (@ConfigurationProperties ai-agent.tools.mutation) record + AiToolCallOutcome enum extension (IDEMPOTENT_REPLAY/COMMIT_FAILED via EnumClass<String>, no schema migration) + @EnableScheduling on AIConfiguration. Rule 3 auto-fix: AiAuditEventDetailDialog.outcomeTheme switch extended with the 2 new cases. Rule 2 auto-fix: bilingual auditList.outcome.* lowercase keys added alongside metaclass-format keys (AiAuditEventListView+DetailDialog use lowercase convention).
+- [Phase ?]: MutationIntent attributes use Collections.unmodifiableMap(new LinkedHashMap<>(attributes)) NOT Map.copyOf — null attribute values represent optional-field clears
+- [Phase ?]: MutationGuard default no-op bean lives directly in AIConfiguration via @ConditionalOnMissingBean — no separate SpiDefaultsAutoConfiguration class (mirrors aiAgentIngestExecutor precedent)
+- [Phase ?]: ToolVetoedException reused verbatim for MutationGuard veto path — no new exception type
+- [Phase ?]: Plan 11-04: ToolEntityResolver shared @Component centralizes Phase 10 R4 unknown_entity opacity for both READ and WRITE tool paths
+- [Phase ?]: Plan 11-04: LlmExposurePolicy split into operation-specific canCreate/canUpdate; canModify retained as backward-compatible alias delegating to canUpdate
+- [Phase ?]: Repository reservation uses TransactionTemplate (REQUIRES_NEW) so commit-time DataIntegrityViolationException is caught around execute(...) and re-classified
+- [Phase ?]: MutationIntentFailureProbe is a package-public ObjectProvider test seam for TEST-12 COMMIT_UNKNOWN coverage
+- [Phase ?]: Cleanup job logs but never deletes PENDING/COMMIT_UNKNOWN; auto-deletion would allow duplicate host writes after a finalization failure
+- [Phase ?]: MutationErrorTranslator NEVER echoes raw exception text or LLM-supplied attribute names; pre-typed ToolUserError instances are sanitized via canned safe templates per code (P-22 mitigation)
+- [Phase ?]: commitFailed maps to concurrent_modification stable code with 'do not retry automatically' hint; the 6-code D-04 taxonomy is closed (no synthetic 7th code for commit-unknown)
+- [Phase ?]: Both OptimisticLockException flavors (jakarta + Spring's translated) AND both AccessDeniedException flavors (Spring + io.jmix.core.security) are caught explicitly per RESEARCH Pitfall 5
+- [Phase ?]: Plan 11-07B: related-write tools narrowly support non-composition parent OneToMany(mappedBy) + child to-one inverse only
+- [Phase ?]: Plan 11-07C locked mutation-tool invariants via JavaDoc + MutationToolInvariantsTest source-level enforcement
+- [Phase ?]: 11-09: ObjectProvider.getIfAvailable for BuiltInMutationTools per RESEARCH Q5
+- [Phase ?]: 11-09: Mutation callbacks ride MutationToolCallbackBoundaryDecorator (NOT ToolCallbackAuditDecorator) — single audit owner from Plan 11-07C preserved
+- [Phase ?]: 11-09: Sibling top-level @Component AgentSystemPromptRulesComposer (no nested @Component precedent)
+- [Phase 11]: Use a test-only Jmix module to make mutation fixture persistence win the reverse persistence.xml scan. — Keeps Plan 11-07B fixture ownership intact while making Plan 11-10 integration tests executable.
+- [Phase 11]: Use @MockitoBean for mutation guard capture tests instead of nested @TestConfiguration. — Prevents guard test doubles from leaking into unrelated Spring test contexts.
+- [Phase 11]: Preserve scalar null mutation attributes before structured-filter literal conversion. — Null values represent optional-field clears at the mutation prompt boundary.
+- [Phase 11]: Use @MockitoBean for the commit-unknown failure probe so the failure does not leak into unrelated Spring test contexts.
+- [Phase 11]: Keep Java 17-compatible List.get(0) assertions even when JetBrains suggests List.getFirst().
+- [Phase 11]: Align the existing tool-name scanner baseline test with Phase 11's read, link, and mutation built-in names.
 
 ### Performance Metrics
 
@@ -154,6 +178,20 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase Phase 10 PP10-09 | 8 | 2 tasks | 2 files |
 | Phase Phase 10 PP10-08 | 25 | 2 tasks | 7 files |
 | Phase Phase 10 PP10-10 | 5 | 2 tasks | 2 files |
+| Phase Phase 11 PP11-01 | 2min | 2 tasks | 8 files |
+| Phase Phase 11 PP11-02 | 3min | 2 tasks | 6 files |
+| Phase 11-mutation-capable-built-in-tools P03 | 2min | 1 tasks | 3 files |
+| Phase 11 P04 | 11min | 2 tasks | 4 files |
+| Phase 11 P05 | 9min | 2 tasks | 2 files |
+| Phase 11-mutation-capable-built-in-tools P06 | 6min | 2 tasks | 3 files |
+| Phase 11 P07B | 1h | 4 tasks | 13 files |
+| Phase 11-mutation-capable-built-in-tools P07C | 12m | 2 tasks | 2 files |
+| Phase 11 P08 | 25min | 1 tasks | 3 files |
+| Phase 11 P09 | 35min | 2 tasks | 9 files |
+| Phase 11 P10 | 25min | 4 tasks | 19 files |
+| Phase 11-mutation-capable-built-in-tools P11 | 20min | 2 tasks | 10 files |
+| Phase 11 P12 | 8min | 2 tasks | 3 files |
+| Phase 11 P13 | 12min | 2 tasks | 4 files |
 
 ### Quick Tasks Completed
 
@@ -163,8 +201,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-28T02:27:47.910Z
-**Stopped at:** Phase 10 shipped - PR #18
+**Last session:** 2026-04-29T07:21:58.486Z
+**Stopped at:** Phase 11 shipped — PR #19; ready to plan Phase 12
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Review/merge PR #18, confirm v1.0.1 publish workflow, then start Phase 11.
+**Next action:** Plan Phase 12 configurable chat surfaces.

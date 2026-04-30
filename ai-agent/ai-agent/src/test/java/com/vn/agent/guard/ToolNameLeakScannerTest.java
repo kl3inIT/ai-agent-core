@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Phase 9 PROMPT-06 / D-07: validates {@link ToolNamePatternProvider} compiles a regex over the
- * union of (a) six built-in tool names, (b) the {@code RETRIEVAL} advisor name, and (c) every
+ * union of (a) built-in tool names, (b) the {@code RETRIEVAL} advisor name, and (c) every
  * {@code @Tool} method name reachable via {@link ToolContributor} beans, and that the
  * {@link OutputScannerAdvisor} propagates a {@code TOOL_NAME_LEAK} flag when assistant text
  * mentions any of those literal names.
@@ -43,12 +43,18 @@ class ToolNameLeakScannerTest {
         assertThat(pattern.get().regex())
                 .isEqualTo("\\b("
                         + "\\QRETRIEVAL\\E|"
+                        + "\\Qadd_related_record\\E|"
                         + "\\Qcount_records\\E|"
+                        + "\\Qcreate_record\\E|"
                         + "\\Qdescribe_entity\\E|"
                         + "\\Qfind_records\\E|"
+                        + "\\Qgenerate_entity_detail_link\\E|"
+                        + "\\Qgenerate_entity_list_link\\E|"
                         + "\\Qget_record\\E|"
                         + "\\Qget_related_records\\E|"
-                        + "\\Qlist_entities\\E)\\b");
+                        + "\\Qlist_entities\\E|"
+                        + "\\Qremove_related_record\\E|"
+                        + "\\Qupdate_record\\E)\\b");
     }
 
     @Test

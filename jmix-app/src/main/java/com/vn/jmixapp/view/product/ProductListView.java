@@ -10,5 +10,6 @@ import io.jmix.flowui.view.*;
 @ViewDescriptor(path = "product-list-view.xml")
 @LookupComponent("productsDataGrid")
 @DialogMode(width = "64em")
+@PrimaryListView(Product.class)
 public class ProductListView extends StandardListView<Product> {
 }

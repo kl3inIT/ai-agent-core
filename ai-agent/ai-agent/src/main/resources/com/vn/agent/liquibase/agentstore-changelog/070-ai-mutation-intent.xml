@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <createTable tableName="AI_MUTATION_INTENT">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="TOOL_NAME" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="IDEMPOTENCY_KEY" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="USER_USERNAME" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CONVERSATION_ID" type="${uuid.type}"/>
+            <column name="REQUEST_HASH" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="STATUS_" type="varchar(32)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="RESULT_ENTITY_ID" type="${uuid.type}"/>
+            <column name="RESULT_ENTITY_NAME" type="varchar(255)"/>
+            <column name="ERROR_CODE" type="varchar(64)"/>
+            <column name="COMMITTED_AT" type="datetime"/>
+            <column name="CREATED_AT" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="EXPIRES_AT" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <!--
+            Composite unique index — concurrency gate (Phase 11 D-02). Index name
+            MUST match the JPA @Index(name="IDX_AI_MUT_INTENT_DEDUP", unique=true)
+            declaration on AiMutationIntent so JPA schema validation does not try
+            to emit a duplicate constraint with a generated name (mirrors the
+            AiExposureRule BLOCKER-02 fix).
+        -->
+        <createIndex indexName="IDX_AI_MUT_INTENT_DEDUP"
+                     tableName="AI_MUTATION_INTENT"
+                     unique="true">
+            <column name="TOOL_NAME"/>
+            <column name="IDEMPOTENCY_KEY"/>
+            <column name="USER_USERNAME"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_MUT_INTENT_EXPIRES_AT"
+                     tableName="AI_MUTATION_INTENT">
+            <column name="EXPIRES_AT"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_MUT_INTENT_STATUS"
+                     tableName="AI_MUTATION_INTENT">
+            <column name="STATUS_"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

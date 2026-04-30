@@ -2,11 +2,13 @@ package com.vn.agent.filter;
 
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.datatype.Datatype;
+import io.jmix.core.metamodel.datatype.EnumClass;
 import io.jmix.core.metamodel.datatype.Enumeration;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.lang.NonNull;
 
 import java.math.BigDecimal;
 import java.text.ParseException;
@@ -127,6 +129,14 @@ class FilterLiteralValueConverterTest {
         assertThat(filterLiteralValueConverter.convertValue("alice", mp)).isEqualTo("alice");
     }
 
+    @Test
+    void coercesStringRejectsNonString() {
+        MetaProperty mp = datatypeProp(String.class, "name", null);
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(42, mp))
+                .isInstanceOf(ToolUserError.class)
+                .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
+    }
+
     // --------- UUID via datatype ---------
 
     @Test
@@ -200,6 +210,22 @@ class FilterLiteralValueConverterTest {
     }
 
     @Test
+    void coercesIntegerRejectsFractionalNumber() {
+        MetaProperty mp = datatypeProp(Integer.class, "qty", null);
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(7.5, mp))
+                .isInstanceOf(ToolUserError.class)
+                .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
+    }
+
+    @Test
+    void coercesIntegerRejectsOutOfRangeNumber() {
+        MetaProperty mp = datatypeProp(Integer.class, "qty", null);
+        assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(3_000_000_000L, mp))
+                .isInstanceOf(ToolUserError.class)
+                .satisfies(e -> assertThat(((ToolUserError) e).toDto().error()).isEqualTo("invalid_literal"));
+    }
+
+    @Test
     void coercesIntegerBad() {
         MetaProperty mp = datatypePropFailing(Integer.class, "qty");
         assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("xyz", mp))
@@ -263,6 +289,13 @@ class FilterLiteralValueConverterTest {
     }
 
     @Test
+    void coercesLocalDateIsoBeforeLocaleDatatypeParser() {
+        MetaProperty mp = datatypePropFailing(LocalDate.class, "birthday");
+        assertThat(filterLiteralValueConverter.convertValue("2026-01-15", mp))
+                .isEqualTo(LocalDate.of(2026, 1, 15));
+    }
+
+    @Test
     void coercesLocalDateBad() {
         MetaProperty mp = datatypePropFailing(LocalDate.class, "birthday");
         assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("01/15/2026", mp))
@@ -285,6 +318,13 @@ class FilterLiteralValueConverterTest {
     }
 
     @Test
+    void coercesLocalDateTimeIsoBeforeLocaleDatatypeParser() {
+        MetaProperty mp = datatypePropFailing(LocalDateTime.class, "createdAt");
+        assertThat(filterLiteralValueConverter.convertValue("2026-01-15T10:30:00", mp))
+                .isEqualTo(LocalDateTime.of(2026, 1, 15, 10, 30));
+    }
+
+    @Test
     void coercesLocalDateTimeBad() {
         MetaProperty mp = datatypePropFailing(LocalDateTime.class, "createdAt");
         assertThatThrownBy(() -> filterLiteralValueConverter.convertValue("yesterday", mp))
@@ -296,10 +336,57 @@ class FilterLiteralValueConverterTest {
 
     enum SampleStatus { NEW, ACTIVE, CLOSED }
 
+    enum NumberedStatus implements EnumClass<Integer> {
+        DRAFT(10),
+        POSTED(20);
+
+        private final Integer id;
+
+        NumberedStatus(Integer id) {
+            this.id = id;
+        }
+
+        @Override
+        @NonNull
+        public Integer getId() {
+            return id;
+        }
+    }
+
+    enum ConflictingStatus implements EnumClass<String> {
+        ACTIVE("DRAFT"),
+        DRAFT("ACTIVE");
+
+        private final String id;
+
+        ConflictingStatus(String id) {
+            this.id = id;
+        }
+
+        @Override
+        @NonNull
+        public String getId() {
+            return id;
+        }
+    }
+
     @Test
     void coercesEnumGood() {
         MetaProperty mp = enumProp(SampleStatus.class, "status");
         assertThat(filterLiteralValueConverter.convertValue("ACTIVE", mp)).isEqualTo(SampleStatus.ACTIVE);
+    }
+
+    @Test
+    void coercesEnumClassByNumericId() {
+        MetaProperty mp = enumProp(NumberedStatus.class, "status");
+        assertThat(filterLiteralValueConverter.convertValue(20, mp)).isEqualTo(NumberedStatus.POSTED);
+        assertThat(filterLiteralValueConverter.convertValue("10", mp)).isEqualTo(NumberedStatus.DRAFT);
+    }
+
+    @Test
+    void coercesEnumClassPrefersStableIdOverJavaName() {
+        MetaProperty mp = enumProp(ConflictingStatus.class, "status");
+        assertThat(filterLiteralValueConverter.convertValue("ACTIVE", mp)).isEqualTo(ConflictingStatus.DRAFT);
     }
 
     @Test
@@ -315,7 +402,7 @@ class FilterLiteralValueConverterTest {
     }
 
     @Test
-    void coercesEnumRejectsNonString() {
+    void coercesEnumRejectsUnknownNumericId() {
         MetaProperty mp = enumProp(SampleStatus.class, "status");
         assertThatThrownBy(() -> filterLiteralValueConverter.convertValue(1, mp))
                 .isInstanceOf(ToolUserError.class)

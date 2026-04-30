@@ -42,22 +42,22 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Mutation-Capable Built-In Tools
 
-- [ ] **MUT-01**: `BuiltInMutationTools` separate `@Component` (NOT methods on `BuiltInDataTools` — preserves the v1.0 ASM read-only test). Conditional via `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled", havingValue="true")` — **default OFF**.
-- [ ] **MUT-02**: Mutation tool depth for v1.1: `create_record`, `update_record`, `add_related_record`, `remove_related_record`. `delete_record` deferred to v1.2 (destructive ops need separate UX — confirmation, undo).
-- [ ] **MUT-03**: Layered gating per call, fail-closed, in order:
+- [x] **MUT-01**: `BuiltInMutationTools` separate `@Component` (NOT methods on `BuiltInDataTools` — preserves the v1.0 ASM read-only test). Conditional via `@ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled", havingValue="true")` — **default OFF**.
+- [x] **MUT-02**: Mutation tool depth for v1.1: `create_record`, `update_record`, `add_related_record`, `remove_related_record`. `delete_record` deferred to v1.2 (destructive ops need separate UX — confirmation, undo).
+- [x] **MUT-03**: Layered gating per call, fail-closed, in order:
   1. `LlmExposurePolicy.canModify(entity, attribute)` (admin can deny mutation even where user can mutate).
   2. `AccessManager` `CrudEntityContext.isCreatePermitted/isUpdatePermitted` and per-attribute `EntityAttributeContext.canModify` for every attribute the LLM tries to write.
   3. Optional `MutationGuard` SPI veto (throws `ToolVetoedException`).
   4. `@Transactional` (REQUIRED, propagation default) `DataManager.save(...)` — regular `DataManager` (NOT `UnconstrainedDataManager`).
-- [ ] **MUT-04**: Mandatory `@ToolParam idempotencyKey` (UUID string) on every mutation tool. Server-side `AiMutationIntent` dedup table records `(toolName, idempotencyKey, userId, conversationId, resultEntityId, createdAt)`. Replay returns the original result with `outcome=IDEMPOTENT_REPLAY`. TTL 24h default, configurable.
-- [ ] **MUT-05**: `MutationGuard` SPI defined: `interface MutationGuard { void check(MutationIntent intent) throws ToolVetoedException; }`. Default no-op bean. Mirrors `ToolGuard`.
-- [ ] **MUT-06**: `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`): `enabled` (default false), `allowDelete` (default false; reserved for v1.2), `confirmationRequired` (default true; UX hint, not enforcement), `idempotencyTtl` (default 24h).
-- [ ] **MUT-07**: `MutationErrorTranslator` translates JPA / `AccessDeniedException` into stable error codes (`access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`) — never echoes user-supplied PII or constraint message text into the LLM result string (P-22 mitigation).
-- [ ] **MUT-08**: Audit reuses `AuditWriter.writeToolCall` with `eventName` ∈ {`create_record`, `update_record`, `add_related_record`, `remove_related_record`}. `argumentsJson` carries LLM JSON; `resultSummary` carries new entity id (create), or compact diff summary (update). New `outcome` values: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED` (P-4: audit logged success but transaction rolled back). Existing REQUIRES_NEW boundary keeps audit durable across mutation rollback.
-- [ ] **MUT-09**: `ToolEntityResolver` shared `@Component` consumed by both `BuiltInDataTools` and `BuiltInMutationTools` — extracted from existing helpers (`resolveReadableEntityOrThrow`, `parseEntityId`, new `resolveWritableEntityOrThrow`).
-- [ ] **MUT-10**: System prompt updated when mutations enabled: explicit rule that mutations are user-driven (LLM proposes via `prepare_form_draft` for complex cases; direct `create_record` only for simple, confirmed user requests). Mutation tools also emit a "preview" payload the chat UI may render before commit (when `confirmationRequired=true`).
-- [ ] **MUT-11**: Locale message keys for all denial/success/idempotency/error paths in ALL existing locales (per CLAUDE.md).
-- [ ] **MUT-12**: Boot-test asserts zero mutation tool callbacks present in `AgentToolCallbacks.forCurrentUser` under default config (P-2: silent default-on regression gate).
+- [x] **MUT-04**: Mandatory `@ToolParam idempotencyKey` (UUID string) on every mutation tool. Server-side `AiMutationIntent` dedup table records `(toolName, idempotencyKey, userId, conversationId, resultEntityId, createdAt)`. Replay returns the original result with `outcome=IDEMPOTENT_REPLAY`. TTL 24h default, configurable.
+- [x] **MUT-05**: `MutationGuard` SPI defined: `interface MutationGuard { void check(MutationIntent intent) throws ToolVetoedException; }`. Default no-op bean. Mirrors `ToolGuard`.
+- [x] **MUT-06**: `AiAgentMutationProperties` (`@ConfigurationProperties("ai-agent.tools.mutation")`): `enabled` (default false), `allowDelete` (default false; reserved for v1.2), `confirmationRequired` (default true; UX hint, not enforcement), `idempotencyTtl` (default 24h).
+- [x] **MUT-07**: `MutationErrorTranslator` translates JPA / `AccessDeniedException` into stable error codes (`access_denied`, `validation_failed`, `idempotency_violation`, `concurrent_modification`) — never echoes user-supplied PII or constraint message text into the LLM result string (P-22 mitigation).
+- [x] **MUT-08**: Audit reuses `AuditWriter.writeToolCall` with `eventName` ∈ {`create_record`, `update_record`, `add_related_record`, `remove_related_record`}. `argumentsJson` carries LLM JSON; `resultSummary` carries new entity id (create), or compact diff summary (update). New `outcome` values: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED` (`COMMIT_FAILED` means host save returned but idempotency finalization failed, so commit outcome must be verified). Existing REQUIRES_NEW boundary keeps audit durable across mutation rollback.
+- [x] **MUT-09**: `ToolEntityResolver` shared `@Component` consumed by both `BuiltInDataTools` and `BuiltInMutationTools` — extracted from existing helpers (`resolveReadableEntityOrThrow`, `parseEntityId`, new `resolveWritableEntityOrThrow`).
+- [x] **MUT-10**: System prompt updated when mutations enabled: explicit rule that mutations are user-driven; direct mutation tools are for simple, confirmed user requests only, while complex extraction/form-draft workflows defer to the later intent-driven extraction phase. `confirmationRequired=true` is a UX hint for chat surfaces and does not add a Phase 11 dry-run/preview payload.
+- [x] **MUT-11**: Locale message keys for all denial/success/idempotency/error paths in ALL existing locales (per CLAUDE.md).
+- [x] **MUT-12**: Boot-test asserts zero mutation tool callbacks present in `AgentToolCallbacks.forCurrentUser` under default config (P-2: silent default-on regression gate).
 
 ### Configurable Chat Surfaces (SEED-005 activated, refined)
 
@@ -108,14 +108,14 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [ ] **ENT-06**: `AiUiSettings` (per SURF-02)
 - [ ] **ENT-07**: `AiTaskFile` (per TASK-03)
 - [ ] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
-- [ ] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)
+- [x] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)
 
 All five entities follow CLAUDE.md conventions: `@JmixEntity` + UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`, no Lombok. Liquibase changelogs included in root `changelog.xml`.
 
 ### New SPIs
 
 - [x] **SPI-09**: `ToolFetchPlanCustomizer` (per TOOL-10)
-- [ ] **SPI-10**: `MutationGuard` (per MUT-05)
+- [x] **SPI-10**: `MutationGuard` (per MUT-05)
 - [ ] **SPI-11**: `TranscriptionPostProcessor` (per STT-04)
 - [ ] **SPI-12**: `IntentExtractor<T>` (per EXTRACT-02)
 
@@ -123,23 +123,23 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ### Audit Extensions
 
-- [ ] **AUD-06**: `AuditWriter.writeToolCall` `outcome` enum extended: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`. New `eventName` strings: `create_record`, `update_record`, `add_related_record`, `remove_related_record`, `prepare_form_draft`, `STT_TRANSCRIPTION`. No new audit kind.
+- [x] **AUD-06**: `AuditWriter.writeToolCall` `outcome` enum extended: `IDEMPOTENT_REPLAY`, `COMMIT_FAILED`. New `eventName` strings: `create_record`, `update_record`, `add_related_record`, `remove_related_record`, `prepare_form_draft`, `STT_TRANSCRIPTION`. No new audit kind.
 - [x] **AUD-07**: Mutation audit row carries pre-image + post-image diff summary in `resultSummary`; PII-bearing fields hashed if `ai-agent.audit.hashSensitiveFields=true` (default true). Field-set configurable.
 
 ### Security Extensions
 
 - [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — pending Phase 12).
 - [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
-- [ ] **SEC-07**: New `AiAgentMutationRole` resource role granting CRUD on entities the LLM may mutate (host composes it with their own roles). Default role catalog ships empty mutation set; hosts opt in.
+- [x] **SEC-07**: New `AiAgentMutationRole` resource role is an explicit AI-mutation marker gate. It grants no entity CRUD by itself; mutation tools require the marker role AND normal Jmix create/update policies. Hosts opt users in by assigning/composing this marker with their own entity roles.
 
 ### Testing
 
 - [x] **TEST-08**: Prompt-contract suite (regression-locks PROMPT-03/04/05): chat reply to "có bao nhiêu khách hàng?" must NOT contain the literal substring matching the internal entity-name pattern; reply must NOT contain literal tool names. Runs in Vietnamese AND English locales.
 - [x] **TEST-09**: `LlmExposurePolicy` integration test — entity readable by user but denylisted for LLM does not appear in `list_entities`, `agent.entities`, RAG hits, or surface as `access_denied` (uniform `unknown_entity`).
-- [ ] **TEST-10**: Mutation gating integration test — user with READ but not MODIFY on attribute `X` triggers `update_record(attribute=X)` → blocked at gating step 2; tool returns structured error; `DataManager.save` never called.
-- [ ] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
-- [ ] **TEST-12**: Mutation audit-vs-transaction test — force `DataManager.save` to throw post-flush; assert audit row written with `outcome=COMMIT_FAILED` (P-4 regression gate).
-- [ ] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
+- [x] **TEST-10**: Mutation gating integration test — user with READ but not MODIFY on attribute `X` triggers `update_record(attribute=X)` → blocked at gating step 2; tool returns structured error; `DataManager.save` never called.
+- [x] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
+- [x] **TEST-12**: Mutation audit-vs-transaction test — known host save rollback writes a durable audit row with `outcome=ERROR`; post-host-save idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`); post-COMMITTED audit/result failures leave the intent `COMMITTED` and exact retry replays.
+- [x] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
 - [ ] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
 - [ ] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
 - [ ] **TEST-16**: Task file isolation test — `AiTaskFile` upload does NOT trigger `IngesterManager` invocation; `VectorStore` count unchanged after task-file attach.

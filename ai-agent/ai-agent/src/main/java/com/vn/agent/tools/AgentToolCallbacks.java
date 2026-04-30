@@ -1,15 +1,21 @@
 package com.vn.agent.tools;
 
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.audit.MutationArgumentSanitizer;
+import com.vn.agent.audit.MutationToolCallbackBoundaryDecorator;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.spi.ToolContributor;
+import com.vn.agent.tools.link.BuiltInLinkTools;
+import com.vn.agent.tools.mutation.BuiltInMutationTools;
 import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,38 +31,81 @@ import java.util.List;
  * {@link MethodToolCallbackProvider}{@code .builder().toolObjects(bean).build().getToolCallbacks()}
  * which performs the same {@code @Tool}-method reflection pass. Behavior is identical; the
  * contract (fresh array per call, no caching) is preserved.</p>
+ *
+ * <h2>Phase 11 wiring (D-09)</h2>
+ * <ul>
+ *   <li>{@link BuiltInLinkTools} is always-on (Plan 11-08, D-05) and is wrapped in the standard
+ *       {@link ToolCallbackAuditDecorator} loop alongside the read-only {@link BuiltInDataTools}
+ *       and host {@link ToolContributor} beans.</li>
+ *   <li>{@link BuiltInMutationTools} is conditional on
+ *       {@code ai-agent.tools.mutation.enabled=true}; the bean is absent from the context under
+ *       default config. RESEARCH Q5 mandates {@link ObjectProvider} (NOT
+ *       {@code @Autowired(required=false)} field injection — proxy / eager-init quirks make
+ *       the field variant brittle). When the bean is absent
+ *       ({@link ObjectProvider#getIfAvailable()} returns {@code null}), zero mutation callbacks
+ *       are appended. When present, its 4 {@code @Tool} methods become callbacks wrapped in the
+ *       {@link MutationToolCallbackBoundaryDecorator} — they are NOT routed through the generic
+ *       audit decorator because {@code BuiltInMutationTools} is the primary in-method audit
+ *       owner (self-audits success/replay/blocked/error/commit-failed exactly once with
+ *       mutation-specific outcomes). The boundary decorator is the fallback for pre-method
+ *       binding/invocation failures.</li>
+ * </ul>
+ *
+ * <p>D-09 callback counts:
+ * <ul>
+ *   <li>default (mutation off): 6 read + 2 link = 8 callbacks.</li>
+ *   <li>{@code ai-agent.tools.mutation.enabled=true}: 6 + 2 + 4 = 12 callbacks.</li>
+ *   <li>NEVER: a {@code delete_record} callback under any property combination (D-07).</li>
+ * </ul>
  */
 @Component
 public class AgentToolCallbacks {
 
     private final BuiltInDataTools builtIns;
+    private final BuiltInLinkTools builtInLinkTools;
+    private final ObjectProvider<BuiltInMutationTools> mutationToolsProvider;
     private final List<ToolContributor> contributors;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
     private final StreamingSinkHolder streamingSinkHolder;
+    private final MutationArgumentSanitizer mutationArgumentSanitizer;
 
     public AgentToolCallbacks(BuiltInDataTools builtIns,
+                              BuiltInLinkTools builtInLinkTools,
+                              ObjectProvider<BuiltInMutationTools> mutationToolsProvider,
                               List<ToolContributor> contributors,
                               AuditWriter auditWriter,
                               CurrentAuthentication currentAuthentication,
-                              StreamingSinkHolder streamingSinkHolder) {
+                              StreamingSinkHolder streamingSinkHolder,
+                              MutationArgumentSanitizer mutationArgumentSanitizer) {
         this.builtIns = builtIns;
+        this.builtInLinkTools = builtInLinkTools;
+        this.mutationToolsProvider = mutationToolsProvider;
         this.contributors = contributors;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
         this.streamingSinkHolder = streamingSinkHolder;
+        this.mutationArgumentSanitizer = mutationArgumentSanitizer;
     }
 
     /**
-     * Build a fresh {@link ToolCallback} array per request (AUD-04). Every callback is wrapped in
-     * a {@link ToolCallbackAuditDecorator} so each tool invocation produces PRE/POST audit rows
-     * via the REQUIRES_NEW {@code AuditWriter} boundary — rows survive even when a tool rolls
-     * back its own transaction. Do NOT cache the returned array — ToolContributor output and
-     * effective schema can change across invocations.
+     * Build a fresh {@link ToolCallback} array per request (AUD-04). Read + link + contributor
+     * callbacks are wrapped in {@link ToolCallbackAuditDecorator} so each tool invocation produces
+     * an audit row via the REQUIRES_NEW {@code AuditWriter} boundary — rows survive even when a
+     * tool rolls back its own transaction. Mutation callbacks (when present) are wrapped instead
+     * in {@link MutationToolCallbackBoundaryDecorator} so {@code BuiltInMutationTools} remains the
+     * primary in-method audit owner for mutation outcomes (self-audits exactly once via
+     * {@code safeWriteAudit}); the boundary decorator only audits if the delegate throws before
+     * the tool method body runs (binding/invocation failures). Do NOT cache the returned array —
+     * ToolContributor output and effective schema can change across invocations.
      */
     public ToolCallback[] forCurrentUser() {
+        // Read + link + host-contributor callbacks: standard generic audit wrapping.
         List<ToolCallback> all = new ArrayList<>();
         Collections.addAll(all, fromBean(builtIns));
+        // Always-on link tools (Plan 11-08): generic audit wrapping is correct here — link tools
+        // do NOT self-audit; they emit a single SUCCESS/ERROR row through the generic decorator.
+        Collections.addAll(all, fromBean(builtInLinkTools));
         for (ToolContributor tc : contributors) {
             List<Object> beans = tc.contribute();
             if (beans == null) {
@@ -66,10 +115,32 @@ public class AgentToolCallbacks {
                 Collections.addAll(all, fromBean(bean));
             }
         }
-        ToolCallback[] out = new ToolCallback[all.size()];
+        ToolCallback[] audited = new ToolCallback[all.size()];
         for (int i = 0; i < all.size(); i++) {
-            out[i] = new ToolCallbackAuditDecorator(all.get(i), auditWriter, currentAuthentication, streamingSinkHolder);
+            audited[i] = new ToolCallbackAuditDecorator(all.get(i), auditWriter, currentAuthentication, streamingSinkHolder);
         }
+
+        // Conditional mutation tools (Plan 11-09 D-09). ObjectProvider.getIfAvailable() returns
+        // null when @ConditionalOnProperty is OFF — RESEARCH Q5 forbids @Autowired(required=false)
+        // field injection because of proxy / eager-init quirks. BuiltInMutationTools is the
+        // primary in-method audit owner (self-audits via safeWriteAudit); raw callbacks are
+        // wrapped in the mutation boundary decorator instead of the generic audit decorator to
+        // avoid duplicate audit rows.
+        BuiltInMutationTools mutationTools = mutationToolsProvider.getIfAvailable();
+        if (mutationTools == null) {
+            return audited;
+        }
+        ToolCallback[] rawMutationCallbacks = fromBean(mutationTools);
+        ToolCallback[] mutationBoundaryWrapped = new ToolCallback[rawMutationCallbacks.length];
+        for (int i = 0; i < rawMutationCallbacks.length; i++) {
+            mutationBoundaryWrapped[i] = new MutationToolCallbackBoundaryDecorator(
+                    rawMutationCallbacks[i], streamingSinkHolder, auditWriter, currentAuthentication,
+                    mutationArgumentSanitizer);
+        }
+
+        // Final array order: [read + link + contributor (audited)] then [mutation (boundary)].
+        ToolCallback[] out = Arrays.copyOf(audited, audited.length + mutationBoundaryWrapped.length);
+        System.arraycopy(mutationBoundaryWrapped, 0, out, audited.length, mutationBoundaryWrapped.length);
         return out;
     }
 

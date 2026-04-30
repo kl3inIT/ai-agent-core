@@ -2,16 +2,20 @@ package com.vn.agent.filter;
 
 import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.ToolUserError;
+import io.jmix.core.QueryUtils;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.querycondition.Condition;
+import io.jmix.core.querycondition.JpqlCondition;
 import io.jmix.core.querycondition.LogicalCondition;
 import io.jmix.core.querycondition.PropertyCondition;
+import io.jmix.core.querycondition.PropertyConditionUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Structured filter → Jmix {@link Condition} mapper (TOOL-05, D-05/D-06/D-08).
@@ -29,7 +33,8 @@ import java.util.Locale;
  *   <li>Depth cap from {@code jmix.ai-agent.tools.max-filter-depth} (default 3).</li>
  *   <li>Literal values converted via {@link FilterLiteralValueConverter}; failure ⇒ structured
  *       {@link ToolUserError} (D-07). JPQL/SQL injection is impossible by construction —
- *       every leaf is {@link PropertyCondition#createWithValue} with a typed param.</li>
+ *       every leaf uses either {@link PropertyCondition#createWithValue} or a fixed
+ *       {@link JpqlCondition} template with a validated metadata path and typed params.</li>
  * </ul>
  *
  * <p>Plan 03 consumes {@link #map(FilterNode, MetaClass)} inside each @Tool body.</p>
@@ -107,7 +112,48 @@ public class StructuredFilterConditionMapper {
         } else {
             coerced = filterLiteralValueConverter.convertValue(value, terminalProperty);
         }
+        if (isStringLikeOperation(propertyConditionOperation, terminalProperty)) {
+            if (coerced instanceof String stringValue) {
+                return stringLikeCondition(property, propertyConditionOperation, stringValue);
+            }
+            throw new ToolUserError("invalid_literal",
+                    "expected String for " + terminalProperty.getName(),
+                    List.of("String"));
+        }
         return PropertyCondition.createWithValue(property, propertyConditionOperation, coerced);
+    }
+
+    private boolean isStringLikeOperation(String operation, MetaProperty terminalProperty) {
+        if (!terminalProperty.getRange().isDatatype()
+                || terminalProperty.getRange().asDatatype().getJavaClass() != String.class) {
+            return false;
+        }
+        return PropertyCondition.Operation.CONTAINS.equals(operation)
+                || PropertyCondition.Operation.NOT_CONTAINS.equals(operation)
+                || PropertyCondition.Operation.STARTS_WITH.equals(operation)
+                || PropertyCondition.Operation.ENDS_WITH.equals(operation);
+    }
+
+    private Condition stringLikeCondition(String property, String operation, String value) {
+        String parameterName = PropertyConditionUtils.generateParameterName(property);
+        String patternExpression = switch (operation) {
+            case PropertyCondition.Operation.CONTAINS, PropertyCondition.Operation.NOT_CONTAINS ->
+                    "concat('%', concat(lower(:" + parameterName + "), '%'))";
+            case PropertyCondition.Operation.STARTS_WITH ->
+                    "concat(lower(:" + parameterName + "), '%')";
+            case PropertyCondition.Operation.ENDS_WITH ->
+                    "concat('%', lower(:" + parameterName + "))";
+            default -> throw new IllegalArgumentException("Unsupported string LIKE operation: " + operation);
+        };
+        String jpqlOperation = PropertyCondition.Operation.NOT_CONTAINS.equals(operation)
+                ? "not like"
+                : "like";
+        String where = "lower({E}." + property + ") " + jpqlOperation + " "
+                + patternExpression + " escape '\\'";
+        return JpqlCondition.createWithParameters(
+                where,
+                null,
+                Map.of(parameterName, QueryUtils.escapeForLike(value)));
     }
 
     /**
