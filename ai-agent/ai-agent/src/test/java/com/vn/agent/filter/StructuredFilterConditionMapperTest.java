@@ -2,11 +2,13 @@ package com.vn.agent.filter;
 
 import com.vn.agent.exposure.LlmExposurePolicy;
 import com.vn.agent.tools.ToolUserError;
+import io.jmix.core.QueryUtils;
 import io.jmix.core.metamodel.datatype.Datatype;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
 import io.jmix.core.querycondition.Condition;
+import io.jmix.core.querycondition.JpqlCondition;
 import io.jmix.core.querycondition.LogicalCondition;
 import io.jmix.core.querycondition.PropertyCondition;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,17 +34,14 @@ import static org.mockito.Mockito.when;
  */
 class StructuredFilterConditionMapperTest {
 
-    private FilterLiteralValueConverter filterLiteralValueConverter;
     private LlmExposurePolicy llmExposurePolicy;
     private StructuredFilterConditionMapper mapper;
     private MetaClass orderMc;
     private MetaProperty nameProp;
-    private MetaProperty amountProp;
-    private MetaProperty activeProp;
 
     @BeforeEach
     void setUp() {
-        filterLiteralValueConverter = new FilterLiteralValueConverter();
+        FilterLiteralValueConverter filterLiteralValueConverter = new FilterLiteralValueConverter();
         llmExposurePolicy = mock(LlmExposurePolicy.class);
         // Default: every attribute is readable. Individual tests override.
         lenient().when(llmExposurePolicy.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))
@@ -56,8 +55,8 @@ class StructuredFilterConditionMapperTest {
         lenient().when(orderMc.getName()).thenReturn("Order");
 
         nameProp = datatypeProp(String.class, "name");
-        amountProp = datatypeProp(java.math.BigDecimal.class, "amount");
-        activeProp = datatypeProp(Boolean.class, "active");
+        MetaProperty amountProp = datatypeProp(java.math.BigDecimal.class, "amount");
+        MetaProperty activeProp = datatypeProp(Boolean.class, "active");
 
         lenient().when(orderMc.findProperty("name")).thenReturn(nameProp);
         lenient().when(orderMc.findProperty("amount")).thenReturn(amountProp);
@@ -69,17 +68,15 @@ class StructuredFilterConditionMapperTest {
     private static MetaProperty datatypeProp(Class<?> javaClass, String name) {
         MetaProperty mp = mock(MetaProperty.class);
         Range range = mock(Range.class);
-        @SuppressWarnings("rawtypes")
-        Datatype dt = mock(Datatype.class);
+        @SuppressWarnings("unchecked")
+        Datatype<Object> dt = mock(Datatype.class);
         lenient().when(mp.getName()).thenReturn(name);
         lenient().when(mp.getRange()).thenReturn(range);
         lenient().when(range.isClass()).thenReturn(false);
         lenient().when(range.isEnum()).thenReturn(false);
         lenient().when(range.isDatatype()).thenReturn(true);
         lenient().when(range.asDatatype()).thenReturn(dt);
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        Class raw = javaClass;
-        lenient().when(dt.getJavaClass()).thenReturn(raw);
+        lenient().when(dt.getJavaClass()).thenReturn(javaClass);
         // FilterLiteralValueConverter delegates scalar datatype parsing to Datatype.parse.
         // For test fixtures using BigDecimal amount with string values like "10", stub parse
         // to echo back a BigDecimal. String and Boolean short-circuit inside the coercer.
@@ -97,10 +94,10 @@ class StructuredFilterConditionMapperTest {
         return mp;
     }
 
-    private static MetaProperty classProp(String name, MetaClass targetMetaClass) {
+    private static MetaProperty customerClassProp(MetaClass targetMetaClass) {
         MetaProperty metaProperty = mock(MetaProperty.class);
         Range range = mock(Range.class);
-        lenient().when(metaProperty.getName()).thenReturn(name);
+        lenient().when(metaProperty.getName()).thenReturn("customer");
         lenient().when(metaProperty.getRange()).thenReturn(range);
         lenient().when(range.isClass()).thenReturn(true);
         lenient().when(range.asClass()).thenReturn(targetMetaClass);
@@ -117,6 +114,11 @@ class StructuredFilterConditionMapperTest {
         return (LogicalCondition) c;
     }
 
+    private static JpqlCondition asJpql(Condition condition) {
+        assertThat(condition).isInstanceOf(JpqlCondition.class);
+        return (JpqlCondition) condition;
+    }
+
     // --------- 13 operators (D-05) ---------
 
     @ParameterizedTest
@@ -126,11 +128,7 @@ class StructuredFilterConditionMapperTest {
             "GREATER,          GREATER,          amount,  10",
             "GREATER_OR_EQUAL, GREATER_OR_EQUAL, amount,  10",
             "LESS,             LESS,             amount,  10",
-            "LESS_OR_EQUAL,    LESS_OR_EQUAL,    amount,  10",
-            "CONTAINS,         CONTAINS,         name,    al",
-            "DOES_NOT_CONTAIN, NOT_CONTAINS,     name,    al",
-            "STARTS_WITH,      STARTS_WITH,      name,    al",
-            "ENDS_WITH,        ENDS_WITH,        name,    al"
+            "LESS_OR_EQUAL,    LESS_OR_EQUAL,    amount,  10"
     })
     void eachOperatorMapsToMatchingJmixConstant(String operationName, String jmixOp, String propName, String rawValue) {
         LeafNode leaf = new LeafNode(propName, operationName, rawValue);
@@ -157,6 +155,39 @@ class StructuredFilterConditionMapperTest {
             case "IS_SET" -> PropertyCondition.Operation.IS_SET;
             default -> throw new IllegalArgumentException("unexpected " + jmixOp);
         };
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {
+            "CONTAINS|like|concat('%', concat(lower(:",
+            "DOES_NOT_CONTAIN|not like|concat('%', concat(lower(:",
+            "STARTS_WITH|like|concat(lower(:",
+            "ENDS_WITH|like|concat('%', lower(:"
+    }, delimiter = '|')
+    void stringLikeOperatorsUseJpqlConditionWithoutJmixCaseInsensitiveMarker(
+            String operationName, String jpqlOperator, String patternSnippet) {
+        String value = "Phan Hồng Đạt_%";
+        LeafNode leaf = new LeafNode("name", operationName, value);
+
+        JpqlCondition condition = asJpql(mapper.map(leaf, orderMc));
+
+        assertThat(condition.getWhere())
+                .startsWith("lower({E}.name) " + jpqlOperator + " ")
+                .contains(patternSnippet)
+                .contains(" escape '\\'")
+                .doesNotContain("(?i)");
+        assertThat(condition.getParameterValuesMap())
+                .hasSize(1)
+                .containsValue(QueryUtils.escapeForLike(value));
+    }
+
+    @Test
+    void notOverContainsUsesNotLikeJpqlCondition() {
+        NotNode not = new NotNode(new LeafNode("name", "CONTAINS", "Phan Hồng Đạt"));
+
+        JpqlCondition condition = asJpql(mapper.map(not, orderMc));
+
+        assertThat(condition.getWhere()).contains(" not like ");
     }
 
     @Test
@@ -274,7 +305,7 @@ class StructuredFilterConditionMapperTest {
     void denylistedRelationshipTargetRejectsDottedPathOpaquely() {
         MetaClass customerMetaClass = mock(MetaClass.class);
         lenient().when(customerMetaClass.getName()).thenReturn("Customer");
-        MetaProperty customerProp = classProp("customer", customerMetaClass);
+        MetaProperty customerProp = customerClassProp(customerMetaClass);
         lenient().when(orderMc.findProperty("customer")).thenReturn(customerProp);
         lenient().when(customerMetaClass.findProperty("name")).thenReturn(nameProp);
         when(llmExposurePolicy.canReadEntity(customerMetaClass)).thenReturn(false);
