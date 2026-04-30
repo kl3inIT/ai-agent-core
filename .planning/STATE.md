@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 11 complete; ready to plan Phase 12
-last_updated: "2026-04-29T07:54:03.087Z"
+stopped_at: Phase 11 shipped - PR #19; ready to plan Phase 12
+last_updated: "2026-04-30T10:15:31.663Z"
 progress:
   total_phases: 6
   completed_phases: 4
@@ -15,7 +15,7 @@ progress:
 
 # Project State
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-04-30
 
 ## Project Reference
 
@@ -34,7 +34,7 @@ Plan: Not started
 | Phase | Phase 12 |
 | Plan | Not started |
 | Status | Ready to plan |
-| Last activity | 2026-04-29 — Phase 11 completed after passed verification |
+| Last activity | 2026-04-30 — Phase 11 shipped — PR #19 |
 
 ## Phase Status
 
@@ -42,7 +42,7 @@ Plan: Not started
 |-------|--------|----------------|---------|-----------|
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
-| 11. Mutation-Capable Built-In Tools | Complete | 16/16 | 2026-04-28 | 2026-04-29 |
+| 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
@@ -202,7 +202,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-04-29T07:21:58.486Z
-**Stopped at:** Phase 11 complete; ready to plan Phase 12
+**Stopped at:** Phase 11 shipped — PR #19; ready to plan Phase 12
 **Resume file:** None
 **Blockers:** None.
 **Next action:** Plan Phase 12 configurable chat surfaces.
