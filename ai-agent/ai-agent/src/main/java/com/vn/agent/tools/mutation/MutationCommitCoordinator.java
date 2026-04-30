@@ -175,9 +175,18 @@ public class MutationCommitCoordinator {
                     }
                 }
             }
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException replayResolutionFailure) {
             // entity may have been deleted, metaClass may have been removed, or load failed;
             // freshName stays null. Idempotent replay outcome is still valid.
+            log.warn("AI_AGENT_MUTATION_REPLAY_INSTANCE_NAME_RESOLUTION_FAILED toolName={} resultEntityName={} resultEntityId={} runId={} rootAuditId={} conversationId={} exceptionClass={} stackFrames={}",
+                    toolName,
+                    existing.getResultEntityName(),
+                    existing.getResultEntityId(),
+                    RunContext.get(),
+                    RunContext.getRootAuditId(),
+                    RunContext.getConversationId(),
+                    replayResolutionFailure.getClass().getName(),
+                    sanitizedStackFrames(replayResolutionFailure));
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("outcome", AiToolCallOutcome.IDEMPOTENT_REPLAY.getId());

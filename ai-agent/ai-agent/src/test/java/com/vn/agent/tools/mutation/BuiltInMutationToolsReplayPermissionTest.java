@@ -16,9 +16,12 @@ import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -26,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +56,7 @@ import static org.mockito.Mockito.when;
 })
 @Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
         MutationToolTestUsersConfiguration.class})
+@ExtendWith(OutputCaptureExtension.class)
 class BuiltInMutationToolsReplayPermissionTest {
 
     private static final String FIXTURE_ENTITY = "mutationTest_MutationTestFixture";
@@ -77,18 +82,30 @@ class BuiltInMutationToolsReplayPermissionTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AtomicBoolean denyReadAfterFirstCall = new AtomicBoolean(false);
+    private final AtomicBoolean failReplayReadPermission = new AtomicBoolean(false);
+    private final AtomicInteger crudCallsAfterReplayFailureArmed = new AtomicInteger();
     private String idempotencyKey;
     private UUID fixtureId;
+    private String replayReadFailureMessage;
 
     @BeforeEach
     void configureSecurity() {
         denyReadAfterFirstCall.set(false);
+        failReplayReadPermission.set(false);
+        crudCallsAfterReplayFailureArmed.set(0);
+        replayReadFailureMessage = null;
         when(llmExposurePolicy.canReadEntity(any())).thenReturn(true);
         when(llmExposurePolicy.canCreate(any())).thenReturn(true);
         when(llmExposurePolicy.canUpdate(any())).thenReturn(true);
         when(llmExposurePolicy.canModify(any())).thenReturn(true);
         doAnswer(invocation -> {
             Object context = invocation.getArgument(0);
+            if (failReplayReadPermission.get() && context instanceof CrudEntityContext) {
+                int crudCall = crudCallsAfterReplayFailureArmed.incrementAndGet();
+                if (crudCall > 1) {
+                    throw new IllegalStateException(replayReadFailureMessage);
+                }
+            }
             if (denyReadAfterFirstCall.get() && context instanceof CrudEntityContext crud) {
                 crud.setReadDenied();
             }
@@ -167,5 +184,45 @@ class BuiltInMutationToolsReplayPermissionTest {
                         .list()
                         .size());
         assertThat(hostRows).isEqualTo(1L);
+    }
+
+    @Test
+    void replayInstanceNameResolutionFailure_isLoggedWithoutLeakingRawExceptionMessage(CapturedOutput output)
+            throws Exception {
+        idempotencyKey = UUID.randomUUID().toString();
+        String secretValue = "replay-resolution-pii";
+        String secretExceptionMessage = "synthetic replay failure with " + secretValue;
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("name", "Replay resolution fixture");
+        attributes.put("secret", secretValue);
+
+        String firstJson = mutationToolTestContext.withMutationRun(USERNAME, () ->
+                builtInMutationTools.createRecord(FIXTURE_ENTITY, attributes, idempotencyKey));
+        JsonNode first = objectMapper.readTree(firstJson);
+        assertThat(first.path("outcome").asText())
+                .as("first mutation must succeed before replay logging can be verified; raw=%s", firstJson)
+                .isEqualTo(AiToolCallOutcome.SUCCESS.getId());
+        fixtureId = UUID.fromString(first.path("entityId").asText());
+
+        replayReadFailureMessage = secretExceptionMessage;
+        failReplayReadPermission.set(true);
+
+        String replayJson = mutationToolTestContext.withMutationRun(USERNAME, () ->
+                builtInMutationTools.createRecord(FIXTURE_ENTITY, new LinkedHashMap<>(attributes), idempotencyKey));
+        JsonNode replay = objectMapper.readTree(replayJson);
+
+        assertThat(replay.path("outcome").asText())
+                .as("replay must remain valid even when live instance-name resolution fails; raw=%s", replayJson)
+                .isEqualTo(AiToolCallOutcome.IDEMPOTENT_REPLAY.getId());
+        assertThat(UUID.fromString(replay.path("entityId").asText())).isEqualTo(fixtureId);
+        assertThat(replay.path("instanceName").isMissingNode() || replay.path("instanceName").isNull())
+                .isTrue();
+
+        assertThat(output.getOut() + output.getErr())
+                .contains("AI_AGENT_MUTATION_REPLAY_INSTANCE_NAME_RESOLUTION_FAILED")
+                .contains(IllegalStateException.class.getName())
+                .doesNotContain(secretExceptionMessage)
+                .doesNotContain(secretValue)
+                .doesNotContain(idempotencyKey);
     }
 }

@@ -45,9 +45,10 @@ import java.util.List;
  *       ({@link ObjectProvider#getIfAvailable()} returns {@code null}), zero mutation callbacks
  *       are appended. When present, its 4 {@code @Tool} methods become callbacks wrapped in the
  *       {@link MutationToolCallbackBoundaryDecorator} — they are NOT routed through the generic
- *       audit decorator because {@code BuiltInMutationTools} is the single audit owner
- *       (self-audits in-method success/replay/blocked/error/commit-failed exactly once with
- *       mutation-specific outcomes).</li>
+ *       audit decorator because {@code BuiltInMutationTools} is the primary in-method audit
+ *       owner (self-audits success/replay/blocked/error/commit-failed exactly once with
+ *       mutation-specific outcomes). The boundary decorator is the fallback for pre-method
+ *       binding/invocation failures.</li>
  * </ul>
  *
  * <p>D-09 callback counts:
@@ -93,7 +94,7 @@ public class AgentToolCallbacks {
      * an audit row via the REQUIRES_NEW {@code AuditWriter} boundary — rows survive even when a
      * tool rolls back its own transaction. Mutation callbacks (when present) are wrapped instead
      * in {@link MutationToolCallbackBoundaryDecorator} so {@code BuiltInMutationTools} remains the
-     * single audit owner for mutation outcomes (self-audits exactly once via
+     * primary in-method audit owner for mutation outcomes (self-audits exactly once via
      * {@code safeWriteAudit}); the boundary decorator only audits if the delegate throws before
      * the tool method body runs (binding/invocation failures). Do NOT cache the returned array —
      * ToolContributor output and effective schema can change across invocations.
@@ -121,9 +122,10 @@ public class AgentToolCallbacks {
 
         // Conditional mutation tools (Plan 11-09 D-09). ObjectProvider.getIfAvailable() returns
         // null when @ConditionalOnProperty is OFF — RESEARCH Q5 forbids @Autowired(required=false)
-        // field injection because of proxy / eager-init quirks. BuiltInMutationTools is the single
-        // audit owner (self-audits via safeWriteAudit); raw callbacks are wrapped in the mutation
-        // boundary decorator instead of the generic audit decorator to avoid duplicate audit rows.
+        // field injection because of proxy / eager-init quirks. BuiltInMutationTools is the
+        // primary in-method audit owner (self-audits via safeWriteAudit); raw callbacks are
+        // wrapped in the mutation boundary decorator instead of the generic audit decorator to
+        // avoid duplicate audit rows.
         BuiltInMutationTools mutationTools = mutationToolsProvider.getIfAvailable();
         if (mutationTools == null) {
             return audited;
