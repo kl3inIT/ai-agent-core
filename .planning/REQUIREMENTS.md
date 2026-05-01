@@ -61,19 +61,18 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Configurable Chat Surfaces (SEED-005 activated, refined)
 
-- [ ] **SURF-01**: Three chat presentation surfaces over the same backend and `ChatPanelFragment`:
-  1. Full route `ChatView` (existing).
-  2. `SidebarChatComponent` — Vaadin component mounted into host `AppLayout` `slot="drawer-end"`.
-  3. `FloatingChatLauncher` — fixed-position bottom-right launcher button + `Dialog.setModality(MODELESS).setDraggable(true)` containing the fragment.
-- [ ] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Fields: `enabledSurfaces` (set of `FULL_ROUTE`, `SIDEBAR`, `FLOATING`), `defaultSurface`, audit fields. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
-- [ ] **SURF-03**: `ChatSurfaceMounter` `@Component` listening to `UIInitEvent` (Vaadin) injects the configured surfaces into the host shell. Reads admin toggle and only mounts what's enabled. Host needs no code edits beyond depending on the starter.
+- [ ] **SURF-01**: Two chat presentation surfaces over the same backend and `ChatPanelFragment`:
+  1. `FULL_ROUTE` — the existing full-route `ChatView`.
+  2. `HEADER_BUTTON` — a host-navbar button that opens the shared chat fragment in a non-modal Jmix `DialogWindow`.
+- [ ] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Persisted fields are `enabledSurfaceIds` (deterministic text-backed id list containing `FULL_ROUTE` and/or `HEADER_BUTTON`), `defaultSurface`, and audit fields. The controller/view-model layer may describe this as enabled surfaces, but the entity must not expose a JavaBean `enabledSurfaces` collection property. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
+- [ ] **SURF-03**: `ChatSurfaceMounter` `@Component` listening to `UIInitEvent` (Vaadin) and navigation events injects the configured header-button surface into the host shell. Reads admin toggle and only mounts what's enabled. Host needs no code edits beyond depending on the starter.
 - [ ] **SURF-04**: `AiChatSessionState` `@VaadinSessionScope` bean tracks the active `conversationId` for the user session. Switching surface mid-session calls `setConversationId(state.getCurrentConversationId())` on the new fragment instance — same conversation continues. No backend duplication.
-- [ ] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE `ChatPanelFragment` per surface instance, but ALL fragments in one session share the same active conversation id via `AiChatSessionState`.
-- [ ] **SURF-06**: Floating launcher placement: bottom-right fixed for v1.1. `defaultPosition` configurability deferred to v1.2.
-- [ ] **SURF-07**: Floating launcher z-index and dialog-stacking: launcher hides itself while a Jmix admin dialog is open (P-21 mitigation) — wire to `Dialog` open/close events on the UI.
+- [ ] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE active `ChatPanelFragment` per UI tab, and all mounted fragments in one session share the same active conversation id via `AiChatSessionState`.
+- [ ] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
+- [ ] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
 - [ ] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
 - [ ] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
-- [ ] **SURF-10**: `ChatPanelFragment` may receive an optional `setCompactMode(boolean)` for the floating dialog (suppress conversation list, tighter layout). Defer if Vaadin sizing already handles it.
+- [ ] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
 
 ### Chat Task Input — Speech-to-Text & Task-Scoped File
 
