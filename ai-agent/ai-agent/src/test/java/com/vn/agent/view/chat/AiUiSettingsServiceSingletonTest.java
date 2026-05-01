@@ -67,10 +67,9 @@ class AiUiSettingsServiceSingletonTest {
     @Test
     void concurrentFirstLoadRaceCreatesExactlyOneSingleton() throws Exception {
         int callerCount = 6;
-        ExecutorService executorService = Executors.newFixedThreadPool(callerCount);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<AiUiSettings>> futures = new ArrayList<>();
-        try {
+        try (ExecutorService executorService = Executors.newFixedThreadPool(callerCount)) {
             for (int i = 0; i < callerCount; i++) {
                 futures.add(executorService.submit(loadAfter(start)));
             }
@@ -81,8 +80,6 @@ class AiUiSettingsServiceSingletonTest {
                 AiUiSettings settings = future.get(10, TimeUnit.SECONDS);
                 assertThat(settings.getId()).isEqualTo(AiUiSettings.SINGLETON_ID);
             }
-        } finally {
-            executorService.shutdownNow();
         }
 
         assertThat(countRows()).isEqualTo(1);
