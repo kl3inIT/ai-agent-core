@@ -11,12 +11,14 @@ import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
+import com.vn.agent.view.chat.AiChatSessionState;
 import io.jmix.core.DataManager;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Notifications;
@@ -40,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** D-29 substrate on Vaadin MessageList + MessageInput. D-03 per-event ui.access; D-04 Stop
@@ -63,6 +66,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private MessageSource messages;
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
+    @Autowired private AiChatSessionState chatSessionState;
 
     private MessageList messageList;
     private MessageInput messageInput;
@@ -75,6 +79,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private volatile Disposable activeStream;
     private MessageListItem botMsg;
     private volatile UI ownerUi;
+    private Registration conversationIdStateRegistration;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
@@ -103,10 +108,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     protected void onAttach(@NonNull AttachEvent attachEvent) {
         super.onAttach(attachEvent);
         this.ownerUi = attachEvent.getUI();
+        registerConversationIdStateListener(this.ownerUi);
     }
 
     @Override
     protected void onDetach(@NonNull DetachEvent detachEvent) {
+        unregisterConversationIdStateListener();
         // Pitfall #8 — dispose-on-detach. Route through registry when runId is known so
         // the CANCELLED audit row is written; bare dispose is only the last-resort fallback.
         Disposable d = this.activeStream;
@@ -134,6 +141,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     // ---- Public API --------------------------------------------------------
 
     public void setConversationId(UUID cid) {
+        setConversationIdInternal(cid);
+        updateSessionConversationId(cid);
+    }
+
+    void setConversationIdFromState(UUID cid) {
+        setConversationIdInternal(cid);
+    }
+
+    private void setConversationIdInternal(UUID cid) {
+        if (Objects.equals(this.conversationId, cid)) {
+            return;
+        }
+
         if (isStreaming()) {
             stopActiveStream();
         }
@@ -176,12 +196,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     public void startNewChat() {
-        if (isStreaming()) {
-            stopActiveStream();
-        }
-        items.clear();
-        if (messageList != null) messageList.setItems(items);
-        conversationId = null;
+        setConversationIdInternal(null);
+        updateSessionConversationId(null);
     }
 
     private void stopActiveStream() {
@@ -234,6 +250,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         activeRunId = f.runId();
                         if (conversationId == null && f.conversationId() != null) {
                             conversationId = f.conversationId();
+                            updateSessionConversationId(conversationId);
                         }
                     }
                     String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
@@ -286,7 +303,37 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             throw new IllegalStateException("Conversation id must not be null");
         }
         conversationId = resolved;
+        updateSessionConversationId(resolved);
         return resolved;
+    }
+
+    void registerConversationIdStateListener(UI ui) {
+        unregisterConversationIdStateListener();
+        if (chatSessionState == null) {
+            return;
+        }
+
+        conversationIdStateRegistration =
+                chatSessionState.addConversationIdChangeListener(ui, this::setConversationIdFromState);
+        UUID stateConversationId = chatSessionState.getCurrentConversationId();
+        if (stateConversationId != null) {
+            setConversationIdFromState(stateConversationId);
+        }
+    }
+
+    private void unregisterConversationIdStateListener() {
+        Registration registration = this.conversationIdStateRegistration;
+        if (registration != null) {
+            registration.remove();
+            this.conversationIdStateRegistration = null;
+        }
+    }
+
+    private void updateSessionConversationId(UUID cid) {
+        if (chatSessionState != null
+                && !Objects.equals(chatSessionState.getCurrentConversationId(), cid)) {
+            chatSessionState.setCurrentConversationId(cid);
+        }
     }
 
     private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
