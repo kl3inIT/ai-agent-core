@@ -11,6 +11,7 @@
     <property name="uuid.type" value="uniqueidentifier" dbms="mssql"/>
     <property name="offsetDateTime.type" value="timestamp" dbms="hsqldb"/>
     <property name="offsetDateTime.type" value="datetimeoffset" dbms="mssql"/>
+    <!-- includeAll below picks up agentstore-changelog/080-ai-ui-settings.xml. -->
     <includeAll path="/com/vn/agent/liquibase/agentstore-changelog" errorIfMissingOrEmpty="false"/>
 
 
