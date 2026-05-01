@@ -2,6 +2,7 @@ package com.vn.agent.view.chat;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.entity.AiConversation;
@@ -10,8 +11,10 @@ import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.view.chat.fragment.ChatPanelFragment;
 import com.vn.agent.view.conversation.ConversationListView;
 import io.jmix.core.AccessManager;
+import io.jmix.core.Messages;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
+import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
@@ -33,13 +36,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @UiTest
 @SpringBootTest(classes = {AITestConfiguration.class, FlowuiTestAssistConfiguration.class})
@@ -217,6 +223,32 @@ class ChatSurfaceMounterTest {
         assertThat(findHeaderButtons(ui)).isEmpty();
     }
 
+    @Test
+    void fullRouteDisabledBeforeEnterForwardsHomeAndShowsLocalizedNotification() throws Exception {
+        ChatView chatView = new ChatView();
+        AiUiSettingsService settingsService = mock(AiUiSettingsService.class);
+        AiUiSettings settings = mock(AiUiSettings.class);
+        Messages messages = mock(Messages.class);
+        Notifications notifications = mock(Notifications.class, RETURNS_DEEP_STUBS);
+        BeforeEnterEvent event = mock(BeforeEnterEvent.class);
+        String notificationText = "Chat is available via the header button only.";
+        when(settings.getEnabledSurfaceSet()).thenReturn(EnumSet.of(AiChatSurface.HEADER_BUTTON));
+        when(settingsService.loadCurrent()).thenReturn(settings);
+        when(messages.getMessage("chatView.fullRouteDisabled")).thenReturn(notificationText);
+        inject(chatView, "uiSettingsService", settingsService);
+        inject(chatView, "messages", messages);
+        inject(chatView, "notifications", notifications);
+
+        chatView.beforeEnter(event);
+
+        verify(event).forwardTo("");
+        verify(notifications).create(notificationText);
+        assertThat(readChatViewSource())
+                .contains("implements BeforeEnterObserver")
+                .contains("chatView.fullRouteDisabled")
+                .contains("AiUiSettingsService");
+    }
+
     private static List<JmixButton> findHeaderButtons(Component root) {
         return root.getChildren()
                 .flatMap(child -> {
@@ -243,5 +275,21 @@ class ChatSurfaceMounterTest {
         Path fallback = Paths.get(System.getProperty("user.dir"))
                 .resolve("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatSurfaceMounter.java");
         return Files.readString(fallback, StandardCharsets.UTF_8);
+    }
+
+    private static String readChatViewSource() throws Exception {
+        Path primary = Paths.get("src/main/java/com/vn/agent/view/chat/ChatView.java");
+        if (Files.exists(primary)) {
+            return Files.readString(primary, StandardCharsets.UTF_8);
+        }
+        Path fallback = Paths.get(System.getProperty("user.dir"))
+                .resolve("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java");
+        return Files.readString(fallback, StandardCharsets.UTF_8);
+    }
+
+    private static void inject(Object target, String fieldName, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 }
