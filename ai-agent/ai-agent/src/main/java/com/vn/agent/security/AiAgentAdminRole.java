@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiAuditEvent;
+import com.vn.agent.entity.AiUiSettings;
 import com.vn.agent.exposure.AiExposureRule;
 import com.vn.agent.tools.mutation.AiMutationIntent;
 import io.jmix.security.model.EntityPolicyAction;
@@ -31,6 +32,9 @@ public interface AiAgentAdminRole {
     @EntityPolicy(entityClass = AiKnowledgeDocument.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiExposureRule.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiMutationIntent.class, actions = EntityPolicyAction.ALL)
+    @EntityPolicy(entityClass = AiUiSettings.class, actions = {
+            EntityPolicyAction.READ,
+            EntityPolicyAction.UPDATE})
     void adminAccess();
 
     @MenuPolicy(menuIds = {
@@ -47,6 +51,7 @@ public interface AiAgentAdminRole {
             "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
             "AiAgent_KnowledgeBase.list", "AiAgent_KnowledgeDocument.detail",
             "AiAgent_AiAuditEvent.list", "AiAgent_AiAuditEvent.detailDialog",
-            "AiAgent_AiExposureRule.list", "AiAgent_AiExposureRule.detail"})
+            "AiAgent_AiExposureRule.list", "AiAgent_AiExposureRule.detail",
+            "AiAgent_AiUiSettings.detail"})
     void adminViews();
 }
