@@ -61,18 +61,18 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Configurable Chat Surfaces (SEED-005 activated, refined)
 
-- [ ] **SURF-01**: Two chat presentation surfaces over the same backend and `ChatPanelFragment`:
+- [x] **SURF-01**: Two chat presentation surfaces over the same backend and `ChatPanelFragment`:
   1. `FULL_ROUTE` — the existing full-route `ChatView`.
   2. `HEADER_BUTTON` — a host-navbar button that opens the shared chat fragment in a non-modal Jmix `DialogWindow`.
-- [ ] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Persisted fields are `enabledSurfaceIds` (deterministic text-backed id list containing `FULL_ROUTE` and/or `HEADER_BUTTON`), `defaultSurface`, and audit fields. The controller/view-model layer may describe this as enabled surfaces, but the entity must not expose a JavaBean `enabledSurfaces` collection property. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
+- [x] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Persisted fields are `enabledSurfaceIds` (deterministic text-backed id list containing `FULL_ROUTE` and/or `HEADER_BUTTON`), `defaultSurface`, and audit fields. The controller/view-model layer may describe this as enabled surfaces, but the entity must not expose a JavaBean `enabledSurfaces` collection property. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
 - [ ] **SURF-03**: `ChatSurfaceMounter` `@Component` listening to `UIInitEvent` (Vaadin) and navigation events injects the configured header-button surface into the host shell. Reads admin toggle and only mounts what's enabled. Host needs no code edits beyond depending on the starter.
 - [ ] **SURF-04**: `AiChatSessionState` `@VaadinSessionScope` bean tracks the active `conversationId` for the user session. Switching surface mid-session calls `setConversationId(state.getCurrentConversationId())` on the new fragment instance — same conversation continues. No backend duplication.
 - [ ] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE active `ChatPanelFragment` per UI tab, and all mounted fragments in one session share the same active conversation id via `AiChatSessionState`.
-- [ ] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
-- [ ] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
+- [x] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
+- [x] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
 - [ ] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
 - [ ] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
-- [ ] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
+- [x] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
 
 ### Chat Task Input — Speech-to-Text & Task-Scoped File
 
@@ -104,7 +104,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 ### New Entities
 
 - [x] **ENT-05**: `AiExposureRule` (per EXP-01)
-- [ ] **ENT-06**: `AiUiSettings` (per SURF-02)
+- [x] **ENT-06**: `AiUiSettings` (per SURF-02)
 - [ ] **ENT-07**: `AiTaskFile` (per TASK-03)
 - [ ] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
 - [x] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)

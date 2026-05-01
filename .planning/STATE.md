@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Phase 12 context gathered (scope simplified to 2 surfaces)
-last_updated: "2026-05-01T20:16:27.484Z"
+status: In Progress
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-05-01T20:39:25.989Z"
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 39
-  completed_plans: 33
-  percent: 85
+  completed_plans: 34
+  percent: 87
 ---
 
 # Project State
@@ -27,14 +27,14 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 12
-Plan: 6 plans ready
+Phase: 12 (configurable-chat-surfaces) — EXECUTING
+Plan: 2 of 6
 | Field | Value |
 |-------|-------|
 | Phase | Phase 12 |
-| Plan | 6 plans ready |
-| Status | Ready to execute |
-| Last activity | 2026-05-02 — Phase 12 planned |
+| Plan | 2 of 6 |
+| Status | In Progress |
+| Last activity | 2026-05-02 — Plan 12-01 completed |
 
 ## Phase Status
 
@@ -43,7 +43,7 @@ Plan: 6 plans ready
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
-| 12. Configurable Chat Surfaces | Ready to execute | 0/6 | 2026-05-02 | - |
+| 12. Configurable Chat Surfaces | In Progress | 1/6 | 2026-05-02 | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 
@@ -156,6 +156,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 11]: Use @MockitoBean for the commit-unknown failure probe so the failure does not leak into unrelated Spring test contexts.
 - [Phase 11]: Keep Java 17-compatible List.get(0) assertions even when JetBrains suggests List.getFirst().
 - [Phase 11]: Align the existing tool-name scanner baseline test with Phase 11's read, link, and mutation built-in names.
+- [Phase 12]: Persist enabled chat surfaces as deterministic enabledSurfaceIds text with typed helper methods, not as an enum collection property. — Jmix enum collection persistence is not used here, and the Phase 12 contract forbids an enabledSurfaces JavaBean collection on AiUiSettings.
+- [Phase 12]: Keep the existing agentstore includeAll changelog strategy and document that it picks up 080-ai-ui-settings.xml. — Changing old changelog include paths could alter Liquibase change identity for deployed databases; includeAll already loads the new file.
+- [Phase 12]: Use the included-build Gradle path :ai-agent:ai-agent:* for Phase 12 add-on verification. — The root checkout has no :ai-agent:test task; Gradle exposes the functional module through the nested included-build path.
 
 ### Performance Metrics
 
@@ -192,6 +195,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11-mutation-capable-built-in-tools P11 | 20min | 2 tasks | 10 files |
 | Phase 11 P12 | 8min | 2 tasks | 3 files |
 | Phase 11 P13 | 12min | 2 tasks | 4 files |
+| Phase 12 P01 | 16 min | 3 tasks | 12 files |
 
 ### Quick Tasks Completed
 
@@ -201,8 +205,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-30T11:20:20.331Z
-**Stopped at:** Phase 12 context gathered (scope simplified to 2 surfaces)
-**Resume file:** .planning/phases/12-configurable-chat-surfaces/12-CONTEXT.md
+**Last session:** 2026-05-01T20:39:01.699Z
+**Stopped at:** Completed 12-01-PLAN.md
+**Resume file:** None
 **Blockers:** None.
-**Next action:** Plan Phase 12 configurable chat surfaces.
+**Next action:** Execute Phase 12 Plan 12-02.
