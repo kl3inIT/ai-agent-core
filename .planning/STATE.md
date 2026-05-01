@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-05-01T21:13:55.978Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-05-01T21:28:11.989Z"
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 39
-  completed_plans: 35
-  percent: 90
+  completed_plans: 36
+  percent: 92
 ---
 
 # Project State
@@ -28,13 +28,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 12 (configurable-chat-surfaces) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 | Field | Value |
 |-------|-------|
 | Phase | Phase 12 |
-| Plan | 3 of 6 |
+| Plan | 4 of 6 |
 | Status | In Progress |
-| Last activity | 2026-05-02 — Plan 12-02 completed |
+| Last activity | 2026-05-02 — Plan 12-03 completed |
 
 ## Phase Status
 
@@ -43,7 +43,7 @@ Plan: 3 of 6
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
-| 12. Configurable Chat Surfaces | In Progress | 2/6 | 2026-05-02 | - |
+| 12. Configurable Chat Surfaces | In Progress | 3/6 | 2026-05-02 | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 
@@ -162,6 +162,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 12]: Use a singleton StandardDetailView for AiUiSettings that loads through AiUiSettingsService.loadCurrent(), so admins edit only AiUiSettings.SINGLETON_ID and cannot create arbitrary settings rows. — Matches the singleton settings model and avoids arbitrary configuration rows.
 - [Phase 12]: Keep settings surface controls controller-managed and persist through getEnabledSurfaceSet/setEnabledSurfaceSet, not an enabledSurfaces Jmix entity property. — Avoids unsupported Jmix enum collection binding and preserves the Phase 12 entity contract.
 - [Phase 12]: AiAgentAdminRole grants AiUiSettings READ/UPDATE plus view/menu policies only; CREATE/DELETE stay service-internal for the singleton row. — Admins can edit settings while singleton creation remains trusted service code.
+- [Phase 12]: Use DialogWindow<?> in AiChatUIState until ChatDialogView is introduced by Plan 12-04. — Keeps Plan 12-03 compiling while preserving the per-UI dialog handle contract.
+- [Phase 12]: Keep active stream/run authority in ChatPanelFragment plus CancellationRegistry; AiChatSessionState stores only currentConversationId and listeners. — Preserves D-10 and avoids turning session state into a cancellation authority.
+- [Phase 12]: Use the repository composite Gradle path :ai-agent:ai-agent:* for add-on verification. — The root checkout exposes the functional module through an included build, matching prior Phase 12 verification.
 
 ### Performance Metrics
 
@@ -200,6 +203,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11 P13 | 12min | 2 tasks | 4 files |
 | Phase 12 P01 | 16 min | 3 tasks | 12 files |
 | Phase 12 P02 | 23 min | 2 tasks | 9 files |
+| Phase 12 P03 | 10 min | 2 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -209,8 +213,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T21:13:55.962Z
-**Stopped at:** Completed 12-02-PLAN.md
+**Last session:** 2026-05-01T21:28:11.971Z
+**Stopped at:** Completed 12-03-PLAN.md
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Execute Phase 12 Plan 12-03.
+**Next action:** Execute Phase 12 Plan 12-04.
