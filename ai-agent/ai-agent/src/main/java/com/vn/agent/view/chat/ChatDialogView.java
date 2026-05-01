@@ -46,9 +46,11 @@ public class ChatDialogView extends StandardView {
         DialogWindow<?> dialogWindow = aiChatUIState.getDialogInstance();
         if (dialogWindow != null) {
             dialogWindow.close();
+            aiChatUIState.clearDialogInstance();
             return;
         }
 
+        aiChatUIState.clearDialogInstance();
         closeWithDefaultAction();
     }
 

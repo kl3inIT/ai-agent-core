@@ -12,7 +12,7 @@ import com.vn.agent.view.conversation.ConversationListView;
 import io.jmix.core.AccessManager;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
-import io.jmix.flowui.DialogWindows;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.component.applayout.JmixAppLayout;
@@ -24,6 +24,7 @@ import io.jmix.flowui.view.DialogWindow;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -59,21 +60,19 @@ class ChatSurfaceMounterTest {
     @Autowired
     UnconstrainedDataManager unconstrainedDataManager;
     @Autowired
-    DialogWindows dialogWindows;
+    ObjectProvider<AiChatUIState> chatUIStateProvider;
     @Autowired
-    AiChatUIState chatUIState;
-    @Autowired
-    AiChatSessionState chatSessionState;
+    ObjectProvider<AiChatSessionState> chatSessionStateProvider;
     @Autowired
     ConversationGateway conversationGateway;
     @Autowired
     ViewNavigators viewNavigators;
+    @Autowired
+    UiComponents uiComponents;
 
     @BeforeEach
     @AfterEach
     void cleanUp() {
-        chatUIState.clearDialogInstance();
-        chatSessionState.setCurrentConversationId(null);
         unconstrainedDataManager.load(AiUiSettings.class)
                 .all()
                 .list()
@@ -94,7 +93,7 @@ class ChatSurfaceMounterTest {
                 .contains("addUIInitListener")
                 .contains("addAfterNavigationListener")
                 .contains("uiSettingsService.loadCurrent()")
-                .contains("new UiShowViewContext(\"AiAgent_ChatDialog\")")
+                .contains("new UiShowViewContext(CHAT_DIALOG_VIEW_ID)")
                 .contains("setModal(false)")
                 .contains("setLeft(\"65%\")")
                 .contains("setTop(\"5%\")")
@@ -102,7 +101,8 @@ class ChatSurfaceMounterTest {
                 .contains("setHeight(\"75%\")")
                 .contains("setResizable(true)")
                 .contains("setDraggable(true)")
-                .contains("AiAgent_Chat");
+                .contains("AiAgent_Chat")
+                .contains("AI Agent chat button not mounted");
     }
 
     @Test
@@ -120,7 +120,7 @@ class ChatSurfaceMounterTest {
     void defaultSettingsMountExactlyOneVisibleHeaderButtonForChatUser() {
         systemAuthenticator.runWithUser("alice", () -> {
             UI ui = UI.getCurrent();
-            JmixAppLayout appLayout = new JmixAppLayout();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
             ui.add(appLayout);
 
             chatSurfaceMounter.initializeUiForTest(ui);
@@ -136,7 +136,7 @@ class ChatSurfaceMounterTest {
     void disablingHeaderButtonHidesMountedButtonAfterNavigationRefresh() {
         systemAuthenticator.runWithUser("alice", () -> {
             UI ui = UI.getCurrent();
-            JmixAppLayout appLayout = new JmixAppLayout();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
             ui.add(appLayout);
             chatSurfaceMounter.initializeUiForTest(ui);
 
@@ -156,7 +156,7 @@ class ChatSurfaceMounterTest {
     void fullChatRouteHidesMountedButton() {
         systemAuthenticator.runWithUser("alice", () -> {
             UI ui = UI.getCurrent();
-            JmixAppLayout appLayout = new JmixAppLayout();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
             ui.add(appLayout);
             chatSurfaceMounter.initializeUiForTest(ui);
 
@@ -171,6 +171,8 @@ class ChatSurfaceMounterTest {
     @Test
     void secondClickClosesDialogAndKeepsSessionConversationId() {
         DialogWindow<?> existingDialog = mock(DialogWindow.class);
+        AiChatUIState chatUIState = new AiChatUIState();
+        AiChatSessionState chatSessionState = new AiChatSessionState();
         UUID conversationId = UUID.randomUUID();
         chatUIState.setDialogInstance(existingDialog);
         chatSessionState.setCurrentConversationId(conversationId);
@@ -186,21 +188,20 @@ class ChatSurfaceMounterTest {
     @Test
     void dialogWindowSurvivesRouteNavigationWithConversationState() {
         systemAuthenticator.runWithUser("alice", () -> {
+            AiChatSessionState chatSessionState = chatSessionStateProvider.getObject();
             AiConversation conversation = conversationGateway.loadOrCreate("alice", null, "first");
             chatSessionState.setCurrentConversationId(conversation.getId());
 
-            DialogWindow<ChatDialogView> dialogWindow = dialogWindows
-                    .view(UiTestUtils.getCurrentView(), ChatDialogView.class)
-                    .build();
-            chatUIState.setDialogInstance(dialogWindow);
-            dialogWindow.open();
+            assertThat(chatSurfaceMounter.findDialogParentViewForTest(UI.getCurrent()))
+                    .isPresent();
+            DialogWindow<ChatDialogView> dialogWindow = chatSurfaceMounter.openDialogForTest();
 
             viewNavigators.view(UiTestUtils.getCurrentView(), ConversationListView.class)
                     .navigate();
 
             ChatDialogView dialogView = dialogWindow.getView();
             ChatPanelFragment fragment = UiTestUtils.getComponent(dialogView, "chatPanelFragment");
-            assertThat(chatUIState.getDialogInstance()).isSameAs(dialogWindow);
+            assertThat(chatUIStateProvider.getObject().getDialogInstance()).isSameAs(dialogWindow);
             assertThat(dialogWindow.getElement().getNode().isAttached()).isTrue();
             assertThat(fragment.getConversationId()).isEqualTo(conversation.getId());
         });

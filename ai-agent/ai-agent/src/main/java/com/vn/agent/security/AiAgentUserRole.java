@@ -45,6 +45,7 @@ public interface AiAgentUserRole {
             "aiAgent.conversations"})
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
+            "AiAgent_ChatDialog",
             "AiAgent_Conversation.list",
             "AiAgent_Conversation.detail"})
     void userViews();
