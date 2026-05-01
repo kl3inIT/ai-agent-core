@@ -1,7 +1,7 @@
 ---
 phase: 12
 reviewers: [codex]
-reviewed_at: 2026-05-02T03:08:54.7674443+07:00
+reviewed_at: 2026-05-02T03:15:33.5277007+07:00
 plans_reviewed:
   - .planning/phases/12-configurable-chat-surfaces/12-01-PLAN.md
   - .planning/phases/12-configurable-chat-surfaces/12-02-PLAN.md
@@ -17,41 +17,40 @@ plans_reviewed:
 
 ### Summary
 
-The replanned Phase 12 is much stronger than the stale three-surface version. The six-plan sequence is coherent, dependency-ordered, and mostly aligned with the locked `FULL_ROUTE` + `HEADER_BUTTON` scope. The plans show good discipline around Jmix-first UI, AccessManager gating, no raw Vaadin launcher, session/UI state separation, and TEST-14 coverage. I count **3 current-cycle HIGH concerns** that should be fixed before execution convergence.
+The dac3d59 replan closes the three previous HIGH concerns with concrete artifacts and acceptance gates. The plans now avoid the unsupported enum-collection trap, add a named bounded title executor, and make TEST-14 require direct Spring AI JDBC memory verification instead of a proxy. I do not see any unresolved current HIGH concerns. Remaining risks are implementation-level, mostly around Jmix/Vaadin lifecycle details and test brittleness.
 
 ### Strengths
 
-- Plans correctly amend `ROADMAP.md` / `REQUIREMENTS.md` first in `12-01`, reducing risk of accidentally building `SIDEBAR`, `FLOATING`, P-21, or compact-mode work.
-- The wave ordering is sensible: settings foundation -> admin UI/session state -> dialog/mounter/title work -> verification.
-- `12-04` explicitly tests the riskiest runtime assumption: whether the dialog survives route navigation.
-- Security posture is mostly sound: settings admin view is role-gated, header button uses `UiShowViewContext`, and `AiUiSettings` is excluded from LLM metadata.
-- `12-05` handles auto-title as backend async work with no-clobber, bounded prompt context, audit, and fail-silent behavior.
-- `12-06` is a real closeout gate, not just a checklist; it includes continuity, settings, title, i18n, and UAT coverage.
+- `enabledSurfaceIds` is now a text-backed entity field, with `getEnabledSurfaceSet()` helpers and explicit bans on `getEnabledSurfaces()` / direct XML binding.
+- Auto-title async execution now has a concrete `AIConfiguration` artifact, named `aiAgentTitleExecutor`, bounded queue/pool settings, and `@Async("aiAgentTitleExecutor")`.
+- TEST-14 now requires direct `JdbcChatMemoryRepository.findByConversationId(...)` assertions, with `AiMessage` parity only as supplemental coverage.
+- The two-surface scope remains clean: `FULL_ROUTE` + `HEADER_BUTTON`, no sidebar, raw floating launcher, P-21 mitigation, or compact-mode creep.
+- Security checks are planned at the right layers: admin settings policies, chat-dialog view policy for normal users, `UiShowViewContext`, route gate, and menu/button visibility.
+- Dialog survival across navigation is not assumed; `12-04` and `12-06` require executable proof.
 
 ### Concerns
 
-- **HIGH - `12-01` / `12-02`: `enabledSurfaces` text storage may still look like an unsupported enum collection.** The plan says persist a text column but expose `getEnabledSurfaces()` / `setEnabledSurfaces(Set<AiChatSurface>)` on the entity. If the field/property name is also `enabledSurfaces`, Jmix metadata or JavaBean inspection can treat it as a collection-valued entity property, which is exactly what the plan is trying to avoid. Use a persisted string like `enabledSurfaceIds` plus typed helpers such as `getEnabledSurfaceSet()` / `setEnabledSurfaceSet(...)`, and keep the checkbox field controller-managed.
-- **HIGH - `12-05`: bounded async executor/autoconfig is not planned as an artifact.** Context D-15 requires `@EnableAsync` plus a sized `TaskExecutor`. `12-05` adds `@Async` title generation but does not list `AIConfiguration` or a new async configuration file, and the acceptance criteria do not enforce a bounded executor. Add an explicit `aiAgentTitleExecutor` configuration or prove an existing bounded executor is used via `@Async("...")`.
-- **HIGH - `12-06`: TEST-14 has an escape hatch that may weaken the JDBC memory requirement.** The requirement says verify the same conversation id and JDBC memory rows. The plan allows falling back to `AiMessage + conversationId` as a proxy. That proves UI persistence but not necessarily Spring AI JDBC memory continuity. Prefer querying the Spring AI chat memory repository/table directly. If that is truly impossible, amend the requirement explicitly instead of letting the test silently weaken it.
-- **MEDIUM - `12-01`: singleton creation race is not covered.** `AiUiSettingsService.loadCurrent()` can race on first concurrent UI init. Add a transaction/retry path: on duplicate key or optimistic insert conflict, reload the singleton.
-- **MEDIUM - locale bundle names are inconsistent across artifacts.** Plans use `messages_en.properties` + `messages_vi.properties`, while some project context references `messages.properties` + `messages_vi.properties`. Verify actual bundle names and update every plan consistently.
-- **MEDIUM - `AiUiSettings` audit fields are treated as optional in `12-01`.** Context says audit fields are part of the entity. Make them explicit in entity and Liquibase acceptance criteria.
-- **MEDIUM - `12-03`: listener registry may retain UI references across tabs.** The design needs clear unregister-on-detach and UI-detach cleanup. Tests should cover detached UI callbacks being ignored, not just listener removal.
-- **MEDIUM - `12-05`: manual title edit authorization is underspecified.** The plan says use secured `DataManager` "if" the user owns/can access the conversation. Add an explicit non-admin chat-user test proving title edit works only for the user's own conversation.
-- **LOW - `12-05`: hidden `attachmentsPanel` split may affect current layout.** A 68/32 split with a hidden right panel could still alter sizing depending on component behavior. Add a focused UI/layout assertion or keep the split dormant until Phase 13 if it causes width regressions.
+- **MEDIUM - `12-05`: title-client isolation is specified but not strongly acceptance-tested.** The plan says no tools/advisors, but acceptance does not require a test proving title generation cannot inherit chat advisors/tool callbacks/memory. This is worth adding because title calls run on user/assistant content.
+- **MEDIUM - `12-04`: UI-level dialog attachment remains somewhat implementation-dependent.** The plan correctly requires a route-navigation survival test, but the implementation instruction still says `DialogWindows.view(currentViewOrUiContext, ...)`. If parent-bound dialogs fail the test, execution must stop and adjust the mounting strategy, not paper over it.
+- **MEDIUM - `12-05`: manual title-edit authorization remains under-tested.** The plan says save through secured `DataManager` only if the user owns/can access the conversation, but should add an explicit non-admin own-conversation and other-user-conversation test.
+- **LOW - `12-03`: listener cleanup could use one more stale-UI assertion.** The plan covers unregister-on-detach, but a test proving detached UI callbacks are ignored would harden the cross-tab listener path.
+- **LOW - `12-01` / `12-02`: malformed persisted `enabledSurfaceIds` handling is not explicit.** Admin UI validation covers normal flow, but service/mounter behavior for corrupted DB values should fail to safe defaults or reject clearly.
 
 ### Suggestions
 
-- Rename the persisted settings field to `enabledSurfaceIds`; reserve `enabledSurfaces` for view-model/controller state only.
-- Add `AiAgentTitleAsyncConfiguration` or update existing config with a bounded `ThreadPoolTaskExecutor`, then use `@Async("aiAgentTitleExecutor")`.
-- Make TEST-14 directly assert Spring AI JDBC memory continuity, or formally narrow the requirement before implementation.
-- Add singleton race handling to `AiUiSettingsService.loadCurrent()`.
-- Add a non-admin title-edit test and a detached-UI listener cleanup test.
-- Normalize message bundle filenames in all six plans before execution.
+- Add a title-service test that verifies no tool callbacks, advisors, RAG, or chat memory are invoked during title generation.
+- In `12-04`, make the dialog survival test a hard gate before accepting the mounter implementation.
+- Add non-admin title-edit authorization tests: own conversation succeeds, another user's conversation is denied/opaque.
+- Add a small `AiUiSettings` parsing test for unknown/blank surface ids.
+- Add a detached-listener test for `AiChatSessionState` or the fragment integration test.
 
 ### Risk Assessment
 
-**Overall risk: MEDIUM.** The architecture is sound and the plan now targets the correct two-surface scope. The remaining risks are concentrated in implementation details that can cause runtime breakage: Jmix metadata mapping for `enabledSurfaces`, async executor behavior, and whether TEST-14 truly proves JDBC memory continuity. Fixing the 3 HIGH concerns should make the phase execution plan low-to-medium risk.
+**Overall risk: MEDIUM.** The plan architecture is sound and the prior HIGHs are resolved. Remaining risk comes from Vaadin/Jmix lifecycle behavior, async event timing, and UI test reliability rather than missing phase-level design.
+
+### Current HIGH Count
+
+**0**
 
 ---
 
@@ -61,15 +60,15 @@ Only the Codex reviewer was invoked for this cycle because the requested workflo
 
 ### Agreed Strengths
 
-- The plan set now follows the locked two-surface scope and explicitly removes the stale sidebar/floating-launcher work.
-- The wave dependency structure is coherent and places foundation, admin security, runtime surfaces, title behavior, and verification in a sensible order.
-- Security-sensitive pieces are mostly identified: admin policies, view/menu gates, `UiShowViewContext`, LLM metadata exclusion, no-clobber title saves, and route disabling.
+- The dac3d59 replan resolves all three previous HIGH concerns with explicit plan artifacts and verification gates.
+- The implementation scope remains aligned to the locked two-surface Phase 12 target: `FULL_ROUTE` and `HEADER_BUTTON`.
+- The remaining issues are implementation hardening items rather than unresolved phase-blocking design gaps.
 
 ### Agreed Concerns
 
-- The entity storage design for enabled surfaces must avoid exposing a Jmix collection-valued enum property by accident.
-- Auto-title async execution needs an explicit bounded executor/configuration artifact.
-- TEST-14 must directly prove Spring AI JDBC memory continuity, or the requirement must be deliberately narrowed.
+- Title generation should be tested to ensure it does not inherit chat tools, advisors, RAG, or memory.
+- Dialog attachment and route-navigation survival must remain a hard executable gate during Plan 12-04.
+- Manual title-edit authorization should be covered with non-admin own-conversation and other-user denial tests.
 
 ### Divergent Views
 
