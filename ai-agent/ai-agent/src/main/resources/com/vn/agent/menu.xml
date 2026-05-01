@@ -8,6 +8,8 @@
               title="msg://com.vn.agent/menu.conversations"/>
         <item id="aiAgent.configuration" view="AiAgent_Configuration"
               title="msg://com.vn.agent/menu.configuration"/>
+        <item id="aiAgent.uiSettings" view="AiAgent_AiUiSettings.detail"
+              title="msg://com.vn.agent/menu.uiSettings"/>
         <item id="aiAgent.knowledge.list" view="AiAgent_KnowledgeBase.list"
               title="msg://com.vn.agent/menu.knowledge"/>
         <item id="aiAgent.audit.list" view="AiAgent_AiAuditEvent.list"
