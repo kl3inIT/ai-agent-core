@@ -3,19 +3,19 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-05-01T20:39:25.989Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-05-01T21:13:55.978Z"
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 39
-  completed_plans: 34
-  percent: 87
+  completed_plans: 35
+  percent: 90
 ---
 
 # Project State
 
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-02
 
 ## Project Reference
 
@@ -28,13 +28,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 12 (configurable-chat-surfaces) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 | Field | Value |
 |-------|-------|
 | Phase | Phase 12 |
-| Plan | 2 of 6 |
+| Plan | 3 of 6 |
 | Status | In Progress |
-| Last activity | 2026-05-02 — Plan 12-01 completed |
+| Last activity | 2026-05-02 — Plan 12-02 completed |
 
 ## Phase Status
 
@@ -43,7 +43,7 @@ Plan: 2 of 6
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
-| 12. Configurable Chat Surfaces | In Progress | 1/6 | 2026-05-02 | - |
+| 12. Configurable Chat Surfaces | In Progress | 2/6 | 2026-05-02 | - |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 
@@ -159,6 +159,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 12]: Persist enabled chat surfaces as deterministic enabledSurfaceIds text with typed helper methods, not as an enum collection property. — Jmix enum collection persistence is not used here, and the Phase 12 contract forbids an enabledSurfaces JavaBean collection on AiUiSettings.
 - [Phase 12]: Keep the existing agentstore includeAll changelog strategy and document that it picks up 080-ai-ui-settings.xml. — Changing old changelog include paths could alter Liquibase change identity for deployed databases; includeAll already loads the new file.
 - [Phase 12]: Use the included-build Gradle path :ai-agent:ai-agent:* for Phase 12 add-on verification. — The root checkout has no :ai-agent:test task; Gradle exposes the functional module through the nested included-build path.
+- [Phase 12]: Use a singleton StandardDetailView for AiUiSettings that loads through AiUiSettingsService.loadCurrent(), so admins edit only AiUiSettings.SINGLETON_ID and cannot create arbitrary settings rows. — Matches the singleton settings model and avoids arbitrary configuration rows.
+- [Phase 12]: Keep settings surface controls controller-managed and persist through getEnabledSurfaceSet/setEnabledSurfaceSet, not an enabledSurfaces Jmix entity property. — Avoids unsupported Jmix enum collection binding and preserves the Phase 12 entity contract.
+- [Phase 12]: AiAgentAdminRole grants AiUiSettings READ/UPDATE plus view/menu policies only; CREATE/DELETE stay service-internal for the singleton row. — Admins can edit settings while singleton creation remains trusted service code.
 
 ### Performance Metrics
 
@@ -196,6 +199,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11 P12 | 8min | 2 tasks | 3 files |
 | Phase 11 P13 | 12min | 2 tasks | 4 files |
 | Phase 12 P01 | 16 min | 3 tasks | 12 files |
+| Phase 12 P02 | 23 min | 2 tasks | 9 files |
 
 ### Quick Tasks Completed
 
@@ -205,8 +209,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-01T20:39:01.699Z
-**Stopped at:** Completed 12-01-PLAN.md
+**Last session:** 2026-05-01T21:13:55.962Z
+**Stopped at:** Completed 12-02-PLAN.md
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Execute Phase 12 Plan 12-02.
+**Next action:** Execute Phase 12 Plan 12-03.

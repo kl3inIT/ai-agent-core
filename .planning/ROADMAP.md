@@ -130,13 +130,13 @@
   2. A user starts a conversation in the full `ChatView`, switches mid-session to the header-button `ChatDialogView`, and continues the same `conversationId`; the same JDBC-backed conversation/message history backs each turn and TEST-14 passes.
   3. The header button opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable), avoiding the deferred raw Vaadin bottom-right launcher and P-21 stacking mitigation.
   4. There is exactly one `AiConversation` row per active user-session conversation regardless of surface — `AiChatSessionState` (`@VaadinSessionScope`) carries the active id and reattaches to whichever fragment is mounted.
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 **Wave 1**
 - [x] 12-01-PLAN.md — Scope-doc amendments + `AiChatSurface` / `AiUiSettings` / singleton settings service foundation
 
 **Wave 2 (blocked on Wave 1 completion)**
-- [ ] 12-02-PLAN.md — `AiUiSettingsDetailView`, menu entry, admin role policies, settings access tests
+- [x] 12-02-PLAN.md — `AiUiSettingsDetailView`, menu entry, admin role policies, settings access tests
 - [ ] 12-03-PLAN.md — `AiChatSessionState` / `AiChatUIState` + `ChatPanelFragment` continuity integration
 
 **Wave 3 (blocked on Wave 2 completion)**
@@ -198,7 +198,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
-| 12. Configurable Chat Surfaces | 1/6 | In Progress|  |
+| 12. Configurable Chat Surfaces | 2/6 | In Progress|  |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 

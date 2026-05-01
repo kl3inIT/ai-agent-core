@@ -70,7 +70,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [ ] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE active `ChatPanelFragment` per UI tab, and all mounted fragments in one session share the same active conversation id via `AiChatSessionState`.
 - [x] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
 - [x] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
-- [ ] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
+- [x] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
 - [ ] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
 - [x] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
 
@@ -127,7 +127,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ### Security Extensions
 
-- [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — pending Phase 12).
+- [x] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — done Phase 12-02).
 - [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
 - [x] **SEC-07**: New `AiAgentMutationRole` resource role is an explicit AI-mutation marker gate. It grants no entity CRUD by itself; mutation tools require the marker role AND normal Jmix create/update policies. Hosts opt users in by assigning/composing this marker with their own entity roles.
 
