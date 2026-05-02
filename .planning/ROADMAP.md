@@ -130,7 +130,7 @@
   2. A user starts a conversation in the full `ChatView`, switches mid-session to the header-button `ChatDialogView`, and continues the same `conversationId`; the same JDBC-backed conversation/message history backs each turn and TEST-14 passes.
   3. The header button opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable), avoiding the deferred raw Vaadin bottom-right launcher and P-21 stacking mitigation.
   4. There is exactly one `AiConversation` row per active user-session conversation regardless of surface — `AiChatSessionState` (`@VaadinSessionScope`) carries the active id and reattaches to whichever fragment is mounted.
-**Plans:** 4/6 plans executed
+**Plans:** 5/6 plans executed
 
 **Wave 1**
 - [x] 12-01-PLAN.md — Scope-doc amendments + `AiChatSurface` / `AiUiSettings` / singleton settings service foundation
@@ -141,7 +141,7 @@
 
 **Wave 3 (blocked on Wave 2 completion)**
 - [x] 12-04-PLAN.md — `ChatDialogView`, `ChatSurfaceMounter`, header-button dialog toggle, route/menu gating
-- [ ] 12-05-PLAN.md — Async conversation auto-title, pencil-edit override, hidden Phase 13 attachments slot
+- [x] 12-05-PLAN.md — Async conversation auto-title, pencil-edit override, hidden Phase 13 attachments slot
 
 **Wave 4 (blocked on Wave 3 completion)**
 - [ ] 12-06-PLAN.md — TEST-14 cross-surface continuity, settings/title/i18n hardening tests, UAT checklist
@@ -198,7 +198,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
-| 12. Configurable Chat Surfaces | 4/6 | In Progress|  |
+| 12. Configurable Chat Surfaces | 5/6 | In Progress|  |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 
