@@ -27,7 +27,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
@@ -208,9 +207,12 @@ class ChatPanelFragmentConversationIdTest {
         UserDetails userDetails = mock(UserDetails.class);
         DataManager dataManager = mock(DataManager.class, RETURNS_DEEP_STUBS);
         Messages messages = mock(Messages.class);
+        AiConversation conversation = mock(AiConversation.class);
 
         when(userDetails.getUsername()).thenReturn("alice");
         when(currentAuthentication.getUser()).thenReturn(userDetails);
+        when(conversation.getTitle()).thenReturn("Loaded title");
+        when(conversationGateway.loadOrCreate("alice", conversationId, null)).thenReturn(conversation);
         when(dataManager.load(AiMessage.class)
                 .query(anyString())
                 .parameter(eq("cid"), eq(conversationId))

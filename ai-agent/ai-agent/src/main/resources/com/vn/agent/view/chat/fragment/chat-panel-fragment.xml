@@ -3,19 +3,43 @@
     <content>
         <vbox id="rootLayout" classNames="ai-agent-chat-panel"
               width="100%" height="100%" padding="false" spacing="false">
-            <hbox id="toolbar" width="100%" alignItems="CENTER"
-                  classNames="ai-agent-chat-panel__toolbar">
-                <button id="stopButton"
-                        text="msg:///chatView.action.stop"
-                        themeNames="tertiary"
-                        visible="false"/>
-            </hbox>
-            <vbox id="messageListSlot" width="100%" height="100%"
-                  padding="false" spacing="false"
-                  classNames="ai-agent-chat-panel__messages"/>
-            <vbox id="messageInputSlot" width="100%"
-                  padding="false" spacing="false"
-                  classNames="ai-agent-chat-panel__input"/>
+            <split id="chatSurfaceSplit"
+                   orientation="HORIZONTAL"
+                   width="100%"
+                   height="100%"
+                   splitterPosition="68">
+                <vbox id="chatPanel" width="100%" height="100%"
+                      padding="false" spacing="false">
+                    <hbox id="titleBar" width="100%" alignItems="CENTER"
+                          classNames="ai-agent-chat-panel__toolbar">
+                        <h3 id="conversationTitle"
+                            text="msg:///chatView.action.newChat"
+                            classNames="m-0"/>
+                        <button id="editConversationTitleButton"
+                                icon="PENCIL"
+                                title="msg:///chatView.action.editTitle"
+                                ariaLabel="msg:///chatView.action.editTitle"
+                                themeNames="tertiary-inline small icon"
+                                visible="false"/>
+                        <button id="stopButton"
+                                text="msg:///chatView.action.stop"
+                                themeNames="tertiary"
+                                visible="false"/>
+                    </hbox>
+                    <vbox id="messageListSlot" width="100%" height="100%"
+                          padding="false" spacing="false"
+                          classNames="ai-agent-chat-panel__messages"/>
+                    <vbox id="messageInputSlot" width="100%"
+                          padding="false" spacing="false"
+                          classNames="ai-agent-chat-panel__input"/>
+                </vbox>
+                <vbox id="attachmentsPanel"
+                      width="100%"
+                      height="100%"
+                      padding="false"
+                      spacing="false"
+                      visible="false"/>
+            </split>
         </vbox>
     </content>
 </fragment>
