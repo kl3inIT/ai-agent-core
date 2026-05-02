@@ -71,7 +71,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [x] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
 - [x] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
 - [x] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
-- [ ] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
+- [x] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
 - [x] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
 
 ### Chat Task Input — Speech-to-Text & Task-Scoped File
@@ -139,7 +139,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 - [x] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
 - [x] **TEST-12**: Mutation audit-vs-transaction test — known host save rollback writes a durable audit row with `outcome=ERROR`; post-host-save idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`); post-COMMITTED audit/result failures leave the intent `COMMITTED` and exact retry replays.
 - [x] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
-- [ ] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
+- [x] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
 - [ ] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
 - [ ] **TEST-16**: Task file isolation test — `AiTaskFile` upload does NOT trigger `IngesterManager` invocation; `VectorStore` count unchanged after task-file attach.
 - [ ] **TEST-17**: STT audit privacy test — by default, `STT_TRANSCRIPTION` audit row contains transcript hash, NOT raw text. Setting `ai-agent.stt.audit.storeTranscript=true` flips it.
