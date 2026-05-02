@@ -1,21 +1,28 @@
 package com.vn.agent.view.chat.fragment;
 
 import com.vaadin.flow.component.DetachEvent;
-import com.vn.agent.entity.AiMessage;
+import com.vaadin.flow.component.html.H3;
 import com.vn.agent.entity.AiConversation;
+import com.vn.agent.entity.AiMessage;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.view.chat.AiChatSessionState;
 import io.jmix.core.DataManager;
+import io.jmix.core.Messages;
 import io.jmix.core.security.CurrentAuthentication;
+import io.jmix.flowui.kit.component.button.JmixButton;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.MessageSource;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import reactor.core.Disposable;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -33,6 +39,24 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 class ChatPanelFragmentConversationIdTest {
+
+    @Test
+    void descriptorAddsTitleEditAndHiddenAttachmentsSlotWithoutUpload() throws Exception {
+        Document document = readDescriptor();
+
+        Element conversationTitle = elementById(document, "conversationTitle");
+        Element editTitleButton = elementById(document, "editConversationTitleButton");
+        Element attachmentsPanel = elementById(document, "attachmentsPanel");
+
+        assertThat(conversationTitle.getTagName()).isEqualTo("h3");
+        assertThat(conversationTitle.getAttribute("text")).startsWith("msg://");
+        assertThat(editTitleButton.getAttribute("icon")).isEqualTo("PENCIL");
+        assertThat(editTitleButton.hasAttribute("text")).isFalse();
+        assertThat(editTitleButton.getAttribute("title")).startsWith("msg://");
+        assertThat(attachmentsPanel.getTagName()).isEqualTo("vbox");
+        assertThat(attachmentsPanel.getAttribute("visible")).isEqualTo("false");
+        assertThat(document.getElementsByTagName("upload").getLength()).isZero();
+    }
 
     @Test
     void ensureConversationIdForSubmit_createsOnce_thenReusesSameId() throws Exception {
@@ -89,14 +113,17 @@ class ChatPanelFragmentConversationIdTest {
     void startNewChat_clearsSessionState() throws Exception {
         ChatPanelFragment fragment = new ChatPanelFragment();
         AiChatSessionState sessionState = new AiChatSessionState();
+        JmixButton editTitleButton = new JmixButton();
         sessionState.setCurrentConversationId(UUID.randomUUID());
         inject(fragment, "chatSessionState", sessionState);
         inject(fragment, "conversationId", UUID.randomUUID());
+        inject(fragment, "editConversationTitleButton", editTitleButton);
 
         fragment.startNewChat();
 
         assertThat(fragment.getConversationId()).isNull();
         assertThat(sessionState.getCurrentConversationId()).isNull();
+        assertThat(editTitleButton.isVisible()).isFalse();
     }
 
     @Test
@@ -135,13 +162,52 @@ class ChatPanelFragmentConversationIdTest {
                 .hasMessage("Conversation id must not be null");
     }
 
+    @Test
+    void saveManualConversationTitle_trimsChecksOwnershipSavesAndUpdatesVisibleTitle() throws Exception {
+        ChatPanelFragment fragment = new ChatPanelFragment();
+        UUID conversationId = UUID.randomUUID();
+        ConversationGateway conversationGateway = mock(ConversationGateway.class);
+        DataManager dataManager = mock(DataManager.class);
+        CurrentAuthentication currentAuthentication = mock(CurrentAuthentication.class);
+        UserDetails userDetails = mock(UserDetails.class);
+        H3 conversationTitle = new H3();
+        AiConversation conversation = mock(AiConversation.class);
+        when(userDetails.getUsername()).thenReturn("alice");
+        when(currentAuthentication.getUser()).thenReturn(userDetails);
+        when(conversationGateway.loadOrCreate("alice", conversationId, null)).thenReturn(conversation);
+        when(dataManager.save(conversation)).thenReturn(conversation);
+        inject(fragment, "conversationGateway", conversationGateway);
+        inject(fragment, "dataManager", dataManager);
+        inject(fragment, "currentAuthentication", currentAuthentication);
+        inject(fragment, "conversationTitle", conversationTitle);
+        inject(fragment, "conversationId", conversationId);
+
+        invokeSaveManualConversationTitle(fragment, "  Manual title  ");
+
+        verify(conversationGateway).loadOrCreate("alice", conversationId, null);
+        verify(conversation).setTitle("Manual title");
+        verify(dataManager).save(conversation);
+        assertThat(conversationTitle.getText()).isEqualTo("Manual title");
+    }
+
+    @Test
+    void saveManualConversationTitle_rejectsBlankTitleBeforeSaving() throws Exception {
+        ChatPanelFragment fragment = new ChatPanelFragment();
+        DataManager dataManager = mock(DataManager.class);
+        inject(fragment, "dataManager", dataManager);
+
+        assertThatThrownBy(() -> invokeSaveManualConversationTitle(fragment, "  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("chatView.editTitle.validation.required");
+    }
+
     private static void prepareSetConversationIdDependencies(ChatPanelFragment fragment,
                                                              UUID conversationId) throws Exception {
         ConversationGateway conversationGateway = mock(ConversationGateway.class);
         CurrentAuthentication currentAuthentication = mock(CurrentAuthentication.class);
         UserDetails userDetails = mock(UserDetails.class);
         DataManager dataManager = mock(DataManager.class, RETURNS_DEEP_STUBS);
-        MessageSource messageSource = mock(MessageSource.class);
+        Messages messages = mock(Messages.class);
 
         when(userDetails.getUsername()).thenReturn("alice");
         when(currentAuthentication.getUser()).thenReturn(userDetails);
@@ -150,13 +216,13 @@ class ChatPanelFragmentConversationIdTest {
                 .parameter(eq("cid"), eq(conversationId))
                 .list())
                 .thenReturn(List.of());
-        when(messageSource.getMessage(anyString(), isNull(), anyString(), any(Locale.class)))
-                .thenAnswer(invocation -> invocation.getArgument(2));
+        when(messages.getMessage(anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         injectConversationGateway(fragment, conversationGateway);
         inject(fragment, "currentAuthentication", currentAuthentication);
         inject(fragment, "dataManager", dataManager);
-        inject(fragment, "messages", messageSource);
+        inject(fragment, "messages", messages);
     }
 
     private static void injectConversationGateway(ChatPanelFragment fragment,
@@ -168,5 +234,38 @@ class ChatPanelFragmentConversationIdTest {
         Field field = ChatPanelFragment.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(fragment, value);
+    }
+
+    private static void invokeSaveManualConversationTitle(ChatPanelFragment fragment, String title) throws Exception {
+        Method method = ChatPanelFragment.class.getDeclaredMethod("saveManualConversationTitle", String.class);
+        method.setAccessible(true);
+        try {
+            method.invoke(fragment, title);
+        } catch (InvocationTargetException exception) {
+            if (exception.getCause() instanceof Exception cause) {
+                throw cause;
+            }
+            throw exception;
+        }
+    }
+
+    private static Document readDescriptor() throws Exception {
+        try (InputStream stream = ChatPanelFragmentConversationIdTest.class.getResourceAsStream(
+                "/com/vn/agent/view/chat/fragment/chat-panel-fragment.xml")) {
+            assertThat(stream).isNotNull();
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(false);
+            return factory.newDocumentBuilder().parse(stream);
+        }
+    }
+
+    private static Element elementById(Document document, String id) {
+        for (int i = 0; i < document.getElementsByTagName("*").getLength(); i++) {
+            Element element = (Element) document.getElementsByTagName("*").item(i);
+            if (id.equals(element.getAttribute("id"))) {
+                return element;
+            }
+        }
+        throw new AssertionError("Element not found: " + id);
     }
 }
