@@ -1,5 +1,6 @@
 package com.vn.agent;
 
+import com.vn.agent.conversation.AiAgentTitleProperties;
 import com.vn.agent.rag.MdcPropagatingTaskDecorator;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.MutationGuard;
@@ -11,10 +12,6 @@ import io.jmix.flowui.FlowuiConfiguration;
 import io.jmix.flowui.sys.ActionsConfiguration;
 import io.jmix.flowui.sys.ViewControllersConfiguration;
 import io.jmix.security.SecurityConfiguration;
-import org.springframework.ai.embedding.EmbeddingModel;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.ApplicationContext;
@@ -22,7 +19,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -96,7 +92,28 @@ public class AIConfiguration {
         return executor;
     }
 
-
+    /**
+     * Bounded executor for fail-silent conversation title generation. The title job is deliberately
+     * outside the chat reply contract, so queue overflow applies caller-runs back-pressure instead
+     * of dropping work or creating an unbounded executor.
+     */
+    @Bean(name = "aiAgentTitleExecutor")
+    @ConditionalOnMissingBean(name = "aiAgentTitleExecutor")
+    public ThreadPoolTaskExecutor aiAgentTitleExecutor(AiAgentTitleProperties props) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        AiAgentTitleProperties.Executor cfg = props.resolvedExecutor();
+        executor.setCorePoolSize(cfg.resolvedCorePoolSize());
+        executor.setMaxPoolSize(cfg.resolvedMaxPoolSize());
+        executor.setQueueCapacity(cfg.resolvedQueueCapacity());
+        executor.setKeepAliveSeconds(cfg.resolvedKeepAliveSeconds());
+        executor.setThreadNamePrefix("ai-title-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setTaskDecorator(new MdcPropagatingTaskDecorator());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
+    }
 
     /**
      * Default no-op {@link MutationGuard} (Phase 11 SPI-10). Hosts opt in to mutation

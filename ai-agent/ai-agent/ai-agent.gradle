@@ -26,6 +26,7 @@ dependencies {
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
     implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
+    implementation 'org.springframework.ai:spring-ai-openai:1.1.4'
 
     // Plan 04-04: ProjectingChatMemoryRepository decorates JdbcChatMemoryRepository (D-08 dual-layer).
     implementation 'org.springframework.ai:spring-ai-model-chat-memory-repository-jdbc:1.1.4'

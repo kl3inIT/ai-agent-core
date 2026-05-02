@@ -18,12 +18,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,7 +67,7 @@ class AiConversationTitleServiceTest {
         assertThat(reloadBeforeSave.getTitle()).isEqualTo("Daily order count");
         assertThat(service.savedConversations).containsExactly(reloadBeforeSave);
         verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
-                eq("conversation_title"), any(), eq("Daily order count"), any(Long.class),
+                eq("conversation_title"), any(), eq("Daily order count"), anyLong(),
                 eq(AiToolCallOutcome.SUCCESS), isNull(), isNull());
     }
 
@@ -86,7 +89,7 @@ class AiConversationTitleServiceTest {
 
         assertThat(service.savedConversations).isEmpty();
         verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
-                eq("conversation_title"), any(), isNull(), any(Long.class),
+                eq("conversation_title"), any(), isNull(), anyLong(),
                 eq(AiToolCallOutcome.ERROR), eq("rejected_title"), eq("IllegalArgumentException"));
     }
 
@@ -109,7 +112,7 @@ class AiConversationTitleServiceTest {
         assertThat(reloadBeforeSave.getTitle()).isEqualTo("Manual account title");
         assertThat(service.savedConversations).isEmpty();
         verify(service.auditWriter, never()).writeToolCall(any(), any(), any(), any(), any(), any(), any(),
-                any(Long.class), eq(AiToolCallOutcome.SUCCESS), any(), any());
+                anyLong(), eq(AiToolCallOutcome.SUCCESS), any(), any());
     }
 
     @Test
@@ -130,7 +133,7 @@ class AiConversationTitleServiceTest {
 
         assertThat(service.savedConversations).isEmpty();
         verify(service.auditWriter).writeToolCall(isNull(), any(UUID.class), eq("alice"), eq(conversationId),
-                eq("conversation_title"), any(), isNull(), any(Long.class),
+                eq("conversation_title"), any(), isNull(), anyLong(),
                 eq(AiToolCallOutcome.ERROR), eq("title_generation_failed"), eq("IllegalStateException"));
     }
 
@@ -178,20 +181,25 @@ class AiConversationTitleServiceTest {
     }
 
     private static AiConversation conversation(UUID conversationId, String title) {
-        AiConversation conversation = new AiConversation();
-        conversation.setId(conversationId);
-        conversation.setTitle(title);
-        conversation.setCreatedBy("alice");
-        conversation.setCreatedDate(OffsetDateTime.now());
+        AiConversation conversation = mock(AiConversation.class);
+        AtomicReference<String> titleReference = new AtomicReference<>(title);
+        org.mockito.Mockito.when(conversation.getId()).thenReturn(conversationId);
+        org.mockito.Mockito.when(conversation.getTitle()).thenAnswer(invocation -> titleReference.get());
+        doAnswer(invocation -> {
+            titleReference.set(invocation.getArgument(0));
+            return null;
+        }).when(conversation).setTitle(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.when(conversation.getCreatedBy()).thenReturn("alice");
+        org.mockito.Mockito.when(conversation.getCreatedDate()).thenReturn(OffsetDateTime.now());
         return conversation;
     }
 
     private static AiMessage message(AiMessageRole role, String content, int sequence) {
-        AiMessage message = new AiMessage();
-        message.setRole(role);
-        message.setContent(content);
-        message.setSeq(sequence);
-        message.setCreatedDate(OffsetDateTime.now().plusSeconds(sequence));
+        AiMessage message = mock(AiMessage.class);
+        org.mockito.Mockito.when(message.getRole()).thenReturn(role);
+        org.mockito.Mockito.when(message.getContent()).thenReturn(content);
+        org.mockito.Mockito.when(message.getSeq()).thenReturn(sequence);
+        org.mockito.Mockito.when(message.getCreatedDate()).thenReturn(OffsetDateTime.now().plusSeconds(sequence));
         return message;
     }
 
