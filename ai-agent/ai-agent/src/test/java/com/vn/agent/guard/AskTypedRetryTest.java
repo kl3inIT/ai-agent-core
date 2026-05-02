@@ -2,6 +2,7 @@ package com.vn.agent.guard;
 
 import com.vn.agent.DefaultChatServiceImpl;
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.orchestration.AiParametersResolver;
@@ -136,7 +137,8 @@ class AskTypedRetryTest {
                 /* chatStreamingScheduler */ null,
                 /* cancellationRegistry */ null,
                 /* streamingSinkHolder */ null,
-                rulesComposer);
+                rulesComposer,
+                mock(ConversationTitleEligibilityPublisher.class));
     }
 
     /**
