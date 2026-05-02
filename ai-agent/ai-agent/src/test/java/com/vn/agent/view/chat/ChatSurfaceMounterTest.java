@@ -44,7 +44,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -245,27 +244,17 @@ class ChatSurfaceMounterTest {
         verify(event).forwardTo("");
         verify(notifications).create(notificationText);
         assertThat(readChatViewSource())
-                .contains("implements BeforeEnterObserver")
+                .doesNotContain("implements BeforeEnterObserver")
+                .contains("super.beforeEnter(event)")
                 .contains("chatView.fullRouteDisabled")
                 .contains("AiUiSettingsService");
     }
 
     @Test
-    void fullRouteEnabledBeforeEnterKeepsNormalNavigation() throws Exception {
-        ChatView chatView = new ChatView();
-        AiUiSettingsService settingsService = mock(AiUiSettingsService.class);
-        AiUiSettings settings = mock(AiUiSettings.class);
-        Notifications notifications = mock(Notifications.class, RETURNS_DEEP_STUBS);
-        BeforeEnterEvent event = mock(BeforeEnterEvent.class);
-        when(settings.getEnabledSurfaceSet()).thenReturn(EnumSet.allOf(AiChatSurface.class));
-        when(settingsService.loadCurrent()).thenReturn(settings);
-        inject(chatView, "uiSettingsService", settingsService);
-        inject(chatView, "notifications", notifications);
-
-        chatView.beforeEnter(event);
-
-        verify(event, never()).forwardTo("");
-        verify(notifications, never()).create(org.mockito.ArgumentMatchers.anyString());
+    void fullRouteEnabledBeforeEnterDelegatesToJmixLifecycle() throws Exception {
+        assertThat(readChatViewSource())
+                .doesNotContain("implements BeforeEnterObserver")
+                .contains("super.beforeEnter(event)");
     }
 
     private static List<JmixButton> findHeaderButtons(Component root) {

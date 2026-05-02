@@ -3,7 +3,6 @@ package com.vn.agent.view.chat;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.router.BeforeEnterEvent;
-import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.orchestration.ConversationNotFoundException;
@@ -29,7 +28,7 @@ import java.util.UUID;
 @Route(value = "ai-agent/chat", layout = DefaultMainViewParent.class)
 @ViewController("AiAgent_Chat")
 @ViewDescriptor("chat-view.xml")
-public class ChatView extends StandardView implements BeforeEnterObserver {
+public class ChatView extends StandardView {
 
     @ViewComponent private ChatPanelFragment chatPanelFragment;
     @Autowired private Dialogs dialogs;
@@ -39,12 +38,13 @@ public class ChatView extends StandardView implements BeforeEnterObserver {
 
     @Override
     public void beforeEnter(@NonNull BeforeEnterEvent event) {
-        if (uiSettingsService.loadCurrent().getEnabledSurfaceSet().contains(AiChatSurface.FULL_ROUTE)) {
+        if (!uiSettingsService.loadCurrent().getEnabledSurfaceSet().contains(AiChatSurface.FULL_ROUTE)) {
+            event.forwardTo("");
+            notifications.create(messages.getMessage("chatView.fullRouteDisabled")).show();
             return;
         }
 
-        event.forwardTo("");
-        notifications.create(messages.getMessage("chatView.fullRouteDisabled")).show();
+        super.beforeEnter(event);
     }
 
     @Subscribe
