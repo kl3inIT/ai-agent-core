@@ -19,7 +19,9 @@ import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.component.applayout.JmixAppLayout;
+import io.jmix.flowui.component.main.JmixListMenu;
 import io.jmix.flowui.kit.component.button.JmixButton;
+import io.jmix.flowui.kit.component.main.ListMenu;
 import io.jmix.flowui.testassist.FlowuiTestAssistConfiguration;
 import io.jmix.flowui.testassist.UiTest;
 import io.jmix.flowui.testassist.UiTestUtils;
@@ -144,6 +146,7 @@ class ChatSurfaceMounterTest {
             UI ui = UI.getCurrent();
             JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
             ui.add(appLayout);
+            JmixListMenu menu = addChatMenu(appLayout);
             chatSurfaceMounter.initializeUiForTest(ui);
 
             AiUiSettings settings = uiSettingsService.loadCurrent();
@@ -155,6 +158,29 @@ class ChatSurfaceMounterTest {
             assertThat(findHeaderButtons(ui)).singleElement()
                     .extracting(Component::isVisible)
                     .isEqualTo(false);
+            assertChatMenuVisible(menu, true);
+        });
+    }
+
+    @Test
+    void disablingFullRouteHidesMenuButLeavesHeaderButtonVisible() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            JmixListMenu menu = addChatMenu(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+
+            AiUiSettings settings = uiSettingsService.loadCurrent();
+            settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.HEADER_BUTTON));
+            unconstrainedDataManager.save(settings);
+
+            chatSurfaceMounter.refreshMountedSurfacesForTest(ui, false);
+
+            assertChatMenuVisible(menu, false);
+            assertThat(findHeaderButtons(ui)).singleElement()
+                    .extracting(Component::isVisible)
+                    .isEqualTo(true);
         });
     }
 
@@ -273,6 +299,20 @@ class ChatSurfaceMounterTest {
     private static boolean isHeaderButton(Component component) {
         return component instanceof JmixButton
                 && component.getId().orElse("").equals(ChatSurfaceMounter.CHAT_BUTTON_ID);
+    }
+
+    private JmixListMenu addChatMenu(JmixAppLayout appLayout) {
+        JmixListMenu menu = uiComponents.create(JmixListMenu.class);
+        menu.addMenuItem(ListMenu.MenuItem.create(ChatSurfaceMounter.FULL_CHAT_MENU_ID)
+                .withTitle("Chat"));
+        appLayout.addToDrawer(menu);
+        return menu;
+    }
+
+    private static void assertChatMenuVisible(JmixListMenu menu, boolean visible) {
+        ListMenu.MenuItem chatMenuItem = menu.getMenuItem(ChatSurfaceMounter.FULL_CHAT_MENU_ID);
+        assertThat(chatMenuItem).isNotNull();
+        assertThat(chatMenuItem.isVisible()).isEqualTo(visible);
     }
 
     private static String readMounterSource() throws Exception {

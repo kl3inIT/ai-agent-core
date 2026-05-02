@@ -9,6 +9,7 @@ import io.jmix.core.UnconstrainedDataManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -46,6 +47,18 @@ class AiConversationTitleServiceTest {
         assertThat(async.value()).isEqualTo("aiAgentTitleExecutor");
         assertThat(eventListener).isNotNull();
         assertThat(eventListener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+    }
+
+    @Test
+    void disabledPropertyGatesTitleServiceBean() {
+        ConditionalOnProperty conditional = AiConversationTitleService.class.getAnnotation(
+                ConditionalOnProperty.class);
+
+        assertThat(conditional).isNotNull();
+        assertThat(conditional.prefix()).isEqualTo("ai-agent.conversation-title");
+        assertThat(conditional.name()).containsExactly("enabled");
+        assertThat(conditional.havingValue()).isEqualTo("true");
+        assertThat(conditional.matchIfMissing()).isTrue();
     }
 
     @Test
