@@ -4,10 +4,10 @@ milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
 stopped_at: Completed 12-06-PLAN.md
-last_updated: "2026-05-02T09:22:52.773Z"
+last_updated: "2026-05-05T06:40:42.419Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 39
   completed_plans: 39
   percent: 100
@@ -15,7 +15,7 @@ progress:
 
 # Project State
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-05
 
 ## Project Reference
 
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 12 — configurable-chat-surfaces
+**Current focus:** Phase 12 — configurable-chat-surfaces (shipped in PR #24)
 
 ## Current Position
 
-Phase: 12 (configurable-chat-surfaces) — READY FOR VERIFICATION
+Phase: 12 (configurable-chat-surfaces) — SHIPPED (PR #24)
 Plan: 6 of 6
 | Field | Value |
 |-------|-------|
 | Phase | Phase 12 |
 | Plan | 6 of 6 |
-| Status | Ready for verification |
-| Last activity | 2026-05-02 — Plan 12-06 completed |
+| Status | Phase 12 shipped — PR #24 |
+| Last activity | 2026-05-05 — Phase 12 shipped in PR #24 |
 
 ## Phase Status
 
@@ -43,7 +43,7 @@ Plan: 6 of 6
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
-| 12. Configurable Chat Surfaces | Ready for verification | 6/6 | 2026-05-02 | - |
+| 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 
