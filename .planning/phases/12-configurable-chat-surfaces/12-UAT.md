@@ -160,15 +160,6 @@ sub_results:
   - audit_no_leak: pass (Loại lỗi=NonTransientAiException class name only — no stack trace; Lý do từ chối=title_generation_failed sanitized constant — not raw provider error message; Tham số shows config metadata {model, maxContextMessages, locale} ONLY — no prompt content / no user message text / no PII)
 notes: "Failure isolation works as designed. Audit row provides operator visibility without leaking sensitive content. Title model config reverted to default after testing."
 
-### 7. Title Failure Isolation
-covers: AI-SPEC failure isolation, operational auditability
-expected: |
-  In a test environment, configure title generation so the title model call FAILS while normal chat still works.
-  Start a new conversation → wait for first assistant reply.
-  Chat reply remains visible; NO title error shown to chat user.
-  As admin, open tool call audit view → find conversation_title entry → outcome = error, no raw provider stack traces or prompt content exposed to the chat user.
-result: pending
-
 ## Summary
 
 total: 7
