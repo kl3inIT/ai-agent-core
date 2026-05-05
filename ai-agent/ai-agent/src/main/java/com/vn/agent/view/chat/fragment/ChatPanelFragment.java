@@ -26,6 +26,7 @@ import io.jmix.core.Messages;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
@@ -33,6 +34,7 @@ import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
 import io.jmix.flowui.fragment.FragmentOwner;
+import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.View;
@@ -64,6 +66,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private static final int AI_COLOR = 2;
 
     @ViewComponent private JmixButton stopButton;
+    @ViewComponent private JmixButton newChatButton;
     @ViewComponent private H3 conversationTitle;
     @ViewComponent private JmixButton editConversationTitleButton;
     @ViewComponent private VerticalLayout messageListSlot;
@@ -148,6 +151,22 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Subscribe("stopButton")
     public void onStopButtonClick(final ClickEvent<Button> event) {
         stopActiveStream();
+    }
+
+    @Subscribe("newChatButton")
+    public void onNewChatButtonClick(final ClickEvent<JmixButton> event) {
+        if (!hasMessages() && !isStreaming()) {
+            startNewChat();
+            return;
+        }
+        dialogs.createOptionDialog()
+                .withHeader(messages.getMessage("chatView.newChat.confirmHeader"))
+                .withText(messages.getMessage("chatView.newChat.confirmText"))
+                .withActions(
+                        new DialogAction(DialogAction.Type.YES).withVariant(ActionVariant.PRIMARY)
+                                .withHandler(actionPerformedEvent -> startNewChat()),
+                        new DialogAction(DialogAction.Type.NO))
+                .open();
     }
 
     @Subscribe("editConversationTitleButton")

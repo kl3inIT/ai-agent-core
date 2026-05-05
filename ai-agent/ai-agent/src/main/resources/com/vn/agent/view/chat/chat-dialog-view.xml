@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <view xmlns="http://jmix.io/schema/flowui/view"
       title="msg:///chatDialogView.title">
-    <layout width="100%" height="100%" padding="false" spacing="true">
-        <hbox id="dialogHeaderBar" width="100%" alignItems="CENTER" justifyContent="BETWEEN" padding="false">
-            <button id="newChatButton"
-                    text="msg:///chatView.newChat.label"
-                    themeNames="tertiary"/>
-            <button id="closeButton"
-                    text="msg:///chatDialogView.close.label"
-                    themeNames="tertiary"/>
-        </hbox>
+    <layout width="100%" height="100%" padding="false" spacing="false">
         <fragment id="chatPanelFragment"
                   class="com.vn.agent.view.chat.fragment.ChatPanelFragment"/>
     </layout>
