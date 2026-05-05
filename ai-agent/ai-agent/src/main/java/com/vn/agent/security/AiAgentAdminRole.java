@@ -46,6 +46,7 @@ public interface AiAgentAdminRole {
             "aiAgent.audit.list"})
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
+            "AiAgent_ChatDialog",
             "AiAgent_Configuration",
             "AiAgent_BaselineContext",
             "AiAgent_Conversation.list", "AiAgent_Conversation.detail",

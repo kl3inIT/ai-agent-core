@@ -226,6 +226,9 @@ public class AiConversationTitleService {
         if (sameTitle(title, defaultTitle)) {
             throw new IllegalArgumentException("default title");
         }
+        if ("NEW_CONVERSATION".equalsIgnoreCase(title)) {
+            throw new IllegalArgumentException("default sentinel");
+        }
         String lowerTitle = title.toLowerCase(Locale.ROOT);
         for (String forbiddenToken : forbiddenTitleTokens()) {
             if (lowerTitle.contains(forbiddenToken)) {
