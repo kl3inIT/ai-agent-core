@@ -20,6 +20,7 @@ import io.jmix.flowui.component.main.JmixListMenu;
 import io.jmix.flowui.app.main.StandardMainView;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.view.DialogWindow;
+import io.jmix.flowui.view.NavigateCloseAction;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewController;
 import org.slf4j.Logger;
@@ -78,7 +79,7 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     }
 
     void refreshMountedSurfacesForTest(UI ui, boolean fullChatRoute) {
-        refreshMountedSurfaces(ui, uiSettingsService.loadCurrent(), fullChatRoute);
+        refreshMountedSurfaces(ui, uiSettingsService.loadCurrent(), isDialogViewPermitted(), fullChatRoute);
     }
 
     private void initializeUi(UI ui) {
@@ -87,15 +88,18 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
 
         AiUiSettings settings = uiSettingsService.loadCurrent();
         mountHeaderButton(ui, mountedState, false);
-        refreshMountedSurfaces(ui, settings, false);
+        refreshMountedSurfaces(ui, settings, isDialogViewPermitted(), false);
     }
 
     private void afterNavigation(UI ui, AfterNavigationEvent event) {
         AiUiSettings settings = uiSettingsService.loadCurrent();
+        boolean fullChatRoute = isFullChatRoute(event);
+        boolean dialogPermitted = isDialogViewPermitted();
+
         MountedChatSurfaceState mountedState = mountedState(ui);
         mountHeaderButton(ui, mountedState, true);
-        refreshMountedSurfaces(ui, settings, isFullChatRoute(event));
-        reattachOpenDialogToUi();
+        refreshMountedSurfaces(ui, settings, dialogPermitted, fullChatRoute);
+        syncDialogAvailability(settings, dialogPermitted, fullChatRoute);
     }
 
     private boolean mountHeaderButton(UI ui, MountedChatSurfaceState mountedState, boolean warnIfMissing) {
@@ -167,6 +171,11 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
         dialogWindow.setApplicationContext(applicationContext);
         dialogWindow.afterPropertiesSet();
         configureDialogWindow(dialogWindow);
+        dialogWindow.addAfterCloseListener(afterCloseEvent -> {
+            if (!(afterCloseEvent.getCloseAction() instanceof NavigateCloseAction)) {
+                clearDialogInstanceIfCurrent(dialogWindow);
+            }
+        });
         chatUIState.setDialogInstance(dialogWindow);
         dialogWindow.open();
         attachDialogWindowToUi(dialogWindow);
@@ -198,6 +207,37 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
         return true;
     }
 
+    private void syncDialogAvailability(AiUiSettings settings, boolean dialogPermitted, boolean fullChatRoute) {
+        if (shouldShowHeaderButton(settings, dialogPermitted, fullChatRoute)) {
+            reattachOpenDialogToUi();
+            return;
+        }
+
+        closeAndClearDialogInstance();
+    }
+
+    private void closeAndClearDialogInstance() {
+        AiChatUIState chatUIState = chatUIStateProvider.getIfAvailable();
+        if (chatUIState == null) {
+            return;
+        }
+
+        DialogWindow<?> dialogWindow = chatUIState.getDialogInstance();
+        if (dialogWindow == null) {
+            return;
+        }
+
+        dialogWindow.close();
+        clearDialogInstanceIfCurrent(dialogWindow);
+    }
+
+    private void clearDialogInstanceIfCurrent(DialogWindow<?> dialogWindow) {
+        AiChatUIState chatUIState = chatUIStateProvider.getIfAvailable();
+        if (chatUIState != null && chatUIState.getDialogInstance() == dialogWindow) {
+            chatUIState.clearDialogInstance();
+        }
+    }
+
     private static void configureDialogWindow(DialogWindow<ChatDialogView> dialogWindow) {
         dialogWindow.setModal(false);
         dialogWindow.setLeft("65%");
@@ -208,21 +248,35 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
         dialogWindow.setDraggable(true);
     }
 
-    private void refreshMountedSurfaces(UI ui, AiUiSettings settings, boolean fullChatRoute) {
+    private void refreshMountedSurfaces(UI ui,
+                                        AiUiSettings settings,
+                                        boolean dialogPermitted,
+                                        boolean fullChatRoute) {
         MountedChatSurfaceState mountedState = mountedState(ui);
         if (mountedState.chatButton != null) {
             mountedState.chatButton.setVisible(shouldShowHeaderButton(
                     settings,
-                    isDialogViewPermitted(),
+                    dialogPermitted,
                     fullChatRoute));
         }
         updateFullRouteMenuVisibility(ui, settings);
     }
 
     private void updateFullRouteMenuVisibility(UI ui, AiUiSettings settings) {
+        boolean visible = shouldShowFullRouteMenu(settings);
+        // Try the JmixListMenu API path first — it's the right thing to do when the menu
+        // is rebuilt fresh (e.g. on route change). However, on this app's StandardMainView
+        // the rendered <li id="aiAgent.chat"> is not consistently re-rendered when the
+        // MenuItem.setVisible flips, so we follow up with a direct DOM toggle by id as a
+        // workaround. The JS path is idempotent (hidden attribute set/removed) and runs
+        // inside ui.access via Element.executeJs, so it is thread-safe.
         findFirstComponent(ui, JmixListMenu.class)
                 .map(menu -> menu.getMenuItem(FULL_CHAT_MENU_ID))
-                .ifPresent(menuItem -> menuItem.setVisible(shouldShowFullRouteMenu(settings)));
+                .ifPresent(menuItem -> menuItem.setVisible(visible));
+        ui.getElement().executeJs(
+                "const item = document.getElementById($0); if (item) item.hidden = !$1;",
+                FULL_CHAT_MENU_ID,
+                visible);
     }
 
     static boolean shouldShowHeaderButton(AiUiSettings settings, boolean dialogPermitted, boolean fullChatRoute) {
