@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 11 shipped - PR #19; ready to plan Phase 12
-last_updated: "2026-04-30T10:15:31.663Z"
+status: In Progress
+stopped_at: Completed 12-06-PLAN.md
+last_updated: "2026-05-05T06:40:42.419Z"
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 33
-  completed_plans: 33
-  percent: 67
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 39
+  completed_plans: 39
+  percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-05
 
 ## Project Reference
 
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 12 — configurable-chat-surfaces
+**Current focus:** Phase 12 — configurable-chat-surfaces (shipped in PR #24)
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
+Phase: 12 (configurable-chat-surfaces) — SHIPPED (PR #24)
+Plan: 6 of 6
 | Field | Value |
 |-------|-------|
 | Phase | Phase 12 |
-| Plan | Not started |
-| Status | Ready to plan |
-| Last activity | 2026-04-30 — Phase 11 shipped — PR #19 |
+| Plan | 6 of 6 |
+| Status | Phase 12 shipped — PR #24 |
+| Last activity | 2026-05-05 — Phase 12 shipped in PR #24 |
 
 ## Phase Status
 
@@ -43,7 +43,7 @@ Plan: Not started
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | Complete | 7/7 | 2026-04-27 | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
-| 12. Configurable Chat Surfaces | Not started | 0/0 | - | - |
+| 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 
@@ -156,6 +156,17 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 11]: Use @MockitoBean for the commit-unknown failure probe so the failure does not leak into unrelated Spring test contexts.
 - [Phase 11]: Keep Java 17-compatible List.get(0) assertions even when JetBrains suggests List.getFirst().
 - [Phase 11]: Align the existing tool-name scanner baseline test with Phase 11's read, link, and mutation built-in names.
+- [Phase 12]: Persist enabled chat surfaces as deterministic enabledSurfaceIds text with typed helper methods, not as an enum collection property. — Jmix enum collection persistence is not used here, and the Phase 12 contract forbids an enabledSurfaces JavaBean collection on AiUiSettings.
+- [Phase 12]: Keep the existing agentstore includeAll changelog strategy and document that it picks up 080-ai-ui-settings.xml. — Changing old changelog include paths could alter Liquibase change identity for deployed databases; includeAll already loads the new file.
+- [Phase 12]: Use the included-build Gradle path :ai-agent:ai-agent:* for Phase 12 add-on verification. — The root checkout has no :ai-agent:test task; Gradle exposes the functional module through the nested included-build path.
+- [Phase 12]: Use a singleton StandardDetailView for AiUiSettings that loads through AiUiSettingsService.loadCurrent(), so admins edit only AiUiSettings.SINGLETON_ID and cannot create arbitrary settings rows. — Matches the singleton settings model and avoids arbitrary configuration rows.
+- [Phase 12]: Keep settings surface controls controller-managed and persist through getEnabledSurfaceSet/setEnabledSurfaceSet, not an enabledSurfaces Jmix entity property. — Avoids unsupported Jmix enum collection binding and preserves the Phase 12 entity contract.
+- [Phase 12]: AiAgentAdminRole grants AiUiSettings READ/UPDATE plus view/menu policies only; CREATE/DELETE stay service-internal for the singleton row. — Admins can edit settings while singleton creation remains trusted service code.
+- [Phase 12]: Use DialogWindow<?> in AiChatUIState until ChatDialogView is introduced by Plan 12-04. — Keeps Plan 12-03 compiling while preserving the per-UI dialog handle contract.
+- [Phase 12]: Keep active stream/run authority in ChatPanelFragment plus CancellationRegistry; AiChatSessionState stores only currentConversationId and listeners. — Preserves D-10 and avoids turning session state into a cancellation authority.
+- [Phase 12]: Use the repository composite Gradle path :ai-agent:ai-agent:* for add-on verification. — The root checkout exposes the functional module through an included build, matching prior Phase 12 verification.
+- [Phase 12]: Plan 12-05: Use ConversationTitleEligibilityPublisher to isolate title eligibility from DefaultChatServiceImpl. — Keeps chat runtime changes narrow while proving publication happens only after assistant response handling returns.
+- [Phase 12]: Plan 12-05: Manual title edits check ownership through ConversationGateway and save through secured DataManager. — Preserves the AI-as-Jmix-client security model while allowing user-visible title overrides to block future auto-title clobbering.
 
 ### Performance Metrics
 
@@ -192,6 +203,12 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 11-mutation-capable-built-in-tools P11 | 20min | 2 tasks | 10 files |
 | Phase 11 P12 | 8min | 2 tasks | 3 files |
 | Phase 11 P13 | 12min | 2 tasks | 4 files |
+| Phase 12 P01 | 16 min | 3 tasks | 12 files |
+| Phase 12 P02 | 23 min | 2 tasks | 9 files |
+| Phase 12 P03 | 10 min | 2 tasks | 5 files |
+| Phase 12 P04 | 38 min | 3 tasks | 9 files |
+| Phase 12 P05 | 43 min | 3 tasks | 17 files |
+| Phase 12 P06 | 29 min | 3 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -201,8 +218,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-04-29T07:21:58.486Z
-**Stopped at:** Phase 11 shipped — PR #19; ready to plan Phase 12
+**Last session:** 2026-05-02T09:22:52.749Z
+**Stopped at:** Completed 12-06-PLAN.md
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Plan Phase 12 configurable chat surfaces.
+**Next action:** Verify Phase 12 configurable chat surfaces.

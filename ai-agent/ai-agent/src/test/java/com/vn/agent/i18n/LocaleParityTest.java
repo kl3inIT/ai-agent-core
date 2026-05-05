@@ -92,4 +92,45 @@ class LocaleParityTest {
                     .isTrue();
         }
     }
+
+    @Test
+    void allPhase12KeysPresentInBothBundles() throws IOException {
+        Properties en = load("/com/vn/agent/messages_en.properties");
+        Properties vi = load("/com/vn/agent/messages_vi.properties");
+
+        List<String> requiredKeys = List.of(
+                "com.vn.agent.entity/AiChatSurface",
+                "com.vn.agent.entity/AiChatSurface.FULL_ROUTE",
+                "com.vn.agent.entity/AiChatSurface.HEADER_BUTTON",
+                "com.vn.agent.entity/AiUiSettings",
+                "com.vn.agent.entity/AiUiSettings.enabledSurfaceIds",
+                "com.vn.agent.entity/AiUiSettings.defaultSurface",
+                "com.vn.agent/menu.uiSettings",
+                "chatView.action.editTitle",
+                "chatView.editTitle.dialog.header",
+                "chatView.editTitle.field.title",
+                "chatView.editTitle.validation.required",
+                "chatView.fullRouteDisabled",
+                "chatDialogView.title",
+                "chatDialogView.close.label",
+                "chatSurfaceMounter.headerButton.ariaLabel",
+                "aiUiSettingsDetail.title",
+                "aiUiSettingsDetail.field.enabledSurfaces",
+                "aiUiSettingsDetail.field.enabledSurfaces.helper",
+                "aiUiSettingsDetail.field.defaultSurface",
+                "aiUiSettingsDetail.field.defaultSurface.helper",
+                "aiUiSettingsDetail.action.save",
+                "aiUiSettingsDetail.validation.enabledSurfacesRequired",
+                "aiUiSettingsDetail.validation.defaultSurfaceRequired",
+                "aiUiSettingsDetail.validation.defaultSurfaceEnabled");
+
+        for (String key : requiredKeys) {
+            assertThat(en.containsKey(key))
+                    .as("Phase 12 key %s must exist in messages_en.properties", key)
+                    .isTrue();
+            assertThat(vi.containsKey(key))
+                    .as("Phase 12 key %s must exist in messages_vi.properties", key)
+                    .isTrue();
+        }
+    }
 }

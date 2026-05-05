@@ -5,30 +5,43 @@ import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.messages.MessageInput;
 import com.vaadin.flow.component.messages.MessageList;
 import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
+import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
+import com.vn.agent.view.chat.AiChatSessionState;
 import io.jmix.core.DataManager;
+import io.jmix.core.Messages;
 import io.jmix.core.security.CurrentAuthentication;
+import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.action.DialogAction;
+import io.jmix.flowui.app.inputdialog.DialogActions;
+import io.jmix.flowui.app.inputdialog.DialogOutcome;
+import io.jmix.flowui.app.inputdialog.InputParameter;
+import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
+import io.jmix.flowui.fragment.FragmentOwner;
+import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.MessageSource;
 import org.springframework.lang.NonNull;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -38,8 +51,8 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** D-29 substrate on Vaadin MessageList + MessageInput. D-03 per-event ui.access; D-04 Stop
@@ -53,6 +66,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private static final int AI_COLOR = 2;
 
     @ViewComponent private JmixButton stopButton;
+    @ViewComponent private JmixButton newChatButton;
+    @ViewComponent private H3 conversationTitle;
+    @ViewComponent private JmixButton editConversationTitleButton;
     @ViewComponent private VerticalLayout messageListSlot;
     @ViewComponent private VerticalLayout messageInputSlot;
 
@@ -60,9 +76,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private ConversationGateway conversationGateway;
     @Autowired private CancellationRegistry cancellationRegistry;
     @Autowired private CurrentAuthentication currentAuthentication;
-    @Autowired private MessageSource messages;
+    @Autowired private Messages messages;
+    @Autowired private Dialogs dialogs;
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
+    @Autowired private AiChatSessionState chatSessionState;
 
     private MessageList messageList;
     private MessageInput messageInput;
@@ -75,6 +93,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private volatile Disposable activeStream;
     private MessageListItem botMsg;
     private volatile UI ownerUi;
+    private Registration conversationIdStateRegistration;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
@@ -96,6 +115,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageInputSlot.add(streamProgressBar, messageInput);
 
         resolveLabels();
+        updateTitleEditState();
         messageList.setItems(items);
     }
 
@@ -103,10 +123,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     protected void onAttach(@NonNull AttachEvent attachEvent) {
         super.onAttach(attachEvent);
         this.ownerUi = attachEvent.getUI();
+        registerConversationIdStateListener(this.ownerUi);
     }
 
     @Override
     protected void onDetach(@NonNull DetachEvent detachEvent) {
+        unregisterConversationIdStateListener();
         // Pitfall #8 — dispose-on-detach. Route through registry when runId is known so
         // the CANCELLED audit row is written; bare dispose is only the last-resort fallback.
         Disposable d = this.activeStream;
@@ -131,9 +153,47 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         stopActiveStream();
     }
 
+    @Subscribe("newChatButton")
+    public void onNewChatButtonClick(final ClickEvent<JmixButton> event) {
+        if (!hasMessages() && !isStreaming()) {
+            startNewChat();
+            return;
+        }
+        dialogs.createOptionDialog()
+                .withHeader(messages.getMessage("chatView.newChat.confirmHeader"))
+                .withText(messages.getMessage("chatView.newChat.confirmText"))
+                .withActions(
+                        new DialogAction(DialogAction.Type.YES).withVariant(ActionVariant.PRIMARY)
+                                .withHandler(actionPerformedEvent -> startNewChat()),
+                        new DialogAction(DialogAction.Type.NO))
+                .open();
+    }
+
+    @Subscribe("editConversationTitleButton")
+    public void onEditConversationTitleButtonClick(final ClickEvent<JmixButton> event) {
+        if (conversationId == null) {
+            updateTitleEditState();
+            return;
+        }
+        openTitleEditDialog();
+    }
+
     // ---- Public API --------------------------------------------------------
 
     public void setConversationId(UUID cid) {
+        setConversationIdInternal(cid);
+        updateSessionConversationId(cid);
+    }
+
+    void setConversationIdFromState(UUID cid) {
+        setConversationIdInternal(cid);
+    }
+
+    private void setConversationIdInternal(UUID cid) {
+        if (Objects.equals(this.conversationId, cid)) {
+            return;
+        }
+
         if (isStreaming()) {
             stopActiveStream();
         }
@@ -141,10 +201,15 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         items.clear();
         if (cid == null) {
             if (messageList != null) messageList.setItems(items);
+            updateConversationTitle(null);
+            updateTitleEditState();
             return;
         }
         // Ownership check (D-09) — foreign / missing ids throw ConversationNotFoundException.
-        conversationGateway.loadOrCreate(currentAuthentication.getUser().getUsername(), cid, null);
+        AiConversation conversation =
+                conversationGateway.loadOrCreate(currentAuthentication.getUser().getUsername(), cid, null);
+        updateConversationTitle(conversation.getTitle());
+        updateTitleEditState();
 
         List<AiMessage> history = dataManager.load(AiMessage.class)
                 .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
@@ -176,12 +241,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     public void startNewChat() {
-        if (isStreaming()) {
-            stopActiveStream();
-        }
-        items.clear();
-        if (messageList != null) messageList.setItems(items);
-        conversationId = null;
+        setConversationIdInternal(null);
+        updateSessionConversationId(null);
     }
 
     private void stopActiveStream() {
@@ -196,6 +257,66 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             streamDisposable.dispose();
             finishStreamInternal();
         }
+    }
+
+    private void openTitleEditDialog() {
+        dialogs.createInputDialog(hostView())
+                .withHeader(messages.getMessage("chatView.editTitle.dialog.header"))
+                .withLabelsPosition(Dialogs.InputDialogBuilder.LabelsPosition.TOP)
+                .withParameters(
+                        InputParameter.stringParameter("title")
+                                .withLabel(messages.getMessage("chatView.editTitle.field.title"))
+                                .withRequired(true)
+                                .withDefaultValue(currentConversationTitle())
+                )
+                .withValidator(context -> {
+                    String title = context.getValue("title");
+                    if (title == null || title.isBlank()) {
+                        return ValidationErrors.of(messages.getMessage("chatView.editTitle.validation.required"));
+                    }
+                    return ValidationErrors.none();
+                })
+                .withActions(DialogActions.OK_CANCEL)
+                .withCloseListener(closeEvent -> {
+                    if (!closeEvent.closedWith(DialogOutcome.OK)) {
+                        return;
+                    }
+                    try {
+                        saveManualConversationTitle(closeEvent.getValue("title"));
+                    } catch (RuntimeException failure) {
+                        log.warn("Manual conversation title save failed conversationId={}", conversationId, failure);
+                        showGenericErrorNotification();
+                    }
+                })
+                .open();
+    }
+
+    void saveManualConversationTitle(String rawTitle) {
+        String title = normalizeManualConversationTitle(rawTitle);
+        if (conversationId == null) {
+            return;
+        }
+
+        String username = currentAuthentication.getUser().getUsername();
+        AiConversation conversation = conversationGateway.loadOrCreate(username, conversationId, null);
+        conversation.setTitle(title);
+        dataManager.save(conversation);
+        updateConversationTitle(title);
+    }
+
+    String normalizeManualConversationTitle(String rawTitle) {
+        if (rawTitle == null || rawTitle.isBlank()) {
+            throw new IllegalArgumentException("chatView.editTitle.validation.required");
+        }
+        return rawTitle.strip();
+    }
+
+    private View<?> hostView() {
+        FragmentOwner parentController = getParentController();
+        if (parentController instanceof View<?> view) {
+            return view;
+        }
+        throw new IllegalStateException("ChatPanelFragment must be attached to a Jmix view");
     }
 
     // ---- Streaming ---------------------------------------------------------
@@ -234,6 +355,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         activeRunId = f.runId();
                         if (conversationId == null && f.conversationId() != null) {
                             conversationId = f.conversationId();
+                            updateSessionConversationId(conversationId);
                         }
                     }
                     String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
@@ -281,12 +403,75 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (conversationId != null) {
             return conversationId;
         }
-        UUID resolved = conversationGateway.loadOrCreate(userId, null, firstMessage).getId();
+        AiConversation conversation = conversationGateway.loadOrCreate(userId, null, firstMessage);
+        UUID resolved = conversation.getId();
         if (resolved == null) {
             throw new IllegalStateException("Conversation id must not be null");
         }
         conversationId = resolved;
+        updateConversationTitle(conversation.getTitle());
+        updateTitleEditState();
+        updateSessionConversationId(resolved);
         return resolved;
+    }
+
+    void registerConversationIdStateListener(UI ui) {
+        unregisterConversationIdStateListener();
+        if (chatSessionState == null) {
+            return;
+        }
+
+        conversationIdStateRegistration =
+                chatSessionState.addConversationIdChangeListener(ui, this::setConversationIdFromState);
+        UUID stateConversationId = chatSessionState.getCurrentConversationId();
+        if (stateConversationId != null) {
+            setConversationIdFromState(stateConversationId);
+        }
+    }
+
+    private void unregisterConversationIdStateListener() {
+        Registration registration = this.conversationIdStateRegistration;
+        if (registration != null) {
+            registration.remove();
+            this.conversationIdStateRegistration = null;
+        }
+    }
+
+    private void updateSessionConversationId(UUID cid) {
+        if (chatSessionState != null
+                && !Objects.equals(chatSessionState.getCurrentConversationId(), cid)) {
+            chatSessionState.setCurrentConversationId(cid);
+        }
+    }
+
+    private void updateConversationTitle(String title) {
+        if (conversationTitle == null) {
+            return;
+        }
+        String displayTitle = title == null || title.isBlank()
+                ? resolveLabel("chatView.action.newChat", "chatView.action.newChat")
+                : title.strip();
+        conversationTitle.setText(displayTitle);
+    }
+
+    private String currentConversationTitle() {
+        if (conversationTitle == null) {
+            return "";
+        }
+        String title = conversationTitle.getText();
+        return title == null ? "" : title;
+    }
+
+    private void updateTitleEditState() {
+        if (editConversationTitleButton == null) {
+            return;
+        }
+        boolean hasConversation = conversationId != null;
+        editConversationTitleButton.setVisible(hasConversation);
+        editConversationTitleButton.setEnabled(hasConversation);
+        if (!hasConversation) {
+            updateConversationTitle(null);
+        }
     }
 
     private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
@@ -323,14 +508,17 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private String resolveLabel(String key, String fallback) {
-        Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
-        return messages.getMessage(key, null, fallback, locale);
+        try {
+            String message = messages.getMessage(key);
+            return message.equals(key) ? fallback : message;
+        } catch (RuntimeException failure) {
+            return fallback;
+        }
     }
 
     private void showGenericErrorNotification() {
-        Locale locale = ownerUi != null ? ownerUi.getLocale() : Locale.getDefault();
         String key = "chatView.error.generic";
-        String text = messages.getMessage(key, null, key, locale);
+        String text = resolveLabel(key, key);
         notifications.create(text != null ? text : key)
                 .withThemeVariant(NotificationVariant.LUMO_ERROR)
                 .show();

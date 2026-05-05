@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.guard.AgentSystemPromptRulesComposer;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
@@ -53,7 +54,9 @@ import reactor.core.scheduler.Scheduler;
 import com.vn.agent.orchestration.ConversationNotFoundException;
 
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Phase-4 default {@link ChatService} implementation (ORCH-01, ORCH-05), extended in Phase 6 with
@@ -127,6 +130,7 @@ public class DefaultChatServiceImpl implements ChatService {
     private final CancellationRegistry cancellationRegistry;
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
+    private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -143,7 +147,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                   @Qualifier("chatStreamingScheduler") Scheduler chatStreamingScheduler,
                                   CancellationRegistry cancellationRegistry,
                                   StreamingSinkHolder streamingSinkHolder,
-                                  AgentSystemPromptRulesComposer agentSystemPromptRulesComposer) {
+                                  AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
+                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -160,6 +165,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.cancellationRegistry = cancellationRegistry;
         this.streamingSinkHolder = streamingSinkHolder;
         this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
+        this.titleEligibilityPublisher = titleEligibilityPublisher;
     }
 
     @Override
@@ -295,6 +301,7 @@ public class DefaultChatServiceImpl implements ChatService {
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
             log.debug("ChatService.ask convId={} runId={} model={} latencyMs={} flagged={}",
                     convId, runId, model, latencyMs, flagged);
+            publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
             return new ChatResponseDto(convId, runId, content, model, latencyMs,
                     flagged, flaggedKey, null);
         } catch (IterationCapExceededException capped) {
@@ -328,6 +335,8 @@ public class DefaultChatServiceImpl implements ChatService {
 
                     final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
                     final UUID convId = conversation.getId();
+                    final AtomicBoolean assistantContentSeen = new AtomicBoolean(false);
+                    final AtomicBoolean titlePublicationHandled = new AtomicBoolean(false);
 
                     AiParameters active = parametersResolver.resolveActive();
                     String model = parametersResolver.effectiveModel(active, effectiveOverrides);
@@ -385,9 +394,11 @@ public class DefaultChatServiceImpl implements ChatService {
                                     AssistantMessage am = chunk != null && chunk.getResult() != null
                                             ? chunk.getResult().getOutput() : null;
                                     String text = am != null ? am.getText() : null;
-                                    return (text != null && !text.isEmpty())
-                                            ? Flux.just(new StreamingEvent.Content(text))
-                                            : Flux.empty();
+                                    if (text == null || text.isEmpty()) {
+                                        return Flux.empty();
+                                    }
+                                    assistantContentSeen.set(true);
+                                    return Flux.just(new StreamingEvent.Content(text));
                                 })
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());
@@ -395,6 +406,7 @@ public class DefaultChatServiceImpl implements ChatService {
                         // D-04 graceful fallback: provider does not support streaming. Fall through to
                         // blocking ask(...) wrapped as a single Content chunk + Final.
                         ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
+                        titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
                                 new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
@@ -404,6 +416,9 @@ public class DefaultChatServiceImpl implements ChatService {
                     return merged
                     .concatWith(Flux.defer(() -> {
                         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        if (assistantContentSeen.get() && !titlePublicationHandled.get()) {
+                            publishTitleEligibilityIfAssistantReply(convId, userId, runId, "streamed");
+                        }
                         return Flux.<StreamingEvent>just(
                                 new StreamingEvent.Final(runId, convId, latencyMs, 0, 0));
                     }));
@@ -588,6 +603,30 @@ public class DefaultChatServiceImpl implements ChatService {
             return currentAuthentication.getAuthentication();
         } catch (RuntimeException anonymous) {
             return null;
+        }
+    }
+
+    private void publishTitleEligibilityIfAssistantReply(UUID conversationId,
+                                                         String userId,
+                                                         UUID runId,
+                                                         String content) {
+        if (content == null || content.isBlank()) {
+            return;
+        }
+        try {
+            titleEligibilityPublisher.publishIfEligible(conversationId, userId, runId, safeGetLocale());
+        } catch (RuntimeException failure) {
+            log.warn("Conversation title eligibility publication failed runId={} convId={}",
+                    runId, conversationId, failure);
+        }
+    }
+
+    private Locale safeGetLocale() {
+        try {
+            Locale locale = currentAuthentication.getLocale();
+            return locale == null ? Locale.getDefault() : locale;
+        } catch (RuntimeException anonymous) {
+            return Locale.getDefault();
         }
     }
 }

@@ -2,11 +2,6 @@
 <view xmlns="http://jmix.io/schema/flowui/view"
       title="msg:///chatView.title">
     <layout padding="true" spacing="true">
-        <hbox id="headerBar" width="100%" alignItems="CENTER" justifyContent="END" padding="false">
-            <button id="newChatButton"
-                    text="msg:///chatView.newChat.label"
-                    themeNames="tertiary"/>
-        </hbox>
         <fragment id="chatPanelFragment"
                   class="com.vn.agent.view.chat.fragment.ChatPanelFragment"
                   width="100%"

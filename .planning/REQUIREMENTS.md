@@ -61,19 +61,18 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Configurable Chat Surfaces (SEED-005 activated, refined)
 
-- [ ] **SURF-01**: Three chat presentation surfaces over the same backend and `ChatPanelFragment`:
-  1. Full route `ChatView` (existing).
-  2. `SidebarChatComponent` — Vaadin component mounted into host `AppLayout` `slot="drawer-end"`.
-  3. `FloatingChatLauncher` — fixed-position bottom-right launcher button + `Dialog.setModality(MODELESS).setDraggable(true)` containing the fragment.
-- [ ] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Fields: `enabledSurfaces` (set of `FULL_ROUTE`, `SIDEBAR`, `FLOATING`), `defaultSurface`, audit fields. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
-- [ ] **SURF-03**: `ChatSurfaceMounter` `@Component` listening to `UIInitEvent` (Vaadin) injects the configured surfaces into the host shell. Reads admin toggle and only mounts what's enabled. Host needs no code edits beyond depending on the starter.
-- [ ] **SURF-04**: `AiChatSessionState` `@VaadinSessionScope` bean tracks the active `conversationId` for the user session. Switching surface mid-session calls `setConversationId(state.getCurrentConversationId())` on the new fragment instance — same conversation continues. No backend duplication.
-- [ ] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE `ChatPanelFragment` per surface instance, but ALL fragments in one session share the same active conversation id via `AiChatSessionState`.
-- [ ] **SURF-06**: Floating launcher placement: bottom-right fixed for v1.1. `defaultPosition` configurability deferred to v1.2.
-- [ ] **SURF-07**: Floating launcher z-index and dialog-stacking: launcher hides itself while a Jmix admin dialog is open (P-21 mitigation) — wire to `Dialog` open/close events on the UI.
-- [ ] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
-- [ ] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
-- [ ] **SURF-10**: `ChatPanelFragment` may receive an optional `setCompactMode(boolean)` for the floating dialog (suppress conversation list, tighter layout). Defer if Vaadin sizing already handles it.
+- [x] **SURF-01**: Two chat presentation surfaces over the same backend and `ChatPanelFragment`:
+  1. `FULL_ROUTE` — the existing full-route `ChatView`.
+  2. `HEADER_BUTTON` — a host-navbar button that opens the shared chat fragment in a non-modal Jmix `DialogWindow`.
+- [x] **SURF-02**: `AiUiSettings` Jmix entity in `agentstore`, single-row by convention. Persisted fields are `enabledSurfaceIds` (deterministic text-backed id list containing `FULL_ROUTE` and/or `HEADER_BUTTON`), `defaultSurface`, and audit fields. The controller/view-model layer may describe this as enabled surfaces, but the entity must not expose a JavaBean `enabledSurfaces` collection property. NOT bundled into `AiParameters` (chat-behavior vs UI-rollout are orthogonal).
+- [x] **SURF-03**: `ChatSurfaceMounter` `@Component` listening to `UIInitEvent` (Vaadin) and navigation events injects the configured header-button surface into the host shell. Reads admin toggle and only mounts what's enabled. Host needs no code edits beyond depending on the starter.
+- [x] **SURF-04**: `AiChatSessionState` `@VaadinSessionScope` bean tracks the active `conversationId` for the user session. Switching surface mid-session calls `setConversationId(state.getCurrentConversationId())` on the new fragment instance — same conversation continues. No backend duplication.
+- [x] **SURF-05**: ONE `ChatService`, ONE `AiConversation` row, ONE active `ChatPanelFragment` per UI tab, and all mounted fragments in one session share the same active conversation id via `AiChatSessionState`.
+- [x] **SURF-06**: Header-button surface opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable when supported by Jmix). Dialog size/position configurability is deferred to v1.2.
+- [x] **SURF-07**: Jmix `DialogWindow` participates in the normal Vaadin/Jmix overlay stack, so the old P-21 raw-dialog stacking mitigation is moot and out of scope for v1.1.
+- [x] **SURF-08**: Admin Flow UI: `AiUiSettingsView` for runtime toggle of which surfaces are enabled/visible. Admin-only (`AiAgentAdminRole`).
+- [x] **SURF-09**: Cross-surface conversation continuity test: switch surface mid-session, send another message, verify same `conversation_id` and same JDBC memory rows.
+- [x] **SURF-10**: Compact-mode work is deferred because both v1.1 surfaces use the full `ChatPanelFragment` layout.
 
 ### Chat Task Input — Speech-to-Text & Task-Scoped File
 
@@ -105,7 +104,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 ### New Entities
 
 - [x] **ENT-05**: `AiExposureRule` (per EXP-01)
-- [ ] **ENT-06**: `AiUiSettings` (per SURF-02)
+- [x] **ENT-06**: `AiUiSettings` (per SURF-02)
 - [ ] **ENT-07**: `AiTaskFile` (per TASK-03)
 - [ ] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
 - [x] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)
@@ -128,7 +127,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 
 ### Security Extensions
 
-- [ ] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — pending Phase 12).
+- [x] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — done Phase 12-02).
 - [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
 - [x] **SEC-07**: New `AiAgentMutationRole` resource role is an explicit AI-mutation marker gate. It grants no entity CRUD by itself; mutation tools require the marker role AND normal Jmix create/update policies. Hosts opt users in by assigning/composing this marker with their own entity roles.
 
@@ -140,7 +139,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 - [x] **TEST-11**: Mutation idempotency test — same `idempotencyKey` twice returns the same result; no duplicate row; second call audited with `outcome=IDEMPOTENT_REPLAY`.
 - [x] **TEST-12**: Mutation audit-vs-transaction test — known host save rollback writes a durable audit row with `outcome=ERROR`; post-host-save idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`); post-COMMITTED audit/result failures leave the intent `COMMITTED` and exact retry replays.
 - [x] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
-- [ ] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
+- [x] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
 - [ ] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
 - [ ] **TEST-16**: Task file isolation test — `AiTaskFile` upload does NOT trigger `IngesterManager` invocation; `VectorStore` count unchanged after task-file attach.
 - [ ] **TEST-17**: STT audit privacy test — by default, `STT_TRANSCRIPTION` audit row contains transcript hash, NOT raw text. Setting `ai-agent.stt.audit.storeTranscript=true` flips it.

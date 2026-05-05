@@ -24,7 +24,7 @@
 - [x] **Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening** — Richer `describe_entity`, fetch-plan SPI, baseline `agent.entities` + `agent.permissions`, `unknown_entity` retry contract, output-scanner pattern additions.
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
 - [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
-- [ ] **Phase 12: Configurable Chat Surfaces** — Full / sidebar / floating surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity.
+- [x] **Phase 12: Configurable Chat Surfaces** — `FULL_ROUTE` + `HEADER_BUTTON` Jmix `DialogWindow` surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity. (completed 2026-05-02)
 - [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
 
@@ -122,15 +122,35 @@
 **Verification status:** passed in `11-VERIFICATION.md` on 2026-04-29 after gap closure plans `11-12-PLAN.md` and `11-13-PLAN.md`.
 
 ### Phase 12: Configurable Chat Surfaces
-**Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through three admin-toggleable presentations (full route, right-sidebar, floating launcher) with continuous conversation state across surface switches.
+**Goal**: One `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session, surfaced through two admin-toggleable presentations (`FULL_ROUTE` and `HEADER_BUTTON` dialog) with continuous conversation state across surface switches.
 **Depends on**: Phase 9 (baseline + tool changes already shipped so UI work does not interleave with prompt-contract churn)
 **Requirements**: SURF-01, SURF-02, SURF-03, SURF-04, SURF-05, SURF-06, SURF-07, SURF-08, SURF-09, SURF-10, ENT-06, TEST-14
 **Success Criteria** (what must be TRUE):
-  1. An admin opens `AiUiSettingsView` and toggles which surfaces are enabled (`FULL_ROUTE`, `SIDEBAR`, `FLOATING`) plus the default surface; on next UI init the host shell renders only the enabled surfaces with no host-side code edits beyond the starter dependency.
-  2. A user starts a conversation in the floating launcher, switches mid-session to the sidebar, then to the full `ChatView`; the same `conversationId` follows them, the same JDBC memory rows back each turn, and the cross-surface continuity test (TEST-14) passes.
-  3. The floating launcher uses the Vaadin `Dialog.setModality(MODELESS).setDraggable(true)` overlay primitive, anchored bottom-right; it auto-hides while a Jmix admin dialog is open and reappears on close (z-index conflict mitigation).
+  1. An admin opens `AiUiSettingsView` and toggles which surfaces are enabled (`FULL_ROUTE`, `HEADER_BUTTON`) plus the default surface; on next UI init/navigation the host shell renders only the enabled surfaces with no host-side code edits beyond the starter dependency.
+  2. A user starts a conversation in the full `ChatView`, switches mid-session to the header-button `ChatDialogView`, and continues the same `conversationId`; the same JDBC-backed conversation/message history backs each turn and TEST-14 passes.
+  3. The header button opens a non-modal Jmix `DialogWindow` anchored top-right (`65%` left, `5%` top, `35%` width, `75%` height, resizable/draggable), avoiding the deferred raw Vaadin bottom-right launcher and P-21 stacking mitigation.
   4. There is exactly one `AiConversation` row per active user-session conversation regardless of surface — `AiChatSessionState` (`@VaadinSessionScope`) carries the active id and reattaches to whichever fragment is mounted.
-**Plans**: TBD
+**Plans:** 6/6 plans complete
+
+**Wave 1**
+- [x] 12-01-PLAN.md — Scope-doc amendments + `AiChatSurface` / `AiUiSettings` / singleton settings service foundation
+
+**Wave 2 (blocked on Wave 1 completion)**
+- [x] 12-02-PLAN.md — `AiUiSettingsDetailView`, menu entry, admin role policies, settings access tests
+- [x] 12-03-PLAN.md — `AiChatSessionState` / `AiChatUIState` + `ChatPanelFragment` continuity integration
+
+**Wave 3 (blocked on Wave 2 completion)**
+- [x] 12-04-PLAN.md — `ChatDialogView`, `ChatSurfaceMounter`, header-button dialog toggle, route/menu gating
+- [x] 12-05-PLAN.md — Async conversation auto-title, pencil-edit override, hidden Phase 13 attachments slot
+
+**Wave 4 (blocked on Wave 3 completion)**
+- [x] 12-06-PLAN.md — TEST-14 cross-surface continuity, settings/title/i18n hardening tests, UAT checklist
+
+**Cross-cutting constraints:**
+- Phase 12 implements the locked two-surface scope (`FULL_ROUTE`, `HEADER_BUTTON`); `SIDEBAR`, raw Vaadin floating launcher, P-21 stacking mitigation, and compact mode are deferred.
+- `AiUiSettings` is admin-managed configuration in `agentstore`, loaded no-cache through `UnconstrainedDataManager` for trusted system reads/writes and hidden from LLM-visible entity inventory.
+- `AiChatSessionState` carries only the active conversation id/listeners; `CancellationRegistry` remains the active-run source of truth.
+- All user-facing UI remains Jmix XML/controller based with all labels in both locale bundles.
 **UI hint**: yes
 
 ### Phase 13: Chat Task Input — STT + Task-Scoped File
@@ -178,7 +198,7 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | 9. Tool-Layer Foundations & Prompt-Contract Hardening | 7/7 | Complete | 2026-04-27 |
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
-| 12. Configurable Chat Surfaces | 0/0 | Not started | - |
+| 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 

@@ -14,6 +14,7 @@ public final class AiInternalEntityNames {
             "ai_AiMessage",
             "ai_AiKnowledgeDocument",
             "ai_AiParameters",
+            "ai_AiUiSettings",
             "aiExposure_AiExposureRule",
             "aiMutation_AiMutationIntent"
     );

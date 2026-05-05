@@ -8,6 +8,7 @@ import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.guard.RateLimitGuard;
 import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
@@ -18,19 +19,28 @@ import org.springframework.ai.chat.client.ChatClientResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.List;
+import java.util.Locale;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -68,6 +78,7 @@ class ChatServiceFilterParamContractTest {
     ChatClientResponse chatClientResponse;
     CancellationRegistry cancellationRegistry;
     StreamingSinkHolder streamingSinkHolder;
+    ConversationTitleEligibilityPublisher titleEligibilityPublisher;
 
     DefaultChatServiceImpl service;
 
@@ -92,6 +103,7 @@ class ChatServiceFilterParamContractTest {
         chatClientResponse = mock(ChatClientResponse.class);
         cancellationRegistry = mock(CancellationRegistry.class);
         streamingSinkHolder = mock(StreamingSinkHolder.class);
+        titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
 
         AiConversation conv = mock(AiConversation.class);
         convId = UUID.randomUUID();
@@ -142,7 +154,8 @@ class ChatServiceFilterParamContractTest {
                 reactor.core.scheduler.Schedulers.immediate(),
                 cancellationRegistry,
                 streamingSinkHolder,
-                rulesComposer);
+                rulesComposer,
+                titleEligibilityPublisher);
     }
 
     @Test
@@ -209,5 +222,44 @@ class ChatServiceFilterParamContractTest {
 
         verify(conversationGateway).loadOrCreate("alice", null, "hello");
         verify(currentAuthentication, atLeastOnce()).getAuthentication();
+    }
+
+    @Test
+    void ask_publishesTitleEligibilityAfterAssistantResponseReturns() {
+        when(chatClientResponse.chatResponse()).thenReturn(chatResponse("assistant answer"));
+
+        service.ask("alice", null, "hello");
+
+        InOrder inOrder = inOrder(callSpec, titleEligibilityPublisher);
+        inOrder.verify(callSpec).chatClientResponse();
+        inOrder.verify(titleEligibilityPublisher)
+                .publishIfEligible(eq(convId), eq("alice"), any(UUID.class), any(Locale.class));
+    }
+
+    @Test
+    void ask_doesNotPublishTitleEligibilityOnGuardDeniedPath() {
+        doThrow(new com.vn.agent.guard.RateLimitExceededException(60))
+                .when(rateLimitGuard).check("alice");
+
+        service.ask("alice", null, "hello");
+
+        verify(titleEligibilityPublisher, never())
+                .publishIfEligible(any(), anyString(), any(), any());
+    }
+
+    @Test
+    void stream_publishesTitleEligibilityAfterStreamCompletes() {
+        ChatClient.StreamResponseSpec streamSpec = mock(ChatClient.StreamResponseSpec.class);
+        when(requestSpec.stream()).thenReturn(streamSpec);
+        when(streamSpec.chatResponse()).thenReturn(reactor.core.publisher.Flux.just(chatResponse("chunk")));
+
+        service.stream("alice", null, "hello", null).blockLast();
+
+        verify(titleEligibilityPublisher)
+                .publishIfEligible(eq(convId), eq("alice"), any(UUID.class), any(Locale.class));
+    }
+
+    private static ChatResponse chatResponse(String content) {
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(content))));
     }
 }
