@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -52,7 +53,24 @@ class AiUiSettingsServiceSingletonTest {
         assertThat(settings.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
         assertThat(settings.getEnabledSurfaceSet())
                 .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
+        assertThat(settings.getCreatedBy()).isEqualTo("admin");
+        assertThat(settings.getCreatedDate()).isNotNull();
         assertThat(countRows()).isEqualTo(1);
+    }
+
+    @Test
+    void createAndUpdatePopulateAuditFields() {
+        AiUiSettings settings = loadAsAdmin();
+
+        AiUiSettings updated = systemAuthenticator.withUser("admin", () -> {
+            settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.HEADER_BUTTON));
+            return unconstrainedDataManager.save(settings);
+        });
+
+        assertThat(updated.getCreatedBy()).isEqualTo("admin");
+        assertThat(updated.getCreatedDate()).isNotNull();
+        assertThat(updated.getLastModifiedBy()).isEqualTo("admin");
+        assertThat(updated.getLastModifiedDate()).isNotNull();
     }
 
     @Test

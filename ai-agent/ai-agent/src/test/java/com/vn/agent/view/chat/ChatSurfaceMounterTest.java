@@ -240,6 +240,71 @@ class ChatSurfaceMounterTest {
     }
 
     @Test
+    void openDialogClosesWhenNavigatingToFullChatRoute() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+            AiChatUIState chatUIState = chatUIStateProvider.getObject();
+            DialogWindow<ChatDialogView> dialogWindow = chatSurfaceMounter.openDialogForTest();
+            assertThat(chatUIState.getDialogInstance()).isSameAs(dialogWindow);
+
+            viewNavigators.view(UiTestUtils.getCurrentView(), ChatView.class)
+                    .navigate();
+
+            assertThat(chatUIState.getDialogInstance()).isNull();
+            assertThat(findHeaderButtons(ui)).singleElement()
+                    .extracting(Component::isVisible)
+                    .isEqualTo(false);
+        });
+    }
+
+    @Test
+    void openDialogClosesWhenHeaderSurfaceDisabledAfterNavigation() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            JmixListMenu menu = addChatMenu(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+            AiChatUIState chatUIState = chatUIStateProvider.getObject();
+            DialogWindow<ChatDialogView> dialogWindow = chatSurfaceMounter.openDialogForTest();
+            assertThat(chatUIState.getDialogInstance()).isSameAs(dialogWindow);
+
+            AiUiSettings settings = uiSettingsService.loadCurrent();
+            settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.FULL_ROUTE));
+            unconstrainedDataManager.save(settings);
+
+            viewNavigators.view(UiTestUtils.getCurrentView(), ConversationListView.class)
+                    .navigate();
+
+            assertThat(chatUIState.getDialogInstance()).isNull();
+            assertThat(findHeaderButtons(ui)).singleElement()
+                    .extracting(Component::isVisible)
+                    .isEqualTo(false);
+            assertChatMenuVisible(menu, true);
+        });
+    }
+
+    @Test
+    void dialogAfterCloseListenerClearsHandleForStandardClosePaths() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            AiChatUIState chatUIState = chatUIStateProvider.getObject();
+            DialogWindow<ChatDialogView> dialogWindow = chatSurfaceMounter.openDialogForTest();
+
+            dialogWindow.close();
+
+            assertThat(chatUIState.getDialogInstance()).isNull();
+
+            DialogWindow<ChatDialogView> secondDialogWindow = chatSurfaceMounter.openDialogForTest();
+
+            assertThat(secondDialogWindow).isNotSameAs(dialogWindow);
+            assertThat(chatUIState.getDialogInstance()).isSameAs(secondDialogWindow);
+        });
+    }
+
+    @Test
     void customShellWithoutAppLayoutDoesNotThrowOrMountButton() {
         UI ui = new UI();
 

@@ -108,6 +108,31 @@ class AiConversationTitleServiceTest {
     }
 
     @Test
+    void sentinelTitleRejectionNormalizesQuotesCaseAndTrailingPeriod() {
+        for (String sentinelTitle : List.of("NEW_CONVERSATION", "\"NEW_CONVERSATION.\"",
+                "'new_conversation.'")) {
+            UUID conversationId = UUID.randomUUID();
+            UUID runId = UUID.randomUUID();
+            AiConversation conversation = conversation(conversationId, "Show recent customers");
+            TestTitleService service = serviceBuilder()
+                    .withLoadedConversations(conversation)
+                    .withMessages(
+                            message(AiMessageRole.USER, "Show recent customers", 1),
+                            message(AiMessageRole.ASSISTANT, "Here are the customers.", 2))
+                    .withModelTitle(sentinelTitle)
+                    .build();
+
+            service.onConversationTitleEligible(new ConversationTitleEligibleEvent(
+                    conversationId, "alice", runId, Locale.ENGLISH));
+
+            assertThat(service.savedConversations).isEmpty();
+            verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
+                    eq("conversation_title"), any(), isNull(), anyLong(),
+                    eq(AiToolCallOutcome.ERROR), eq("rejected_title"), eq("IllegalArgumentException"));
+        }
+    }
+
+    @Test
     void reloadBeforeSavePreventsManualTitleClobber() {
         UUID conversationId = UUID.randomUUID();
         AiConversation firstLoad = conversation(conversationId, "Summarize this account");

@@ -94,6 +94,7 @@ class AdminViewAccessTest {
 
     @Test
     void allowsAdminViewsForAdmin() {
+        assertThat(permittedFor("admin", "AiAgent_ChatDialog")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_Configuration")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiUiSettings.detail")).isTrue();
         assertThat(uiSettingsMenuPermittedFor("admin")).isTrue();
