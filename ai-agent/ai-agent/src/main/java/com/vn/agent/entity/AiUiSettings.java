@@ -11,6 +11,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.Version;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.OffsetDateTime;
 import java.util.Arrays;
@@ -48,15 +52,19 @@ public class AiUiSettings {
     @Column(name = "DEFAULT_SURFACE", nullable = false, length = 64)
     private String defaultSurface = AiChatSurface.FULL_ROUTE.getId();
 
+    @CreatedBy
     @Column(name = "CREATED_BY")
     private String createdBy;
 
+    @CreatedDate
     @Column(name = "CREATED_DATE")
     private OffsetDateTime createdDate;
 
+    @LastModifiedBy
     @Column(name = "LAST_MODIFIED_BY")
     private String lastModifiedBy;
 
+    @LastModifiedDate
     @Column(name = "LAST_MODIFIED_DATE")
     private OffsetDateTime lastModifiedDate;
 
@@ -80,7 +88,11 @@ public class AiUiSettings {
     }
 
     public void setEnabledSurfaceSet(Set<AiChatSurface> enabledSurfaceSet) {
-        this.enabledSurfaceIds = toEnabledSurfaceIds(enabledSurfaceSet);
+        // Route through the public setter so EclipseLink's setter weaving fires the
+        // property-change event and the Jmix DataContext flags the entity dirty.
+        // Direct field assignment (this.enabledSurfaceIds = ...) bypasses weaving and
+        // produces a silent no-op save (version unchanged, value reverts on revisit).
+        setEnabledSurfaceIds(toEnabledSurfaceIds(enabledSurfaceSet));
     }
 
     public AiChatSurface getDefaultSurface() {
@@ -88,6 +100,10 @@ public class AiUiSettings {
     }
 
     public void setDefaultSurface(AiChatSurface defaultSurface) {
+        // The JPA field is named `defaultSurface` (String) — EclipseLink's weaver treats
+        // this very method (which has the matching name) as the property setter, so
+        // direct field assignment here IS tracked. (Contrast with setEnabledSurfaceSet,
+        // which has a non-matching name and must route via setEnabledSurfaceIds.)
         this.defaultSurface = defaultSurface == null ? null : defaultSurface.getId();
     }
 

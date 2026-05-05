@@ -1,5 +1,6 @@
 package com.vn.agent.view.uisettings;
 
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.Route;
@@ -68,12 +69,26 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
         AiUiSettings settings = getEditedEntity();
         enabledSurfacesField.setValue(copySurfaceSet(settings.getEnabledSurfaceSet()));
         defaultSurfaceField.setValue(settings.getDefaultSurface());
+
+        // Sync field changes to the managed entity immediately. Reading from the entity
+        // at BeforeSaveEvent time is more reliable than re-reading enabledSurfacesField,
+        // and forces the DataContext snapshot diff to detect the change so the UPDATE
+        // actually fires (entity setter must route through setEnabledSurfaceIds — see
+        // AiUiSettings.setEnabledSurfaceSet for the EclipseLink weaving requirement).
+        enabledSurfacesField.addValueChangeListener(change -> {
+            Set<AiChatSurface> next = change.getValue();
+            settings.setEnabledSurfaceSet(next == null ? EnumSet.noneOf(AiChatSurface.class) : next);
+        });
+        defaultSurfaceField.addValueChangeListener(change -> {
+            settings.setDefaultSurface(change.getValue());
+        });
     }
 
     @Subscribe
     public void onBeforeSave(final BeforeSaveEvent event) {
-        Set<AiChatSurface> enabledSurfaces = enabledSurfacesField.getValue();
-        AiChatSurface defaultSurface = defaultSurfaceField.getValue();
+        AiUiSettings settings = getEditedEntity();
+        Set<AiChatSurface> enabledSurfaces = settings.getEnabledSurfaceSet();
+        AiChatSurface defaultSurface = settings.getDefaultSurface();
 
         if (enabledSurfaces == null || enabledSurfaces.isEmpty()) {
             rejectSave(event, "aiUiSettingsDetail.validation.enabledSurfacesRequired");
@@ -81,17 +96,14 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
         }
         if (defaultSurface == null || !enabledSurfaces.contains(defaultSurface)) {
             rejectSave(event, "aiUiSettingsDetail.validation.defaultSurfaceEnabled");
-            return;
         }
-
-        AiUiSettings settings = getEditedEntity();
-        settings.setEnabledSurfaceSet(enabledSurfaces);
-        settings.setDefaultSurface(defaultSurface);
     }
 
     private void rejectSave(BeforeSaveEvent event, String messageKey) {
         notifications.create(messages.getMessage(messageKey))
-                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                .withPosition(Notification.Position.MIDDLE)
+                .withDuration(5000)
                 .show();
         event.preventSave();
     }
