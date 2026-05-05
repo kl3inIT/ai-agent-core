@@ -2,8 +2,8 @@
 
 **Milestone:** v1.1.0
 **Granularity:** coarse
-**Total phases:** 6 (Phase 9 → Phase 14)
-**Phase numbering:** continues from v1.0.0 (which ended at Phase 8 plus inserted 7.1, 7.2). v1.1 starts at Phase 9.
+**Total phases:** 7 (Phase 9 → Phase 15)
+**Phase numbering:** continues from v1.0.0 (which ended at Phase 8 plus inserted 7.1, 7.2). v1.1 starts at Phase 9. Phase 13 was rewritten 2026-05-05 (STT split out to a new Phase 15; Phase 13 retitled to Chat Task File — Attach + LLM Read + Bulk Save).
 **Coverage:** 100% of v1.1 active REQ-IDs mapped (Future Requirements and Out of Scope intentionally NOT mapped).
 
 **Previous milestone:** v1.0.0 MVP shipped 2026-04-26
@@ -16,8 +16,9 @@
 - Phase 10 → depends on Phase 9; must precede Phase 11 (admin must be able to deny mutation per entity below user permission level before opt-in).
 - Phase 11 → hard-depends on Phase 9 + Phase 10.
 - Phase 12 → independent of 10/11 but depends on Phase 9; sequenced after to avoid interleaving UI refactor with security work.
-- Phase 13 → depends on Phase 9; independent of 10/11/12.
-- Phase 14 → depends on Phase 9 and Phase 10; sequenced last (highest novelty).
+- Phase 13 → depends on Phase 9 + Phase 11 (`bulk_save_records` extends Phase 11 `MutationSaveExecutor`) + Phase 12 (`ChatPanelFragment.attachmentsPanel` slot is the integration point); independent of 10.
+- Phase 14 → depends on Phase 9 and Phase 10; may consume `AiTaskFile` (Phase 13) by id for single-record extraction.
+- Phase 15 → depends on Phase 12 (`ChatPanelFragment.messageInputSlot` integration point); independent of 10/11/13/14. Sequenced last in v1.1 (lowest priority — voice input is a "nice to have").
 
 ## Phases
 
@@ -25,8 +26,9 @@
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
 - [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
 - [x] **Phase 12: Configurable Chat Surfaces** — `FULL_ROUTE` + `HEADER_BUTTON` Jmix `DialogWindow` surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity. (completed 2026-05-02)
-- [ ] **Phase 13: Chat Task Input — STT + Task-Scoped File** — Browser-recorded STT via Spring AI `OpenAiAudioTranscriptionModel`; transient `AiTaskFile` separate from KB ingestion.
+- [ ] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable).
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
+- [ ] **Phase 15: Chat Voice Input — Soniox STT** — Browser `MediaRecorder` capture (webm/opus or mp4, no transcoding) + custom Spring `RestClient` Soniox provider (`/v1/files` + `/v1/transcriptions`, `Authorization: Bearer`); `TranscriptionService` strategy interface (`SonioxTranscriptionService` default + optional `SpringAiTranscriptionService` OpenAI fallback); `TranscriptionPostProcessor` SPI; STT_TRANSCRIPTION audit via `writeToolCall`.
 
 ## Phase Details
 
@@ -153,17 +155,40 @@
 - All user-facing UI remains Jmix XML/controller based with all labels in both locale bundles.
 **UI hint**: yes
 
-### Phase 13: Chat Task Input — STT + Task-Scoped File
-**Goal**: Users can dictate chat input via browser-recorded audio transcribed server-side, and attach task-scoped files to a turn — both pathways disjoint from the chat client and from KB ingestion, audit-privacy-safe by default.
-**Depends on**: Phase 9 (no exposure-policy or mutation surface dependency; `ChatPanelFragment`'s `messageInputSlot` is the integration point and stable from v1.0)
-**Requirements**: STT-01, STT-02, STT-03, STT-04, STT-05, STT-06, TASK-01, TASK-02, TASK-03, TASK-04, TASK-05, ENT-07, SPI-11, TEST-16, TEST-17, SEC-06 (partial — read+create on own `AiTaskFile` rows; row-level draft policy completes in Phase 14)
+### Phase 13: Chat Task File — Attach + LLM Read + Bulk Save
+**Goal**: Users attach files (xlsx, pdf, docx, csv, png, jpg, …) to a chat turn; the LLM reads file content directly via Spring AI `Media` (multimodal Qwen3.6-35B-A3B) and acts on it through the existing Phase 9–11 tool surface plus a new `bulk_save_records` tool that persists multiple host entities in a single audited transaction. Pathway is structurally disjoint from KB ingestion (`IngesterManager` / `VectorStore`).
+**Depends on**: Phase 9 (`agent.entities` / `agent.permissions` baseline) + Phase 11 (`MutationSaveExecutor`, `MutationGuard`, `AiMutationIntent`, `MutationErrorTranslator`, `AuditWriter.writeToolCall`) + Phase 12 (`ChatPanelFragment.attachmentsPanel` slot, `AiChatSessionState`)
+**Requirements**: ENT-07, TASK-01, TASK-02, TASK-03, TASK-04, TASK-05, SEC-06 (partial — read+create on own `AiTaskFile` rows; row-level draft policy completes in Phase 14), TEST-16. NEW for v1.1 (folded into this phase rewrite): `bulk_save_records` tool spec (extends MUT-* surface) and default-model swap to `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable, multimodal native, replaces `openai/gpt-4o-mini`).
 **Success Criteria** (what must be TRUE):
-  1. With `ai-agent.stt.enabled=true` and an OpenAI key (operator docs note OpenRouter does not proxy `/audio/transcriptions`), the user clicks the mic button, records up to 60s via browser `MediaRecorder` (no transcoding), and the transcribed text appears in the `MessageInput` for review/edit before send — `TranscriptionService` does not call `ChatService.ask` directly.
-  2. A user attaches a task-scoped file to a turn via a UI affordance distinct from `MessageInput` and from `KnowledgeBaseView`; an `AiTaskFile` row is persisted to `agentstore` with conversation id, filename, content type, size, storage ref, TTL (default 1h); the file is stored via Jmix `FileStorage` (default `local`) and `IngesterManager` is never invoked (TEST-16 asserts unchanged `VectorStore` count after attach).
-  3. By default the `STT_TRANSCRIPTION` audit row records duration, language, model, outcome, and SHA-256 transcript hash (NOT raw text); flipping `ai-agent.stt.audit.storeTranscript=true` switches it (TEST-17 covers both modes).
-  4. STT failures (e.g. provider 4xx, recording too long) surface a non-blocking error message + retry button in the input area; the chat flow itself remains usable; an optional `TranscriptionPostProcessor` SPI bean rewrites transcripts (PII redaction / vocabulary normalization) before they reach the input field.
+  1. A user attaches one or more files to a chat turn via an "Attach" button + chip strip rendered in the existing Phase 12 `attachmentsPanel` slot (working in BOTH `FULL_ROUTE` `ChatView` and `HEADER_BUTTON` `ChatDialogView`); each upload persists exactly one `AiTaskFile` row to `agentstore` with `conversationId` (NOT NULL FK), `messageId` (NULLABLE FK to `AiMessage`, populated on send), filename, content type, size, storage ref, TTL (default 1h). `IngesterManager` is never invoked and `VectorStore` count is unchanged after attach (TEST-16).
+  2. On user-message send, `AiTaskFileMediaResolver` returns rows where `messageId IS NULL` (newly attached, not yet sent), `DefaultChatServiceImpl` injects them as Spring AI `Media` into the user message (`chatClient.prompt().user(u -> u.media(...))`), and after the message is persisted, `UPDATE AiTaskFile SET messageId = newMessageId` for those rows. Subsequent turns receive an empty `Media` list (single-turn-only injection — matches `D:/DTH/jmix-crm` `AiAttachmentMediaResolver` pattern; aligns with Spring AI `JdbcChatMemoryRepository` text-only persistence).
+  3. With `ai-agent.tools.mutation.enabled=true`, `bulk_save_records(entityName, records[], idempotencyKey)` runs ONE transaction through the Phase 11 chain (`LlmExposurePolicy.canCreate/canUpdate` → `AccessManager.applyRegisteredConstraints(CrudEntityContext)` per row → per-attribute `EntityAttributeContext.canModify` per row → `AiMutationIntent` reservation once per batch → type coercion → `MutationGuard` per row → `@Transactional DataManager.save` per row → `AuditWriter.writeToolCall` once per batch). Per-row dispatch: `id != null` → update, `id == null` → create. Per-row failure (validation / `AccessDeniedException` / `MutationGuard` veto) rolls back the entire batch; audit row records `outcome=FAILED` with `failedRowIndex`. Replay with the same `idempotencyKey` returns `IDEMPOTENT_REPLAY` and persists no additional rows. `requestHash` = SHA-256 over canonical JSON of records in submission order.
+  4. Default chat model is swapped to `qwen/qwen3.6-35b-a3b` in `application.properties` (`jmix.ai-agent.defaults.model` and `spring.ai.openai.chat.options.model`); admin `AiParametersDetailView` (Phase 6) override surface is unchanged. Self-host constraint preserved: model is Apache 2.0; OpenRouter API endpoint stays for dev, swap `spring.ai.openai.base-url` for prod self-host (vLLM / Ollama).
 **Plans**: TBD
 **UI hint**: yes
+**Cross-cutting constraints:**
+- STT (`STT-01..06`, `SPI-11`, `TEST-17`) is OUT of scope for Phase 13 — moved to a new Phase 15.
+- No `ChatModelRouter` / dual-model routing — single multimodal model covers text and file turns. Defer dual-model split to a future phase if cost telemetry justifies.
+- No `TaskFileContentExtractor` SPI / Apache POI / Tika server-side parser — Qwen3.6-VL reads xlsx/pdf/docx/png binaries natively. Add server-side extractor only if a host runs a text-only chat model.
+- No admin list view for `AiTaskFile` rows in v1.1 — task files are transient; `AiAgentAdminRole` policy provisioned for future addition.
+- `bulk_save_records` ships as create+update only; `bulk_delete_records` is reserved for v1.2 (destructive ops need separate UX with confirmation/undo).
+- Per-row failure semantics: rollback-all only in v1.1; continue-on-error mode (sub-transaction per row) deferred until a host requests it.
+
+### Phase 15: Chat Voice Input — Soniox STT
+**Goal**: Users can dictate chat input via browser-recorded audio transcribed server-side through Soniox STT — text appears in `MessageInput` for review/edit before send; pathway is disjoint from the chat client and audit-privacy-safe by default.
+**Depends on**: Phase 12 (`ChatPanelFragment.messageInputSlot` is the integration point and is stable from v1.0 + Phase 12 surface contract)
+**Requirements**: STT-01, STT-02, STT-03, STT-04, STT-05, STT-06, SPI-11, TEST-17
+**Success Criteria** (what must be TRUE):
+  1. With `ai-agent.stt.enabled=true` and a Soniox API key (`ai-agent.stt.soniox.api-key`), the user clicks the mic button, records up to 60s via browser `MediaRecorder` (no transcoding — webm/opus or mp4 directly to `Authorization: Bearer` `POST /v1/files` then `POST /v1/transcriptions` with `model=stt-async-v4` + `language_hints: ["vi","en"]`), and the transcribed text appears in `MessageInput` for review/edit before send — `TranscriptionService` does NOT call `ChatService.ask` directly.
+  2. `TranscriptionService` is a strategy interface with a default `SonioxTranscriptionService` impl (custom Spring `RestClient`-based — Soniox has no Java SDK) and an optional `SpringAiTranscriptionService` OpenAI-direct impl; selected via `ai-agent.stt.provider=soniox|openai|<custom-bean-name>` (default `soniox`). Hosts can register their own `TranscriptionService` bean and select it by bean name.
+  3. By default the `STT_TRANSCRIPTION` audit row (via `AuditWriter.writeToolCall` `eventName=stt_transcription`, no new `AuditKind`) records duration, language, model, outcome, and SHA-256 transcript hash (NOT raw text); flipping `ai-agent.stt.audit.storeTranscript=true` stores raw transcript instead (TEST-17 covers both modes).
+  4. STT failures (provider 4xx, recording too long, network) surface a non-blocking error message + retry button in the input area; the chat flow itself remains usable. An optional `TranscriptionPostProcessor` SPI bean rewrites transcripts (PII redaction / vocabulary normalization) before they reach the input field.
+**Plans**: TBD
+**UI hint**: yes
+**Cross-cutting constraints:**
+- Operator docs note: Soniox uses an independent API key from OpenAI/OpenRouter chat key. OpenRouter does NOT proxy `/audio/transcriptions`; if `provider=openai` is selected, OpenAI key is required directly.
+- Soniox file/transcription resources are cleaned up via `DELETE /v1/files/{id}` + `DELETE /v1/transcriptions/{id}` after retrieval.
+- This phase is sequenced last in v1.1; deferral past v1.1 close into v1.2 is acceptable if other phases consume schedule.
 
 ### Phase 14: Intent-Driven Extraction → Form Prefill
 **Goal**: The LLM produces a structured draft for a host entity (e.g. PDF → customer-draft), the user confirms via a chat-rendered button, and a Jmix detail view opens prefilled — all without giving the LLM any UI-mutation primitive and with `AccessManager` validating the eventual save exactly as for any human form submission.
@@ -183,13 +208,17 @@
 Phase 9 (foundations)
   ├── Phase 10 (exposure policy)
   │     ├── Phase 11 (mutation tools)
+  │     │     └── Phase 13 (chat task file + bulk_save_records)
   │     └── Phase 14 (intent extraction)
   ├── Phase 12 (chat surfaces)
-  ├── Phase 13 (chat task input)
+  │     ├── Phase 13 (attachmentsPanel slot)
+  │     └── Phase 15 (messageInputSlot mic button)
   └── (Phase 14 also uses Phase 9)
 ```
 
-Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent of each other, all assume Phase 9; 14 also assumes 10).
+Hard chain: 9 → 10 → 11. Phase 13 depends on 9 + 11 + 12 (mutation chain extension + UI slot). Phase 14 assumes 9 + 10 (and may consume Phase 13 `AiTaskFile` by id). Phase 15 assumes 12 only.
+
+Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → **13** → 14 → 15.
 
 ## Progress
 
@@ -199,8 +228,9 @@ Hard chain: 9 → 10 → 11. Soft sequence: 12 → 13 → 14 (each independent o
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
-| 13. Chat Task Input — STT + Task-Scoped File | 0/0 | Not started | - |
+| 13. Chat Task File — Attach + LLM Read + Bulk Save | 0/0 | SPEC + CONTEXT done (2026-05-05) | - |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
+| 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
 ## Coverage Validation
 
@@ -213,8 +243,8 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 | EXP-01..10 | 10 | Phase 10 |
 | MUT-01..12 | 12 | Phase 11 |
 | SURF-01..10 | 10 | Phase 12 |
-| STT-01..06 | 6 | Phase 13 |
 | TASK-01..05 | 5 | Phase 13 |
+| STT-01..06 | 6 | **Phase 15** (split out from Phase 13 on 2026-05-05) |
 | EXTRACT-01..10 | 10 | Phase 14 |
 | ENT-05 | 1 | Phase 10 |
 | ENT-06 | 1 | Phase 12 |
@@ -223,7 +253,7 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 | ENT-09 | 1 | Phase 11 |
 | SPI-09 | 1 | Phase 9 |
 | SPI-10 | 1 | Phase 11 |
-| SPI-11 | 1 | Phase 13 |
+| SPI-11 | 1 | **Phase 15** (TranscriptionPostProcessor — moved with STT) |
 | SPI-12 | 1 | Phase 14 |
 | AUD-06 | 1 | Phase 11 |
 | AUD-07 | 1 | Phase 11 (plumbing prepared in Phase 9) |
@@ -235,7 +265,8 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 | TEST-10..13 | 4 | Phase 11 |
 | TEST-14 | 1 | Phase 12 |
 | TEST-15 | 1 | Phase 14 |
-| TEST-16, TEST-17 | 2 | Phase 13 |
+| TEST-16 | 1 | Phase 13 (task-file isolation) |
+| TEST-17 | 1 | **Phase 15** (STT audit privacy — moved with STT) |
 
 **No orphans. No duplicates.**
 
@@ -243,10 +274,12 @@ All v1.1 active REQ-IDs in REQUIREMENTS.md are mapped to exactly one phase. Futu
 
 - Phase numbering continues from v1.0.0 (which ended at Phase 8 plus inserted 7.1, 7.2). v1.1 starts at Phase 9 — no renumbering.
 - Every phase that introduces a new entity (Phase 10: `AiExposureRule`; Phase 11: `AiMutationIntent`; Phase 12: `AiUiSettings`; Phase 13: `AiTaskFile`; Phase 14: `AiExtractionDraft`) bundles its Liquibase changelog (included in root `changelog.xml`), all-locale message bundle entries, and role-policy updates as part of the same phase, per CLAUDE.md.
-- Mutation tools (Phase 11) ship default OFF via `@ConditionalOnProperty`; the boot test asserts zero mutation callbacks under default config.
+- Mutation tools (Phase 11) ship default OFF via `@ConditionalOnProperty`; the boot test asserts zero mutation callbacks under default config. Phase 13 `bulk_save_records` joins under the same gate.
 - Exposure policy (Phase 10) is `EXCLUDE`-only at the rule-shape level; UI labels read "Hide from AI" / "Visible to AI"; composition is `userVisible AND NOT excluded`. `attributePath` field omitted in v1.1 per user decision 2026-04-27 (entity-level denylist only).
 - LLM never receives `ViewNavigators` or any UI-mutation primitive (Phase 14): controller renders the confirm card; controller navigates after `AccessManager.isPermitted(ViewContext)`.
-- Audit reuses `AuditWriter.writeToolCall` end-to-end; no new `AuditKind`. New `eventName` strings and two new `outcome` values are the only audit surface changes.
+- Audit reuses `AuditWriter.writeToolCall` end-to-end; no new `AuditKind`. New `eventName` strings (`bulk_save_records` Phase 13; `stt_transcription` Phase 15) and existing `outcome` values are the only audit surface changes.
+- 2026-05-05 (v1.1 mid-milestone): Phase 13 scope was rewritten and STT split into a new Phase 15. Driver: user prioritized attach-file-then-LLM-process and bulk-save productivity over voice dictation, AND required a self-hostable open-weights model (Qwen3.6-35B-A3B Apache 2.0) instead of the original Spring AI `OpenAiAudioTranscriptionModel` (proprietary). Phase 13 now ships `AiTaskFileMediaResolver` (jmix-crm pattern), `bulk_save_records` (extends Phase 11 `MutationSaveExecutor`), and a default-model swap to Qwen3.6-35B-A3B. STT moves to Phase 15 with a Soniox-first provider strategy (custom Spring `RestClient`, no Java SDK).
+- 2026-05-05: default chat model swap from `openai/gpt-4o-mini` → `qwen/qwen3.6-35b-a3b` is bundled into Phase 13 (multimodal native is required for the file-read deliverable). Embedding model unchanged (`qwen/qwen3-embedding-4b`).
 
 ## Backlog
 
