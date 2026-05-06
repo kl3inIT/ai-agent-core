@@ -9,8 +9,8 @@ progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 52
-  completed_plans: 47
-  percent: 90
+  completed_plans: 48
+  percent: 92
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 | Field | Value |
 |-------|-------|
 | Phase | Phase 13 |
@@ -176,6 +176,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 13]: Plan 13-06 gap closure: extracted `DefaultChatServiceImpl.executeBlockingTurn(...)` private helper to eliminate the BLK-01 streaming-fallback double-write — both `ask(...)` and the streaming `catch(UnsupportedOperationException)` now delegate to the same helper passing already-resolved Media + already-persisted user-message id, so `userMessagePersister.persistUserMessage` and `taskFileMediaResolver.resolvePending` each fire EXACTLY ONCE per turn on the D-04 graceful-fallback path. D-03 streaming-success doOnComplete invariant left untouched. BLK-04 (prompt-build orphan) closed implicitly. Regression locked by `DefaultChatServiceImplStreamFallbackTest` (5 Mockito tests, pure JUnit — sidesteps deferred AiAuditEvent boot regression).
 - [Phase ?]: Phase 13.1 Plan 01: Wave-0 schema lock — dropped AI_TASK_FILE.MESSAGE_ID/INJECTED_AT (Liquibase 100), removed AiTaskFile.message/injectedAt fields, flipped AiTaskFileProperties to long ttlSeconds + perTurnMaxFiles + perTurnMaxTotalBytes with -1 sentinel, added AiMessageRole.NOTICE + bilingual captions. Compile passes via Rule 3 stubs in AiTaskFileRepository.markInjected, ConversationDetailView switch, and ChatPanelFragment.setExpiresAt; full rewrite in Plans 13.1-02/04. Three Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H deferred to Plan 13.1-06.
 - [Phase 13.1]: Plan 02: AiTaskFileMediaResolver.resolveActive(UUID) per-turn-all + LRU budget cap + task_file_budget_exceeded audit (REQUIRES_NEW; failure swallowed to log.warn). Resolved record now (media, budgetExceeded); taskFileIds dropped. AiTaskFileRepository slimmed to {loadExpired, deleteRow, deleteAllExpired} — markInjected and loadPending deleted with their AiMessage/Optional imports. New BudgetExceededAuditKeys constants are the single source of truth shared with the upcoming BudgetCapTest (Plan 13.1-06) — 9-key argumentsJson order locked via LinkedHashMap; Jackson JsonProcessingException falls back to a String.format literal that ALSO references the constants. Rule-3 stub: DefaultChatServiceImpl resolvePending/markInjected/taskFileIds call sites swapped for resolveActive + structural no-ops; Plan 13.1-03 deletes the dead UserMessagePersister wiring + executeBlockingTurn parameter end-to-end.
+- [Phase 13.1]: Plan 03: ProjectingChatMemoryRepository.saveAll JPQL excludes role=NOTICE so notice rows survive the delete-recreate projection wipe each turn (D-A1). DefaultChatServiceImpl now calls AiTaskFileMediaResolver.resolveActive(convId) once per turn on both the blocking ask() and the streaming stream() transports; UserMessagePersister field/parameter and the markInjected stamping path are removed; executeBlockingTurn signature drops userMessageIdAlreadyPersisted while preserving the BLK-01 single-write streaming-fallback invariant. ChatResponseDto + StreamingEvent.Final extended with a budgetExceeded boolean propagated from Resolved.budgetExceeded() on both transports (D-D1). UserMessagePersister.java deleted; chat-memory advisor's own AiMessage projection is the sole user-message persistence path. DefaultChatServiceImplStreamFallbackTest rewritten with 4 cases (A/B/C/D) covering resolveActive-once-per-turn on both transports + budgetExceeded propagation on both — all green on pure JUnit 5 + Mockito. Rule-3 stubs on the 3 deferred Plan-13.1-01 test files (AiTaskFileCleanupJobTest, AiTaskFileMediaResolverIntegrationTest, AiTaskFileNoVectorStoreInvocationTest) were the minimum-diff required to unblock :compileTestJava; Plan 13.1-06 owns the proper rewrite.
 
 ### Performance Metrics
 
@@ -225,6 +226,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13 P13-06 (gap) | ~22m | 2 tasks | 2 files |
 | Phase 13.1 P01 | 25min | 2 tasks | 10 files |
 | Phase 13.1 P02 | ~20min | 2 tasks | 4 files |
+| Phase 13.1 P03 | ~25min | 2 tasks | 10 files |
 
 ### Quick Tasks Completed
 
@@ -235,7 +237,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-05-07T00:00:00.000Z
-**Stopped at:** Phase 13.1 Plan 02 complete (per-turn-all resolver + budget cap + audit; repo slimmed)
+**Stopped at:** Phase 13.1 Plan 03 complete (resolveActive wiring + UserMessagePersister deleted + NOTICE projection filter + 4-case stream-fallback test green)
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Plan 13.1-03 — ProjectingChatMemoryRepository NOTICE-survival JPQL fix + DefaultChatServiceImpl resolveActive wiring + UserMessagePersister deletion + DefaultChatServiceImplStreamFallbackTest rewrite.
+**Next action:** Plan 13.1-04 — UI fragment reshape (`<split>` + right-pane Attachments panel) + budgetExceeded toast wire-up consuming the new ChatResponseDto/StreamingEvent.Final flag.
