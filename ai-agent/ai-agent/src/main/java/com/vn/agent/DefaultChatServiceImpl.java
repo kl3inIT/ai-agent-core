@@ -268,17 +268,20 @@ public class DefaultChatServiceImpl implements ChatService {
                 log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
             }
 
-            // Phase 13 Plan 04 — single-turn Media injection (D-01 / REVIEWS HIGH-1).
-            // Resolver scans pending rows where injectedAt IS NULL AND expiresAt > now;
-            // returns Media + the row ids the caller threads into markInjected after the
-            // turn completes.
+            // Phase 13.1 Plan 02 RES-01 — per-turn-all Media injection. The resolver
+            // loads ALL non-expired AiTaskFile rows for the conversation in DESC order,
+            // applies the per-turn caps, and returns Resolved(media, budgetExceeded).
+            // The Plan-13 markInjected/userMessagePersister stamping path is dead and
+            // will be removed end-to-end by Plan 13.1-03; the call sites below are
+            // structural no-ops kept only to satisfy the Phase 13 BLK-01 invariant
+            // (executeBlockingTurn(...) signature unchanged) until Plan 13.1-03 lands.
             final AiTaskFileMediaResolver.Resolved resolvedMedia =
-                    taskFileMediaResolver.resolvePending(convId);
+                    taskFileMediaResolver.resolveActive(convId);
 
-            // REVIEWS HIGH-14 — explicit user-message persist BEFORE chatClient invocation,
-            // so we have a stable AiMessage.id to thread into markInjected. Replaces the
-            // race-prone SELECT-back "latest USER message" lookup. Only runs when there ARE
-            // pending Media to stamp; without media there is nothing to link.
+            // Plan 13.1-03 will delete this whole UserMessagePersister block. Kept for
+            // now so Phase 13 BLK-01 streaming-fallback semantics still compile; the
+            // userMessageId is never threaded into a markInjected stamp anymore (the
+            // stamp method itself is gone — see AiTaskFileRepository).
             UUID userMessageId = null;
             if (!resolvedMedia.isEmpty()) {
                 try {
@@ -380,18 +383,11 @@ public class DefaultChatServiceImpl implements ChatService {
                 .call()
                 .chatClientResponse();
 
-        // BLK-01 fix (gap-closure plan 13-06): markInjected is invoked EXACTLY ONCE here
-        // against the already-persisted userMessageIdAlreadyPersisted. Wrapped in try/catch
-        // so a markInjected failure cannot fail the user's response — Plan 04 invariant.
-        if (!resolvedMedia.isEmpty()) {
-            try {
-                taskFileRepository.markInjected(resolvedMedia.taskFileIds(),
-                        userMessageIdAlreadyPersisted, java.time.OffsetDateTime.now());
-            } catch (RuntimeException stampEx) {
-                log.warn("markInjected failed for conv={} ids={}", convId,
-                        resolvedMedia.taskFileIds(), stampEx);
-            }
-        }
+        // Phase 13.1 Plan 02: markInjected is gone — the per-turn-all resolver does not
+        // need a pending-state marker. Plan 13.1-03 will remove this block entirely along
+        // with the userMessageIdAlreadyPersisted parameter on executeBlockingTurn(...).
+        // Suppress unused-parameter warning until Plan 13.1-03 lands.
+        java.util.Objects.requireNonNullElse(userMessageIdAlreadyPersisted, java.util.UUID.randomUUID());
 
         ChatResponse springResponse = clientResp.chatResponse();
         String content = springResponse != null
@@ -516,13 +512,13 @@ public class DefaultChatServiceImpl implements ChatService {
                         log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
                     }
 
-                    // Phase 13 Plan 04 — single-turn Media injection (D-01 / REVIEWS HIGH-1).
+                    // Phase 13.1 Plan 02 RES-01 — per-turn-all Media injection.
                     // RESEARCH Pitfall 8: hoisted INSIDE Flux.defer so readAllBytes does not
-                    // run on the calling thread before subscription. REVIEWS HIGH-14:
-                    // user-message persist also runs INSIDE the defer, capturing the id into
-                    // an AtomicReference closed over by doOnComplete.
+                    // run on the calling thread before subscription. The Plan-13
+                    // markInjected stamp path is dead; Plan 13.1-03 deletes the
+                    // userMessagePersister wiring below entirely.
                     final AiTaskFileMediaResolver.Resolved resolvedMedia =
-                            taskFileMediaResolver.resolvePending(convId);
+                            taskFileMediaResolver.resolveActive(convId);
                     final AtomicReference<UUID> userMessageIdRef = new AtomicReference<>();
                     if (!resolvedMedia.isEmpty()) {
                         try {
@@ -576,22 +572,13 @@ public class DefaultChatServiceImpl implements ChatService {
                                     assistantContentSeen.set(true);
                                     return Flux.just(new StreamingEvent.Content(text));
                                 })
-                                // REVIEWS HIGH-1 + HIGH-14: stamp injectedAt only on successful
-                                // completion. doOnComplete (NOT doOnSubscribe / doOnNext) so a
-                                // cancelled stream does NOT mark files as injected — D-03
-                                // two-phase semantics: cancelled = retry works.
+                                // Phase 13.1 Plan 02: markInjected is gone (the per-turn-all
+                                // resolver has no pending-state marker). Plan 13.1-03 will
+                                // remove this entire doOnComplete arm and the userMessageIdRef
+                                // capture along with the userMessagePersister wiring above.
                                 .doOnComplete(() -> {
-                                    if (!resolvedMedia.isEmpty()) {
-                                        try {
-                                            taskFileRepository.markInjected(
-                                                    resolvedMedia.taskFileIds(),
-                                                    userMessageIdRef.get(),
-                                                    java.time.OffsetDateTime.now());
-                                        } catch (Exception stampEx) {
-                                            log.warn("markInjected failed for conv={} ids={}", convId,
-                                                    resolvedMedia.taskFileIds(), stampEx);
-                                        }
-                                    }
+                                    java.util.Objects.requireNonNullElse(userMessageIdRef.get(),
+                                            java.util.UUID.randomUUID());
                                 })
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());

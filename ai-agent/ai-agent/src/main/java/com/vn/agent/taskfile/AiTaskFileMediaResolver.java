@@ -1,11 +1,20 @@
 package com.vn.agent.taskfile;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.RunContext;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
 import io.jmix.core.FileStorageLocator;
+import io.jmix.core.security.CurrentAuthentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.content.Media;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
@@ -14,32 +23,35 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Resolves pending {@link AiTaskFile} rows for a conversation into Spring AI
- * {@link Media} objects so the chat client can pass them to the multimodal LLM.
+ * Resolves task-file rows for a conversation into Spring AI {@link Media} objects so the
+ * chat client can pass them to the multimodal LLM.
  *
- * <p>D-01: returns Media for files where {@code injectedAt IS NULL} —
- * single-turn injection only (REVIEWS HIGH-1 — stable pending marker, NOT
- * {@code messageId}; the projecting chat-memory repo deletes/reinserts
- * {@link com.vn.agent.entity.AiMessage} rows on every {@code saveAll}, so
- * {@code message} is unstable while {@code injectedAt} is set exactly once
- * by {@link AiTaskFileRepository#markInjected}).
+ * <p>Phase 13.1 RES-01: returns Media for ALL non-expired AiTaskFile rows in the
+ * conversation, applying token-budget caps from {@link AiTaskFileProperties}
+ * ({@code perTurnMaxFiles}, {@code perTurnMaxTotalBytes}) with LRU eviction on
+ * {@code createdDate DESC}. Emits one {@code task_file_budget_exceeded} audit on
+ * overflow via {@link AuditWriter#writeToolCall} (REQUIRES_NEW; failure is swallowed
+ * with a log.warn so the chat turn cannot be poisoned by a downstream audit error).
  *
  * <p>Verbatim port of {@code D:/DTH/jmix-crm/.../AiAttachmentMediaResolver}
  * (constants, MIME table, helpers preserved line-for-line) — adapted for the
- * Phase 13 entity name {@code ai_AiTaskFile} and the {@code injectedAt is null}
- * predicate.
+ * Phase 13 entity name {@code ai_AiTaskFile}.
  *
  * <p>Task-file pathway is structurally disjoint from KB ingestion (TEST-16;
  * see this package's {@code package-info.java} for the forbidden-token list).
  */
 @Component
 public class AiTaskFileMediaResolver {
+
+    private static final Logger log = LoggerFactory.getLogger(AiTaskFileMediaResolver.class);
 
     private static final int MAX_MEDIA_NAME_LENGTH = 96;
 
@@ -79,43 +91,154 @@ public class AiTaskFileMediaResolver {
 
     private final DataManager dataManager;
     private final FileStorageLocator fileStorageLocator;
+    private final AiTaskFileProperties taskFileProperties;
+    private final AuditWriter auditWriter;
+    private final CurrentAuthentication currentAuthentication;
 
     public AiTaskFileMediaResolver(DataManager dataManager,
-                                   FileStorageLocator fileStorageLocator) {
+                                   FileStorageLocator fileStorageLocator,
+                                   AiTaskFileProperties taskFileProperties,
+                                   AuditWriter auditWriter,
+                                   CurrentAuthentication currentAuthentication) {
         this.dataManager = dataManager;
         this.fileStorageLocator = fileStorageLocator;
+        this.taskFileProperties = taskFileProperties;
+        this.auditWriter = auditWriter;
+        this.currentAuthentication = currentAuthentication;
     }
 
     /**
-     * Loads pending task-file rows for the conversation and converts each into
-     * a {@link Media} object. Pending = {@code injectedAt IS NULL AND
-     * expiresAt > :now} per REVIEWS HIGH-1.
+     * Loads ALL non-expired task-file rows for the conversation in {@code createdDate DESC}
+     * order, applies {@link AiTaskFileProperties#getPerTurnMaxFiles()} and
+     * {@link AiTaskFileProperties#getPerTurnMaxTotalBytes()} caps with LRU eviction
+     * (oldest dropped first because the iteration walks newest-first), and converts each
+     * kept row into a {@link Media} object.
      *
-     * <p>Uses {@link DataManager} (NOT {@link io.jmix.core.UnconstrainedDataManager})
-     * so the user row-level policy filters by {@code userUsername} (Plan 13-01).
+     * <p>Sentinel {@code -1} on either cap disables that cap; setting both to {@code -1}
+     * returns every row and emits zero audit rows.
      *
-     * <p>Returns {@link Resolved#empty()} when {@code conversationId} is null
-     * or no pending rows exist; the caller injects {@code .media(...)} only
-     * when {@link Resolved#isEmpty()} is false.
+     * <p>Uses {@link DataManager} (NOT {@link io.jmix.core.UnconstrainedDataManager}) so
+     * the user row-level policy filters by {@code userUsername} (Plan 13-01); cross-user
+     * reads are structurally impossible.
+     *
+     * <p>Returns {@link Resolved#empty()} when {@code conversationId} is null or no
+     * non-expired rows exist; the caller injects {@code .media(...)} only when
+     * {@link Resolved#isEmpty()} is false.
      */
-    public Resolved resolvePending(UUID conversationId) {
+    public Resolved resolveActive(UUID conversationId) {
         if (conversationId == null) {
             return Resolved.empty();
         }
-        List<AiTaskFile> pending = dataManager.load(AiTaskFile.class)
+        List<AiTaskFile> rows = dataManager.load(AiTaskFile.class)
                 .query("select e from ai_AiTaskFile e " +
-                        "where e.conversation.id = :cid and e.injectedAt is null " +
-                        "and e.expiresAt > :now " +
-                        "order by e.createdDate asc")
+                        "where e.conversation.id = :cid and e.expiresAt > :now " +
+                        "order by e.createdDate desc")
                 .parameter("cid", conversationId)
                 .parameter("now", OffsetDateTime.now())
                 .list();
-        if (pending.isEmpty()) {
+        if (rows.isEmpty()) {
             return Resolved.empty();
         }
-        List<Media> media = pending.stream().map(this::buildMedia).toList();
-        List<UUID> ids = pending.stream().map(AiTaskFile::getId).toList();
-        return new Resolved(media, ids);
+
+        int maxFiles = taskFileProperties.getPerTurnMaxFiles();          // -1 disables file cap
+        long maxBytes = taskFileProperties.getPerTurnMaxTotalBytes();    // -1 disables byte cap
+
+        List<AiTaskFile> kept = new ArrayList<>();
+        long keptBytes = 0L;
+        int droppedRows = 0;
+        long droppedBytes = 0L;
+        long totalBytes = 0L;
+        for (AiTaskFile row : rows) {
+            long size = row.getSizeBytes() == null ? 0L : row.getSizeBytes();
+            totalBytes += size;
+            boolean fileCapHit = (maxFiles >= 0) && (kept.size() >= maxFiles);
+            boolean byteCapHit = (maxBytes >= 0) && (keptBytes + size > maxBytes);
+            if (fileCapHit || byteCapHit) {
+                droppedRows++;
+                droppedBytes += size;
+                continue;
+            }
+            kept.add(row);
+            keptBytes += size;
+        }
+
+        boolean budgetExceeded = droppedRows > 0;
+        if (budgetExceeded) {
+            try {
+                String argumentsJson = buildBudgetArgumentsJson(conversationId,
+                        rows.size(), totalBytes, kept.size(), keptBytes,
+                        droppedRows, droppedBytes, maxFiles, maxBytes);
+                auditWriter.writeToolCall(
+                        /*parentId*/ null,
+                        /*runId*/ runContextRunIdOrNew(),
+                        /*userUsername*/ currentUsername(),
+                        /*conversationId*/ conversationId,
+                        /*toolName*/ "task_file_budget_exceeded",
+                        argumentsJson,
+                        /*resultSummary*/ null,
+                        /*latencyMs*/ 0L,
+                        AiToolCallOutcome.SUCCESS,
+                        /*denialReason*/ null,
+                        /*errorClass*/ null);
+            } catch (RuntimeException auditEx) {
+                log.warn("Failed to write task_file_budget_exceeded audit row for conv={}",
+                        conversationId, auditEx);
+            }
+        }
+
+        List<Media> media = kept.stream().map(this::buildMedia).toList();
+        return new Resolved(media, budgetExceeded);
+    }
+
+    private String buildBudgetArgumentsJson(UUID conversationId,
+                                            int totalRows, long totalBytes,
+                                            int keptRows, long keptBytes,
+                                            int droppedRows, long droppedBytes,
+                                            int maxFiles, long maxBytes) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put(BudgetExceededAuditKeys.CONVERSATION_ID, conversationId.toString());
+        payload.put(BudgetExceededAuditKeys.TOTAL_ROWS, totalRows);
+        payload.put(BudgetExceededAuditKeys.TOTAL_BYTES, totalBytes);
+        payload.put(BudgetExceededAuditKeys.KEPT_ROWS, keptRows);
+        payload.put(BudgetExceededAuditKeys.KEPT_BYTES, keptBytes);
+        payload.put(BudgetExceededAuditKeys.DROPPED_ROWS, droppedRows);
+        payload.put(BudgetExceededAuditKeys.DROPPED_BYTES, droppedBytes);
+        payload.put(BudgetExceededAuditKeys.PER_TURN_MAX_FILES, maxFiles);
+        payload.put(BudgetExceededAuditKeys.PER_TURN_MAX_TOTAL_BYTES, maxBytes);
+        try {
+            return new ObjectMapper().writeValueAsString(payload);
+        } catch (JsonProcessingException jsonEx) {
+            log.warn("Failed to serialize task_file_budget_exceeded argumentsJson; falling back to literal",
+                    jsonEx);
+            return String.format(
+                    "{\"%s\":\"%s\",\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d}",
+                    BudgetExceededAuditKeys.CONVERSATION_ID, conversationId,
+                    BudgetExceededAuditKeys.TOTAL_ROWS, totalRows,
+                    BudgetExceededAuditKeys.TOTAL_BYTES, totalBytes,
+                    BudgetExceededAuditKeys.KEPT_ROWS, keptRows,
+                    BudgetExceededAuditKeys.KEPT_BYTES, keptBytes,
+                    BudgetExceededAuditKeys.DROPPED_ROWS, droppedRows,
+                    BudgetExceededAuditKeys.DROPPED_BYTES, droppedBytes,
+                    BudgetExceededAuditKeys.PER_TURN_MAX_FILES, maxFiles,
+                    BudgetExceededAuditKeys.PER_TURN_MAX_TOTAL_BYTES, maxBytes);
+        }
+    }
+
+    private UUID runContextRunIdOrNew() {
+        UUID runId = RunContext.get();
+        return runId != null ? runId : UUID.randomUUID();
+    }
+
+    private String currentUsername() {
+        try {
+            UserDetails user = currentAuthentication.getUser();
+            if (user != null && StringUtils.hasText(user.getUsername())) {
+                return user.getUsername();
+            }
+        } catch (RuntimeException anonymous) {
+            // No authenticated user (e.g. test without security context) — fall through.
+        }
+        return "system";
     }
 
     private Media buildMedia(AiTaskFile row) {
@@ -189,14 +312,14 @@ public class AiTaskFileMediaResolver {
     }
 
     /**
-     * Result of {@link #resolvePending(UUID)} — the pending {@link Media} list
-     * and the corresponding {@link AiTaskFile} ids that the caller will pass
-     * to {@link AiTaskFileRepository#markInjected} after the user message is
-     * persisted.
+     * Result of {@link #resolveActive(UUID)} — the per-turn {@link Media} list and a
+     * {@code budgetExceeded} flag set when at least one row was dropped due to the
+     * {@code perTurnMaxFiles} / {@code perTurnMaxTotalBytes} caps. The chat path uses the
+     * flag to surface a UI toast (D-D1).
      */
-    public record Resolved(List<Media> media, List<UUID> taskFileIds) {
+    public record Resolved(List<Media> media, boolean budgetExceeded) {
         public static Resolved empty() {
-            return new Resolved(List.of(), List.of());
+            return new Resolved(List.of(), false);
         }
 
         public boolean isEmpty() {

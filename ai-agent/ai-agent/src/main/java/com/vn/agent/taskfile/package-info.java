@@ -22,9 +22,9 @@
  * <p>The task-file pathway is structurally disjoint from KB ingestion: a chat
  * file lives only as bytes in {@link io.jmix.core.FileStorage} plus a metadata
  * row in {@code AI_TASK_FILE} (agentstore); the resolver streams those bytes
- * straight into a multimodal {@code Media} payload on the user turn that newly
- * attached the file (D-01 single-turn inject). Re-injection on follow-up turns
- * is deliberately not supported — the assistant's first-turn paraphrase is
- * persisted by the chat-memory store and covers downstream recall.
+ * straight into a multimodal {@code Media} payload on EVERY user turn for the
+ * conversation (Phase 13.1 RES-01 per-turn-all), subject to the
+ * {@code perTurnMaxFiles} / {@code perTurnMaxTotalBytes} budget caps in
+ * {@link com.vn.agent.taskfile.AiTaskFileProperties}.
  */
 package com.vn.agent.taskfile;
