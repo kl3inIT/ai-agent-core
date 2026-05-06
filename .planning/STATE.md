@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Phase 13.1 UI-SPEC approved
-last_updated: "2026-05-06T18:40:32.754Z"
+last_updated: "2026-05-06T18:59:51.619Z"
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 52
-  completed_plans: 45
-  percent: 87
+  completed_plans: 46
+  percent: 88
 ---
 
 # Project State
@@ -23,12 +23,12 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 13 — chat task file (attach + LLM read + bulk save) — Plan 13-05 verification surface complete (2026-05-06)
+**Current focus:** Phase 13.1 — Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context
 
 ## Current Position
 
-Phase: 999.1 of 5 (phase 11 mutation hardening follow ups refactor duplicated m)
-Plan: Not started
+Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context) — EXECUTING
+Plan: 2 of 7
 | Field | Value |
 |-------|-------|
 | Phase | Phase 13 |
@@ -174,6 +174,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 13-03: AiMutationIntent.RESULT_SUMMARY column persists bulk savedIds for IDEMPOTENT_REPLAY (REVIEWS HIGH-11)
 - [Phase ?]: 13-03: Per-row CrudEntityContext after entity load/create satisfies MUT-14 row-state-dependent constraint enforcement (REVIEWS HIGH-13)
 - [Phase 13]: Plan 13-06 gap closure: extracted `DefaultChatServiceImpl.executeBlockingTurn(...)` private helper to eliminate the BLK-01 streaming-fallback double-write — both `ask(...)` and the streaming `catch(UnsupportedOperationException)` now delegate to the same helper passing already-resolved Media + already-persisted user-message id, so `userMessagePersister.persistUserMessage` and `taskFileMediaResolver.resolvePending` each fire EXACTLY ONCE per turn on the D-04 graceful-fallback path. D-03 streaming-success doOnComplete invariant left untouched. BLK-04 (prompt-build orphan) closed implicitly. Regression locked by `DefaultChatServiceImplStreamFallbackTest` (5 Mockito tests, pure JUnit — sidesteps deferred AiAuditEvent boot regression).
+- [Phase ?]: Phase 13.1 Plan 01: Wave-0 schema lock — dropped AI_TASK_FILE.MESSAGE_ID/INJECTED_AT (Liquibase 100), removed AiTaskFile.message/injectedAt fields, flipped AiTaskFileProperties to long ttlSeconds + perTurnMaxFiles + perTurnMaxTotalBytes with -1 sentinel, added AiMessageRole.NOTICE + bilingual captions. Compile passes via Rule 3 stubs in AiTaskFileRepository.markInjected, ConversationDetailView switch, and ChatPanelFragment.setExpiresAt; full rewrite in Plans 13.1-02/04. Three Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H deferred to Plan 13.1-06.
 
 ### Performance Metrics
 
@@ -221,6 +222,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13 P03 | 9m | 2 tasks | 11 files |
 | Phase 13 P13-04 | ~10m | 2 tasks | 4 files |
 | Phase 13 P13-06 (gap) | ~22m | 2 tasks | 2 files |
+| Phase 13.1 P01 | 25min | 2 tasks | 10 files |
 
 ### Quick Tasks Completed
 
@@ -230,8 +232,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-06T17:40:17.963Z
+**Last session:** 2026-05-06T18:59:19.619Z
 **Stopped at:** Phase 13.1 UI-SPEC approved
-**Resume file:** .planning/phases/13.1-chat-attachments-rightpane-and-persistent-context/13.1-UI-SPEC.md
+**Resume file:** None
 **Blockers:** None.
 **Next action:** Verifier re-flips Phase 13 status row to Complete after gap closure run; then Phase 14 (intent-driven extraction) per ROADMAP.
