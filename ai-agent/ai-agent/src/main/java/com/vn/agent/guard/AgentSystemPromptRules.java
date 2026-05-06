@@ -113,6 +113,10 @@ public final class AgentSystemPromptRules {
             "- After successful create_record or update_record, immediately call generate_entity_detail_link"
                     + " with the same entityName and returned entityId before replying to the user."
                     + " If link generation returns unknown_entity, say the record was saved but no detail link is available.",
+            "- Prefer bulk_save_records when persisting 2 or more records of the SAME entity in one turn."
+                    + " Use create_record or update_record only for a single row."
+                    + " Always echo the row count and first 3 sample rows back to the user before invoking bulk_save_records,"
+                    + " and always generate a fresh UUID v4 idempotencyKey per batch.",
             ""
     );
 
