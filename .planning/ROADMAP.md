@@ -201,7 +201,7 @@
   4. Each successful upload INSERTs an `AiMessage` of `MessageType=SYSTEM_NOTICE` (or extends the existing assistant message stream with an inline `attachmentEvent` row) reading `[<username>] added attachment "<filename>"` (bilingual via `messages.properties` / `messages_vi.properties`). The notice is rendered between message bubbles per the CRM screenshot. Notice rows are NEVER sent to the LLM (filtered out of `ChatMemoryRepository.findByConversationId` for prompt assembly). TEST-18 asserts: turn 1 attaches a 100KB xlsx, turn 2 sends "phân tích cột A", turn 3 sends "đếm số dòng" — all 3 outbound prompts contain the same `Media` for the xlsx; `JdbcChatMemoryRepository` returns 3 user messages + 3 assistant messages (notices not included).
   5. Two-phase `markSent` write from Phase 13 REQ-4 / 13-04-PLAN is **removed** (no more `messageId` UPDATE post-send). `AiTaskFile.messageId` column may be retained NULL for backward compat, marked deprecated in JavaDoc, or removed via a Liquibase 100 cleanup changelog (decision deferred to spec-phase). All rows for the conversation are "active" until expired or conversation deleted.
   6. `AiAgentUserRowLevelRole` row-level predicate continues to scope `AiTaskFile` to `userUsername = :current_user_username`; admin role unchanged. Per-turn-all resolver uses `UnconstrainedDataManager` per Phase 13 invariant (`feedback_jmix_unconstrained_for_system_writes`).
-**Plans:** 5/7 plans executed
+**Plans:** 6/7 plans executed
 
 Plans:
 - [x] 13.1-01-PLAN.md — Wave 0 schema + config + enum: Liquibase 100 dropping MESSAGE_ID/INJECTED_AT, AiTaskFile field deletion, AiTaskFileProperties seconds-flip + per-turn caps, AiTaskFileCleanupJob sentinel, application.properties rename, AiMessageRole.NOTICE entry
@@ -209,7 +209,7 @@ Plans:
 - [x] 13.1-03-PLAN.md — ProjectingChatMemoryRepository NOTICE-survival JPQL fix, DefaultChatServiceImpl resolveActive wiring, UserMessagePersister deletion, DefaultChatServiceImplStreamFallbackTest rewrite
 - [x] 13.1-04-PLAN.md — chat-panel-fragment.xml CRM-style split reshape, ai-task-file-card-fragment.xml + AiTaskFileCardFragmentRenderer, ai-agent-chat.css CRM appendix, 13 bilingual chatView.attachments.* keys
 - [x] 13.1-05-PLAN.md — ChatPanelFragment Java rewire: taskFilesDl loader binding, empty-state toggle, NOTICE insert/render via vaadin-message.attachment-event, budget-exceeded toast, Phase 12 contract preservation
-- [ ] 13.1-06-PLAN.md — Resolver/lifecycle/notice tests: PerTurnMediaInjectionTest (TEST-18), BudgetCapTest, TtlConfigTest, NoticeFilterTest + property-rename sweep on 3 existing Phase 13 tests + widened TEST-16 source-scanner scope
+- [x] 13.1-06-PLAN.md — Resolver/lifecycle/notice tests: PerTurnMediaInjectionTest (TEST-18), BudgetCapTest, TtlConfigTest, NoticeFilterTest + property-rename sweep on 3 existing Phase 13 tests + widened TEST-16 source-scanner scope
 - [ ] 13.1-07-PLAN.md — UI/schema/locale tests: CrmStyleLayoutTest, NoticeRenderTest, SurfaceMountingTest, LiquibaseSchemaTest, LocaleParityTest
 
 **UI hint**: yes
