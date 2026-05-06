@@ -438,12 +438,46 @@ public class DefaultChatServiceImpl implements ChatService {
 
         return Flux.defer(() -> {
                     RunContext.set(runId);
+                    // CR-01 fix: prime the per-thread iteration counter at subscribe time so
+                    // GuardedToolCallingManager sees clean ThreadLocal state regardless of
+                    // transport mode. Counterpart reset() lives in the .doFinally below
+                    // (mirrors ask()'s start() at line 196 + reset() in finally at line 433).
+                    IterationCounter.start();
+
+                    // CR-01 fix: guard preamble — rate-limit BEFORE conversationGateway so a
+                    // denied first turn does not persist an AiConversation row (mirrors
+                    // ask()'s WR-01 ordering at lines 200-208). On denial: emit a terminal
+                    // Error + Final event pair and skip all streaming machinery.
+                    try {
+                        rateLimitGuard.check(userId);
+                    } catch (RateLimitExceededException rate) {
+                        auditDenial(runId, userId, conversationId, "rate-limit-exceeded");
+                        long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Error("ai-agent.guard.rate-limit-exceeded",
+                                        Map.of("retryAfterSec", 60)),
+                                new StreamingEvent.Final(runId, conversationId, denyLatencyMs, 0, 0));
+                    }
+
                     // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
                     Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
                     streamingSinkHolder.register(runId, toolSink);
 
                     final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
                     final UUID convId = conversation.getId();
+
+                    // CR-01 fix: token-budget gate runs AFTER loadOrCreate because it is
+                    // strictly per-conversation (mirrors ask() at lines 215-221).
+                    try {
+                        tokenBudgetGuard.check(convId);
+                    } catch (TokenBudgetExhaustedException budget) {
+                        auditDenial(runId, userId, convId, "token-budget-exhausted");
+                        long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Error("ai-agent.guard.token-budget-exhausted", Map.of()),
+                                new StreamingEvent.Final(runId, convId, denyLatencyMs, 0, 0));
+                    }
+
                     final AtomicBoolean assistantContentSeen = new AtomicBoolean(false);
                     final AtomicBoolean titlePublicationHandled = new AtomicBoolean(false);
 
@@ -599,6 +633,10 @@ public class DefaultChatServiceImpl implements ChatService {
                 cancellationRegistry.register(runId, subscription::cancel))
         .onErrorResume(ex -> Flux.just(mapToStreamingError(ex)))
         .doFinally(signalType -> {
+            // CR-01 fix: reset iteration counter on every terminal signal (complete,
+            // cancel, error). Pairs with IterationCounter.start() at the top of Flux.defer
+            // — mirrors ask()'s finally at line 433.
+            IterationCounter.reset();
             RunContext.clear();
             streamingSinkHolder.unregister(runId);
             cancellationRegistry.clearDisposable(runId);
