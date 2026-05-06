@@ -34,7 +34,11 @@ public record AiAgentMutationProperties(
         Boolean enabled,
         Boolean allowDelete,
         Boolean confirmationRequired,
-        Duration idempotencyTtl) {
+        Duration idempotencyTtl,
+        Integer bulkMaxRows) {
+
+    /** Phase 13 D-02 DoS guard — default cap on rows per {@code bulk_save_records} call. */
+    public static final int DEFAULT_BULK_MAX_ROWS = 100;
 
     /** D-07: enabled defaults to disabled when key omitted (mutation tools opt-in). */
     public boolean resolvedEnabled() {
@@ -54,5 +58,18 @@ public record AiAgentMutationProperties(
     /** D-02: idempotency TTL defaults to 24h when key omitted; applied at reservation time. */
     public Duration resolvedIdempotencyTtl() {
         return idempotencyTtl == null ? Duration.ofHours(24) : idempotencyTtl;
+    }
+
+    /**
+     * Phase 13 D-02 — DoS guard for {@code bulk_save_records}. Defaults to
+     * {@value #DEFAULT_BULK_MAX_ROWS} when {@code ai-agent.tools.mutation.bulk-max-rows} is
+     * unset. Values <= 0 fall back to the default (a misconfigured 0 must not silently
+     * disable the bulk tool).
+     */
+    public int resolvedBulkMaxRows() {
+        if (bulkMaxRows == null || bulkMaxRows <= 0) {
+            return DEFAULT_BULK_MAX_ROWS;
+        }
+        return bulkMaxRows;
     }
 }

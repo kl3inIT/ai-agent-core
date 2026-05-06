@@ -110,10 +110,28 @@ public class MutationIntentRepository {
         return ReservationResult.reserved(intent);
     }
 
-    @Transactional(transactionManager = "agentstoreTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    /**
+     * Single-record tool overload (create_record / update_record / add_related_record /
+     * remove_related_record). Leaves {@code RESULT_SUMMARY} null. Behaviour is byte-identical
+     * to the pre-Phase-13 contract.
+     */
     public void markCommitted(AiMutationIntent intent,
                               UUID resultEntityId,
                               String resultEntityName) {
+        markCommitted(intent, resultEntityId, resultEntityName, null);
+    }
+
+    /**
+     * Phase 13 REVIEWS HIGH-11 — full overload that also persists a tool-specific
+     * {@code resultSummary} JSON for {@code IDEMPOTENT_REPLAY}. Bulk tools
+     * (bulk_save_records) populate this with the full savedIds JSON so a retry returns the
+     * same shape as the original call. Single-record callers pass {@code null}.
+     */
+    @Transactional(transactionManager = "agentstoreTransactionManager", propagation = Propagation.REQUIRES_NEW)
+    public void markCommitted(AiMutationIntent intent,
+                              UUID resultEntityId,
+                              String resultEntityName,
+                              String resultSummary) {
         findById(intent.getId())
                 .filter(current -> current.getStatus() == AiMutationIntentStatus.PENDING)
                 .ifPresent(current -> {
@@ -121,11 +139,13 @@ public class MutationIntentRepository {
                     OffsetDateTime committedAt = OffsetDateTime.now();
                     agentstoreJdbcTemplate.update(
                             "update AI_MUTATION_INTENT set VERSION = VERSION + 1, STATUS_ = ?, " +
-                                    "RESULT_ENTITY_ID = ?, RESULT_ENTITY_NAME = ?, COMMITTED_AT = ?, ERROR_CODE = null " +
+                                    "RESULT_ENTITY_ID = ?, RESULT_ENTITY_NAME = ?, RESULT_SUMMARY = ?, " +
+                                    "COMMITTED_AT = ?, ERROR_CODE = null " +
                                     "where ID = ? and STATUS_ = ?",
                             AiMutationIntentStatus.COMMITTED.getId(),
                             resultEntityId,
                             resultEntityName,
+                            resultSummary,
                             timestamp(committedAt),
                             current.getId(),
                             AiMutationIntentStatus.PENDING.getId());
@@ -218,8 +238,8 @@ public class MutationIntentRepository {
     private Optional<AiMutationIntent> findById(UUID id) {
         List<AiMutationIntent> rows = agentstoreJdbcTemplate.query(
                 "select ID, VERSION, TOOL_NAME, IDEMPOTENCY_KEY, USER_USERNAME, CONVERSATION_ID, " +
-                        "REQUEST_HASH, STATUS_, RESULT_ENTITY_ID, RESULT_ENTITY_NAME, ERROR_CODE, " +
-                        "COMMITTED_AT, CREATED_AT, EXPIRES_AT " +
+                        "REQUEST_HASH, STATUS_, RESULT_ENTITY_ID, RESULT_ENTITY_NAME, RESULT_SUMMARY, " +
+                        "ERROR_CODE, COMMITTED_AT, CREATED_AT, EXPIRES_AT " +
                         "from AI_MUTATION_INTENT where ID = ?",
                 (resultSet, rowNumber) -> readIntent(resultSet),
                 id);
@@ -346,6 +366,7 @@ public class MutationIntentRepository {
         intent.setStatus(AiMutationIntentStatus.fromId(resultSet.getString("STATUS_")));
         intent.setResultEntityId(readUuid(resultSet, "RESULT_ENTITY_ID"));
         intent.setResultEntityName(resultSet.getString("RESULT_ENTITY_NAME"));
+        intent.setResultSummary(resultSet.getString("RESULT_SUMMARY"));
         intent.setErrorCode(resultSet.getString("ERROR_CODE"));
         intent.setCommittedAt(readOffsetDateTime(resultSet, "COMMITTED_AT"));
         intent.setCreatedAt(readOffsetDateTime(resultSet, "CREATED_AT"));

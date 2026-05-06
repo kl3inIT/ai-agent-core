@@ -10,7 +10,7 @@ class AgentSystemPromptRulesComposerTest {
     @Test
     void defaultConfigUsesBaselineRulesWithoutMutationOnlyTerms() {
         AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
-                new AiAgentMutationProperties(null, null, null, null));
+                new AiAgentMutationProperties(null, null, null, null, null));
 
         String rules = composer.effectiveRules();
 
@@ -27,7 +27,7 @@ class AgentSystemPromptRulesComposerTest {
     @Test
     void mutationEnabledConfigAppendsMutationRulesWithoutForwardReferenceTools() {
         AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
-                new AiAgentMutationProperties(true, null, null, null));
+                new AiAgentMutationProperties(true, null, null, null, null));
 
         String rules = composer.effectiveRules();
 

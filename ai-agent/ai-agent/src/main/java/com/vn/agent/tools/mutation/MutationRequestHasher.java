@@ -59,4 +59,22 @@ public class MutationRequestHasher {
             throw new IllegalStateException("Failed to compute mutation request hash", e);
         }
     }
+
+    /**
+     * Phase 13 — canonical SHA-256 of an arbitrary value (e.g. one bulk-save record). Used
+     * by {@link DiffSerializer#serializeBulkArgumentsJson} to produce the {@code sampleHashes}
+     * array in the bulk argumentsJson without leaking raw row values (P-22).
+     *
+     * <p>Reuses the same {@link ObjectMapper} configured with
+     * {@link SerializationFeature#ORDER_MAP_ENTRIES_BY_KEYS} so identical row content always
+     * produces the same hash regardless of LLM key emission order.
+     */
+    public String hashCanonical(Object value) {
+        try {
+            String canonicalJson = canonicalMapper.writeValueAsString(value);
+            return AuditFieldHasher.sha256Hex(canonicalJson);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to compute canonical hash", e);
+        }
+    }
 }

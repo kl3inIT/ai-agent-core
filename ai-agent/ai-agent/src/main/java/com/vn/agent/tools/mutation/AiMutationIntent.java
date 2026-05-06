@@ -96,6 +96,15 @@ public class AiMutationIntent {
     @Column(name = "RESULT_ENTITY_NAME", length = 255)
     private String resultEntityName;
 
+    /**
+     * Phase 13 REVIEWS HIGH-11 — bulk-tool result summary JSON for {@code IDEMPOTENT_REPLAY}.
+     * Single-record tools (create_record, update_record, add/remove_related_record) leave
+     * this null. Bulk tools (bulk_save_records) persist the full {@code savedIds} array as
+     * canonical JSON so a replay returns the same shape as the original call.
+     */
+    @Column(name = "RESULT_SUMMARY", length = 4000)
+    private String resultSummary;
+
     @Column(name = "ERROR_CODE", length = 64)
     private String errorCode;
 
@@ -188,6 +197,14 @@ public class AiMutationIntent {
 
     public void setResultEntityName(String resultEntityName) {
         this.resultEntityName = resultEntityName;
+    }
+
+    public String getResultSummary() {
+        return resultSummary;
+    }
+
+    public void setResultSummary(String resultSummary) {
+        this.resultSummary = resultSummary;
     }
 
     public String getErrorCode() {

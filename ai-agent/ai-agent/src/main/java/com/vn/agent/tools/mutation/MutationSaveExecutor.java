@@ -2,6 +2,7 @@ package com.vn.agent.tools.mutation;
 
 import io.jmix.core.DataManager;
 import io.jmix.core.EntitySet;
+import io.jmix.core.SaveContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,5 +45,24 @@ public class MutationSaveExecutor {
     @Transactional
     public EntitySet saveAll(Object... entities) {
         return dataManager.save(entities);
+    }
+
+    /**
+     * Bulk save for the {@code bulk_save_records} tool (Phase 13 D-02). SINGLE
+     * {@code @Transactional} span — any RuntimeException from
+     * {@link DataManager#save(SaveContext)} rolls back ALL rows in the SaveContext
+     * (rollback-all invariant).
+     *
+     * <p>Uses regular {@link DataManager} (NOT {@code UnconstrainedDataManager}) so user row
+     * policies, lifecycle events, listeners, and Bean Validation run on every per-row save
+     * (Phase 11 MUT-03 / SEC-07).
+     *
+     * <p>This method MUST be called from {@code BuiltInMutationTools.bulkSaveRecords} via the
+     * Spring proxy — NEVER add {@code @Transactional} to {@code bulkSaveRecords} itself
+     * (self-invocation pitfall; see class JavaDoc).
+     */
+    @Transactional
+    public EntitySet bulkSave(SaveContext saveContext) {
+        return dataManager.save(saveContext);
     }
 }
