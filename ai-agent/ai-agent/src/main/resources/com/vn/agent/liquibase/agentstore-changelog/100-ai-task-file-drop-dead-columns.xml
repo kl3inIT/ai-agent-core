@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Phase 13.1 SCHEMA-01: drop AI_TASK_FILE.MESSAGE_ID + INJECTED_AT and
+        their FK + indexes. Per-turn-all resolver (Plan 13.1-02) no longer
+        needs them. Order: drop FK -> drop indexes -> drop columns.
+        DO NOT touch FK_AI_TASK_FILE__ON_CONVERSATION (deleteCascade=true) -
+        that is a Phase 13 invariant and must survive (Pitfall 10).
+    -->
+    <changeSet id="1" author="ai-agent">
+        <dropForeignKeyConstraint baseTableName="AI_TASK_FILE"
+                                  constraintName="FK_AI_TASK_FILE__ON_MESSAGE"/>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <dropIndex indexName="IDX_AI_TASK_FILE__ON_MESSAGE" tableName="AI_TASK_FILE"/>
+    </changeSet>
+
+    <changeSet id="3" author="ai-agent">
+        <dropIndex indexName="IDX_AI_TASK_FILE__INJECTED_AT" tableName="AI_TASK_FILE"/>
+    </changeSet>
+
+    <changeSet id="4" author="ai-agent">
+        <dropColumn columnName="MESSAGE_ID" tableName="AI_TASK_FILE"/>
+    </changeSet>
+
+    <changeSet id="5" author="ai-agent">
+        <dropColumn columnName="INJECTED_AT" tableName="AI_TASK_FILE"/>
+    </changeSet>
+
+</databaseChangeLog>

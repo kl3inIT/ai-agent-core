@@ -29,30 +29,24 @@ import java.util.UUID;
 /**
  * Task-scoped file uploaded by a user during a chat turn.
  *
- * <p>Phase 13 contract (CONTEXT.md D-03):
+ * <p>Phase 13.1 contract (SCHEMA-01):
  * <ul>
  *     <li>Persisted in {@code agentstore} alongside other AI-* entities.</li>
  *     <li>{@link #conversation} is a NOT NULL FK to {@code AI_AGENT_CONVERSATION}
- *         with {@link DeletePolicy#CASCADE} — deleting a conversation removes
+ *         with {@link DeletePolicy#CASCADE} - deleting a conversation removes
  *         all its task files.</li>
- *     <li>{@link #message} is an OPTIONAL FK to {@code AI_AGENT_MESSAGE} with
- *         {@link DeletePolicy#UNLINK} (ON DELETE SET NULL at the DB level via
- *         the Liquibase {@code addForeignKeyConstraint onDelete="SET NULL"}
- *         changeSet). The {@code message} field is a soft display-link populated
- *         by the two-phase write in Plan 04 — it is NEVER read by the resolver
- *         predicate (REVIEWS HIGH-1).</li>
- *     <li>{@link #injectedAt} is the AUTHORITATIVE pending-state marker
- *         (REVIEWS HIGH-1). The resolver predicate is
- *         {@code injectedAt IS NULL AND expiresAt > :now}; {@code markInjected}
- *         sets this once per row in Plan 02. Do NOT confuse with
- *         {@link #message} — that is a separate optional UI-display link, not
- *         authoritative pending state.</li>
  *     <li>{@link #storageRef} carries the {@link FileRef} blob pointer via
  *         {@link PropertyDatatype} {@code "fileRef"}; the column stays
  *         {@code varchar(1024)}.</li>
  *     <li>{@link #expiresAt} is the non-audit TTL timestamp; the cleanup job
- *         (Plan 02) reaps rows where {@code expiresAt < now()}.</li>
+ *         (Plan 13.1-02 / Phase 13 Plan 02) reaps rows where
+ *         {@code expiresAt < now()}.</li>
  * </ul>
+ *
+ * <p>Phase 13.1 SCHEMA-01 dropped the prior message (AiMessage FK) and
+ * injection-timestamp fields - the per-turn-all resolver (Plan 13.1-02) loads
+ * every non-expired row for the conversation on every turn, so no pending-state
+ * marker or message back-link is needed.
  *
  * <p>Excluded from the LLM-visible surface via {@code AiInternalEntityNames}.
  */
@@ -61,9 +55,7 @@ import java.util.UUID;
 @Entity(name = "ai_AiTaskFile")
 @Table(name = "AI_TASK_FILE", indexes = {
         @Index(name = "IDX_AI_TASK_FILE__ON_CONVERSATION", columnList = "CONVERSATION_ID"),
-        @Index(name = "IDX_AI_TASK_FILE__ON_MESSAGE", columnList = "MESSAGE_ID"),
-        @Index(name = "IDX_AI_TASK_FILE__EXPIRES_AT", columnList = "EXPIRES_AT"),
-        @Index(name = "IDX_AI_TASK_FILE__INJECTED_AT", columnList = "INJECTED_AT")
+        @Index(name = "IDX_AI_TASK_FILE__EXPIRES_AT", columnList = "EXPIRES_AT")
 })
 public class AiTaskFile {
 
@@ -81,28 +73,6 @@ public class AiTaskFile {
     @OnDelete(DeletePolicy.CASCADE)
     @JoinColumn(name = "CONVERSATION_ID", nullable = false)
     private AiConversation conversation;
-
-    /**
-     * Optional UI-display link to the AiMessage row that consumed this task file.
-     * Populated by the two-phase write in Plan 04 after the user message is
-     * persisted; NEVER read by the resolver predicate (REVIEWS HIGH-1).
-     * ON DELETE SET NULL via the Liquibase {@code addForeignKeyConstraint}
-     * changeSet (REVIEWS HIGH-2).
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @OnDelete(DeletePolicy.UNLINK)
-    @JoinColumn(name = "MESSAGE_ID")
-    private AiMessage message;
-
-    /**
-     * Authoritative pending-state marker (REVIEWS HIGH-1). When {@code null} the
-     * row is pending injection and the resolver returns it; once set by
-     * {@code markInjected} (Plan 02) the row is excluded from the resolver
-     * predicate {@code injectedAt IS NULL AND expiresAt > :now}.
-     * NEVER overwritten by chat-memory persistence.
-     */
-    @Column(name = "INJECTED_AT")
-    private OffsetDateTime injectedAt;
 
     @NotNull
     @Column(name = "USER_USERNAME", nullable = false, length = 255)
@@ -165,22 +135,6 @@ public class AiTaskFile {
 
     public void setConversation(AiConversation conversation) {
         this.conversation = conversation;
-    }
-
-    public AiMessage getMessage() {
-        return message;
-    }
-
-    public void setMessage(AiMessage message) {
-        this.message = message;
-    }
-
-    public OffsetDateTime getInjectedAt() {
-        return injectedAt;
-    }
-
-    public void setInjectedAt(OffsetDateTime injectedAt) {
-        this.injectedAt = injectedAt;
     }
 
     public String getUserUsername() {

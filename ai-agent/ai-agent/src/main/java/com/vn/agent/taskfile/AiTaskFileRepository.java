@@ -139,11 +139,22 @@ public class AiTaskFileRepository {
                     continue;
                 }
                 AiTaskFile row = rowOpt.get();
-                row.setInjectedAt(injectedAt);
-                if (messageRef != null) {
-                    row.setMessage(messageRef);
-                }
+                // Phase 13.1 SCHEMA-01 (Plan 13.1-01): AiTaskFile.message + injectedAt
+                // fields were dropped from the entity (and Liquibase 100 drops the
+                // matching columns at next boot). The per-turn-all resolver
+                // (Plan 13.1-02) loads every non-expired row each turn, so there is
+                // no pending-state marker to stamp here. This block is left as a
+                // structural no-op pending Plan 13.1-02 rewrite which removes the
+                // method entirely; parameters stay on the signature so existing
+                // callers in Plan 13.1-01 still compile. Best-effort save() retained
+                // to keep the row's last-modified-* lifecycle stamps fresh.
                 unconstrainedDataManager.save(row);
+                // Suppress unused-parameter warnings until Plan 13.1-02 deletes the method.
+                java.util.Objects.requireNonNull(injectedAt, "injectedAt");
+                if (messageRef != null) {
+                    // intentionally unused; will be removed in Plan 13.1-02.
+                    log.trace("markInjected: message FK lookup succeeded but field has been removed");
+                }
             }
             return null;
         });
