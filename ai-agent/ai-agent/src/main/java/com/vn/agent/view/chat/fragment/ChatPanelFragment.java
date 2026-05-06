@@ -7,6 +7,8 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.messages.MessageInput;
+import com.vaadin.flow.component.messages.MessageList;
+import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
@@ -23,7 +25,6 @@ import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
-import com.vn.agent.view.chat.MarkdownRenderer;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
@@ -54,6 +55,7 @@ import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.lang.NonNull;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
@@ -62,7 +64,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -71,17 +76,27 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** D-29 substrate: Phase 13.1 reshape — left chat column renders mixed bubbles
- *  ({@link MessageBubbleComponent}) for USER/ASSISTANT and {@code <vaadin-message
- *  class="attachment-event">} sibling rows for NOTICE (Pitfall 7 Option A). The right
- *  pane is data-loader driven via {@code taskFilesDl}; empty-state visibility toggles
- *  on {@link CollectionLoader.PostLoadEvent}. D-03 per-event ui.access; D-04 Stop via
- *  CancellationRegistry.cancel; Pitfall #8 dispose-on-detach. Public API for ChatView:
- *  setConversationId / hasMessages / isStreaming / startNewChat. */
+/** D-29 substrate: Phase 13.1 UAT-fix — left chat column renders USER/ASSISTANT turns
+ *  on Vaadin {@link MessageList} + {@link MessageListItem} (Phase 7.1 baseline,
+ *  feedback_jmix_first_ui — these ARE Vaadin components shipped by Jmix). NOTICE rows
+ *  render as plain {@code <div class="ai-agent-attachment-notice">} sibling elements
+ *  appended to the message-list slot AFTER the {@code <vaadin-message-list>} block;
+ *  this avoids the default {@code <vaadin-avatar>} upload-arrow fallback that the
+ *  prior {@code <vaadin-message class="attachment-event">} substrate exposed when no
+ *  userName was set. UI-SPEC §138 explicitly allows "alternatively a custom inline
+ *  element" for the NOTICE row, so this satisfies the visual contract.
+ *  The right pane stays data-loader driven via {@code taskFilesDl}; empty-state
+ *  visibility toggles on {@link CollectionLoader.PostLoadEvent}. D-03 per-event
+ *  ui.access; D-04 Stop via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach.
+ *  Public API for ChatView: setConversationId / hasMessages / isStreaming / startNewChat. */
 @FragmentDescriptor("chat-panel-fragment.xml")
 public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private static final Logger log = LoggerFactory.getLogger(ChatPanelFragment.class);
+    private static final OffsetDateTime NON_EXPIRING_EXPIRES_AT =
+            OffsetDateTime.of(9999, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC);
+    private static final int USER_COLOR = 0;
+    private static final int AI_COLOR = 2;
 
     @ViewComponent private JmixButton stopButton;
     @ViewComponent private JmixButton newChatButton;
@@ -113,11 +128,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private Metadata metadataApi;
     @Autowired private FileStorageLocator fileStorageLocator;
     @Autowired private AiTaskFileProperties taskFileProperties;
-    // Phase 13.1 — server-side markdown for mixed-bubble rendering (Option A).
-    @Autowired private MarkdownRenderer markdownRenderer;
 
+    private MessageList messageList;
     private MessageInput messageInput;
     private ProgressBar streamProgressBar;
+    private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
 
     private Path uploadTempDir;
@@ -170,15 +185,23 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private UUID conversationId;
     private UUID activeRunId;
     private volatile Disposable activeStream;
-    private MessageBubbleComponent botBubble;
+    private MessageListItem botMsg;
     private volatile UI ownerUi;
     private Registration conversationIdStateRegistration;
-    // Phase 13.1 — message-count tracker replaces the old item buffer so hasMessages()
-    // stays a cheap O(1) probe without scanning messageListSlot children.
+    // Phase 13.1 UAT-fix — tracks visible turns across the mixed substrate
+    // (MessageList items + NOTICE divs) so hasMessages() is O(1).
     private int messageCount;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
+        // Phase 13.1 UAT-fix — restore Vaadin MessageList substrate (Phase 7.1 baseline).
+        messageList = new MessageList();
+        messageList.setMarkdown(true);
+        messageList.setWidthFull();
+        messageList.getStyle().set("flex-grow", "1");
+        messageListSlot.add(messageList);
+        messageList.setItems(items);
+
         messageInput = new MessageInput();
         messageInput.setWidthFull();
         messageInput.addSubmitListener(this::onSubmit);
@@ -246,6 +269,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Subscribe(id = "taskFilesDl", target = Target.DATA_LOADER)
     public void onTaskFilesPostLoad(final CollectionLoader.PostLoadEvent<AiTaskFile> event) {
         refreshTaskFiles();
+    }
+
+    @EventListener
+    public void onTaskFileDeleted(final AiTaskFileDeletedUiEvent event) {
+        if (event.getConversationId() != null
+                && !Objects.equals(conversationId, event.getConversationId())) {
+            return;
+        }
+        if (taskFilesDl != null) {
+            taskFilesDl.load();
+        } else {
+            refreshTaskFiles();
+        }
     }
 
     private void refreshTaskFiles() {
@@ -377,24 +413,35 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
         List<AiMessage> history = dataManager.load(AiMessage.class)
                 .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
-                       "order by m.createdDate asc, m.seq asc")
+                       "order by m.seq asc, m.createdDate asc")
                 .parameter("cid", cid)
                 .list();
 
-        // Phase 13.1 UX-01 — dispatch by role:
-        //   USER / ASSISTANT  → MessageBubbleComponent (Option A migration; substrate is now
-        //                        a VerticalLayout of Composites + sibling vaadin-message rows)
-        //   NOTICE            → <vaadin-message class="attachment-event"> sibling element
-        //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only)
+        // Phase 13.1 UAT-fix — dispatch by role across mixed substrate:
+        //   USER / ASSISTANT  → MessageListItem accumulated into the items list, then
+        //                        flushed with a single setItems at the end of replay
+        //                        (Pitfall #5 — only the turn boundary calls setItems).
+        //   NOTICE            → plain <div class="ai-agent-attachment-notice"> appended
+        //                        as sibling of the MessageList element. Strict
+        //                        chronological in-bubble interleaving is approximated as
+        //                        end-of-list (UI-SPEC §138 allows custom inline element).
+        //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only).
+        String userName = resolveLabel("chatView.message.userName", "You");
+        String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
         for (AiMessage m : history) {
             AiMessageRole role = m.getRole();
             if (role == AiMessageRole.USER) {
-                appendBubble(MessageBubbleComponent.Role.USER, m.getContent());
+                items.add(buildItem(m, userName, USER_COLOR));
+                messageCount++;
             } else if (role == AiMessageRole.ASSISTANT) {
-                appendBubble(MessageBubbleComponent.Role.ASSISTANT, m.getContent());
+                items.add(buildItem(m, aiName, AI_COLOR));
+                messageCount++;
             } else if (role == AiMessageRole.NOTICE) {
                 appendNoticeRow(m.getContent());
             }
+        }
+        if (messageList != null) {
+            messageList.setItems(new ArrayList<>(items));
         }
     }
 
@@ -492,8 +539,20 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         String text = event.getValue();
         if (text == null || text.isBlank()) return;
 
-        appendBubble(MessageBubbleComponent.Role.USER, text);
-        botBubble = appendBubble(MessageBubbleComponent.Role.ASSISTANT, "");
+        String userName = resolveLabel("chatView.message.userName", "You");
+        String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+
+        MessageListItem userItem = new MessageListItem(text, Instant.now(), userName);
+        userItem.setUserColorIndex(USER_COLOR);
+        items.add(userItem);
+        messageCount++;
+
+        botMsg = new MessageListItem("", Instant.now(), aiName);
+        botMsg.setUserColorIndex(AI_COLOR);
+        items.add(botMsg);
+        messageCount++;
+        // Pitfall #5 — last setItems of the turn; mid-stream chunks use appendText only.
+        messageList.setItems(new ArrayList<>(items));
 
         setStreamingUiState(true);
 
@@ -528,8 +587,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
                     if (md.isEmpty()) return;
                     accessUi(() -> {
-                        if (botBubble != null) {
-                            botBubble.appendMarkdown(md);
+                        if (botMsg != null) {
+                            botMsg.appendText(md);
                         }
                         scrollToBottom();
                     });
@@ -578,7 +637,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (activeRunId != null) cancellationRegistry.clearDisposable(activeRunId);
         activeRunId = null;
         activeStream = null;
-        botBubble = null;
+        botMsg = null;
     }
 
     void setStreamingUiState(boolean streaming) {
@@ -679,48 +738,55 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     /**
-     * Phase 13.1 UX-01 — append a USER/ASSISTANT bubble to the message list slot.
-     *
-     * <p>Returns the created bubble so the caller can hold a reference for streaming
-     * appends (the assistant bubble accumulates token chunks via
-     * {@link MessageBubbleComponent#appendMarkdown(String)}).</p>
+     * Phase 13.1 UAT-fix — build a {@link MessageListItem} for replay from a persisted
+     * {@link AiMessage}. Keeps the original timestamp so MessageList renders the historical
+     * order naturally.
      */
-    private MessageBubbleComponent appendBubble(MessageBubbleComponent.Role role, String content) {
-        MessageBubbleComponent bubble = new MessageBubbleComponent(role, markdownRenderer);
-        if (content != null && !content.isEmpty()) {
-            bubble.setMarkdown(content);
-        }
-        messageListSlot.add(bubble);
-        messageCount++;
-        return bubble;
+    private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
+        String content = m.getContent() == null ? "" : m.getContent();
+        OffsetDateTime created = m.getCreatedDate();
+        Instant time = created == null ? Instant.now() : created.toInstant();
+        MessageListItem item = new MessageListItem(content, time, name);
+        item.setUserColorIndex(colorIndex);
+        return item;
     }
 
     /**
-     * Phase 13.1 UX-01 — append a NOTICE divider as a {@code <vaadin-message>} sibling
-     * element with class {@code attachment-event}. Vaadin escapes the {@code text}
-     * property by default (T-13.1-17 mitigation), so the formatted message bundle text
-     * cannot inject HTML even if a filename contains script tags.
+     * Phase 13.1 UAT-fix — append a NOTICE divider as a plain {@code <div>} sibling of
+     * the {@code <vaadin-message-list>} block. The plain-div substrate avoids the default
+     * {@code <vaadin-avatar>} upload-arrow fallback that the prior {@code <vaadin-message
+     * class="attachment-event">} substrate exposed when no userName was set. The
+     * {@code <div>} text content is set via {@code setText}, which is HTML-escaped by the
+     * Vaadin Element API (T-13.1-17 mitigation), so even a filename containing script tags
+     * cannot inject HTML.
      */
     private void appendNoticeRow(String text) {
         if (text == null) {
             text = "";
         }
-        com.vaadin.flow.dom.Element msg = new com.vaadin.flow.dom.Element("vaadin-message");
-        msg.getClassList().add("attachment-event");
-        msg.setProperty("text", text);
-        messageListSlot.getElement().appendChild(msg);
+        com.vaadin.flow.dom.Element notice = new com.vaadin.flow.dom.Element("div");
+        notice.getClassList().add("ai-agent-attachment-notice");
+        notice.setText(text);
+        messageListSlot.getElement().appendChild(notice);
         messageCount++;
     }
 
     private void clearMessageList() {
+        items.clear();
         if (messageListSlot != null) {
+            // Wipe the underlying element children so both the MessageList component AND any
+            // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.
             messageListSlot.removeAll();
-            // removeAll() only removes Component children; vaadin-message siblings added via
-            // raw Element APIs are NOT Components, so wipe the underlying element children
-            // explicitly. Element.removeAllChildren() is safe to call on an already-empty slot.
             messageListSlot.getElement().removeAllChildren();
+            // Re-attach a fresh MessageList so subsequent items render into a clean substrate.
+            messageList = new MessageList();
+            messageList.setMarkdown(true);
+            messageList.setWidthFull();
+            messageList.getStyle().set("flex-grow", "1");
+            messageListSlot.add(messageList);
+            messageList.setItems(items);
         }
-        botBubble = null;
+        botMsg = null;
         messageCount = 0;
     }
 
@@ -813,7 +879,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      *   <li>Save under the regular {@code DataManager} so the user row-level policy from
      *       Plan 13-01 stamps the row with {@code userUsername} and prevents cross-user reads.</li>
      *   <li><b>Phase 13.1 UX-01</b> — persist a NOTICE {@link AiMessage} attributed to the
-     *       uploading user and append a {@code <vaadin-message class="attachment-event">}
+     *       uploading user and append a {@code <div class="ai-agent-attachment-notice">}
      *       sibling row to {@code messageListSlot}. Failure is logged and the upload still
      *       succeeds (per CONTEXT integration-points "log-and-continue").</li>
      *   <li>Reload {@code taskFilesDl} so the right-pane card grid + empty-state toggle
@@ -823,7 +889,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      * <p>Best-effort temp-file cleanup runs in the {@code finally} block; a missing temp
      * file is not a failure (Jmix may have already removed it).
      */
-    private void handleUploadedFile(String fileName, String declaredContentType, long sizeBytes, Path tempFile) {
+    private void handleUploadedFile(String fileName, String declaredContentType,
+                                    long declaredSizeBytes, Path tempFile) {
         try {
             UUID convId = ensureConversationIdForUpload();
             if (convId == null) {
@@ -834,10 +901,25 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 return;
             }
 
+            long actualSizeBytes;
+            try {
+                actualSizeBytes = Files.size(tempFile);
+            } catch (IOException sizeFailure) {
+                log.warn("Failed to measure staged upload {}; rejecting", fileName, sizeFailure);
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                        .show();
+                return;
+            }
+            if (declaredSizeBytes >= 0 && declaredSizeBytes != actualSizeBytes) {
+                log.debug("Upload metadata size mismatch for {}: declared={} actual={}",
+                        fileName, declaredSizeBytes, actualSizeBytes);
+            }
+
             // REVIEWS HIGH-5 — server-side size cap re-validated BEFORE blob persist.
             long maxBytes = taskFileProperties.getMaxFileSizeBytes();
-            if (sizeBytes > maxBytes) {
-                log.warn("Upload rejected (size {} > cap {}): {}", sizeBytes, maxBytes, fileName);
+            if (actualSizeBytes > maxBytes) {
+                log.warn("Upload rejected (size {} > cap {}): {}", actualSizeBytes, maxBytes, fileName);
                 notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
                         .withThemeVariant(NotificationVariant.LUMO_WARNING)
                         .show();
@@ -872,16 +954,15 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             row.setStorageRef(fileRef);
             row.setFilename(fileName);
             row.setContentType(resolvedContentType);
-            row.setSizeBytes(sizeBytes);
+            row.setSizeBytes(actualSizeBytes);
             row.setUserUsername(currentAuthentication.getUser().getUsername());
             // Phase 13.1 LIFE-01: ttlSeconds is the operator-facing TTL knob; sentinel
-            // -1 disables purge but the upload row still needs a deterministic expiresAt
-            // value, so fall back to the 24h default in that case.
+            // -1 disables purge and active-row filtering. Persist a DB-safe far-future
+            // timestamp instead of the 24h default so sentinel uploads do not age out.
             long ttlSeconds = taskFileProperties.getTtlSeconds();
-            if (ttlSeconds == -1L) {
-                ttlSeconds = 86_400L;
-            }
-            row.setExpiresAt(OffsetDateTime.now().plusSeconds(ttlSeconds));
+            row.setExpiresAt(ttlSeconds == -1L
+                    ? NON_EXPIRING_EXPIRES_AT
+                    : OffsetDateTime.now().plusSeconds(ttlSeconds));
 
             AiTaskFile saved = dataManager.save(row);
 
@@ -891,10 +972,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 AiMessage notice = metadataApi.create(AiMessage.class);
                 notice.setConversation(conversation);
                 notice.setRole(AiMessageRole.NOTICE);
-                // Root-bundle key (memory feedback_jmix_messages_over_spring) — use the
-                // group-form formatMessage so the resolver hits the same com.vn.agent bundle
-                // as the rest of the chat view.
-                notice.setContent(messages.formatMessage("com.vn.agent",
+                // Phase 13.1 UAT-fix — use the no-group formatMessage form (per memory
+                // feedback_jmix_messages_over_spring + KnowledgeBaseView canonical pattern).
+                // The prior call passed "com.vn.agent" as the group, which made the resolver
+                // look up the key inside a per-class bundle — yielding the literal key back
+                // instead of the formatted bilingual notice.
+                notice.setContent(messages.formatMessage(
                         "chatView.attachments.notice",
                         currentAuthentication.getUser().getUsername(),
                         saved.getFilename()));
