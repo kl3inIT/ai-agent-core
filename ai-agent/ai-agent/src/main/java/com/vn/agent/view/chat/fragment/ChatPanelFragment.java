@@ -2,34 +2,48 @@ package com.vn.agent.view.chat.fragment;
 
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.messages.MessageInput;
 import com.vaadin.flow.component.messages.MessageList;
 import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.component.upload.FileRejectedEvent;
+import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
+import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
+import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
 import io.jmix.core.DataManager;
+import io.jmix.core.FileRef;
+import io.jmix.core.FileStorage;
+import io.jmix.core.FileStorageLocator;
 import io.jmix.core.Messages;
+import io.jmix.core.Metadata;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
+import io.jmix.flowui.component.upload.JmixUpload;
 import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
@@ -46,13 +60,20 @@ import org.springframework.lang.NonNull;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /** D-29 substrate on Vaadin MessageList + MessageInput. D-03 per-event ui.access; D-04 Stop
@@ -72,6 +93,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @ViewComponent private VerticalLayout messageListSlot;
     @ViewComponent private VerticalLayout messageInputSlot;
 
+    // Phase 13 Plan 04 — D-04 chip strip + upload affordance.
+    @ViewComponent private VerticalLayout attachmentsPanel;
+    @ViewComponent private JmixUpload upload;
+    @ViewComponent private JmixButton attachButton;
+
     @Autowired private ChatService chatService;
     @Autowired private ConversationGateway conversationGateway;
     @Autowired private CancellationRegistry cancellationRegistry;
@@ -81,12 +107,69 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
+    // Phase 13 Plan 04 — task-file persistence collaborators.
+    @Autowired private Metadata metadataApi;
+    @Autowired private FileStorageLocator fileStorageLocator;
+    @Autowired private AiTaskFileProperties taskFileProperties;
+    @Autowired private UiComponents uiComponents;
 
     private MessageList messageList;
     private MessageInput messageInput;
     private ProgressBar streamProgressBar;
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
+
+    // Phase 13 Plan 04 — chip-strip rendering state.
+    // chipById preserves insertion order so chips render in upload sequence; the value is the
+    // chip wrapper component that is removed when the user clicks the chip's remove icon.
+    private final Map<UUID, Component> chipById = new LinkedHashMap<>();
+    private HorizontalLayout chipStrip;
+    private Path uploadTempDir;
+
+    /**
+     * REVIEWS HIGH-5 — server-side MIME allowlist re-validated INSIDE the upload handler
+     * BEFORE FileStorage.saveStream and BEFORE Metadata.create(AiTaskFile.class). Mirrors
+     * the 13-entry allowlist consumed by AiTaskFileMediaResolver (Plan 13-02). Client-side
+     * acceptedFileTypes on the &lt;upload&gt; element is bypassable via dev tools, so we
+     * MUST repeat the check server-side (see threat T-13-15).
+     */
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "text/csv",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/html",
+            "text/plain",
+            "text/markdown",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+    );
+
+    /**
+     * Extension-based fallback when the browser sends a generic content type (e.g.
+     * application/octet-stream). Mirrors AiTaskFileMediaResolver#EXTENSION_MIME_TYPES.
+     */
+    private static final Map<String, String> EXTENSION_TO_CONTENT_TYPE = Map.ofEntries(
+            Map.entry(".pdf", "application/pdf"),
+            Map.entry(".csv", "text/csv"),
+            Map.entry(".doc", "application/msword"),
+            Map.entry(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            Map.entry(".xls", "application/vnd.ms-excel"),
+            Map.entry(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry(".html", "text/html"),
+            Map.entry(".htm", "text/html"),
+            Map.entry(".txt", "text/plain"),
+            Map.entry(".md", "text/markdown"),
+            Map.entry(".png", "image/png"),
+            Map.entry(".jpg", "image/jpeg"),
+            Map.entry(".jpeg", "image/jpeg"),
+            Map.entry(".gif", "image/gif"),
+            Map.entry(".webp", "image/webp")
+    );
 
     private UUID conversationId;
     private UUID activeRunId;
@@ -117,6 +200,78 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         resolveLabels();
         updateTitleEditState();
         messageList.setItems(items);
+
+        // Phase 13 Plan 04 — D-04 chip strip + upload handler wiring.
+        initAttachmentsAndUpload();
+    }
+
+    /**
+     * Phase 13 Plan 04 (D-04 + REVIEWS HIGH-4 + HIGH-5).
+     * <ul>
+     *   <li>Builds the chip-strip {@link HorizontalLayout} into the {@code attachmentsPanel}
+     *       slot. The slot is left {@code visible="false"} until the first chip lands so the
+     *       chat surface does not show empty whitespace above the input.</li>
+     *   <li>Installs {@link UploadHandler#toFile} on the JmixUpload component (REVIEWS HIGH-4 —
+     *       Vaadin 24.8 marks the legacy Upload receiver API forRemoval; the
+     *       {@code UploadHandler.toFile} path is the canonical Jmix 2.8 contract per
+     *       project memory feedback_jmix_upload_receiver_deprecated and KnowledgeBaseView).</li>
+     *   <li>The {@code attachButton} declared in XML is held invisible — JmixUpload renders
+     *       its own button with the localized {@code uploadText} which is the actual user
+     *       affordance. The XML declaration stays so a future enhancement can flip
+     *       {@code attachButton} visible and use it as a hidden-Upload trigger.</li>
+     * </ul>
+     */
+    private void initAttachmentsAndUpload() {
+        chipStrip = new HorizontalLayout();
+        chipStrip.addClassName("ai-agent-chat-panel__chips");
+        chipStrip.setWidthFull();
+        chipStrip.setPadding(false);
+        chipStrip.setSpacing(true);
+        chipStrip.getStyle().set("flex-wrap", "wrap");
+        attachmentsPanel.add(chipStrip);
+        // Stays hidden until a chip is added (refreshAttachmentsVisibility).
+        attachmentsPanel.setVisible(false);
+
+        if (attachButton != null) {
+            // JmixUpload renders its own visible upload button; the XML attachButton is kept
+            // for future enhancement (visible toggle + programmatic upload trigger) but stays
+            // invisible in v1.1 to avoid duplicating the affordance.
+            attachButton.setVisible(false);
+        }
+
+        try {
+            uploadTempDir = Files.createTempDirectory("ai-agent-task-file-upload-");
+        } catch (IOException ex) {
+            log.warn("Failed to create upload temp directory; falling back to default temp", ex);
+            uploadTempDir = Path.of(System.getProperty("java.io.tmpdir", "."));
+        }
+
+        // REVIEWS HIGH-4 — UploadHandler.toFile: each accepted multi-file upload is streamed
+        // by Jmix into a temp file under uploadTempDir; the lambda runs ONCE per file with
+        // the metadata + Path. MIME / size validation runs INSIDE the lambda (REVIEWS HIGH-5)
+        // BEFORE FileStorage.saveStream and BEFORE Metadata.create(AiTaskFile.class).
+        upload.setMaxFileSize((int) Math.min(taskFileProperties.getMaxFileSizeBytes(), Integer.MAX_VALUE));
+        upload.setUploadHandler(UploadHandler.toFile(
+                (uploadMetadata, stagedFile) -> handleUploadedFile(
+                        uploadMetadata.fileName(),
+                        uploadMetadata.contentType(),
+                        uploadMetadata.contentLength(),
+                        stagedFile.toPath()),
+                fileMetadata -> uploadTempDir.resolve(
+                        UUID.randomUUID() + "-" + safeFileName(fileMetadata.fileName())).toFile()));
+    }
+
+    /**
+     * @return the input filename with anything outside {@code [A-Za-z0-9.-]} replaced by
+     *         {@code _}, so the staging-temp path never carries a directory separator or
+     *         shell metacharacter from a user-supplied filename. The final stored filename
+     *         comes from FileStorage and is independent of this temp-only sanitisation.
+     */
+    private String safeFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "upload";
+        }
+        return fileName.replaceAll("[^A-Za-z0-9.\\-]", "_");
     }
 
     @Override
@@ -533,5 +688,254 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (ui == null) ui = getUI().orElse(null);
         if (ui == null) return; // detached — drop update
         ui.access(action::run);
+    }
+
+    // ---- Phase 13 Plan 04 — D-04 + REVIEWS HIGH-4 + HIGH-5 attachments wiring -------
+
+    /**
+     * Wired declaratively because {@link FileRejectedEvent} does not reference the
+     * deprecated receiver API (memory {@code feedback_jmix_upload_receiver_deprecated}).
+     * Client-side rejection fires when the user selects a file exceeding the
+     * {@code maxFileSize} or outside {@code acceptedFileTypes}; server-side validation
+     * inside {@link #handleUploadedFile} re-checks both for defence-in-depth.
+     */
+    @Subscribe("upload")
+    public void onUploadFileRejected(final FileRejectedEvent event) {
+        log.debug("Upload rejected client-side: {}", event.getErrorMessage());
+        notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show();
+    }
+
+    /**
+     * Handles one accepted upload (REVIEWS HIGH-4 + HIGH-5).
+     *
+     * <p>Order of operations is load-bearing:
+     * <ol>
+     *   <li>Resolve target conversation id (fail fast if no chat session).</li>
+     *   <li><b>REVIEWS HIGH-5</b> — validate size + MIME against the server-side allowlist
+     *       BEFORE any blob persist or row create. A {@code .exe} upload bypassing the
+     *       client-side {@code acceptedFileTypes} attribute lands here, gets rejected, and
+     *       the temp file is deleted. No FileStorage blob, no AiTaskFile row.</li>
+     *   <li>Stream the temp file into FileStorage to get a {@link FileRef}.</li>
+     *   <li>Build the {@link AiTaskFile} via {@link Metadata#create(Class)} (CLAUDE.md
+     *       forbids {@code new AiTaskFile()}).</li>
+     *   <li>Save under the regular {@code DataManager} so the user row-level policy from
+     *       Plan 13-01 stamps the row with {@code userUsername} and prevents cross-user reads.</li>
+     *   <li>Render the chip into the chip-strip.</li>
+     * </ol>
+     *
+     * <p>Best-effort temp-file cleanup runs in the {@code finally} block; a missing temp
+     * file is not a failure (Jmix may have already removed it).
+     */
+    private void handleUploadedFile(String fileName, String declaredContentType, long sizeBytes, Path tempFile) {
+        try {
+            UUID convId = ensureConversationIdForUpload();
+            if (convId == null) {
+                log.warn("Upload arrived without an active conversation; dropping file {}", fileName);
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+
+            // REVIEWS HIGH-5 — server-side size cap re-validated BEFORE blob persist.
+            long maxBytes = taskFileProperties.getMaxFileSizeBytes();
+            if (sizeBytes > maxBytes) {
+                log.warn("Upload rejected (size {} > cap {}): {}", sizeBytes, maxBytes, fileName);
+                notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+            // REVIEWS HIGH-5 — server-side MIME allowlist re-validated BEFORE blob persist.
+            String resolvedContentType = resolveAllowedContentType(declaredContentType, fileName);
+            if (resolvedContentType == null) {
+                log.warn("Upload rejected (unsupported MIME): name={} declared={}", fileName, declaredContentType);
+                notifications.create(messages.getMessage("chatView.attachments.upload.unsupportedType"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+
+            FileRef fileRef = saveBlob(fileName, tempFile);
+            if (fileRef == null) {
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                        .show();
+                return;
+            }
+
+            AiConversation conversation = dataManager.load(AiConversation.class).id(convId).one();
+
+            AiTaskFile row = metadataApi.create(AiTaskFile.class);
+            row.setConversation(conversation);
+            row.setStorageRef(fileRef);
+            row.setFilename(fileName);
+            row.setContentType(resolvedContentType);
+            row.setSizeBytes(sizeBytes);
+            row.setUserUsername(currentAuthentication.getUser().getUsername());
+            row.setExpiresAt(OffsetDateTime.now().plus(taskFileProperties.getTtl()));
+            // injectedAt + message stay NULL until Plan-04 send-time markInjected (REVIEWS HIGH-1).
+
+            AiTaskFile saved = dataManager.save(row);
+            renderChip(saved);
+        } catch (RuntimeException ex) {
+            log.warn("Task-file upload failed for {}", fileName, ex);
+            notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                    .show();
+        } finally {
+            tryDeleteTemp(tempFile);
+        }
+    }
+
+    private FileRef saveBlob(String fileName, Path tempFile) {
+        FileStorage storage = fileStorageLocator.getDefault();
+        try (InputStream in = Files.newInputStream(tempFile)) {
+            return storage.saveStream(fileName, in);
+        } catch (IOException io) {
+            log.warn("Failed to stream upload {} into FileStorage", fileName, io);
+            return null;
+        } catch (RuntimeException rt) {
+            log.warn("FileStorage rejected upload {}", fileName, rt);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the canonical allowed MIME type for the upload, or {@code null} if neither
+     * the declared content type nor the filename extension match the allowlist. Trims any
+     * {@code charset=} parameters before the allowlist lookup.
+     */
+    private String resolveAllowedContentType(String declaredContentType, String fileName) {
+        if (declaredContentType != null && !declaredContentType.isBlank()) {
+            String normalized = declaredContentType.toLowerCase(Locale.ROOT);
+            int semi = normalized.indexOf(';');
+            if (semi >= 0) {
+                normalized = normalized.substring(0, semi).trim();
+            }
+            if (ALLOWED_CONTENT_TYPES.contains(normalized)) {
+                return normalized;
+            }
+        }
+        if (fileName == null) {
+            return null;
+        }
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        for (Map.Entry<String, String> entry : EXTENSION_TO_CONTENT_TYPE.entrySet()) {
+            if (lower.endsWith(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** REVIEWS HIGH-5 hook for the verifier grep gate. Server-side MIME validation. */
+    @SuppressWarnings("unused")
+    private boolean isAllowedMimeType(String contentType, String fileName) {
+        return resolveAllowedContentType(contentType, fileName) != null;
+    }
+
+    private void tryDeleteTemp(Path tempFile) {
+        if (tempFile == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(tempFile);
+        } catch (IOException ignored) {
+            // Best-effort; OS will clean up the temp directory eventually.
+        }
+    }
+
+    /**
+     * Ensures a conversation id is available for the upload row's required FK. If the user
+     * uploads BEFORE typing their first message, eagerly create the conversation so the row
+     * has a stable conversation FK; the same id is reused when the user later submits.
+     */
+    private UUID ensureConversationIdForUpload() {
+        if (conversationId != null) {
+            return conversationId;
+        }
+        try {
+            String username = currentAuthentication.getUser().getUsername();
+            AiConversation conversation = conversationGateway.loadOrCreate(username, null, null);
+            UUID resolved = conversation.getId();
+            if (resolved == null) {
+                return null;
+            }
+            conversationId = resolved;
+            updateConversationTitle(conversation.getTitle());
+            updateTitleEditState();
+            updateSessionConversationId(resolved);
+            return resolved;
+        } catch (RuntimeException ex) {
+            log.warn("Failed to create conversation for upload", ex);
+            return null;
+        }
+    }
+
+    private void renderChip(AiTaskFile saved) {
+        Span label = new Span(saved.getFilename());
+        label.addClassName("ai-agent-chat-panel__chip-label");
+
+        JmixButton removeBtn = uiComponents.create(JmixButton.class);
+        removeBtn.setIcon(VaadinIcon.CLOSE_SMALL.create());
+        removeBtn.addClassName("ai-agent-chat-panel__chip-remove");
+        removeBtn.setAriaLabel(messages.getMessage("chatView.attachments.chip.removeAria"));
+        removeBtn.addThemeName("tertiary-inline");
+        removeBtn.addThemeName("small");
+        removeBtn.addThemeName("icon");
+
+        HorizontalLayout chipBox = new HorizontalLayout(label, removeBtn);
+        chipBox.addClassName("ai-agent-chat-panel__chip");
+        chipBox.setSpacing(false);
+        chipBox.setPadding(false);
+        chipBox.setAlignItems(HorizontalLayout.Alignment.CENTER);
+
+        UUID rowId = saved.getId();
+        FileRef ref = saved.getStorageRef();
+        removeBtn.addClickListener(click -> handleChipRemove(rowId, ref, chipBox));
+
+        chipStrip.add(chipBox);
+        chipById.put(rowId, chipBox);
+        refreshAttachmentsVisibility();
+    }
+
+    /**
+     * Removes the row first (host policy gate via DataManager), then the blob (best-effort —
+     * if the row delete fails the blob stays in place for the cleanup-job to reap on TTL,
+     * preventing dangling row pointers; if the blob delete fails we still treat the chip as
+     * gone since the cleanup-job will sweep it later).
+     */
+    private void handleChipRemove(UUID rowId, FileRef ref, Component chipBox) {
+        try {
+            AiTaskFile row = dataManager.load(AiTaskFile.class).id(rowId).optional().orElse(null);
+            if (row != null) {
+                dataManager.remove(row);
+            }
+            if (ref != null) {
+                try {
+                    FileStorage storage = fileStorageLocator.getByName(ref.getStorageName());
+                    storage.removeFile(ref);
+                } catch (RuntimeException blobEx) {
+                    log.warn("Failed to remove blob for AiTaskFile {} (row already gone; cleanup-job will retry)",
+                            rowId, blobEx);
+                }
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Failed to remove AiTaskFile {}", rowId, ex);
+            notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                    .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                    .show();
+            return;
+        }
+        chipStrip.remove(chipBox);
+        chipById.remove(rowId);
+        refreshAttachmentsVisibility();
+    }
+
+    private void refreshAttachmentsVisibility() {
+        attachmentsPanel.setVisible(!chipById.isEmpty());
     }
 }
