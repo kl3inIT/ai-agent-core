@@ -234,7 +234,10 @@ class AiTaskFileCleanupJobTest {
             row.setContentType(contentType);
             row.setSizeBytes(0L);
             row.setStorageRef(storageRef);
-            row.setInjectedAt(injectedAt);
+            // Plan 13.1-01 dropped AiTaskFile.injectedAt; Plan 13.1-06 owns the full
+            // rewrite of this test against the new resolveActive contract. Suppress
+            // the now-unused parameter so the helper signature stays stable until then.
+            java.util.Objects.requireNonNullElse(injectedAt, java.time.OffsetDateTime.now());
             row.setExpiresAt(expiresAt);
             return unconstrainedDataManager.save(row).getId();
         });

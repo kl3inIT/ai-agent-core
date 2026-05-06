@@ -141,11 +141,14 @@ class AiTaskFileNoVectorStoreInvocationTest {
         });
         seededTaskFileIds.add(taskFileId);
 
-        // Exercise the agentstore predicate paths used by the chat turn — both the
-        // resolver and the repository touch the same query. We do not call
-        // resolvePending(...) directly because the synthetic FileRef has no blob;
-        // loadPending(...) exercises the same JPA path without opening the stream.
-        systemAuthenticator.runWithSystem(() -> repository.loadPending(conversationId));
+        // Phase 13.1 Plan 03 Rule-3 stub: the Phase-13 loadPending() seam was deleted
+        // (the per-turn-all resolver loads via DataManager directly — no repo intermediary).
+        // Plan 13.1-06 rewrites this test against the AiTaskFileMediaResolver.resolveActive
+        // contract; in the meantime exercising the underlying TTL cleanup path keeps the
+        // TEST-16 verifyNoInteractions(ingesterManager) assertion meaningful — the cleanup
+        // job touches the same agentstore JPQL surface a chat turn would.
+        systemAuthenticator.runWithSystem(() ->
+                repository.deleteAllExpired(java.time.OffsetDateTime.now().minusYears(1)));
 
         // TEST-16 invariant: NO ingestion calls. similaritySearch (retrieval) is
         // intentionally NOT asserted to be zero — RAG retrieval is allowed.
