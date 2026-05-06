@@ -1,86 +1,92 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <fragment xmlns="http://jmix.io/schema/flowui/fragment">
     <!--
-        Phase 13 Plan 04 — D-04 / Blocker 1 fix.
-        The previous Phase 12 layout used a horizontal splitter element with attachmentsPanel
-        as the right pane (rejected option E per CONTEXT D-04). v1.1 has no other right-pane
-        content (admin list view is deferred), so the splitter wrapper is removed; chatPanel
-        is hoisted directly under rootLayout, and attachmentsPanel becomes a chip-strip vbox
-        positioned BETWEEN messageListSlot and messageInputSlot (chip strip above MessageInput).
+        Phase 13.1 Plan 04 — CRM-style right-pane Attachments shape (UI-01 / CONTRACT-01-xml).
+        Horizontal split with chat on the left and the Attachments panel on the right
+        (splitterPosition=68). Replaces the Phase 13 inline pill-strip plus inline-upload
+        row layout. The right-pane vbox keeps id="attachmentsPanel" so the Phase 12
+        ChatSurfaceMounter contract (slot id) is unchanged.
 
-        Phase 13 Plan 04 — REVIEWS HIGH-4 fix.
-        The upload element carries NO declarative receiver attribute — Vaadin 24.8 marks
-        Upload.setReceiver / Upload.getReceiver forRemoval (project memory
-        feedback_jmix_upload_receiver_deprecated). The handler is wired in Java via
-        com.vaadin.flow.server.streams.UploadHandler.toFile(...) inside ChatPanelFragment.onReady,
-        mirroring KnowledgeBaseView.documentUpload.
+        REVIEWS HIGH-4 carry-over: <upload> carries NO declarative receiverType — the
+        handler is wired in Java via UploadHandler.toFile(...) (project memory
+        feedback_jmix_upload_receiver_deprecated). Mirrors KnowledgeBaseView.documentUpload.
     -->
+    <data>
+        <collection id="taskFilesDc" class="com.vn.agent.entity.AiTaskFile">
+            <fetchPlan extends="_base"/>
+            <loader id="taskFilesDl">
+                <query>
+                    <![CDATA[select e from ai_AiTaskFile e where e.conversation.id = :conversationId order by e.createdDate desc]]>
+                </query>
+            </loader>
+        </collection>
+    </data>
     <content>
         <vbox id="rootLayout" classNames="ai-agent-chat-panel"
               width="100%" height="100%" padding="false" spacing="false">
-            <vbox id="chatPanel" width="100%" height="100%"
-                  padding="false" spacing="false">
-                <hbox id="titleBar" width="100%" alignItems="CENTER"
-                      classNames="ai-agent-chat-panel__toolbar">
-                    <h3 id="conversationTitle"
-                        text="msg:///chatView.action.newChat"
-                        classNames="m-0 ai-agent-chat-panel__title"/>
-                    <button id="editConversationTitleButton"
-                            icon="PENCIL"
-                            title="msg:///chatView.action.editTitle"
-                            ariaLabel="msg:///chatView.action.editTitle"
-                            themeNames="tertiary-inline small icon"
-                            visible="false"/>
-                    <button id="newChatButton"
-                            icon="PLUS"
-                            title="msg:///chatView.action.newChat"
-                            ariaLabel="msg:///chatView.action.newChat"
-                            themeNames="tertiary-inline small icon"/>
-                    <button id="stopButton"
-                            text="msg:///chatView.action.stop"
-                            themeNames="tertiary"
-                            visible="false"/>
-                </hbox>
-                <vbox id="messageListSlot" width="100%" height="100%"
-                      padding="false" spacing="false"
-                      classNames="ai-agent-chat-panel__messages"/>
-
-                <!-- Phase 13 Plan 04 — D-04 chip strip. Direct child of chatPanel,
-                     positioned ABOVE messageInputSlot, NEVER inside a horizontal splitter
-                     element (Blocker 1 — option E rejected).
-                     Toggled visible by ChatPanelFragment when chips exist. -->
-                <vbox id="attachmentsPanel"
-                      width="100%"
-                      padding="false"
-                      spacing="false"
-                      classNames="ai-agent-chat-panel__attachments"
-                      visible="false"/>
-
-                <vbox id="messageInputSlot" width="100%"
-                      padding="false" spacing="false"
-                      classNames="ai-agent-chat-panel__input">
-                    <hbox id="attachRow" width="100%"
-                          padding="false" spacing="true"
-                          classNames="ai-agent-chat-panel__attach-row">
-                        <button id="attachButton"
-                                icon="PAPERCLIP"
-                                text="msg:///chatView.attachments.button"
-                                ariaLabel="msg:///chatView.attachments.button"
-                                themeNames="tertiary-inline small"
+            <split id="conversationSplit" orientation="HORIZONTAL"
+                   width="100%" height="100%" splitterPosition="68">
+                <vbox id="chatPanel" width="100%" height="100%"
+                      padding="false" spacing="false">
+                    <hbox id="titleBar" width="100%" alignItems="CENTER"
+                          classNames="ai-agent-chat-panel__toolbar">
+                        <h3 id="conversationTitle"
+                            text="msg:///chatView.action.newChat"
+                            classNames="m-0 ai-agent-chat-panel__title"/>
+                        <button id="editConversationTitleButton"
+                                icon="PENCIL"
+                                title="msg:///chatView.action.editTitle"
+                                ariaLabel="msg:///chatView.action.editTitle"
+                                themeNames="tertiary-inline small icon"
                                 visible="false"/>
-                        <!-- REVIEWS HIGH-4: NO declarative receiver attribute. Upload handler
-                             is wired in Java via UploadHandler.toFile(...) (project memory
-                             feedback_jmix_upload_receiver_deprecated). Mirrors
-                             knowledge-base-view.xml#documentUpload. -->
-                        <upload id="upload"
-                                acceptedFileTypes="application/pdf,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/html,text/plain,text/markdown,image/png,image/jpeg,image/gif,image/webp,.pdf,.csv,.doc,.docx,.xls,.xlsx,.html,.htm,.txt,.md,.png,.jpg,.jpeg,.gif,.webp"
-                                maxFiles="10"
-                                maxFileSize="104857600"
-                                uploadText="msg:///chatView.attachments.button"
-                                width="100%"/>
+                        <button id="newChatButton"
+                                icon="PLUS"
+                                title="msg:///chatView.action.newChat"
+                                ariaLabel="msg:///chatView.action.newChat"
+                                themeNames="tertiary-inline small icon"/>
+                        <button id="stopButton"
+                                text="msg:///chatView.action.stop"
+                                themeNames="tertiary"
+                                visible="false"/>
                     </hbox>
+                    <vbox id="messageListSlot" width="100%" height="100%"
+                          padding="false" spacing="false"
+                          classNames="ai-agent-chat-panel__messages"/>
+                    <vbox id="messageInputSlot" width="100%"
+                          padding="false" spacing="false"
+                          classNames="ai-agent-chat-panel__input"/>
                 </vbox>
-            </vbox>
+                <vbox id="attachmentsPanel" width="100%" height="100%"
+                      spacing="false" padding="true">
+                    <h3 id="attachmentsTitle"
+                        text="msg:///chatView.attachments.title"
+                        classNames="m-0"/>
+                    <vbox id="attachmentsEmptyState"
+                          alignItems="CENTER" justifyContent="CENTER"
+                          spacing="true" padding="true"
+                          width="100%" height="100%">
+                        <icon icon="vaadin:cloud-upload" size="XL"
+                              classNames="text-tertiary"/>
+                        <span text="msg:///chatView.attachments.emptyState"
+                              classNames="text-tertiary text-s"/>
+                    </vbox>
+                    <gridLayout id="attachmentsGridLayout"
+                                itemsContainer="taskFilesDc"
+                                width="100%">
+                        <fragmentRenderer
+                                class="com.vn.agent.view.chat.fragment.AiTaskFileCardFragmentRenderer"/>
+                    </gridLayout>
+                    <upload id="taskFileUpload"
+                            width="100%"
+                            classNames="attachments-dropzone"
+                            acceptedFileTypes="application/pdf,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/html,text/plain,text/markdown,image/png,image/jpeg,image/gif,image/webp,.pdf,.csv,.doc,.docx,.xls,.xlsx,.html,.htm,.txt,.md,.png,.jpg,.jpeg,.gif,.webp"
+                            maxFiles="10"
+                            maxFileSize="104857600"
+                            uploadText="msg:///chatView.attachments.uploadText"
+                            dropLabel="msg:///chatView.attachments.dropLabel"
+                            dropAllowed="true"/>
+                </vbox>
+            </split>
         </vbox>
     </content>
 </fragment>
