@@ -56,6 +56,20 @@ class TaskFileNoVectorStoreSourceScannerTest {
     private static final Path TASKFILE_SOURCE_ROOT =
             Path.of("src", "main", "java", "com", "vn", "agent", "taskfile");
 
+    /**
+     * Phase 13.1 TEST-16-PORT: widened scope. Files outside the
+     * {@code com.vn.agent.taskfile} package that participate in the task-file
+     * pathway (the right-pane card renderer + the reshaped chat-panel fragment
+     * XML) are also asserted to be free of the forbidden tokens. Listed
+     * explicitly because they live outside the package walk root.
+     */
+    private static final List<Path> EXTRA_TASKFILE_SCOPE = List.of(
+            Path.of("src", "main", "java", "com", "vn", "agent", "view", "chat", "fragment",
+                    "AiTaskFileCardFragmentRenderer.java"),
+            Path.of("src", "main", "resources", "com", "vn", "agent", "view", "chat", "fragment",
+                    "chat-panel-fragment.xml")
+    );
+
     @Test
     void noForbiddenTokenReferencedFromTaskfilePackage() throws IOException {
         assertThat(Files.exists(TASKFILE_SOURCE_ROOT))
@@ -67,6 +81,22 @@ class TaskFileNoVectorStoreSourceScannerTest {
             paths.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(".java"))
                     .forEach(this::assertFileFreeOfForbiddenTokens);
+        }
+    }
+
+    /**
+     * Phase 13.1 TEST-16-PORT: assert the widened scope (right-pane card
+     * renderer + reshaped chat-panel fragment XML) carries no forbidden
+     * tokens. These files live outside the {@code com.vn.agent.taskfile}
+     * package walk root — they are scanned individually here.
+     */
+    @Test
+    void noForbiddenTokenReferencedFromWidenedScope() {
+        for (Path file : EXTRA_TASKFILE_SCOPE) {
+            assertThat(Files.exists(file))
+                    .as("widened TEST-16 scope file must exist at %s", file)
+                    .isTrue();
+            assertFileFreeOfForbiddenTokens(file);
         }
     }
 

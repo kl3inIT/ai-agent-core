@@ -63,7 +63,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @SpringBootTest(classes = AITestConfiguration.class,
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
-                "ai-agent.task-file.ttl=PT1H"
+                "ai-agent.task-file.ttl-seconds=3600"
         })
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
