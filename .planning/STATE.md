@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
 stopped_at: Phase 13.1 UI-SPEC approved
-last_updated: "2026-05-06T18:59:51.619Z"
+last_updated: "2026-05-07T00:00:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 52
-  completed_plans: 48
-  percent: 92
+  completed_plans: 49
+  percent: 94
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 | Field | Value |
 |-------|-------|
 | Phase | Phase 13 |
@@ -177,6 +177,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: Phase 13.1 Plan 01: Wave-0 schema lock — dropped AI_TASK_FILE.MESSAGE_ID/INJECTED_AT (Liquibase 100), removed AiTaskFile.message/injectedAt fields, flipped AiTaskFileProperties to long ttlSeconds + perTurnMaxFiles + perTurnMaxTotalBytes with -1 sentinel, added AiMessageRole.NOTICE + bilingual captions. Compile passes via Rule 3 stubs in AiTaskFileRepository.markInjected, ConversationDetailView switch, and ChatPanelFragment.setExpiresAt; full rewrite in Plans 13.1-02/04. Three Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H deferred to Plan 13.1-06.
 - [Phase 13.1]: Plan 02: AiTaskFileMediaResolver.resolveActive(UUID) per-turn-all + LRU budget cap + task_file_budget_exceeded audit (REQUIRES_NEW; failure swallowed to log.warn). Resolved record now (media, budgetExceeded); taskFileIds dropped. AiTaskFileRepository slimmed to {loadExpired, deleteRow, deleteAllExpired} — markInjected and loadPending deleted with their AiMessage/Optional imports. New BudgetExceededAuditKeys constants are the single source of truth shared with the upcoming BudgetCapTest (Plan 13.1-06) — 9-key argumentsJson order locked via LinkedHashMap; Jackson JsonProcessingException falls back to a String.format literal that ALSO references the constants. Rule-3 stub: DefaultChatServiceImpl resolvePending/markInjected/taskFileIds call sites swapped for resolveActive + structural no-ops; Plan 13.1-03 deletes the dead UserMessagePersister wiring + executeBlockingTurn parameter end-to-end.
 - [Phase 13.1]: Plan 03: ProjectingChatMemoryRepository.saveAll JPQL excludes role=NOTICE so notice rows survive the delete-recreate projection wipe each turn (D-A1). DefaultChatServiceImpl now calls AiTaskFileMediaResolver.resolveActive(convId) once per turn on both the blocking ask() and the streaming stream() transports; UserMessagePersister field/parameter and the markInjected stamping path are removed; executeBlockingTurn signature drops userMessageIdAlreadyPersisted while preserving the BLK-01 single-write streaming-fallback invariant. ChatResponseDto + StreamingEvent.Final extended with a budgetExceeded boolean propagated from Resolved.budgetExceeded() on both transports (D-D1). UserMessagePersister.java deleted; chat-memory advisor's own AiMessage projection is the sole user-message persistence path. DefaultChatServiceImplStreamFallbackTest rewritten with 4 cases (A/B/C/D) covering resolveActive-once-per-turn on both transports + budgetExceeded propagation on both — all green on pure JUnit 5 + Mockito. Rule-3 stubs on the 3 deferred Plan-13.1-01 test files (AiTaskFileCleanupJobTest, AiTaskFileMediaResolverIntegrationTest, AiTaskFileNoVectorStoreInvocationTest) were the minimum-diff required to unblock :compileTestJava; Plan 13.1-06 owns the proper rewrite.
+- [Phase 13.1]: Plan 04: chat-panel-fragment.xml reshaped into a horizontal `<split splitterPosition="68">` with chatPanel left and attachmentsPanel right; right-pane vbox keeps id="attachmentsPanel" so the Phase 12 ChatSurfaceMounter slot contract is preserved (REQ-7 zero-diff). New ai-task-file-card-fragment.xml + AiTaskFileCardFragmentRenderer.java (extends FragmentRenderer<JmixCard, AiTaskFile> + @RendererItemContainer("taskFileDc")) ship the per-row card with DOWNLOAD action via Jmix Downloader and TRASH action via Dialogs option-confirm; performDelete removes the JPA row first and best-effort removes the storage blob (log-and-continue on blob failure — TTL cleanup sweeps orphans, D-B1). resolveIcon adds an image-extension arm (png/jpg/jpeg/gif/webp → FILE_PICTURE) on top of the CRM csv/xlsx → TABLE and pdf/html/md/txt → FILE_TEXT_O switch. ai-agent-chat.css gets a verbatim CRM appendix (14 new top-level rules) with the single mechanical rename .ai-conversation-message-list → .ai-agent-chat-panel__messages. 13 new chatView.attachments.* keys land in both messages_en.properties and messages_vi.properties. Java fragment controller wiring (taskFilesDl loader binding, empty-state toggle, NOTICE rendering, budgetExceeded toast) is owned by Plan 13.1-05 — this plan delivers the stable XML/CSS/i18n surface against which Plan 05 builds. One Rule-1 deviation: the documentation comment in chat-panel-fragment.xml was rephrased so it doesn't name the deleted `attachRow`/`chip-strip` ids (the verify regex scans comments alongside elements).
 
 ### Performance Metrics
 
@@ -227,6 +228,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13.1 P01 | 25min | 2 tasks | 10 files |
 | Phase 13.1 P02 | ~20min | 2 tasks | 4 files |
 | Phase 13.1 P03 | ~25min | 2 tasks | 10 files |
+| Phase 13.1 P04 | ~15min | 2 tasks | 6 files |
 
 ### Quick Tasks Completed
 
@@ -237,7 +239,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-05-07T00:00:00.000Z
-**Stopped at:** Phase 13.1 Plan 03 complete (resolveActive wiring + UserMessagePersister deleted + NOTICE projection filter + 4-case stream-fallback test green)
+**Stopped at:** Phase 13.1 Plan 04 complete (chat-panel-fragment.xml split reshape + AiTaskFileCardFragmentRenderer + ai-agent-chat.css CRM appendix + 13 bilingual keys; compileJava green)
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Plan 13.1-04 — UI fragment reshape (`<split>` + right-pane Attachments panel) + budgetExceeded toast wire-up consuming the new ChatResponseDto/StreamingEvent.Final flag.
+**Next action:** Plan 13.1-05 — ChatPanelFragment Java rewire (taskFilesDl loader binding, empty-state toggle, NOTICE insert/render via vaadin-message.attachment-event, budgetExceeded toast against the now-stable XML/CSS surface).
