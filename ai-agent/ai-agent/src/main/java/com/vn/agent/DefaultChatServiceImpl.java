@@ -289,89 +289,9 @@ public class DefaultChatServiceImpl implements ChatService {
             }
             final UUID userMessageIdFinal = userMessageId;
 
-            ChatClientResponse clientResp = chatClient.prompt()
-                    .system(composedSystemPrompt)
-                    .user(u -> {
-                        // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media —
-                        // the convenience .user(String) overload silently drops media. Use
-                        // .text(...) + .media(...) inside the lambda.
-                        u.text(message);
-                        if (!resolvedMedia.isEmpty()) {
-                            u.media(resolvedMedia.media().toArray(new Media[0]));
-                        }
-                    })
-                    .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
-                    .toolContext(auditToolContext(runId, convId))
-                    .advisors(advisorSpec -> {
-                        advisorSpec
-                                .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                .param("audit.runId", runId)
-                                .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
-                                .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
-                                        retrievalSimilarityThreshold);
-                        if (ragFilter != null) {
-                            advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
-                        }
-                    })
-                    .options(ChatOptions.builder()
-                            .model(model)
-                            .temperature(parametersResolver.effectiveTemperature(active))
-                            .topP(parametersResolver.effectiveTopP(active))
-                            .maxTokens(parametersResolver.effectiveMaxTokens(active))
-                            .build())
-                    .call()
-                    .chatClientResponse();
-
-            // Phase 13 Plan 04 — REVIEWS HIGH-1 + HIGH-14: stamp injectedAt (authoritative
-            // pending marker) AFTER the call returns, threading the explicit userMessageId
-            // captured above. Wrapped in try/catch so a markInjected failure cannot fail the
-            // user's response — the row stays pending and the next turn re-injects (the
-            // cleanup job reaps on TTL).
-            if (!resolvedMedia.isEmpty()) {
-                try {
-                    taskFileRepository.markInjected(resolvedMedia.taskFileIds(),
-                            userMessageIdFinal, java.time.OffsetDateTime.now());
-                } catch (RuntimeException stampEx) {
-                    log.warn("markInjected failed for conv={} ids={}", convId,
-                            resolvedMedia.taskFileIds(), stampEx);
-                }
-            }
-
-            ChatResponse springResponse = clientResp.chatResponse();
-            String content = springResponse != null
-                    && springResponse.getResult() != null
-                    && springResponse.getResult().getOutput() != null
-                            ? springResponse.getResult().getOutput().getText()
-                            : "";
-            if (content == null) {
-                content = "";
-            }
-
-            // Post-response token accumulation for the breaker.
-            long tokensUsed = usageTokens(springResponse);
-            tokenBudgetGuard.accumulate(convId, tokensUsed);
-
-            // Promote scanner flag (D-17/D-18 — pattern KEY only, never matched text).
-            String flaggedKey = null;
-            try {
-                Map<String, Object> context = clientResp.context();
-                Object contextFlag = context == null ? null
-                        : context.get(OutputScannerAdvisor.CONTEXT_KEY_FLAGGED_PATTERN);
-                if (contextFlag instanceof String s && !s.isBlank()) {
-                    flaggedKey = s;
-                    auditFlagged(runId, userId, convId, flaggedKey);
-                }
-            } catch (RuntimeException readCtx) {
-                log.debug("Failed to read scanner context flag runId={}", runId, readCtx);
-            }
-            boolean flagged = flaggedKey != null;
-
-            long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
-            log.debug("ChatService.ask convId={} runId={} model={} latencyMs={} flagged={}",
-                    convId, runId, model, latencyMs, flagged);
-            publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
-            return new ChatResponseDto(convId, runId, content, model, latencyMs,
-                    flagged, flaggedKey, null);
+            return executeBlockingTurn(userId, convId, message, effectiveOverrides,
+                    resolvedMedia, userMessageIdFinal, composedSystemPrompt, model, active,
+                    ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
             // Iteration-cap request-level audit row is written by GuardedToolCallingManager (D-11).
@@ -387,6 +307,127 @@ public class DefaultChatServiceImpl implements ChatService {
             IterationCounter.reset();
             com.vn.agent.orchestration.RunContext.clear();
         }
+    }
+
+    /**
+     * Executes the blocking-call portion of a chat turn against an ALREADY-RESOLVED
+     * state (Media + persisted user-message id). Used by both the public {@link #ask}
+     * entrypoint AND the {@link #stream} catch-block fallback (D-04 graceful
+     * streaming fallback) so the user message and Media injection happen exactly
+     * ONCE per turn — fixing BLK-01 from 13-HUMAN-UAT.md (the recursive ask(...)
+     * call from the streaming catch double-persisted user messages).
+     *
+     * @param userId attribution user (for audit/run-context)
+     * @param convId conversation id (already loaded by caller)
+     * @param message raw user-message text (verbatim — already persisted by caller)
+     * @param effectiveOverrides resolved overrides (NEVER null; caller normalizes)
+     * @param resolvedMedia pre-resolved Media + ids; may be empty but never null
+     * @param userMessageIdAlreadyPersisted id returned by
+     *        {@link UserMessagePersister#persistUserMessage}, or {@code null} when
+     *        {@code resolvedMedia.isEmpty()} (no media -> no persist was attempted)
+     * @param composedSystemPrompt system prompt already composed by caller
+     * @param model resolved model id (caller already applied Overrides + AiParameters)
+     * @param active resolved {@link AiParameters} snapshot (caller already loaded)
+     * @param ragFilter RAG filter expression or {@code null} (admin-bypass)
+     * @param retrievalTopK already-resolved RAG top-K
+     * @param retrievalSimilarityThreshold already-resolved similarity threshold
+     * @param runId already-allocated run id (caller manages RunContext lifecycle)
+     * @param startNanos start instant for latency calculation
+     * @return blocking ChatResponseDto for the turn
+     */
+    private ChatResponseDto executeBlockingTurn(String userId,
+                                                UUID convId,
+                                                String message,
+                                                Overrides effectiveOverrides,
+                                                AiTaskFileMediaResolver.Resolved resolvedMedia,
+                                                UUID userMessageIdAlreadyPersisted,
+                                                String composedSystemPrompt,
+                                                String model,
+                                                AiParameters active,
+                                                Filter.Expression ragFilter,
+                                                int retrievalTopK,
+                                                double retrievalSimilarityThreshold,
+                                                UUID runId,
+                                                long startNanos) {
+        ChatClientResponse clientResp = chatClient.prompt()
+                .system(composedSystemPrompt)
+                .user(u -> {
+                    // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
+                    u.text(message);
+                    if (!resolvedMedia.isEmpty()) {
+                        u.media(resolvedMedia.media().toArray(new Media[0]));
+                    }
+                })
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                .toolContext(auditToolContext(runId, convId))
+                .advisors(advisorSpec -> {
+                    advisorSpec
+                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
+                            .param("audit.runId", runId)
+                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                    retrievalSimilarityThreshold);
+                    if (ragFilter != null) {
+                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
+                    }
+                })
+                .options(ChatOptions.builder()
+                        .model(model)
+                        .temperature(parametersResolver.effectiveTemperature(active))
+                        .topP(parametersResolver.effectiveTopP(active))
+                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
+                        .build())
+                .call()
+                .chatClientResponse();
+
+        // BLK-01 fix (gap-closure plan 13-06): markInjected is invoked EXACTLY ONCE here
+        // against the already-persisted userMessageIdAlreadyPersisted. Wrapped in try/catch
+        // so a markInjected failure cannot fail the user's response — Plan 04 invariant.
+        if (!resolvedMedia.isEmpty()) {
+            try {
+                taskFileRepository.markInjected(resolvedMedia.taskFileIds(),
+                        userMessageIdAlreadyPersisted, java.time.OffsetDateTime.now());
+            } catch (RuntimeException stampEx) {
+                log.warn("markInjected failed for conv={} ids={}", convId,
+                        resolvedMedia.taskFileIds(), stampEx);
+            }
+        }
+
+        ChatResponse springResponse = clientResp.chatResponse();
+        String content = springResponse != null
+                && springResponse.getResult() != null
+                && springResponse.getResult().getOutput() != null
+                        ? springResponse.getResult().getOutput().getText()
+                        : "";
+        if (content == null) {
+            content = "";
+        }
+
+        // Post-response token accumulation for the breaker.
+        long tokensUsed = usageTokens(springResponse);
+        tokenBudgetGuard.accumulate(convId, tokensUsed);
+
+        // Promote scanner flag (D-17/D-18 — pattern KEY only, never matched text).
+        String flaggedKey = null;
+        try {
+            Map<String, Object> ctx = clientResp.context();
+            Object contextFlag = ctx == null ? null
+                    : ctx.get(OutputScannerAdvisor.CONTEXT_KEY_FLAGGED_PATTERN);
+            if (contextFlag instanceof String s && !s.isBlank()) {
+                flaggedKey = s;
+                auditFlagged(runId, userId, convId, flaggedKey);
+            }
+        } catch (RuntimeException readCtx) {
+            log.debug("Failed to read scanner context flag runId={}", runId, readCtx);
+        }
+        boolean flagged = flaggedKey != null;
+
+        long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        log.debug("ChatService.executeBlockingTurn convId={} runId={} model={} latencyMs={} flagged={}",
+                convId, runId, model, latencyMs, flagged);
+        publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
+        return new ChatResponseDto(convId, runId, content, model, latencyMs,
+                flagged, flaggedKey, null);
     }
 
     @Override
@@ -521,9 +562,14 @@ public class DefaultChatServiceImpl implements ChatService {
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());
                     } catch (UnsupportedOperationException nonStreaming) {
-                        // D-04 graceful fallback: provider does not support streaming. Fall through to
-                        // blocking ask(...) wrapped as a single Content chunk + Final.
-                        ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
+                        // BLK-01 fix (gap-closure plan 13-06): D-04 graceful fallback. The chat model
+                        // does not support streaming. Reuse the ALREADY-RESOLVED Media + ALREADY-PERSISTED
+                        // user-message id by delegating to executeBlockingTurn(...) — do NOT recurse
+                        // through ask(...) (which would re-resolve and double-persist the user message,
+                        // polluting ChatMemory replay).
+                        ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
+                                resolvedMedia, userMessageIdRef.get(), composedSystemPrompt, model, active,
+                                ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
