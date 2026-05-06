@@ -30,6 +30,8 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.ToolVetoedException;
+import com.vn.agent.taskfile.AiTaskFileMediaResolver;
+import com.vn.agent.taskfile.AiTaskFileRepository;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
 import jakarta.validation.ConstraintViolationException;
@@ -41,6 +43,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
@@ -57,6 +60,7 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Phase-4 default {@link ChatService} implementation (ORCH-01, ORCH-05), extended in Phase 6 with
@@ -131,6 +135,11 @@ public class DefaultChatServiceImpl implements ChatService {
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
     private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
+    // Phase 13 Plan 04 — single-turn Media injection (D-01) + two-phase markInjected
+    // (D-03 / REVIEWS HIGH-1 / HIGH-14).
+    private final AiTaskFileMediaResolver taskFileMediaResolver;
+    private final AiTaskFileRepository taskFileRepository;
+    private final UserMessagePersister userMessagePersister;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -148,7 +157,10 @@ public class DefaultChatServiceImpl implements ChatService {
                                   CancellationRegistry cancellationRegistry,
                                   StreamingSinkHolder streamingSinkHolder,
                                   AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
-                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher) {
+                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher,
+                                  AiTaskFileMediaResolver taskFileMediaResolver,
+                                  AiTaskFileRepository taskFileRepository,
+                                  UserMessagePersister userMessagePersister) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -166,6 +178,9 @@ public class DefaultChatServiceImpl implements ChatService {
         this.streamingSinkHolder = streamingSinkHolder;
         this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
         this.titleEligibilityPublisher = titleEligibilityPublisher;
+        this.taskFileMediaResolver = taskFileMediaResolver;
+        this.taskFileRepository = taskFileRepository;
+        this.userMessagePersister = userMessagePersister;
     }
 
     @Override
@@ -244,9 +259,47 @@ public class DefaultChatServiceImpl implements ChatService {
             RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
             RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
+            // Phase 13 Plan 04 — opportunistic TTL cleanup. Best-effort; never blocks a chat
+            // turn (CONTEXT.md "TTL cleanup hourly + opportunistic on chat-send"). Wrapped in
+            // try/catch so a transient cleanup-job failure cannot fail the user's request.
+            try {
+                taskFileRepository.deleteAllExpired(java.time.OffsetDateTime.now());
+            } catch (Exception cleanupEx) {
+                log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
+            }
+
+            // Phase 13 Plan 04 — single-turn Media injection (D-01 / REVIEWS HIGH-1).
+            // Resolver scans pending rows where injectedAt IS NULL AND expiresAt > now;
+            // returns Media + the row ids the caller threads into markInjected after the
+            // turn completes.
+            final AiTaskFileMediaResolver.Resolved resolvedMedia =
+                    taskFileMediaResolver.resolvePending(convId);
+
+            // REVIEWS HIGH-14 — explicit user-message persist BEFORE chatClient invocation,
+            // so we have a stable AiMessage.id to thread into markInjected. Replaces the
+            // race-prone SELECT-back "latest USER message" lookup. Only runs when there ARE
+            // pending Media to stamp; without media there is nothing to link.
+            UUID userMessageId = null;
+            if (!resolvedMedia.isEmpty()) {
+                try {
+                    userMessageId = userMessagePersister.persistUserMessage(convId, message, userId);
+                } catch (RuntimeException persistEx) {
+                    log.warn("UserMessagePersister failed; continuing without explicit message FK", persistEx);
+                }
+            }
+            final UUID userMessageIdFinal = userMessageId;
+
             ChatClientResponse clientResp = chatClient.prompt()
                     .system(composedSystemPrompt)
-                    .user(message)
+                    .user(u -> {
+                        // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media —
+                        // the convenience .user(String) overload silently drops media. Use
+                        // .text(...) + .media(...) inside the lambda.
+                        u.text(message);
+                        if (!resolvedMedia.isEmpty()) {
+                            u.media(resolvedMedia.media().toArray(new Media[0]));
+                        }
+                    })
                     .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
                     .toolContext(auditToolContext(runId, convId))
                     .advisors(advisorSpec -> {
@@ -268,6 +321,21 @@ public class DefaultChatServiceImpl implements ChatService {
                             .build())
                     .call()
                     .chatClientResponse();
+
+            // Phase 13 Plan 04 — REVIEWS HIGH-1 + HIGH-14: stamp injectedAt (authoritative
+            // pending marker) AFTER the call returns, threading the explicit userMessageId
+            // captured above. Wrapped in try/catch so a markInjected failure cannot fail the
+            // user's response — the row stays pending and the next turn re-injects (the
+            // cleanup job reaps on TTL).
+            if (!resolvedMedia.isEmpty()) {
+                try {
+                    taskFileRepository.markInjected(resolvedMedia.taskFileIds(),
+                            userMessageIdFinal, java.time.OffsetDateTime.now());
+                } catch (RuntimeException stampEx) {
+                    log.warn("markInjected failed for conv={} ids={}", convId,
+                            resolvedMedia.taskFileIds(), stampEx);
+                }
+            }
 
             ChatResponse springResponse = clientResp.chatResponse();
             String content = springResponse != null
@@ -364,11 +432,44 @@ public class DefaultChatServiceImpl implements ChatService {
                     RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
                     RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
+                    // Phase 13 Plan 04 — opportunistic TTL cleanup, hoisted INSIDE Flux.defer
+                    // so it runs at subscribe time (not flux-build time). Best-effort; never
+                    // blocks a chat turn.
+                    try {
+                        taskFileRepository.deleteAllExpired(java.time.OffsetDateTime.now());
+                    } catch (Exception cleanupEx) {
+                        log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
+                    }
+
+                    // Phase 13 Plan 04 — single-turn Media injection (D-01 / REVIEWS HIGH-1).
+                    // RESEARCH Pitfall 8: hoisted INSIDE Flux.defer so readAllBytes does not
+                    // run on the calling thread before subscription. REVIEWS HIGH-14:
+                    // user-message persist also runs INSIDE the defer, capturing the id into
+                    // an AtomicReference closed over by doOnComplete.
+                    final AiTaskFileMediaResolver.Resolved resolvedMedia =
+                            taskFileMediaResolver.resolvePending(convId);
+                    final AtomicReference<UUID> userMessageIdRef = new AtomicReference<>();
+                    if (!resolvedMedia.isEmpty()) {
+                        try {
+                            userMessageIdRef.set(userMessagePersister.persistUserMessage(
+                                    convId, message, userId));
+                        } catch (RuntimeException persistEx) {
+                            log.warn("UserMessagePersister failed; continuing without explicit message FK",
+                                    persistEx);
+                        }
+                    }
+
                     Flux<StreamingEvent> content;
                     try {
                         content = chatClient.prompt()
                                 .system(composedSystemPrompt)
-                                .user(message)
+                                .user(u -> {
+                                    // AI-SPEC pitfall 6: lambda form REQUIRED when media is non-empty.
+                                    u.text(message);
+                                    if (!resolvedMedia.isEmpty()) {
+                                        u.media(resolvedMedia.media().toArray(new Media[0]));
+                                    }
+                                })
                                 .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
                                 .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
@@ -399,6 +500,23 @@ public class DefaultChatServiceImpl implements ChatService {
                                     }
                                     assistantContentSeen.set(true);
                                     return Flux.just(new StreamingEvent.Content(text));
+                                })
+                                // REVIEWS HIGH-1 + HIGH-14: stamp injectedAt only on successful
+                                // completion. doOnComplete (NOT doOnSubscribe / doOnNext) so a
+                                // cancelled stream does NOT mark files as injected — D-03
+                                // two-phase semantics: cancelled = retry works.
+                                .doOnComplete(() -> {
+                                    if (!resolvedMedia.isEmpty()) {
+                                        try {
+                                            taskFileRepository.markInjected(
+                                                    resolvedMedia.taskFileIds(),
+                                                    userMessageIdRef.get(),
+                                                    java.time.OffsetDateTime.now());
+                                        } catch (Exception stampEx) {
+                                            log.warn("markInjected failed for conv={} ids={}", convId,
+                                                    resolvedMedia.taskFileIds(), stampEx);
+                                        }
+                                    }
                                 })
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());
