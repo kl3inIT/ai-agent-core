@@ -3,8 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 13 Plan 13-06 gap-closure complete (BLK-01 streaming-fallback double-write fixed)
-last_updated: "2026-05-06T07:55:00.000Z"
+stopped_at: Phase 13.1 context gathered (CONTEXT.md + DISCUSSION-LOG.md)
+last_updated: "2026-05-06T08:30:00.000Z"
+resume_file: .planning/phases/13.1-chat-attachments-rightpane-and-persistent-context/13.1-CONTEXT.md
 progress:
   total_phases: 8
   completed_phases: 5
