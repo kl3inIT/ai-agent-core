@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
-stopped_at: Phase 13 Plan 13-05 complete (verification surface shipped; Spring-context boot regression deferred)
-last_updated: "2026-05-06T08:00:00.000Z"
+stopped_at: Phase 13 Plan 13-06 gap-closure complete (BLK-01 streaming-fallback double-write fixed)
+last_updated: "2026-05-06T07:55:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -33,8 +33,8 @@ Plan: 5 of 5
 |-------|-------|
 | Phase | Phase 13 |
 | Plan | 5 of 5 |
-| Status | Phase 13 Plan 13-05 complete; Spring-context boot regression deferred (see deferred-items.md) |
-| Last activity | 2026-05-06 — Plan 13-05 verification surface shipped |
+| Status | Phase 13 Plan 13-06 gap-closure complete (BLK-01 fixed); Spring-context boot regression still deferred (see deferred-items.md) |
+| Last activity | 2026-05-06 — Plan 13-06 gap closure shipped (executeBlockingTurn refactor + Mockito test) |
 
 ## Phase Status
 
@@ -173,6 +173,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase ?]: 13-03: bulk_save_records as single @Tool with id-presence dispatch (D-02 mixed-batch); ONE @Transactional boundary on MutationSaveExecutor.bulkSave
 - [Phase ?]: 13-03: AiMutationIntent.RESULT_SUMMARY column persists bulk savedIds for IDEMPOTENT_REPLAY (REVIEWS HIGH-11)
 - [Phase ?]: 13-03: Per-row CrudEntityContext after entity load/create satisfies MUT-14 row-state-dependent constraint enforcement (REVIEWS HIGH-13)
+- [Phase 13]: Plan 13-06 gap closure: extracted `DefaultChatServiceImpl.executeBlockingTurn(...)` private helper to eliminate the BLK-01 streaming-fallback double-write — both `ask(...)` and the streaming `catch(UnsupportedOperationException)` now delegate to the same helper passing already-resolved Media + already-persisted user-message id, so `userMessagePersister.persistUserMessage` and `taskFileMediaResolver.resolvePending` each fire EXACTLY ONCE per turn on the D-04 graceful-fallback path. D-03 streaming-success doOnComplete invariant left untouched. BLK-04 (prompt-build orphan) closed implicitly. Regression locked by `DefaultChatServiceImplStreamFallbackTest` (5 Mockito tests, pure JUnit — sidesteps deferred AiAuditEvent boot regression).
 
 ### Performance Metrics
 
@@ -219,6 +220,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13 P13-02 | 25min | 2 tasks | 4 files |
 | Phase 13 P03 | 9m | 2 tasks | 11 files |
 | Phase 13 P13-04 | ~10m | 2 tasks | 4 files |
+| Phase 13 P13-06 (gap) | ~22m | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -228,8 +230,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-06T05:33:58.833Z
-**Stopped at:** Phase 13 context gathered
+**Last session:** 2026-05-06T07:55:00.000Z
+**Stopped at:** Phase 13 Plan 13-06 gap-closure complete (BLK-01 fixed)
 **Resume file:** None
 **Blockers:** None.
-**Next action:** Verify Phase 12 configurable chat surfaces.
+**Next action:** Verifier re-flips Phase 13 status row to Complete after gap closure run; then Phase 14 (intent-driven extraction) per ROADMAP.
