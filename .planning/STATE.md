@@ -4,13 +4,13 @@ milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
 stopped_at: Phase 13 context gathered
-last_updated: "2026-05-06T04:47:22.847Z"
+last_updated: "2026-05-06T04:58:52.140Z"
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 44
-  completed_plans: 40
-  percent: 91
+  completed_plans: 41
+  percent: 93
 ---
 
 # Project State
@@ -168,6 +168,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 12]: Plan 12-05: Use ConversationTitleEligibilityPublisher to isolate title eligibility from DefaultChatServiceImpl. — Keeps chat runtime changes narrow while proving publication happens only after assistant response handling returns.
 - [Phase 12]: Plan 12-05: Manual title edits check ownership through ConversationGateway and save through secured DataManager. — Preserves the AI-as-Jmix-client security model while allowing user-visible title overrides to block future auto-title clobbering.
 - [Phase ?]: Phase 13 Plan 13-01: AiTaskFile entity foundation + qwen/qwen3.6-35b-a3b model swap shipped; D-03 schema lock (separate addForeignKeyConstraint with onDelete=SET NULL for MESSAGE_ID, REVIEWS HIGH-2); injectedAt is authoritative pending marker (REVIEWS HIGH-1); user role gains DELETE for Plan 04 chip removal (REVIEWS HIGH-3); default-params.yaml model swapped (REVIEWS HIGH-9).
+- [Phase ?]: Phase 13 Plan 13-02: AiTaskFileRepository + AiTaskFileMediaResolver + AiTaskFileCleanupJob + package-info shipped. Resolver predicate is injectedAt IS NULL per REVIEWS HIGH-1. markInjected runs in REQUIRES_NEW agentstore tx; deleteRow uses blob-first ordering with retry-on-failure semantics. TEST-16 forbidden-token grep gates at zero across all .java sources except the allowlisted package-info.java JavaDoc (REVIEWS HIGH-8).
 
 ### Performance Metrics
 
@@ -211,6 +212,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 12 P05 | 43 min | 3 tasks | 17 files |
 | Phase 12 P06 | 29 min | 3 tasks | 5 files |
 | Phase 13 P13-01 | 25min | 2 tasks | 11 files |
+| Phase 13 P13-02 | 25min | 2 tasks | 4 files |
 
 ### Quick Tasks Completed
 
@@ -220,7 +222,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-06T04:46:18.239Z
+**Last session:** 2026-05-06T04:58:40.531Z
 **Stopped at:** Phase 13 context gathered
 **Resume file:** None
 **Blockers:** None.
