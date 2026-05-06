@@ -148,6 +148,14 @@ class ChatServiceFilterParamContractTest {
                 mock(com.vn.agent.guard.AgentSystemPromptRulesComposer.class);
         when(rulesComposer.effectiveRules())
                 .thenReturn(com.vn.agent.guard.AgentSystemPromptRules.PROMPT_RULES);
+        // Phase 13 Plan 13-04: stub the resolver to return an empty Resolved record so the
+        // ask()/stream() paths' resolvedMedia.isEmpty() check does not NPE under a bare mock.
+        // This test does not exercise attached files; the repository and persister are unused.
+        com.vn.agent.taskfile.AiTaskFileMediaResolver taskFileMediaResolver =
+                mock(com.vn.agent.taskfile.AiTaskFileMediaResolver.class);
+        when(taskFileMediaResolver.resolvePending(any()))
+                .thenReturn(com.vn.agent.taskfile.AiTaskFileMediaResolver.Resolved.empty());
+
         service = new DefaultChatServiceImpl(chatClient, conversationGateway, toolCallbacks,
                 parametersResolver, baselineContextProvider, retrievalFilterBuilder, ragProperties,
                 currentAuthentication, rateLimitGuard, tokenBudgetGuard, auditWriter, validator,
@@ -155,7 +163,10 @@ class ChatServiceFilterParamContractTest {
                 cancellationRegistry,
                 streamingSinkHolder,
                 rulesComposer,
-                titleEligibilityPublisher);
+                titleEligibilityPublisher,
+                taskFileMediaResolver,
+                mock(com.vn.agent.taskfile.AiTaskFileRepository.class),
+                mock(com.vn.agent.UserMessagePersister.class));
     }
 
     @Test
