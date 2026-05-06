@@ -139,13 +139,11 @@ class AskTypedRetryTest {
                 /* streamingSinkHolder */ null,
                 rulesComposer,
                 mock(ConversationTitleEligibilityPublisher.class),
-                // Phase 13 Plan 13-04: task-file media + repository + user-message-persister
-                // dependencies. AskTypedRetryTest exercises only the typed-retry path with no
-                // attached files, so the resolver is stubbed to return an empty Resolved record
-                // and the repository/persister are unused.
+                // Phase 13.1 Plan 03: task-file media + repository dependencies. AskTypedRetryTest
+                // exercises only the typed-retry path with no attached files, so the resolver is
+                // stubbed to return an empty Resolved record and the repository is unused.
                 stubEmptyTaskFileResolver(),
-                mock(com.vn.agent.taskfile.AiTaskFileRepository.class),
-                mock(com.vn.agent.UserMessagePersister.class));
+                mock(com.vn.agent.taskfile.AiTaskFileRepository.class));
     }
 
     /**
@@ -251,15 +249,15 @@ class AskTypedRetryTest {
     }
 
     /**
-     * Phase 13 Plan 13-04: {@code DefaultChatServiceImpl.ask} dereferences
-     * {@code resolvePending(...).isEmpty()} unconditionally. A bare Mockito
+     * Phase 13.1 Plan 03: {@code DefaultChatServiceImpl.ask} dereferences
+     * {@code resolveActive(...).isEmpty()} unconditionally. A bare Mockito
      * mock would return {@code null} and NPE on the dereference, so stub a
      * non-null empty {@code Resolved} record for the no-attached-files path.
      */
     private static com.vn.agent.taskfile.AiTaskFileMediaResolver stubEmptyTaskFileResolver() {
         com.vn.agent.taskfile.AiTaskFileMediaResolver resolver =
                 mock(com.vn.agent.taskfile.AiTaskFileMediaResolver.class);
-        when(resolver.resolvePending(any()))
+        when(resolver.resolveActive(any()))
                 .thenReturn(com.vn.agent.taskfile.AiTaskFileMediaResolver.Resolved.empty());
         return resolver;
     }

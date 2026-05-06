@@ -2,6 +2,7 @@ package com.vn.agent.orchestration;
 
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
+import com.vn.agent.entity.AiMessageRole;
 import io.jmix.core.Metadata;
 import io.jmix.core.UnconstrainedDataManager;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
@@ -82,9 +83,12 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
         // Mirror JdbcChatMemoryRepository.saveAll semantics: delete-then-insert the whole
         // conversation. MessageWindowChatMemory calls saveAll with the CUMULATIVE list each turn,
         // so an append-only projection would duplicate rows; JDBC replaces the set atomically.
+        // Phase 13.1 D-A1: NOTICE rows survive the projection wipe so the upload ledger persists across turns.
         dataManager.load(AiMessage.class)
-                .query("select m from ai_AiMessage m where m.conversation.id = :cid")
+                .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
+                        "and m.role <> :noticeRole")
                 .parameter("cid", convUuid)
+                .parameter("noticeRole", AiMessageRole.NOTICE.getId())
                 .list()
                 .forEach(dataManager::remove);
         if (messages.isEmpty()) {

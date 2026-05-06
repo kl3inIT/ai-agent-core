@@ -36,8 +36,20 @@ public sealed interface StreamingEvent
 
     record Citation(int index, UUID documentId, String snippet) implements StreamingEvent {}
 
-    record Final(UUID runId, UUID conversationId, long latencyMs, int promptTokens, int completionTokens)
-            implements StreamingEvent {}
+    /**
+     * Terminal streaming event. Carries the run id + conversation id + usage metrics for the
+     * just-completed turn. Phase 13.1 D-D1: {@code budgetExceeded} mirrors the
+     * {@code ChatResponseDto.budgetExceeded} flag on the blocking path so the UI can render a
+     * toast on either transport mode.
+     */
+    record Final(UUID runId, UUID conversationId, long latencyMs, int promptTokens, int completionTokens,
+                 boolean budgetExceeded)
+            implements StreamingEvent {
+        /** Back-compat factory for callers that pre-date the {@code budgetExceeded} field. */
+        public Final(UUID runId, UUID conversationId, long latencyMs, int promptTokens, int completionTokens) {
+            this(runId, conversationId, latencyMs, promptTokens, completionTokens, false);
+        }
+    }
 
     record Error(String messageKey, Map<String, Object> params) implements StreamingEvent {}
 }

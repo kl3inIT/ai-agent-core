@@ -60,7 +60,6 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Phase-4 default {@link ChatService} implementation (ORCH-01, ORCH-05), extended in Phase 6 with
@@ -135,11 +134,12 @@ public class DefaultChatServiceImpl implements ChatService {
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
     private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
-    // Phase 13 Plan 04 — single-turn Media injection (D-01) + two-phase markInjected
-    // (D-03 / REVIEWS HIGH-1 / HIGH-14).
+    // Phase 13.1 Plan 03 — per-turn-all Media injection via resolveActive(...). The Phase 13
+    // single-turn pending-state stamp and the standalone two-phase user-message persist seam
+    // are gone; the chat-memory advisor's own AiMessage projection is now the sole user-message
+    // persistence path (RES-01 + project memory feedback_jmix_unconstrained_for_system_writes).
     private final AiTaskFileMediaResolver taskFileMediaResolver;
     private final AiTaskFileRepository taskFileRepository;
-    private final UserMessagePersister userMessagePersister;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -159,8 +159,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                   AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
                                   ConversationTitleEligibilityPublisher titleEligibilityPublisher,
                                   AiTaskFileMediaResolver taskFileMediaResolver,
-                                  AiTaskFileRepository taskFileRepository,
-                                  UserMessagePersister userMessagePersister) {
+                                  AiTaskFileRepository taskFileRepository) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -180,7 +179,6 @@ public class DefaultChatServiceImpl implements ChatService {
         this.titleEligibilityPublisher = titleEligibilityPublisher;
         this.taskFileMediaResolver = taskFileMediaResolver;
         this.taskFileRepository = taskFileRepository;
-        this.userMessagePersister = userMessagePersister;
     }
 
     @Override
@@ -268,32 +266,17 @@ public class DefaultChatServiceImpl implements ChatService {
                 log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
             }
 
-            // Phase 13.1 Plan 02 RES-01 — per-turn-all Media injection. The resolver
+            // Phase 13.1 Plan 03 RES-01 — per-turn-all Media injection. The resolver
             // loads ALL non-expired AiTaskFile rows for the conversation in DESC order,
             // applies the per-turn caps, and returns Resolved(media, budgetExceeded).
-            // The Plan-13 markInjected/userMessagePersister stamping path is dead and
-            // will be removed end-to-end by Plan 13.1-03; the call sites below are
-            // structural no-ops kept only to satisfy the Phase 13 BLK-01 invariant
-            // (executeBlockingTurn(...) signature unchanged) until Plan 13.1-03 lands.
+            // The Phase 13 single-turn pending-state stamp and the two-phase write seam
+            // are gone; the chat-memory advisor's own AiMessage projection is now the
+            // sole user-message persistence path.
             final AiTaskFileMediaResolver.Resolved resolvedMedia =
                     taskFileMediaResolver.resolveActive(convId);
 
-            // Plan 13.1-03 will delete this whole UserMessagePersister block. Kept for
-            // now so Phase 13 BLK-01 streaming-fallback semantics still compile; the
-            // userMessageId is never threaded into a markInjected stamp anymore (the
-            // stamp method itself is gone — see AiTaskFileRepository).
-            UUID userMessageId = null;
-            if (!resolvedMedia.isEmpty()) {
-                try {
-                    userMessageId = userMessagePersister.persistUserMessage(convId, message, userId);
-                } catch (RuntimeException persistEx) {
-                    log.warn("UserMessagePersister failed; continuing without explicit message FK", persistEx);
-                }
-            }
-            final UUID userMessageIdFinal = userMessageId;
-
             return executeBlockingTurn(userId, convId, message, effectiveOverrides,
-                    resolvedMedia, userMessageIdFinal, composedSystemPrompt, model, active,
+                    resolvedMedia, composedSystemPrompt, model, active,
                     ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
@@ -314,20 +297,19 @@ public class DefaultChatServiceImpl implements ChatService {
 
     /**
      * Executes the blocking-call portion of a chat turn against an ALREADY-RESOLVED
-     * state (Media + persisted user-message id). Used by both the public {@link #ask}
-     * entrypoint AND the {@link #stream} catch-block fallback (D-04 graceful
-     * streaming fallback) so the user message and Media injection happen exactly
-     * ONCE per turn — fixing BLK-01 from 13-HUMAN-UAT.md (the recursive ask(...)
-     * call from the streaming catch double-persisted user messages).
+     * Media list. Used by both the public {@link #ask} entrypoint AND the
+     * {@link #stream} catch-block fallback (D-04 graceful streaming fallback) so
+     * the resolver runs exactly ONCE per turn — the BLK-01 invariant from Phase 13
+     * (gap-closure plan 13-06). Phase 13.1 Plan 03 dropped the
+     * {@code userMessageIdAlreadyPersisted} parameter because the per-turn-all
+     * resolver no longer needs a pending-state marker, so there is nothing left
+     * for an external persister to thread back here.
      *
      * @param userId attribution user (for audit/run-context)
      * @param convId conversation id (already loaded by caller)
-     * @param message raw user-message text (verbatim — already persisted by caller)
+     * @param message raw user-message text (verbatim)
      * @param effectiveOverrides resolved overrides (NEVER null; caller normalizes)
-     * @param resolvedMedia pre-resolved Media + ids; may be empty but never null
-     * @param userMessageIdAlreadyPersisted id returned by
-     *        {@link UserMessagePersister#persistUserMessage}, or {@code null} when
-     *        {@code resolvedMedia.isEmpty()} (no media -> no persist was attempted)
+     * @param resolvedMedia pre-resolved Media + budgetExceeded; may be empty but never null
      * @param composedSystemPrompt system prompt already composed by caller
      * @param model resolved model id (caller already applied Overrides + AiParameters)
      * @param active resolved {@link AiParameters} snapshot (caller already loaded)
@@ -336,14 +318,14 @@ public class DefaultChatServiceImpl implements ChatService {
      * @param retrievalSimilarityThreshold already-resolved similarity threshold
      * @param runId already-allocated run id (caller manages RunContext lifecycle)
      * @param startNanos start instant for latency calculation
-     * @return blocking ChatResponseDto for the turn
+     * @return blocking ChatResponseDto for the turn (carries
+     *         {@code budgetExceeded} from the resolver per D-D1)
      */
     private ChatResponseDto executeBlockingTurn(String userId,
                                                 UUID convId,
                                                 String message,
                                                 Overrides effectiveOverrides,
                                                 AiTaskFileMediaResolver.Resolved resolvedMedia,
-                                                UUID userMessageIdAlreadyPersisted,
                                                 String composedSystemPrompt,
                                                 String model,
                                                 AiParameters active,
@@ -383,12 +365,6 @@ public class DefaultChatServiceImpl implements ChatService {
                 .call()
                 .chatClientResponse();
 
-        // Phase 13.1 Plan 02: markInjected is gone — the per-turn-all resolver does not
-        // need a pending-state marker. Plan 13.1-03 will remove this block entirely along
-        // with the userMessageIdAlreadyPersisted parameter on executeBlockingTurn(...).
-        // Suppress unused-parameter warning until Plan 13.1-03 lands.
-        java.util.Objects.requireNonNullElse(userMessageIdAlreadyPersisted, java.util.UUID.randomUUID());
-
         ChatResponse springResponse = clientResp.chatResponse();
         String content = springResponse != null
                 && springResponse.getResult() != null
@@ -423,7 +399,7 @@ public class DefaultChatServiceImpl implements ChatService {
                 convId, runId, model, latencyMs, flagged);
         publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
         return new ChatResponseDto(convId, runId, content, model, latencyMs,
-                flagged, flaggedKey, null);
+                flagged, flaggedKey, null, resolvedMedia.budgetExceeded());
     }
 
     @Override
@@ -512,23 +488,14 @@ public class DefaultChatServiceImpl implements ChatService {
                         log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
                     }
 
-                    // Phase 13.1 Plan 02 RES-01 — per-turn-all Media injection.
+                    // Phase 13.1 Plan 03 RES-01 — per-turn-all Media injection.
                     // RESEARCH Pitfall 8: hoisted INSIDE Flux.defer so readAllBytes does not
-                    // run on the calling thread before subscription. The Plan-13
-                    // markInjected stamp path is dead; Plan 13.1-03 deletes the
-                    // userMessagePersister wiring below entirely.
+                    // run on the calling thread before subscription. The Phase 13 single-turn
+                    // pending-state stamp and the two-phase write seam are gone; the chat-memory
+                    // advisor's own AiMessage projection is the sole user-message persistence
+                    // path going forward.
                     final AiTaskFileMediaResolver.Resolved resolvedMedia =
                             taskFileMediaResolver.resolveActive(convId);
-                    final AtomicReference<UUID> userMessageIdRef = new AtomicReference<>();
-                    if (!resolvedMedia.isEmpty()) {
-                        try {
-                            userMessageIdRef.set(userMessagePersister.persistUserMessage(
-                                    convId, message, userId));
-                        } catch (RuntimeException persistEx) {
-                            log.warn("UserMessagePersister failed; continuing without explicit message FK",
-                                    persistEx);
-                        }
-                    }
 
                     Flux<StreamingEvent> content;
                     try {
@@ -572,24 +539,16 @@ public class DefaultChatServiceImpl implements ChatService {
                                     assistantContentSeen.set(true);
                                     return Flux.just(new StreamingEvent.Content(text));
                                 })
-                                // Phase 13.1 Plan 02: markInjected is gone (the per-turn-all
-                                // resolver has no pending-state marker). Plan 13.1-03 will
-                                // remove this entire doOnComplete arm and the userMessageIdRef
-                                // capture along with the userMessagePersister wiring above.
-                                .doOnComplete(() -> {
-                                    java.util.Objects.requireNonNullElse(userMessageIdRef.get(),
-                                            java.util.UUID.randomUUID());
-                                })
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());
                     } catch (UnsupportedOperationException nonStreaming) {
                         // BLK-01 fix (gap-closure plan 13-06): D-04 graceful fallback. The chat model
-                        // does not support streaming. Reuse the ALREADY-RESOLVED Media + ALREADY-PERSISTED
-                        // user-message id by delegating to executeBlockingTurn(...) — do NOT recurse
-                        // through ask(...) (which would re-resolve and double-persist the user message,
-                        // polluting ChatMemory replay).
+                        // does not support streaming. Reuse the ALREADY-RESOLVED Media by delegating
+                        // to executeBlockingTurn(...) — do NOT recurse through ask(...) (which would
+                        // re-resolve, double-running the resolver and re-emitting the budget-exceeded
+                        // audit row).
                         ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
-                                resolvedMedia, userMessageIdRef.get(), composedSystemPrompt, model, active,
+                                resolvedMedia, composedSystemPrompt, model, active,
                                 ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
@@ -604,8 +563,12 @@ public class DefaultChatServiceImpl implements ChatService {
                         if (assistantContentSeen.get() && !titlePublicationHandled.get()) {
                             publishTitleEligibilityIfAssistantReply(convId, userId, runId, "streamed");
                         }
+                        // Phase 13.1 D-D1: propagate the resolver's budgetExceeded flag onto the
+                        // terminal Final event so the streaming-path subscriber can render the
+                        // same toast as the blocking-path subscriber.
                         return Flux.<StreamingEvent>just(
-                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0));
+                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0,
+                                        resolvedMedia.budgetExceeded()));
                     }));
                 })
         .subscribeOn(chatStreamingScheduler)

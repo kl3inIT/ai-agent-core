@@ -39,6 +39,11 @@ import java.util.UUID;
  * @param flagged           {@code true} if the output scanner matched a pattern on the final message (D-17)
  * @param flaggedPatternKey stable key of the matched pattern when {@code flagged=true}; otherwise {@code null}
  * @param guardDenial       populated when a request-level guard denied the request; {@code null} on success
+ * @param budgetExceeded    Phase 13.1 D-D1 — {@code true} when the per-turn-all task-file resolver
+ *                          dropped at least one row due to {@code perTurnMaxFiles} /
+ *                          {@code perTurnMaxTotalBytes} caps; the UI consumes this to surface a
+ *                          toast. Always {@code false} on guard denials and on turns that did not
+ *                          exercise the resolver.
  */
 public record ChatResponseDto(
         UUID conversationId,
@@ -48,7 +53,8 @@ public record ChatResponseDto(
         long latencyMs,
         boolean flagged,
         String flaggedPatternKey,
-        GuardDenialInfo guardDenial) {
+        GuardDenialInfo guardDenial,
+        boolean budgetExceeded) {
 
     /**
      * Typed denial payload for Phase 7 UI rendering.
@@ -66,7 +72,7 @@ public record ChatResponseDto(
      * {@code flagged=false} and leaves {@code flaggedPatternKey} / {@code guardDenial} null.
      */
     public static ChatResponseDto ok(UUID conversationId, UUID runId, String content, String model, long latencyMs) {
-        return new ChatResponseDto(conversationId, runId, content, model, latencyMs, false, null, null);
+        return new ChatResponseDto(conversationId, runId, content, model, latencyMs, false, null, null, false);
     }
 
     /**
@@ -75,6 +81,7 @@ public record ChatResponseDto(
      * {@code null} and {@code latencyMs} is {@code 0} because no LLM call occurred.
      */
     public static ChatResponseDto denied(UUID conversationId, UUID runId, String messageKey, Map<String, Object> params) {
-        return new ChatResponseDto(conversationId, runId, "", null, 0L, false, null, new GuardDenialInfo(messageKey, params));
+        return new ChatResponseDto(conversationId, runId, "", null, 0L, false, null,
+                new GuardDenialInfo(messageKey, params), false);
     }
 }
