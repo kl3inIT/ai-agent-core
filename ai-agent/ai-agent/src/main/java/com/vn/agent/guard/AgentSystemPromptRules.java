@@ -63,6 +63,20 @@ public final class AgentSystemPromptRules {
                     + " unless the user explicitly asks for the raw URL.",
             "- For multiple links, use a compact bullet list. Emoji are allowed when they make"
                     + " the reply easier to scan, but keep operational answers compact.",
+            "- ANTI-FABRICATION: never write phrases like 'click here', 'tại đây', 'see the list',"
+                    + " 'xem chi tiết', 'view full list' as plain text. ANY such phrase MUST be a"
+                    + " Markdown link with a real URL obtained from generate_entity_list_link or"
+                    + " generate_entity_detail_link. If the link tool was not called or returned"
+                    + " unknown_entity, omit the phrase entirely instead of inventing a URL.",
+            "- When the user asks to see / view / open a list of records (e.g. 'show customers',"
+                    + " 'danh sách đơn hàng'), call generate_entity_list_link with the relevant"
+                    + " entityName and embed the returned URL in your reply as a Markdown link.",
+            "- DATA-FIDELITY: when listing or summarizing records (rows, fields, names, ids, phone"
+                    + " numbers, emails, dates), every value MUST come from a tool result in the"
+                    + " current turn (find_records, get_record, count_records, get_related_records,"
+                    + " bulk_save_records). Never invent rows, ids, phone numbers, emails, or fill"
+                    + " missing fields with plausible-looking placeholders. If find_records returned"
+                    + " zero rows, say so explicitly.",
             "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"
