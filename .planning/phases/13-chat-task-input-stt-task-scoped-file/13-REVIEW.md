@@ -7,266 +7,118 @@ files_reviewed_list:
   - ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java
   - ai-agent/ai-agent/src/test/java/com/vn/agent/DefaultChatServiceImplStreamFallbackTest.java
 findings:
-  critical: 1
-  warning: 4
+  critical: 0
+  warning: 3
   info: 2
-  total: 7
+  total: 5
 status: issues_found
 ---
 
-# Phase 13: Code Review Report (Gap-Closure Narrow Scope — BLK-01 Fix)
+# Phase 13: Code Review Report (Re-review of CR-01 fix at commit `38d9476`)
 
 **Reviewed:** 2026-05-06
 **Depth:** standard
 **Files Reviewed:** 2
 **Status:** issues_found
+**Predecessor:** Narrow review at commit `bbc9168`; CR-01 fix landed at `38d9476`. Previous review preserved in git history.
 
 ## Summary
 
-Narrow gap-closure review of plan 13-06 BLK-01 fix. The recursive `ask(...)` call has been
-correctly removed from the streaming catch (D-04 graceful-fallback path) and replaced with a
-direct call to the new private `executeBlockingTurn(...)` helper that operates on already-
-resolved state — so user-message persist and `markInjected` now fire EXACTLY ONCE per
-streaming-fallback turn. The five-test Mockito harness exercises the right invariants
-(persist x1, markInjected x1, resolvePending x1, no-attached-file degenerate, streaming-success
-regression guard) and correctly stays off `@SpringBootTest` to avoid the deferred
-AiAuditEvent metamodel boot regression.
+**CR-01 is closed.** The streaming path's guard preamble now mirrors `ask()`'s blocking preamble at the right ordering:
 
-However, the refactor introduces a **BLOCKER**: by replacing the recursive `ask(...)` call with
-a direct `executeBlockingTurn(...)` call, the streaming-fallback path loses the
-`IterationCounter.start()` initialization and the `IterationCapExceededException` /
-`ToolVetoedException` catches that the old recursive `ask(...)` path provided. The original
-recursive call also "happened" to invoke the `rateLimitGuard.check(userId)` /
-`tokenBudgetGuard.check(convId)` preamble — that gating is now bypassed on the fallback path.
-This regresses request-level guard coverage that existed before plan 13-06 landed. Also flagged
-are several smaller robustness and ordering concerns around the catch block.
+- `IterationCounter.start()` is primed at the top of `Flux.defer` (line 445) and `IterationCounter.reset()` is invoked on every terminal signal in `.doFinally(...)` (line 639) — pairs structurally with `ask()`'s line 196 / 307.
+- `rateLimitGuard.check(userId)` runs BEFORE `conversationGateway.loadOrCreate` (line 452); on `RateLimitExceededException` the code emits `Error("ai-agent.guard.rate-limit-exceeded", retryAfterSec=60)` + `Final(...)` and exits — mirrors `ask()` lines 202-208 (WR-04 from the prior review is now closed).
+- `tokenBudgetGuard.check(convId)` runs AFTER `loadOrCreate` (line 472) since the gate is per-conversation; on denial emits `Error("ai-agent.guard.token-budget-exhausted")` + `Final(...)` — mirrors `ask()` lines 215-221.
+- `mapToStreamingError(...)` (line 650) was already mapping `IterationCapExceededException` / `ToolVetoedException` correctly; CR-01 fix did not touch it. Confirmed still correct.
+- Early-return Flux denial paths properly trigger `.doFinally(...)` so `IterationCounter.reset()` and `RunContext.clear()` fire on every denial path (`Flux.just(Error, Final)` completes through the outer chain to `doFinally`).
+- Streaming-success path primes `IterationCounter` exactly once — no double `start()` because `executeBlockingTurn` does NOT call `start()` itself (the start at line 445 covers both transports).
 
-D-01 (`.user(u -> u.media(...))` lambda form), D-03 (`doOnComplete`-only `markInjected` in the
-streaming-success path), and D-04 (UnsupportedOperationException catch produces a working
-Content+Final pair) invariants are individually intact in the post-refactor code. The 11 prior
-WARNINGs from the original full-phase review live in files outside this two-file scope and are
-out of scope per the run brief.
+**D-01 / D-03 / D-04 invariants** still hold post-fix:
+- D-01 (single-turn Media injection via `.user(u -> u.media(...))` lambda): preserved at lines 541-547.
+- D-03 (`markInjected` only on `doOnComplete`, never on cancel/error in streaming success): preserved at lines 583-595.
+- D-04 (graceful streaming fallback to `executeBlockingTurn` instead of recursive `ask()`): preserved at lines 598-611; user-message persist + `markInjected` still fire EXACTLY ONCE per turn per BLK-01.
 
-## Critical Issues
+**Public API signatures** unchanged: `ask`, `stream`, `askTyped` (both arities), constructor argument list and types — verified against the test's constructor call at lines 153-173.
 
-### CR-01: Streaming-fallback path skips IterationCounter.start() AND iteration-cap / tool-vetoed mapping that the old recursive `ask(...)` provided
+**Test suite:** 5/5 PASSED post-fix per the brief. The tests exercise the BLK-01 single-write invariants under both fallback and streaming-success paths.
 
-**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:564-577`
-
-**Issue:** The old streaming-fallback recursed through `ask(userId, conversationId, message, overrides)`
-which (a) primed `IterationCounter.start()` (line 196), (b) caught `IterationCapExceededException`
-and `ToolVetoedException` and mapped them to `ChatResponseDto.denied(...)` (lines 295-305), and
-(c) ran the `rateLimitGuard.check(...)` / `tokenBudgetGuard.check(...)` guard preamble (lines 203,
-216).
-
-The new direct call to `executeBlockingTurn(...)` from the streaming catch skips ALL THREE:
-
-1. **`IterationCounter` is never primed for the streaming path.** `stream()` (line 439) does not
-   call `IterationCounter.start()`, only `RunContext.set(runId)`. When the fallback runs
-   `chatClient.prompt()...call()...chatClientResponse()` inside `executeBlockingTurn`, the
-   `GuardedToolCallingManager` reads `IterationCounter` ThreadLocal — and because the streaming
-   path never primed it, the counter is in whatever state the previous request left it in (the
-   blocking `ask()` path ends with `IterationCounter.reset()` in `finally` so usually it's reset,
-   but a failed pre-`finally` exit on a pooled Vaadin request thread can leak state into this
-   fallback turn).
-
-2. **`IterationCapExceededException` thrown from `executeBlockingTurn` is no longer mapped
-   to a typed denial.** Inside the `Flux.defer(...)` body it propagates out of the lambda and
-   hits `.onErrorResume(ex -> mapToStreamingError(ex))` which DOES map
-   `IterationCapExceededException` to `ai-agent.guard.iteration-cap-exceeded` (lines 618-619), so
-   user surface is OK — but `toolSink.tryEmitComplete()` (line 574) is unreachable because the
-   throw from `executeBlockingTurn` (line 570-572) happens BEFORE that line, leaving the
-   tool-event sink open until `.doFinally(...)` triggers `streamingSinkHolder.unregister(runId)`
-   on cancellation/completion of the outer Flux. This is a sink-completion ordering regression.
-
-3. **Rate-limit and token-budget guards are not run on the streaming-fallback path.** The original
-   recursive `ask(...)` call would have re-checked both guards before the blocking LLM call. The
-   new helper (`executeBlockingTurn`) has no guard preamble of its own — it goes straight to
-   `chatClient.prompt()...call()`. So a caller whose chat model lacks streaming support now
-   bypasses both guards entirely. This affects fairness/cost-safety on a transport-mode boundary
-   that should be invisible to gating.
-
-**Why this is a BLOCKER, not a WARNING:** the fix is intended to be behaviour-preserving for
-everything except the duplicate-write defect. Removing iteration-counter priming and silently
-dropping the rate-limit/token-budget gate on the fallback transport changes the operational
-contract for any deployed model that returns `UnsupportedOperationException` on `.stream()`. This
-is exactly the kind of "fix one bug, regress an adjacent invariant" the gap-closure review brief
-asks to surface.
-
-**Fix:**
-```java
-} catch (UnsupportedOperationException nonStreaming) {
-    // BLK-01 fix (gap-closure plan 13-06): D-04 graceful fallback. Reuse already-
-    // resolved Media + persisted user-message id via executeBlockingTurn(...) — but
-    // run the same guard preamble + ThreadLocal priming the blocking ask() path runs,
-    // so transport-mode does not become an implicit policy bypass.
-    try {
-        rateLimitGuard.check(userId);
-    } catch (RateLimitExceededException rate) {
-        toolSink.tryEmitComplete();
-        throw rate; // -> mapToStreamingError -> ai-agent.guard.rate-limit-exceeded
-    }
-    try {
-        tokenBudgetGuard.check(convId);
-    } catch (TokenBudgetExhaustedException budget) {
-        toolSink.tryEmitComplete();
-        throw budget;
-    }
-    IterationCounter.start();
-    try {
-        ChatResponseDto blocking;
-        try {
-            blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
-                    resolvedMedia, userMessageIdRef.get(), composedSystemPrompt, model, active,
-                    ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
-        } catch (IterationCapExceededException | ToolVetoedException denied) {
-            toolSink.tryEmitComplete();
-            throw denied; // mapToStreamingError handles both keys
-        }
-        titlePublicationHandled.set(true);
-        toolSink.tryEmitComplete();
-        content = Flux.just(
-                new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
-    } finally {
-        IterationCounter.reset();
-    }
-}
-```
-
-Then add a regression test that injects an `IterationCapExceededException`-throwing mock chat
-model and asserts the `StreamingEvent.Error` carries `ai-agent.guard.iteration-cap-exceeded`,
-plus a rate-limit-denied-on-stream test.
+Three WARNINGs surface from CR-01-adjacent surface area: a Reactor thread-locality concern with `IterationCounter` (now lit up because `start()` runs on a scheduler thread), a terminal-event asymmetry between guard short-circuits and `onErrorResume`-mapped errors, and a `Final` event carrying a possibly-null `conversationId` on first-turn rate-limit denial. None block ship of CR-01 itself.
 
 ## Warnings
 
-### WR-01: `toolSink.tryEmitComplete()` is reachable only on the success branch of the fallback — sink leaks if `executeBlockingTurn` throws
+### WR-01: ThreadLocal `IterationCounter` may not survive Reactor thread-hops on streaming path
 
-**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:570-577`
+**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:445,639`
 
-**Issue:** The catch block currently does:
+**Issue:** `IterationCounter` is a ThreadLocal consumed by `GuardedToolCallingManager` on whatever thread invokes the chat client. On the streaming path:
+
+- `IterationCounter.start()` (line 445) runs inside `Flux.defer`, which after `.subscribeOn(chatStreamingScheduler)` (line 624) executes on a scheduler thread.
+- `IterationCounter.reset()` (line 639) runs in `.doFinally(...)`, which fires on whatever thread emits the terminal signal. Reactor pipelines hop threads — Spring AI's `ChatClient.stream().chatResponse()` may use the HTTP client's own scheduler — so `reset()` is not guaranteed to run on the same thread as `start()`.
+- If the threads differ, `start()` leaks ThreadLocal state on the original scheduler thread. Subsequent `stream()` calls re-prime via `start()` (which sets the count to 0), so the leak is masked for the chat path itself, but anything else dispatched on that scheduler thread between `start()` and the next `start()` could observe stale counter state.
+
+The blocking `ask()` path is unaffected (single-threaded). This concern existed pre-CR-01 only as "the counter was never primed for streaming"; CR-01 makes the leak surface real because `start()` now runs.
+
+**Fix (any one):**
+- Migrate `IterationCounter` to a Reactor `ContextView` value rather than a ThreadLocal, OR
+- Register a Micrometer `ThreadLocalAccessor` SPI for it and rely on the `.contextCapture()` already at line 627, OR
+- Document explicitly that the counter is best-effort on streaming and add an integration test verifying that tool execution for the supported chat models stays on the subscribe thread (smallest change).
+
+### WR-02: Streaming-path guard short-circuits emit `Final`, but `onErrorResume`-mapped errors do NOT
+
+**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:456-459,476-478,615-622,634`
+
+**Issue:** Asymmetric terminal-event behaviour after the CR-01 fix:
+
+- The new rate-limit and token-budget short-circuits (lines 456-459 and 476-478) emit `Error(...)` followed by `Final(runId, ...)` — explicit terminal event pair.
+- The `.onErrorResume(ex -> Flux.just(mapToStreamingError(ex)))` at line 634 emits ONLY an `Error` event. The `concatWith(Flux.defer(... Final ...))` at line 615 lives upstream of `onErrorResume`, so when `onErrorResume` fires it replaces the entire upstream including the `Final` emitter.
+- Consequence: `IterationCapExceededException`, `ToolVetoedException`, `ConversationNotFoundException`, and the generic-error catchall produce a stream that ends with `Error` and no `Final`. UI consumers waiting for `Final` to release the spinner / unlock the input box will hang or have to rely on the Flux completion signal alone.
+
+This was pre-existing; the CR-01 fix made it visibly inconsistent because the new short-circuit branches DO emit `Final`.
+
+**Fix:** make `onErrorResume` emit a terminating `Final` too. Capture `convId` into an `AtomicReference<UUID>` set inside `Flux.defer` after `loadOrCreate` so it is visible to `onErrorResume`:
+
 ```java
-ChatResponseDto blocking = executeBlockingTurn(...);   // line 570 — may throw
-titlePublicationHandled.set(true);                     // line 573
-toolSink.tryEmitComplete();                            // line 574
-content = Flux.just(...);                              // line 575
-```
-If `executeBlockingTurn` throws (LLM call failure, audit-write failure, scanner read failure,
-etc.), `toolSink.tryEmitComplete()` is never invoked — the tool-event sink stays open until
-`.doFinally` clears it via `streamingSinkHolder.unregister(runId)`. Downstream consumers
-(`toolSink.asFlux().mergeWith(content)`) will see a half-completed merge. The outer
-`onErrorResume` does map the throw to a `StreamingEvent.Error`, but the tool-sink half of the
-merge is never told to stop emitting.
-
-**Fix:** wrap the `executeBlockingTurn` call in try/finally so `toolSink.tryEmitComplete()`
-always runs, OR move `toolSink.tryEmitComplete()` BEFORE the fallback call (the helper does not
-emit tool events itself).
-
-```java
-} catch (UnsupportedOperationException nonStreaming) {
-    titlePublicationHandled.set(true);
-    toolSink.tryEmitComplete(); // close BEFORE the blocking call so a throw cannot leak the sink
-    ChatResponseDto blocking = executeBlockingTurn(...);
-    content = Flux.just(
-            new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
-}
+final AtomicReference<UUID> convIdRef = new AtomicReference<>(conversationId);
+// inside Flux.defer, after loadOrCreate:
+convIdRef.set(convId);
+// ...
+.onErrorResume(ex -> Flux.just(
+        mapToStreamingError(ex),
+        new StreamingEvent.Final(runId, convIdRef.get(),
+                (System.nanoTime() - startNanos) / 1_000_000L, 0, 0)))
 ```
 
-### WR-02: `executeBlockingTurn` re-runs `markInjected` on the streaming-fallback path even though `taskFileMediaResolver.resolvePending` was already called in `Flux.defer`
+### WR-03: `Final` event on first-turn rate-limit denial carries the raw caller-supplied `conversationId` (possibly `null`)
 
-**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:386-394`
+**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:459`
 
-**Issue:** The fallback delegates through `executeBlockingTurn(...)` passing the
-already-resolved `resolvedMedia` from `Flux.defer`. Inside `executeBlockingTurn` lines 386-394
-unconditionally call `taskFileRepository.markInjected(...)` if `!resolvedMedia.isEmpty()`. That
-is correct for BLK-01 (it does happen exactly once on the fallback path) — BUT the streaming-
-success `doOnComplete` (lines 549-561) has the SAME `markInjected` call against the SAME
-`resolvedMedia` and the SAME `userMessageIdRef.get()`. If a future refactor accidentally lets
-both branches run (e.g. if `executeBlockingTurn` is called THEN the streaming success path also
-fires), `markInjected` would be invoked twice. There's currently no guard preventing this; the
-mutual-exclusion is purely flow-control (catch vs no-catch).
+**Issue:** On the rate-limit short-circuit, `loadOrCreate` has not yet run, so the server-side `convId` is unknown. Line 459 emits `new StreamingEvent.Final(runId, conversationId, ...)` using the caller's raw `conversationId` — which is `null` for first-turn requests.
 
-**Fix:** add a defensive `AtomicBoolean alreadyMarked` flag set inside `executeBlockingTurn`'s
-caller closure, OR (simpler) document the mutual-exclusion contract in `executeBlockingTurn`'s
-javadoc — currently the javadoc states "exactly once per turn" but the helper itself has no way
-to enforce that against the streaming-success `doOnComplete`. The test suite covers the
-single-call invariant per branch but does not cover a hypothetical "both branches fire" path.
+This is symmetric with `ask()` line 206 (`ChatResponseDto.denied(conversationId, runId, ...)` also emits the raw caller param), so it is consistent across transports. But it means UI clients receiving a streaming denial for a first-turn request get `Final.conversationId == null` and cannot subsequently navigate to a conversation that does not exist. The blocking path has the same limitation; it is an inherent consequence of denying before `loadOrCreate`.
 
-### WR-03: `userMessageIdRef.get()` may be `null` when `markInjected` is called on the fallback path
-
-**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:493-501, 570-572`
-
-**Issue:** `stream()` only calls `userMessagePersister.persistUserMessage` inside a try/catch
-that swallows `RuntimeException` (line 497-500), leaving `userMessageIdRef` empty. The fallback
-then passes `userMessageIdRef.get()` (= `null`) into `executeBlockingTurn`, which passes it to
-`taskFileRepository.markInjected(ids, null, now())`. Whether that null is acceptable depends on
-the AiTaskFile schema — if `injected_message_id` is non-null in the DB, `markInjected` will
-throw a constraint violation that the inner try/catch (line 390-393) swallows as a `warn` log,
-but the user message and the LLM response have already happened, so we now have a confirmed
-`AiMessage` row with NO link from the AiTaskFile chunks. The blocking `ask(...)` path has the
-identical defect (line 286-288), so this is not a refactor regression — but the BLK-01 fix has
-the opportunity to address it cleanly because both paths now share `executeBlockingTurn`.
-
-**Fix:** when `userMessageIdAlreadyPersisted == null && !resolvedMedia.isEmpty()`, skip the
-`markInjected` call entirely (no FK to stamp) and emit a `log.warn` audit-trail breadcrumb so
-operators can see an injection attempt that lost its link. Or fail-fast on `null` userMessageId
-so the user gets a typed denial instead of a silent partial-state turn.
-
-### WR-04: Streaming path lacks the rate-limit / token-budget guard preamble that the blocking path has
-
-**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:439-501`
-
-**Issue:** The blocking `ask(...)` runs `rateLimitGuard.check(userId)` (line 203) BEFORE
-`conversationGateway.loadOrCreate` and `tokenBudgetGuard.check(convId)` (line 216) AFTER. The
-streaming `stream(...)` runs neither — it goes straight from `RunContext.set(runId)` to
-`conversationGateway.loadOrCreate`. This pre-existed the gap-fix, but the gap-fix amplifies its
-impact because the new fallback turns a streaming-only path into one that also runs the blocking
-LLM call (without guards). Even without the fallback, this means a streaming caller can spend
-LLM budget that a blocking caller of the same conversation would be denied.
-
-**Fix:** the streaming path should run the same guard preamble (`rateLimitGuard` then
-`tokenBudgetGuard` after `loadOrCreate`) and short-circuit with a terminal
-`StreamingEvent.Error` on denial. This needs to land alongside CR-01.
+**Fix:** either (a) document on `StreamingEvent.Final`'s record that `conversationId` may be `null` on pre-`loadOrCreate` denials, or (b) leave behaviour and add a short comment at line 459 stating "convId is null until loadOrCreate runs; rate-limit denials predate that step". No functional change required if intentional — flag for visibility.
 
 ## Info
 
-### IN-01: `setUp()` stubs guard `doNothing().when(rateLimitGuard).check(anyString())` — does not exercise denied-on-stream branch
+### IN-01: `streamingSinkHolder.unregister(runId)` and `cancellationRegistry.clearDisposable(runId)` run on rate-limit denial path despite never having registered
 
-**File:** `ai-agent/ai-agent/src/test/java/com/vn/agent/DefaultChatServiceImplStreamFallbackTest.java:141-142`
+**File:** `ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java:451-460,641-642`
 
-**Issue:** The five tests prove BLK-01 invariants but skip the negative paths
-(`RateLimitExceededException` thrown during fallback, `IterationCapExceededException` thrown
-from the blocking call, `UserMessagePersister` throwing). The `streamingFallback_*` test names
-already imply scope: BLK-01 — but the gap-fix's risk surface (CR-01 above) extends into those
-denied-paths and a follow-up test would catch it.
+**Issue:** When the rate-limit short-circuit at lines 451-460 fires, `streamingSinkHolder.register(runId, toolSink)` (line 464) is never reached because the early return precedes the registration. The `.doFinally` cleanup at lines 641-642 still calls `unregister(runId)` and `clearDisposable(runId)`. Assumes both operations are silent no-ops on missing-id; if either logs a WARN on missing-id, log volume could spike under sustained rate-limit denial. The token-budget denial branch at lines 471-479 is symmetric — it DOES register first (line 464 runs before the check at 472).
 
-**Fix:** add three negative-path tests after CR-01 / WR-04 land:
-- `streamingFallback_whenRateLimitDenied_emitsErrorAndDoesNotPersist`
-- `streamingFallback_whenIterationCapExceededInsideBlockingCall_emitsIterationCapErrorKey`
-- `streamingFallback_whenUserMessagePersisterThrows_doesNotCallMarkInjected`
+**Fix:** confirm `StreamingSinkHolder.unregister` and `CancellationRegistry.clearDisposable` are silent on missing ids; if not, gate the cleanup with `if (registered) { ... }`. One-line comment confirming the no-op contract is sufficient if the registries already handle it.
 
-### IN-02: Test uses `RETURNS_DEEP_STUBS` with argument matchers inside `when(...)` builder chain
+### IN-02: Test setUp duplicates the deep-stub chain when only the leaf differs
 
 **File:** `ai-agent/ai-agent/src/test/java/com/vn/agent/DefaultChatServiceImplStreamFallbackTest.java:189-208`
 
-**Issue:** Calls like
-```java
-when(chatClient.prompt().system(anyString()).user(any(...))...options(any()).call().chatClientResponse())
-        .thenReturn(clientResp);
-```
-use Mockito argument matchers inside a deep-stub builder chain. This pattern works in practice
-for the current Spring AI 1.1.x ChatClient builder shape but is brittle: if Spring AI changes
-the builder return type or makes any builder method final, the deep-stub chain silently returns
-a fresh mock and the stubbing applies to the wrong link. Not a bug today, but a maintenance
-hazard.
+**Issue:** `stubChatClientForFallback()` repeats the full `chatClient.prompt().system(...).user(...).toolCallbacks(...).toolContext(...).advisors(...).options(...)` chain twice — once stubbing `.call().chatClientResponse()` and once stubbing `.stream().chatResponse()`. With `RETURNS_DEEP_STUBS` and matching argument matchers, both paths return the same mid-chain mock, so this works today. But the duplication is brittle if the Spring AI builder chain reorders or if any builder method becomes `final`.
 
-**Fix:** consider extracting an explicit stub helper that captures each builder mock by hand
-(`when(chatClient.prompt()).thenReturn(promptSpec); when(promptSpec.system(any())).thenReturn(...)`,
-etc.) — much more verbose but immune to silent breakage on the Spring AI upgrade path. Or wait
-until the deep-stub chain breaks once and refactor reactively.
+**Fix:** extract the common chain prefix into a helper that returns the request-spec mock at the leaf-1 level, then call `.call().chatClientResponse()` / `.stream().chatResponse()` on the result. Pure test-quality improvement; not blocking.
 
 ---
 
 _Reviewed: 2026-05-06_
 _Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard_
-_Scope: BLK-01 gap-closure (plan 13-06) — DefaultChatServiceImpl.java + DefaultChatServiceImplStreamFallbackTest.java only_
+_Depth: standard (re-review of CR-01 fix at commit `38d9476`)_
+_Scope: DefaultChatServiceImpl.java + DefaultChatServiceImplStreamFallbackTest.java only_
