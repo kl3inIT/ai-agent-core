@@ -164,14 +164,14 @@
   2. On user-message send, `AiTaskFileMediaResolver` returns rows where `messageId IS NULL` (newly attached, not yet sent), `DefaultChatServiceImpl` injects them as Spring AI `Media` into the user message (`chatClient.prompt().user(u -> u.media(...))`), and after the message is persisted, `UPDATE AiTaskFile SET messageId = newMessageId` for those rows. Subsequent turns receive an empty `Media` list (single-turn-only injection — matches `D:/DTH/jmix-crm` `AiAttachmentMediaResolver` pattern; aligns with Spring AI `JdbcChatMemoryRepository` text-only persistence).
   3. With `ai-agent.tools.mutation.enabled=true`, `bulk_save_records(entityName, records[], idempotencyKey)` runs ONE transaction through the Phase 11 chain (`LlmExposurePolicy.canCreate/canUpdate` → `AccessManager.applyRegisteredConstraints(CrudEntityContext)` per row → per-attribute `EntityAttributeContext.canModify` per row → `AiMutationIntent` reservation once per batch → type coercion → `MutationGuard` per row → `@Transactional DataManager.save` per row → `AuditWriter.writeToolCall` once per batch). Per-row dispatch: `id != null` → update, `id == null` → create. Per-row failure (validation / `AccessDeniedException` / `MutationGuard` veto) rolls back the entire batch; audit row records `outcome=FAILED` with `failedRowIndex`. Replay with the same `idempotencyKey` returns `IDEMPOTENT_REPLAY` and persists no additional rows. `requestHash` = SHA-256 over canonical JSON of records in submission order.
   4. Default chat model is swapped to `qwen/qwen3.6-35b-a3b` in `application.properties` (`jmix.ai-agent.defaults.model` and `spring.ai.openai.chat.options.model`); admin `AiParametersDetailView` (Phase 6) override surface is unchanged. Self-host constraint preserved: model is Apache 2.0; OpenRouter API endpoint stays for dev, swap `spring.ai.openai.base-url` for prod self-host (vLLM / Ollama).
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 
 **Wave 1**
 - [x] 13-01-PLAN.md — AiTaskFile entity + Liquibase 090 + AiTaskFileProperties + role extensions + bilingual messages + default-model swap
 
 **Wave 2 (blocked on Wave 1 completion)**
 - [x] 13-02-PLAN.md — AiTaskFileMediaResolver (verbatim port) + AiTaskFileRepository + AiTaskFileCleanupJob + package-info TEST-16 invariant
-- [ ] 13-03-PLAN.md — MutationSaveExecutor.bulkSave + DiffSerializer extensions + bulk_save_records @Tool + AgentSystemPromptRules
+- [x] 13-03-PLAN.md — MutationSaveExecutor.bulkSave + DiffSerializer extensions + bulk_save_records @Tool + AgentSystemPromptRules
 
 **Wave 3 (blocked on Wave 2 completion)**
 - [ ] 13-04-PLAN.md — chat-panel-fragment.xml chip strip + ChatPanelFragment upload wiring + DefaultChatServiceImpl Media injection + markSent two-phase write
@@ -241,7 +241,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → **13** → 14 → 1
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
-| 13. Chat Task File — Attach + LLM Read + Bulk Save | 2/5 | In Progress|  |
+| 13. Chat Task File — Attach + LLM Read + Bulk Save | 3/5 | In Progress|  |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
