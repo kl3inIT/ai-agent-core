@@ -2,6 +2,7 @@ package com.vn.agent.security;
 
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
+import com.vn.agent.entity.AiTaskFile;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.annotation.EntityPolicy;
 import io.jmix.security.role.annotation.ResourceRole;
@@ -27,6 +28,13 @@ public interface AiAgentUserRole {
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
     @EntityPolicy(entityClass = AiMessage.class,
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE})
+    // Phase 13 D-04 + REVIEWS HIGH-3: DELETE granted so Plan 04 chip removal can
+    // call dataManager.remove(row) through the secured DataManager. The
+    // AiAgentUserRowLevelRole.taskFile() row policy restricts the row scope to
+    // {E}.userUsername = :current_user_username, so users can only delete their
+    // OWN rows.
+    @EntityPolicy(entityClass = AiTaskFile.class,
+            actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.DELETE})
     void userAccess();
 
     /**

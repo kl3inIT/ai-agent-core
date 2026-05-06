@@ -2,6 +2,7 @@ package com.vn.agent.security;
 
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
+import com.vn.agent.entity.AiTaskFile;
 import io.jmix.security.role.annotation.JpqlRowLevelPolicy;
 import io.jmix.security.role.annotation.RowLevelRole;
 
@@ -29,4 +30,11 @@ public interface AiAgentUserRowLevelRole {
             entityClass = AiMessage.class,
             where = "{E}.conversation.createdBy = :current_user_username")
     void message();
+
+    // Phase 13 D-04: AiTaskFile carries its own userUsername column (D-03 schema)
+    // so the predicate filters directly — do NOT chain via {E}.conversation.createdBy.
+    @JpqlRowLevelPolicy(
+            entityClass = AiTaskFile.class,
+            where = "{E}.userUsername = :current_user_username")
+    void taskFile();
 }
