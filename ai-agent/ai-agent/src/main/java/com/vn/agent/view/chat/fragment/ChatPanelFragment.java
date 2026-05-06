@@ -775,8 +775,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             row.setContentType(resolvedContentType);
             row.setSizeBytes(sizeBytes);
             row.setUserUsername(currentAuthentication.getUser().getUsername());
-            row.setExpiresAt(OffsetDateTime.now().plus(taskFileProperties.getTtl()));
-            // injectedAt + message stay NULL until Plan-04 send-time markInjected (REVIEWS HIGH-1).
+            // Phase 13.1 LIFE-01: ttlSeconds is the operator-facing TTL knob; sentinel
+            // -1 disables purge but the upload row still needs a deterministic expiresAt
+            // value, so fall back to the 24h default in that case.
+            long ttlSeconds = taskFileProperties.getTtlSeconds();
+            if (ttlSeconds == -1L) {
+                ttlSeconds = 86_400L;
+            }
+            row.setExpiresAt(OffsetDateTime.now().plusSeconds(ttlSeconds));
 
             AiTaskFile saved = dataManager.save(row);
             renderChip(saved);
