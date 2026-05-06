@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: In Progress
-stopped_at: Phase 13 context gathered
-last_updated: "2026-05-06T05:34:34.298Z"
+stopped_at: Phase 13 Plan 13-05 complete (verification surface shipped; Spring-context boot regression deferred)
+last_updated: "2026-05-06T08:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 4
@@ -15,7 +15,7 @@ progress:
 
 # Project State
 
-**Last updated:** 2026-05-05
+**Last updated:** 2026-05-06
 
 ## Project Reference
 
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 12 — configurable-chat-surfaces (shipped in PR #24)
+**Current focus:** Phase 13 — chat task file (attach + LLM read + bulk save) — Plan 13-05 verification surface complete (2026-05-06)
 
 ## Current Position
 
-Phase: 12 (configurable-chat-surfaces) — SHIPPED (PR #24)
-Plan: 6 of 6
+Phase: 13 (chat-task-file) — Plan 5 of 5 complete
+Plan: 5 of 5
 | Field | Value |
 |-------|-------|
-| Phase | Phase 12 |
-| Plan | 6 of 6 |
-| Status | Phase 12 shipped — PR #24 |
-| Last activity | 2026-05-05 — Phase 12 shipped in PR #24 |
+| Phase | Phase 13 |
+| Plan | 5 of 5 |
+| Status | Phase 13 Plan 13-05 complete; Spring-context boot regression deferred (see deferred-items.md) |
+| Last activity | 2026-05-06 — Plan 13-05 verification surface shipped |
 
 ## Phase Status
 
@@ -44,8 +44,9 @@ Plan: 6 of 6
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
-| 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
+| 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
+| 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
 

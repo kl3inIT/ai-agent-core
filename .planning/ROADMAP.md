@@ -26,7 +26,7 @@
 - [x] **Phase 10: AI-Specific LLM Exposure Policy** — `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary; admin Flow UI; RAG cross-cut. (completed 2026-04-28)
 - [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
 - [x] **Phase 12: Configurable Chat Surfaces** — `FULL_ROUTE` + `HEADER_BUTTON` Jmix `DialogWindow` surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity. (completed 2026-05-02)
-- [ ] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable).
+- [x] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable). (completed 2026-05-06)
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
 - [ ] **Phase 15: Chat Voice Input — Soniox STT** — Browser `MediaRecorder` capture (webm/opus or mp4, no transcoding) + custom Spring `RestClient` Soniox provider (`/v1/files` + `/v1/transcriptions`, `Authorization: Bearer`); `TranscriptionService` strategy interface (`SonioxTranscriptionService` default + optional `SpringAiTranscriptionService` OpenAI fallback); `TranscriptionPostProcessor` SPI; STT_TRANSCRIPTION audit via `writeToolCall`.
 
@@ -164,7 +164,7 @@
   2. On user-message send, `AiTaskFileMediaResolver` returns rows where `messageId IS NULL` (newly attached, not yet sent), `DefaultChatServiceImpl` injects them as Spring AI `Media` into the user message (`chatClient.prompt().user(u -> u.media(...))`), and after the message is persisted, `UPDATE AiTaskFile SET messageId = newMessageId` for those rows. Subsequent turns receive an empty `Media` list (single-turn-only injection — matches `D:/DTH/jmix-crm` `AiAttachmentMediaResolver` pattern; aligns with Spring AI `JdbcChatMemoryRepository` text-only persistence).
   3. With `ai-agent.tools.mutation.enabled=true`, `bulk_save_records(entityName, records[], idempotencyKey)` runs ONE transaction through the Phase 11 chain (`LlmExposurePolicy.canCreate/canUpdate` → `AccessManager.applyRegisteredConstraints(CrudEntityContext)` per row → per-attribute `EntityAttributeContext.canModify` per row → `AiMutationIntent` reservation once per batch → type coercion → `MutationGuard` per row → `@Transactional DataManager.save` per row → `AuditWriter.writeToolCall` once per batch). Per-row dispatch: `id != null` → update, `id == null` → create. Per-row failure (validation / `AccessDeniedException` / `MutationGuard` veto) rolls back the entire batch; audit row records `outcome=FAILED` with `failedRowIndex`. Replay with the same `idempotencyKey` returns `IDEMPOTENT_REPLAY` and persists no additional rows. `requestHash` = SHA-256 over canonical JSON of records in submission order.
   4. Default chat model is swapped to `qwen/qwen3.6-35b-a3b` in `application.properties` (`jmix.ai-agent.defaults.model` and `spring.ai.openai.chat.options.model`); admin `AiParametersDetailView` (Phase 6) override surface is unchanged. Self-host constraint preserved: model is Apache 2.0; OpenRouter API endpoint stays for dev, swap `spring.ai.openai.base-url` for prod self-host (vLLM / Ollama).
-**Plans:** 5/5 plans executed
+**Plans:** 5/5 plans complete
 
 **Wave 1**
 - [x] 13-01-PLAN.md — AiTaskFile entity + Liquibase 090 + AiTaskFileProperties + role extensions + bilingual messages + default-model swap
@@ -241,7 +241,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → **13** → 14 → 1
 | 10. AI-Specific LLM Exposure Policy | 10/10 | Complete   | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
-| 13. Chat Task File — Attach + LLM Read + Bulk Save | 5/5 | Complete | 2026-05-06 |
+| 13. Chat Task File — Attach + LLM Read + Bulk Save | 5/5 | Complete   | 2026-05-06 |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
