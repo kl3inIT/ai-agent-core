@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1.0
 **Granularity:** coarse
-**Total phases:** 7 (Phase 9 → Phase 15)
+**Total phases:** 8 (Phase 9 → Phase 15, plus follow-up Phase 13.1)
 **Phase numbering:** continues from v1.0.0 (which ended at Phase 8 plus inserted 7.1, 7.2). v1.1 starts at Phase 9. Phase 13 was rewritten 2026-05-05 (STT split out to a new Phase 15; Phase 13 retitled to Chat Task File — Attach + LLM Read + Bulk Save).
 **Coverage:** 100% of v1.1 active REQ-IDs mapped (Future Requirements and Out of Scope intentionally NOT mapped).
 
@@ -17,7 +17,8 @@
 - Phase 11 → hard-depends on Phase 9 + Phase 10.
 - Phase 12 → independent of 10/11 but depends on Phase 9; sequenced after to avoid interleaving UI refactor with security work.
 - Phase 13 → depends on Phase 9 + Phase 11 (`bulk_save_records` extends Phase 11 `MutationSaveExecutor`) + Phase 12 (`ChatPanelFragment.attachmentsPanel` slot is the integration point); independent of 10.
-- Phase 14 → depends on Phase 9 and Phase 10; may consume `AiTaskFile` (Phase 13) by id for single-record extraction.
+- Phase 13.1 → hard-depends on Phase 13 (modifies `AiTaskFile`, `AiTaskFileMediaResolver`, `chat-panel-fragment.xml`, `DefaultChatServiceImpl` two-phase write); independent of 14/15. UI-only + lifecycle change; no new entity, no new tool surface.
+- Phase 14 → depends on Phase 9 and Phase 10; may consume `AiTaskFile` (Phase 13/13.1) by id for single-record extraction.
 - Phase 15 → depends on Phase 12 (`ChatPanelFragment.messageInputSlot` integration point); independent of 10/11/13/14. Sequenced last in v1.1 (lowest priority — voice input is a "nice to have").
 
 ## Phases
@@ -27,6 +28,7 @@
 - [x] **Phase 11: Mutation-Capable Built-In Tools** — `BuiltInMutationTools` (default OFF), `MutationGuard` SPI, `AiMutationIntent` idempotency, layered fail-closed gating, audit reuse via `writeToolCall`. (completed 2026-04-29)
 - [x] **Phase 12: Configurable Chat Surfaces** — `FULL_ROUTE` + `HEADER_BUTTON` Jmix `DialogWindow` surfaces over one `ChatPanelFragment`; `AiUiSettings` admin toggle; `AiChatSessionState` continuity. (completed 2026-05-02)
 - [x] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable). (completed 2026-05-06)
+- [ ] **Phase 13.1: Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context (FOLLOW-UP)** — Replace Phase 13 chip-strip with verbatim port of jmix-crm Attachments right-pane (card grid + drop-zone + empty state); change `AiTaskFileMediaResolver` from single-turn to per-turn-all (with token-budget cap); extend `AiTaskFile` lifetime to conversation-scoped (or 24h TTL, configurable); add inline "[user] added attachment" ledger row in message stream. Driver: post-Phase-13 UX review confirmed CRM right-pane is more discoverable + per-turn-all `Media` is required for "AI agent thực thụ" multi-turn follow-up.
 - [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
 - [ ] **Phase 15: Chat Voice Input — Soniox STT** — Browser `MediaRecorder` capture (webm/opus or mp4, no transcoding) + custom Spring `RestClient` Soniox provider (`/v1/files` + `/v1/transcriptions`, `Authorization: Bearer`); `TranscriptionService` strategy interface (`SonioxTranscriptionService` default + optional `SpringAiTranscriptionService` OpenAI fallback); `TranscriptionPostProcessor` SPI; STT_TRANSCRIPTION audit via `writeToolCall`.
 
@@ -187,6 +189,28 @@
 - `bulk_save_records` ships as create+update only; `bulk_delete_records` is reserved for v1.2 (destructive ops need separate UX with confirmation/undo).
 - Per-row failure semantics: rollback-all only in v1.1; continue-on-error mode (sub-transaction per row) deferred until a host requests it.
 
+### Phase 13.1: Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context (FOLLOW-UP)
+**Goal**: Re-skin and re-scope the Phase 13 attachments UX to match the verbatim jmix-crm pattern (right-pane Attachments panel with card grid + drop-zone + empty-state) and lift the single-turn `Media` injection so attached files remain in the agent's context across follow-up turns within the same conversation. Phase 13's chip-strip-above-MessageInput layout and TTL-1h ephemeral lifecycle proved undiscoverable in UX review and incompatible with the "AI agent thực thụ" multi-turn workflow (e.g. user uploads xlsx → asks for analysis → asks follow-up questions → triggers `bulk_save_records` — turns 2..N currently see EMPTY `Media` because Phase 13 REQ-4 only injects on the turn that ATTACHED the file). Both Phase 12 surfaces (`FULL_ROUTE` `ChatView` + `HEADER_BUTTON` `ChatDialogView`) ship the new layout — verified working in `D:/DTH/jmix-crm` `AiConversationDetailView` AND its dialog variant.
+**Depends on**: Phase 13 (`AiTaskFile` entity + Liquibase 090 + `AiTaskFileMediaResolver` + `ChatPanelFragment` + `chat-panel-fragment.xml` + `DefaultChatServiceImpl` two-phase markSent + `AiAgentUserRowLevelRole`)
+**Requirements**: TBD (`/gsd-spec-phase 13.1` — likely TASK-06 (right-pane card layout), TASK-07 (per-turn-all `Media` resolver + token cap), TASK-08 (lifecycle change to conversation-scoped or 24h), TASK-09 (inline attachment ledger row in message stream), TEST-18 (multi-turn agent follow-up integration test))
+**Success Criteria** (what must be TRUE):
+  1. Both surfaces (`ChatView` + `ChatDialogView`) render an "Attachments" right-pane (vbox with header `Attachments`, body = `<gridLayout>` with `AiTaskFileCardFragmentRenderer` cards, footer = `<upload>` drop-zone with `Drop attachment here` text + `Upload` button) verbatim per `D:/DTH/jmix-crm/.../ai-conversation-detail-view.xml` + `ai-attachment-card-fragment.xml`. Empty state shows the Jmix logo + `There's nothing here yet...` text. Phase 13 chip-strip vbox + `attachRow` hbox are removed.
+  2. `AiTaskFileMediaResolver.resolveActive(conversationId)` returns ALL non-expired `AiTaskFile` rows for the conversation (NOT just `messageId IS NULL`). `DefaultChatServiceImpl` injects all of them as `Media` on every turn, subject to a token-budget cap (`ai-agent.task-file.per-turn-max-files=10` and `ai-agent.task-file.per-turn-max-total-bytes=...` default 50 MB) — when cap exceeded, resolver returns the most recent N files (LRU by `createdAt DESC`) and emits an audit event `task_file_budget_exceeded` (no new `AuditKind`, reuses `writeToolCall`).
+  3. `AiTaskFile` lifetime extends to **conversation-scoped** by default: rows are deleted when their `conversationId` is deleted (FK `ON DELETE CASCADE` already exists in Liquibase 090 — confirm) AND when the operator runs the cleanup job. Default TTL becomes `ai-agent.task-file.ttl-seconds=86400` (24h, was 3600). Operators can set `ttl-seconds=-1` for "no TTL, only delete on conversation delete". `AiTaskFileCleanupJob` and the opportunistic per-turn purge respect the new value.
+  4. Each successful upload INSERTs an `AiMessage` of `MessageType=SYSTEM_NOTICE` (or extends the existing assistant message stream with an inline `attachmentEvent` row) reading `[<username>] added attachment "<filename>"` (bilingual via `messages.properties` / `messages_vi.properties`). The notice is rendered between message bubbles per the CRM screenshot. Notice rows are NEVER sent to the LLM (filtered out of `ChatMemoryRepository.findByConversationId` for prompt assembly). TEST-18 asserts: turn 1 attaches a 100KB xlsx, turn 2 sends "phân tích cột A", turn 3 sends "đếm số dòng" — all 3 outbound prompts contain the same `Media` for the xlsx; `JdbcChatMemoryRepository` returns 3 user messages + 3 assistant messages (notices not included).
+  5. Two-phase `markSent` write from Phase 13 REQ-4 / 13-04-PLAN is **removed** (no more `messageId` UPDATE post-send). `AiTaskFile.messageId` column may be retained NULL for backward compat, marked deprecated in JavaDoc, or removed via a Liquibase 100 cleanup changelog (decision deferred to spec-phase). All rows for the conversation are "active" until expired or conversation deleted.
+  6. `AiAgentUserRowLevelRole` row-level predicate continues to scope `AiTaskFile` to `userUsername = :current_user_username`; admin role unchanged. Per-turn-all resolver uses `UnconstrainedDataManager` per Phase 13 invariant (`feedback_jmix_unconstrained_for_system_writes`).
+**Plans**: TBD
+**UI hint**: yes
+**Cross-cutting constraints:**
+- This is a UX + lifecycle reshape, NOT a re-implementation. Reuse 100% of Phase 13 entity, Liquibase, role, FileStorage, MIME allowlist, audit, TEST-16 invariant. No changes to `bulk_save_records`, `MutationSaveExecutor`, `AgentSystemPromptRules`, default model, or `AiParameters`.
+- TEST-16 (no `IngesterManager` / `VectorStore` touch) MUST continue to pass — port the static + runtime assertions verbatim.
+- Token-budget cap is mandatory: per-turn-all without a cap will blow context on a multi-file conversation. Default cap (`per-turn-max-files=10`, `per-turn-max-total-bytes=52428800`) MUST be configurable; operators with larger context windows can raise it.
+- No new audit `AuditKind` and no new role. Reuse `AuditWriter.writeToolCall` for the budget-exceeded event.
+- Layout port from `D:/DTH/jmix-crm`: both `ai-conversation-detail-view.xml` AND its dialog opener (`AiConversationListView` lookup-action variant) are in scope as reference. Verify the dialog variant exists in CRM source before locking the spec — if not, spec-phase derives the dialog layout from the detail layout with width adjustments.
+- Phase 12 fragment contract: the `attachmentsPanel` slot is repurposed (vbox-between-list-and-input → right-pane vbox). Layout shape changes from vertical-stack to hbox-split inside `chat-panel-fragment.xml`. Verify both surfaces still respect the Phase 12 `ChatSurfaceMounter` contract (no new mounter API needed — same fragment, different internal layout).
+- Locale parity: every new message key (`Attachments`, `Drop attachment here`, `There's nothing here yet...`, `[<user>] added attachment "<file>"`, budget-exceeded notice) MUST land in BOTH `messages.properties` and `messages_vi.properties`.
+
 ### Phase 15: Chat Voice Input — Soniox STT
 **Goal**: Users can dictate chat input via browser-recorded audio transcribed server-side through Soniox STT — text appears in `MessageInput` for review/edit before send; pathway is disjoint from the chat client and audit-privacy-safe by default.
 **Depends on**: Phase 12 (`ChatPanelFragment.messageInputSlot` is the integration point and is stable from v1.0 + Phase 12 surface contract)
@@ -222,6 +246,7 @@ Phase 9 (foundations)
   ├── Phase 10 (exposure policy)
   │     ├── Phase 11 (mutation tools)
   │     │     └── Phase 13 (chat task file + bulk_save_records)
+  │     │           └── Phase 13.1 (CRM-style right-pane + per-turn-all Media)
   │     └── Phase 14 (intent extraction)
   ├── Phase 12 (chat surfaces)
   │     ├── Phase 13 (attachmentsPanel slot)
@@ -229,9 +254,9 @@ Phase 9 (foundations)
   └── (Phase 14 also uses Phase 9)
 ```
 
-Hard chain: 9 → 10 → 11. Phase 13 depends on 9 + 11 + 12 (mutation chain extension + UI slot). Phase 14 assumes 9 + 10 (and may consume Phase 13 `AiTaskFile` by id). Phase 15 assumes 12 only.
+Hard chain: 9 → 10 → 11. Phase 13 depends on 9 + 11 + 12 (mutation chain extension + UI slot). Phase 13.1 hard-depends on Phase 13 only (UX + lifecycle reshape; no new entity, no new tool surface). Phase 14 assumes 9 + 10 (and may consume Phase 13/13.1 `AiTaskFile` by id). Phase 15 assumes 12 only.
 
-Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → **13** → 14 → 15.
+Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1** → 14 → 15.
 
 ## Progress
 
