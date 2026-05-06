@@ -83,7 +83,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 - [ ] **TASK-01**: Task-scoped file attachment in chat — separate UI affordance from `MessageInput` for "attach file for current task." Distinct from KB upload (`KnowledgeBaseView`). Renders as Button + chip strip in the existing Phase 12 `attachmentsPanel` slot, working in BOTH `FULL_ROUTE` (`ChatView`) and `HEADER_BUTTON` (`ChatDialogView`).
 - [ ] **TASK-02**: Task files are transient (conversation-scoped); they NEVER touch `VectorStore` / `IngesterManager`. Lifecycle: create on attach, delete on TTL (default 1 hour) via hourly scheduled cleanup job + opportunistic cleanup on chat-send entry.
-- [ ] **TASK-03**: `AiTaskFile` Jmix entity in `agentstore` — `id`, `conversationId` (NOT NULL FK → `AiConversation`), `messageId` (NULLABLE FK → `AiMessage`, populated on send via 2-phase write), `userUsername`, `filename`, `contentType`, `sizeBytes`, `storageRef` (`@PropertyDatatype("fileRef")`), `createdAt`, `expiresAt`. Storage backed by Jmix `FileStorage` with default `local` storage. MIME allowlist hard-coded mirroring `D:/DTH/jmix-crm` `AiAttachmentMediaResolver`: pdf, csv, doc, docx, xls, xlsx, html, txt, md, png, jpg/jpeg, gif, webp. Per-file size cap reuses `jmix.ai-agent.rag.upload.max-file-size-bytes` (100 MB). Liquibase changelog `090-ai-task-file.xml` included in root.
+- [x] **TASK-03**: `AiTaskFile` Jmix entity in `agentstore` — `id`, `conversationId` (NOT NULL FK → `AiConversation`), `messageId` (NULLABLE FK → `AiMessage`, populated on send via 2-phase write), `userUsername`, `filename`, `contentType`, `sizeBytes`, `storageRef` (`@PropertyDatatype("fileRef")`), `createdAt`, `expiresAt`. Storage backed by Jmix `FileStorage` with default `local` storage. MIME allowlist hard-coded mirroring `D:/DTH/jmix-crm` `AiAttachmentMediaResolver`: pdf, csv, doc, docx, xls, xlsx, html, txt, md, png, jpg/jpeg, gif, webp. Per-file size cap reuses `jmix.ai-agent.rag.upload.max-file-size-bytes` (100 MB). Liquibase changelog `090-ai-task-file.xml` included in root.
 - [ ] **TASK-04**: Files reach the LLM via Spring AI `Media` injected into the user message ON THE SEND TURN (matches `D:/DTH/jmix-crm` `AiAttachmentMediaResolver` pattern). Single-turn-only injection: subsequent turns receive an empty `Media` list — Spring AI `JdbcChatMemoryRepository` persists `content TEXT` only, so re-injection would force re-reading bytes from `FileStorage` every turn at 5–15× token cost. The assistant's first-turn paraphrase becomes the persistent textual record. Files DO NOT enter chat memory `content` (Spring AI persists text only by design). Downstream Phase 14 `prepare_form_draft` may consume `AiTaskFile` by id for single-record extraction.
 - [ ] **TASK-05**: UI clearly distinguishes three input affordances: (a) plain text via `MessageInput`, (b) task-scoped file attachment for current intent (chip strip), (c) KB upload via existing `KnowledgeBaseView`.
 - [ ] **TASK-06**: `AiTaskFileMediaResolver` (`@Component`) returns rows where `messageId IS NULL` (newly attached, not yet sent) for the active conversation; `DefaultChatServiceImpl.ask(...)` and `.stream(...)` invoke the resolver and inject `Media` via `chatClient.prompt().user(u -> u.media(media.toArray(new Media[0])))`. After the new `AiMessage` is persisted, `UPDATE AiTaskFile SET messageId = newMessageId WHERE id IN (resolvedIds)`. Default model `qwen/qwen3.6-35b-a3b` (multimodal native) is set in `application.properties` for both `jmix.ai-agent.defaults.model` and `spring.ai.openai.chat.options.model`; admin per-conversation override surface via `AiParametersDetailView` (Phase 6) is unchanged.
@@ -116,7 +116,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 - [x] **ENT-05**: `AiExposureRule` (per EXP-01)
 - [x] **ENT-06**: `AiUiSettings` (per SURF-02)
-- [ ] **ENT-07**: `AiTaskFile` (per TASK-03)
+- [x] **ENT-07**: `AiTaskFile` (per TASK-03)
 - [ ] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
 - [x] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)
 
@@ -139,7 +139,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 ### Security Extensions
 
 - [x] **SEC-05**: `AiAgentAdminRole` extended with policies for new entities: `AiExposureRule` (CRUD + view + menu — done Phase 10-03), `AiUiSettings` (read + update; no create/delete since single-row — done Phase 12-02).
-- [ ] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
+- [x] **SEC-06**: `AiAgentUserRole` extended: read on own `AiExtractionDraft` rows (row-level policy by `userUsername`), read+create on own `AiTaskFile` rows.
 - [x] **SEC-07**: New `AiAgentMutationRole` resource role is an explicit AI-mutation marker gate. It grants no entity CRUD by itself; mutation tools require the marker role AND normal Jmix create/update policies. Hosts opt users in by assigning/composing this marker with their own entity roles.
 
 ### Testing
