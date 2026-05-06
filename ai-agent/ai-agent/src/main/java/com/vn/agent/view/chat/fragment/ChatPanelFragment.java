@@ -64,6 +64,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.MessageFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -972,13 +973,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 AiMessage notice = metadataApi.create(AiMessage.class);
                 notice.setConversation(conversation);
                 notice.setRole(AiMessageRole.NOTICE);
-                // Phase 13.1 UAT-fix — use the no-group formatMessage form (per memory
-                // feedback_jmix_messages_over_spring + KnowledgeBaseView canonical pattern).
-                // The prior call passed "com.vn.agent" as the group, which made the resolver
-                // look up the key inside a per-class bundle — yielding the literal key back
-                // instead of the formatted bilingual notice.
-                notice.setContent(messages.formatMessage(
-                        "chatView.attachments.notice",
+                // Phase 13.1 UAT-fix-02 — Java overload-resolution trap: when calling
+                // messages.formatMessage(key, arg1, arg2) with three String args, the compiler
+                // picks the more-specific (String pack, String key, Object... params) overload,
+                // treating arg1 as the key and arg2 as the only param. That returned just
+                // arg1 ("admin") because the resolver failed to find a key called "admin"
+                // and fell back to returning the key literal. Workaround: fetch the raw
+                // template via getMessage(key) and interpolate with java.text.MessageFormat
+                // so we never touch the ambiguous formatMessage signature.
+                String noticeTemplate = messages.getMessage("chatView.attachments.notice");
+                notice.setContent(MessageFormat.format(noticeTemplate,
                         currentAuthentication.getUser().getUsername(),
                         saved.getFilename()));
                 notice.setCreatedDate(OffsetDateTime.now());

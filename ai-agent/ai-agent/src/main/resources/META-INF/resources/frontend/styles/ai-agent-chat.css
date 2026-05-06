@@ -50,12 +50,23 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--lumo-space-s) 0;
-    color: var(--lumo-secondary-text-color);
-    font-size: var(--lumo-font-size-xs);
-    border-top: 1px solid var(--lumo-contrast-20pct);
-    border-bottom: 1px solid var(--lumo-contrast-20pct);
-    margin: var(--lumo-space-s) 0;
+    gap: var(--lumo-space-xs);
+    padding: var(--lumo-space-s) var(--lumo-space-m);
+    margin: var(--lumo-space-m) auto;
+    max-width: fit-content;
+    color: var(--lumo-primary-text-color);
+    font-size: var(--lumo-font-size-s);
+    font-weight: 500;
+    background: var(--lumo-primary-color-10pct);
+    border: 1px solid var(--lumo-primary-color-50pct);
+    border-radius: var(--lumo-border-radius-l);
+    box-shadow: var(--lumo-box-shadow-xs);
+}
+
+.ai-agent-attachment-notice::before {
+    content: "📎";
+    font-size: var(--lumo-font-size-m);
+    line-height: 1;
 }
 
 /* --- Phase 13.1: right-pane attachments dropzone ---------------------------- */

@@ -157,7 +157,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         // override this to exercise the budget-exceeded propagation contract.
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), false));
+                .thenReturn(new Resolved(List.of(media), List.of(), false));
 
         sut = new DefaultChatServiceImpl(
                 chatClient,
@@ -301,7 +301,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         // Override the default Resolved stub: budgetExceeded=true.
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), true));
+                .thenReturn(new Resolved(List.of(media), List.of(), true));
         stubChatClientForStreamingSuccess();
 
         StreamingEvent terminal = sut.stream(USER_ID, convId, MESSAGE, Overrides.NONE).blockLast();
@@ -320,7 +320,7 @@ class DefaultChatServiceImplStreamFallbackTest {
     void blockingPathPropagatesBudgetExceeded() {
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), true));
+                .thenReturn(new Resolved(List.of(media), List.of(), true));
         stubChatClientForBlocking();
 
         ChatResponseDto resp = sut.ask(USER_ID, convId, MESSAGE, Overrides.NONE);

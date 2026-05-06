@@ -56,8 +56,9 @@ import reactor.core.scheduler.Scheduler;
 
 import com.vn.agent.orchestration.ConversationNotFoundException;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -334,12 +335,17 @@ public class DefaultChatServiceImpl implements ChatService {
                                                 double retrievalSimilarityThreshold,
                                                 UUID runId,
                                                 long startNanos) {
+        // Phase 13.1 UAT-fix-02 — prepend Tika-extracted document text to the user
+        // message so PDF/DOCX/XLSX/TXT/CSV/HTML/MD attachments reach the LLM. Spring AI
+        // OpenAI ChatModel only renders Media as image_url content parts — non-image
+        // documents 400 from OpenRouter / OpenAI chat/completions if sent as Media.
+        final String composedUserText = composeUserText(message, resolvedMedia.documentTexts());
         ChatClientResponse clientResp = chatClient.prompt()
                 .system(composedSystemPrompt)
                 .user(u -> {
                     // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
-                    u.text(message);
-                    if (!resolvedMedia.isEmpty()) {
+                    u.text(composedUserText);
+                    if (!resolvedMedia.media().isEmpty()) {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
                 })
@@ -496,6 +502,8 @@ public class DefaultChatServiceImpl implements ChatService {
                     // path going forward.
                     final AiTaskFileMediaResolver.Resolved resolvedMedia =
                             taskFileMediaResolver.resolveActive(convId);
+                    // Phase 13.1 UAT-fix-02 — same text-prepending strategy as the blocking path.
+                    final String composedUserText = composeUserText(message, resolvedMedia.documentTexts());
 
                     Flux<StreamingEvent> content;
                     try {
@@ -503,8 +511,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                 .system(composedSystemPrompt)
                                 .user(u -> {
                                     // AI-SPEC pitfall 6: lambda form REQUIRED when media is non-empty.
-                                    u.text(message);
-                                    if (!resolvedMedia.isEmpty()) {
+                                    u.text(composedUserText);
+                                    if (!resolvedMedia.media().isEmpty()) {
                                         u.media(resolvedMedia.media().toArray(new Media[0]));
                                     }
                                 })
@@ -780,5 +788,43 @@ public class DefaultChatServiceImpl implements ChatService {
         } catch (RuntimeException anonymous) {
             return Locale.getDefault();
         }
+    }
+
+    /**
+     * Phase 13.1 UAT-fix-02 — compose the user-message text by prepending labeled
+     * blocks for each Tika-extracted document. The block layout is intentionally
+     * boring + obvious for the LLM:
+     * <pre>
+     *   The user has attached the following document(s):
+     *
+     *   === Attachment: foo.pdf ===
+     *   ...extracted text...
+     *   === End ===
+     *
+     *   ...
+     *
+     *   User message:
+     *   {original prompt}
+     * </pre>
+     * Returns the original message unchanged when no documents were extracted.
+     */
+    private static String composeUserText(String message,
+                                          List<AiTaskFileMediaResolver.DocumentText> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return message == null ? "" : message;
+        }
+        StringBuilder sb = new StringBuilder(message == null ? 0 : message.length() + 256);
+        sb.append("The user has attached the following document(s). " +
+                "Use them as authoritative context when answering.\n\n");
+        for (AiTaskFileMediaResolver.DocumentText d : documents) {
+            sb.append("=== Attachment: ").append(d.filename()).append(" ===\n");
+            sb.append(d.text());
+            if (d.truncated()) {
+                sb.append("\n[...truncated to fit token budget...]");
+            }
+            sb.append("\n=== End ===\n\n");
+        }
+        sb.append("User message:\n").append(message == null ? "" : message);
+        return sb.toString();
     }
 }

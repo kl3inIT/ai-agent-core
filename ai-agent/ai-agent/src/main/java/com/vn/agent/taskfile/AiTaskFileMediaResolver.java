@@ -14,6 +14,9 @@ import io.jmix.core.security.CurrentAuthentication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.content.Media;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.reader.tika.TikaDocumentReader;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeType;
@@ -29,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Resolves task-file rows for a conversation into Spring AI {@link Media} objects so the
@@ -54,6 +58,25 @@ public class AiTaskFileMediaResolver {
     private static final Logger log = LoggerFactory.getLogger(AiTaskFileMediaResolver.class);
 
     private static final int MAX_MEDIA_NAME_LENGTH = 96;
+
+    /**
+     * Phase 13.1 UAT-fix-02 — per-document text-extraction cap. Spring AI 1.1
+     * OpenAI {@code ChatModel} only renders {@link Media} as {@code image_url}
+     * content parts; non-image documents (PDF/DOCX/XLSX/TXT/CSV/HTML/MD) cause
+     * a {@code 400 BAD_REQUEST} from OpenRouter (and direct OpenAI for most
+     * models). Workaround: extract text via Apache Tika and prepend to the
+     * user-message text. Cap each document at ~50KB chars (~12-15K tokens) so
+     * a single huge PDF cannot blow the request token budget. Truncation is
+     * reported via {@link DocumentText#truncated()}.
+     */
+    static final int MAX_DOC_TEXT_CHARS = 50_000;
+
+    private static final Set<MimeType> IMAGE_MIME_TYPES = Set.of(
+            Media.Format.IMAGE_PNG,
+            Media.Format.IMAGE_JPEG,
+            Media.Format.IMAGE_GIF,
+            Media.Format.IMAGE_WEBP
+    );
 
     private static final Set<MimeType> SUPPORTED_MEDIA_TYPES = Set.of(
             Media.Format.DOC_PDF,
@@ -186,8 +209,23 @@ public class AiTaskFileMediaResolver {
             }
         }
 
-        List<Media> media = kept.stream().map(this::buildMedia).toList();
-        return new Resolved(media, budgetExceeded);
+        // Phase 13.1 UAT-fix-02 — split kept rows by MIME family. Images keep their Media
+        // representation (Spring AI OpenAI renders as image_url, accepted by OpenRouter and
+        // direct OpenAI on every vision model). Documents (PDF/DOCX/XLSX/TXT/CSV/HTML/MD)
+        // are extracted to text via Apache Tika and returned as DocumentText so the chat
+        // service prepends them to the user-message text — chat/completions does not accept
+        // non-image data URLs and would 400 if we tried to send them as Media.
+        List<Media> media = new ArrayList<>();
+        List<DocumentText> documentTexts = new ArrayList<>();
+        for (AiTaskFile row : kept) {
+            MimeType mime = resolveSupportedMimeType(row.getContentType(), row.getFilename());
+            if (IMAGE_MIME_TYPES.contains(mime)) {
+                media.add(buildMedia(row, mime));
+            } else {
+                documentTexts.add(extractDocumentText(row));
+            }
+        }
+        return new Resolved(media, documentTexts, budgetExceeded);
     }
 
     private String buildBudgetArgumentsJson(UUID conversationId,
@@ -241,16 +279,63 @@ public class AiTaskFileMediaResolver {
         return "system";
     }
 
-    private Media buildMedia(AiTaskFile row) {
+    private Media buildMedia(AiTaskFile row, MimeType mime) {
         FileRef fileRef = row.getStorageRef();
         if (fileRef == null) {
             throw new IllegalStateException("AiTaskFile has no storageRef: " + row.getId());
         }
         return Media.builder()
-                .mimeType(resolveSupportedMimeType(row.getContentType(), row.getFilename()))
+                .mimeType(mime)
                 .data(readFileBytes(fileRef))
                 .name(sanitizeMediaName(row.getFilename()))
                 .build();
+    }
+
+    /**
+     * Phase 13.1 UAT-fix-02 — extract text content from a non-image AiTaskFile via
+     * Apache Tika ({@link TikaDocumentReader}). Tika auto-detects document type from
+     * the byte stream (PDF / DOCX / XLSX / TXT / CSV / HTML / MD all supported via
+     * the Tika app classpath bundled with {@code spring-ai-tika-document-reader}).
+     * The result is capped at {@link #MAX_DOC_TEXT_CHARS} characters so a single
+     * large file cannot blow the LLM token budget. Failure is logged and a
+     * placeholder is returned so the chat turn never fails because of one
+     * unreadable document.
+     */
+    private DocumentText extractDocumentText(AiTaskFile row) {
+        FileRef fileRef = row.getStorageRef();
+        if (fileRef == null) {
+            log.warn("AiTaskFile has no storageRef: {}", row.getId());
+            return new DocumentText(safeFilename(row), "[Empty file]", false);
+        }
+        String filename = safeFilename(row);
+        try {
+            byte[] bytes = readFileBytes(fileRef);
+            ByteArrayResource resource = new ByteArrayResource(bytes) {
+                @Override
+                public String getFilename() {
+                    return filename;
+                }
+            };
+            TikaDocumentReader reader = new TikaDocumentReader(resource);
+            List<Document> documents = reader.get();
+            String text = documents.stream()
+                    .map(Document::getText)
+                    .collect(Collectors.joining("\n"));
+            boolean truncated = text.length() > MAX_DOC_TEXT_CHARS;
+            if (truncated) {
+                text = text.substring(0, MAX_DOC_TEXT_CHARS);
+            }
+            return new DocumentText(filename, text, truncated);
+        } catch (RuntimeException tikaEx) {
+            log.warn("Tika failed to extract text from task file {} ({}): {}",
+                    filename, row.getId(), tikaEx.getMessage());
+            return new DocumentText(filename,
+                    "[Failed to extract text from " + filename + "]", false);
+        }
+    }
+
+    private String safeFilename(AiTaskFile row) {
+        return StringUtils.hasText(row.getFilename()) ? row.getFilename() : "unnamed";
     }
 
     private byte[] readFileBytes(FileRef fileRef) {
@@ -312,18 +397,36 @@ public class AiTaskFileMediaResolver {
     }
 
     /**
-     * Result of {@link #resolveActive(UUID)} — the per-turn {@link Media} list and a
-     * {@code budgetExceeded} flag set when at least one row was dropped due to the
-     * {@code perTurnMaxFiles} / {@code perTurnMaxTotalBytes} caps. The chat path uses the
-     * flag to surface a UI toast (D-D1).
+     * Result of {@link #resolveActive(UUID)} — the per-turn {@link Media} list (images
+     * only; Spring AI OpenAI renders these as {@code image_url} content parts), the
+     * per-turn {@link DocumentText} list (Tika-extracted text for non-image documents,
+     * to be prepended into the user-message text), and a {@code budgetExceeded} flag
+     * set when at least one row was dropped due to the {@code perTurnMaxFiles} /
+     * {@code perTurnMaxTotalBytes} caps. The chat path uses the flag to surface a UI
+     * toast (D-D1).
      */
-    public record Resolved(List<Media> media, boolean budgetExceeded) {
+    public record Resolved(List<Media> media,
+                           List<DocumentText> documentTexts,
+                           boolean budgetExceeded) {
         public static Resolved empty() {
-            return new Resolved(List.of(), false);
+            return new Resolved(List.of(), List.of(), false);
         }
 
         public boolean isEmpty() {
-            return media.isEmpty();
+            return media.isEmpty() && documentTexts.isEmpty();
         }
+    }
+
+    /**
+     * Phase 13.1 UAT-fix-02 — Tika-extracted text content for a single non-image
+     * task file. The chat service prepends a labeled block of these into the user
+     * message text since OpenAI/OpenRouter chat/completions does not accept document
+     * data URLs as Media.
+     *
+     * @param filename  display name shown in the prepended block header
+     * @param text      extracted text body, capped at {@link #MAX_DOC_TEXT_CHARS}
+     * @param truncated whether the original document exceeded the cap and was sliced
+     */
+    public record DocumentText(String filename, String text, boolean truncated) {
     }
 }

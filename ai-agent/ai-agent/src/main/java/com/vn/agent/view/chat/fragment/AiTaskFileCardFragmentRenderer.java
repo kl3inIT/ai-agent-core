@@ -5,12 +5,16 @@ import com.vaadin.flow.component.html.H5;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vn.agent.entity.AiTaskFile;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
 import io.jmix.core.FileStorageLocator;
+import io.jmix.core.Messages;
 import io.jmix.flowui.Dialogs;
+import io.jmix.flowui.Notifications;
+import io.jmix.flowui.UiEventPublisher;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.component.card.JmixCard;
 import io.jmix.flowui.fragment.FragmentDescriptor;
@@ -19,7 +23,6 @@ import io.jmix.flowui.fragmentrenderer.RendererItemContainer;
 import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.InstanceContainer;
-import io.jmix.flowui.view.MessageBundle;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.ViewComponent;
@@ -28,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.text.DecimalFormat;
+import java.text.MessageFormat;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Per-row card renderer for the right-pane Attachments grid (Phase 13.1 UI-01).
@@ -37,11 +42,10 @@ import java.util.Locale;
  * adaptations: AiTaskFile entity binding, taskFileDc instance container id, filename
  * header property, +1 TRASH delete button, sizeValue replacing the source-icon hbox.
  *
- * <p>Open uses Jmix {@link Downloader} to stream the FileRef back as a download
+ * <p>Open uses Jmix {@link io.jmix.flowui.download.Downloader} to stream the FileRef back as a download
  * (showNewWindow=true). Delete opens an option dialog (D-B2 confirm), then removes
- * the JPA row via the user-scoped DataManager (row-level role applies); on row-remove
- * success the storage blob is removed best-effort. Blob-only failures are logged and
- * surrendered to the AiTaskFileCleanupJob TTL sweep.
+ * the storage blob before the JPA row. If blob removal fails, the row is preserved
+ * so the user can retry and the scheduled TTL cleanup can still discover it.
  */
 @FragmentDescriptor("ai-task-file-card-fragment.xml")
 @RendererItemContainer("taskFileDc")
@@ -60,8 +64,6 @@ public class AiTaskFileCardFragmentRenderer extends FragmentRenderer<JmixCard, A
     @ViewComponent
     private JmixButton deleteButton;
     @ViewComponent
-    private MessageBundle messageBundle;
-    @ViewComponent
     private InstanceContainer<AiTaskFile> taskFileDc;
 
     @Autowired
@@ -72,11 +74,17 @@ public class AiTaskFileCardFragmentRenderer extends FragmentRenderer<JmixCard, A
     private FileStorageLocator fileStorageLocator;
     @Autowired
     private Dialogs dialogs;
+    @Autowired
+    private Messages messages;
+    @Autowired
+    private Notifications notifications;
+    @Autowired
+    private UiEventPublisher uiEventPublisher;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
-        openButton.setAriaLabel(messageBundle.getMessage("chatView.attachments.action.download"));
-        deleteButton.setAriaLabel(messageBundle.getMessage("chatView.attachments.action.delete"));
+        openButton.setAriaLabel(message("chatView.attachments.action.download"));
+        deleteButton.setAriaLabel(message("chatView.attachments.action.delete"));
         applyState(taskFileDc.getItemOrNull());
     }
 
@@ -102,47 +110,47 @@ public class AiTaskFileCardFragmentRenderer extends FragmentRenderer<JmixCard, A
             return;
         }
         dialogs.createOptionDialog()
-                .withHeader(messageBundle.getMessage("chatView.attachments.deleteConfirm.title"))
-                .withText(messageBundle.formatMessage(
-                        "chatView.attachments.deleteConfirm.message",
+                .withHeader(message("chatView.attachments.deleteConfirm.title"))
+                .withText(MessageFormat.format(
+                        messages.getMessage("chatView.attachments.deleteConfirm.message"),
                         safeFilename(row)))
                 .withActions(
                         new DialogAction(DialogAction.Type.YES)
                                 .withVariant(ActionVariant.DANGER)
-                                .withText(messageBundle.getMessage(
-                                        "chatView.attachments.deleteConfirm.confirm"))
+                                .withText(message("chatView.attachments.deleteConfirm.confirm"))
                                 .withHandler(e -> performDelete(row)),
                         new DialogAction(DialogAction.Type.NO)
-                                .withText(messageBundle.getMessage(
-                                        "chatView.attachments.deleteConfirm.cancel")))
+                                .withText(message("chatView.attachments.deleteConfirm.cancel")))
                 .open();
     }
 
     private void performDelete(AiTaskFile row) {
         FileRef ref = row.getStorageRef();
-        try {
-            dataManager.remove(row);
-        } catch (RuntimeException ex) {
-            log.warn("Failed to remove AiTaskFile {}", row.getId(), ex);
-            return;
-        }
+        UUID conversationId = row.getConversation() == null ? null : row.getConversation().getId();
         if (ref != null) {
             try {
                 FileStorage storage = fileStorageLocator.getByName(ref.getStorageName());
                 storage.removeFile(ref);
             } catch (RuntimeException blobEx) {
-                // Log-and-continue per CONTEXT D-B1 — orphan blob is swept by
-                // AiTaskFileCleanupJob on its next TTL pass.
-                log.warn("Failed to remove blob for AiTaskFile {}", row.getId(), blobEx);
+                log.warn("Failed to remove blob for AiTaskFile {}; preserving row for retry",
+                        row.getId(), blobEx);
+                showDeleteFailed();
+                return;
             }
         }
-        // Grid refresh is triggered by ChatPanelFragment listening to dataManager
-        // events (Plan 13.1-05 wires the loader refresh).
+        try {
+            dataManager.remove(row);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to remove AiTaskFile {} after blob delete", row.getId(), ex);
+            showDeleteFailed();
+            return;
+        }
+        publishDeletedEvent(conversationId, row.getId());
     }
 
     private void applyState(AiTaskFile row) {
         if (row == null) {
-            titleValue.setText(messageBundle.getMessage("chatView.attachments.missingFileName"));
+            titleValue.setText(message("chatView.attachments.missingFileName"));
             attachmentIcon.setIcon(VaadinIcon.FILE_O);
             sizeValue.setText("");
             openButton.setEnabled(false);
@@ -161,7 +169,30 @@ public class AiTaskFileCardFragmentRenderer extends FragmentRenderer<JmixCard, A
         if (filename != null && !filename.isBlank()) {
             return filename;
         }
-        return messageBundle.getMessage("chatView.attachments.missingFileName");
+        return message("chatView.attachments.missingFileName");
+    }
+
+    private void showDeleteFailed() {
+        notifications.create(message("chatView.attachments.delete.failed"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show();
+    }
+
+    private void publishDeletedEvent(UUID conversationId, UUID taskFileId) {
+        try {
+            uiEventPublisher.publishEventForCurrentUI(
+                    new AiTaskFileDeletedUiEvent(this, conversationId));
+        } catch (RuntimeException eventFailure) {
+            log.debug("Failed to publish task-file delete UI event for {}", taskFileId, eventFailure);
+        }
+    }
+
+    private String message(String key) {
+        // Phase 13.1 UAT-fix-02 — root-bundle no-group form. Prior pack-form
+        // messages.getMessage("com.vn.agent", key) returned the literal key because
+        // the bundle is registered as the default MessageSource, not under the
+        // "com.vn.agent" group label.
+        return messages.getMessage(key);
     }
 
     /**
