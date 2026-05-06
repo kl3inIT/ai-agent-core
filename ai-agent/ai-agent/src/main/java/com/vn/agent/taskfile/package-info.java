@@ -1,0 +1,30 @@
+/**
+ * Phase 13 task-file pathway — attached chat files surfaced to the LLM via
+ * Spring AI {@link org.springframework.ai.content.Media}.
+ *
+ * <p><b>STRUCTURAL INVARIANT (TEST-16):</b> No source file in this package may
+ * reference any of the following — task-file content NEVER reaches the RAG
+ * pathway. <b>DO NOT REFERENCE:</b>
+ * <ul>
+ *   <li>{@code IngesterManager}</li>
+ *   <li>{@code VectorStore}</li>
+ *   <li>{@code RetrievalAugmentationAdvisor}</li>
+ *   <li>{@code TokenTextSplitter}</li>
+ *   <li>{@code DocumentReader} (Tika reader)</li>
+ *   <li>Anything from {@code com.vn.agent.rag.**}</li>
+ * </ul>
+ * Enforced by {@code TaskFileNoVectorStoreSourceScannerTest} (Wave 4). The
+ * scanner strips this JavaDoc DO-NOT-REFERENCE block via the same allowlist
+ * helper that the per-plan grep gates exclude (REVIEWS HIGH-8) — only this
+ * {@code package-info.java} may name the forbidden tokens, and only inside
+ * JavaDoc.
+ *
+ * <p>The task-file pathway is structurally disjoint from KB ingestion: a chat
+ * file lives only as bytes in {@link io.jmix.core.FileStorage} plus a metadata
+ * row in {@code AI_TASK_FILE} (agentstore); the resolver streams those bytes
+ * straight into a multimodal {@code Media} payload on the user turn that newly
+ * attached the file (D-01 single-turn inject). Re-injection on follow-up turns
+ * is deliberately not supported — the assistant's first-turn paraphrase is
+ * persisted by the chat-memory store and covers downstream recall.
+ */
+package com.vn.agent.taskfile;
