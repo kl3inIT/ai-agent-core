@@ -210,7 +210,7 @@ Plans:
 - [x] 13.1-04-PLAN.md — chat-panel-fragment.xml CRM-style split reshape, ai-task-file-card-fragment.xml + AiTaskFileCardFragmentRenderer, ai-agent-chat.css CRM appendix, 13 bilingual chatView.attachments.* keys
 - [x] 13.1-05-PLAN.md — ChatPanelFragment Java rewire: taskFilesDl loader binding, empty-state toggle, NOTICE insert/render via vaadin-message.attachment-event, budget-exceeded toast, Phase 12 contract preservation
 - [x] 13.1-06-PLAN.md — Resolver/lifecycle/notice tests: PerTurnMediaInjectionTest (TEST-18), BudgetCapTest, TtlConfigTest, NoticeFilterTest + property-rename sweep on 3 existing Phase 13 tests + widened TEST-16 source-scanner scope
-- [ ] 13.1-07-PLAN.md — UI/schema/locale tests: CrmStyleLayoutTest, NoticeRenderTest, SurfaceMountingTest, LiquibaseSchemaTest, LocaleParityTest
+- [x] 13.1-07-PLAN.md — UI/schema/locale tests: CrmStyleLayoutTest, NoticeRenderTest, SurfaceMountingTest, LiquibaseSchemaTest, LocaleParityTest
 
 **UI hint**: yes
 **Cross-cutting constraints:**
@@ -278,6 +278,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1**
 | 11. Mutation-Capable Built-In Tools | 16/16 | Complete    | 2026-04-29 |
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | 6/6 | Complete    | 2026-05-06 |
+| 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | 7/7 | Complete | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
