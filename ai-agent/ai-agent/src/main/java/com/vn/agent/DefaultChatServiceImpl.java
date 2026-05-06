@@ -335,16 +335,18 @@ public class DefaultChatServiceImpl implements ChatService {
                                                 double retrievalSimilarityThreshold,
                                                 UUID runId,
                                                 long startNanos) {
-        // Phase 13.1 UAT-fix-02 — prepend Tika-extracted document text to the user
-        // message so PDF/DOCX/XLSX/TXT/CSV/HTML/MD attachments reach the LLM. Spring AI
-        // OpenAI ChatModel only renders Media as image_url content parts — non-image
-        // documents 400 from OpenRouter / OpenAI chat/completions if sent as Media.
-        final String composedUserText = composeUserText(message, resolvedMedia.documentTexts());
+        // Phase 13.1 UAT-fix-02 — Tika-extracted document text rides the SYSTEM prompt,
+        // NOT the user message text. Spring AI's chat memory only persists USER +
+        // ASSISTANT messages, so per-turn rebuilt system prompts never pollute history
+        // replay. The earlier attempt prepended documents into the user message and the
+        // "=== End === / User message:" scaffolding leaked into next-session UI replay.
+        final String systemPromptWithDocs = appendDocumentBlocks(
+                composedSystemPrompt, resolvedMedia.documentTexts());
         ChatClientResponse clientResp = chatClient.prompt()
-                .system(composedSystemPrompt)
+                .system(systemPromptWithDocs)
                 .user(u -> {
                     // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
-                    u.text(composedUserText);
+                    u.text(message);
                     if (!resolvedMedia.media().isEmpty()) {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
@@ -502,16 +504,18 @@ public class DefaultChatServiceImpl implements ChatService {
                     // path going forward.
                     final AiTaskFileMediaResolver.Resolved resolvedMedia =
                             taskFileMediaResolver.resolveActive(convId);
-                    // Phase 13.1 UAT-fix-02 — same text-prepending strategy as the blocking path.
-                    final String composedUserText = composeUserText(message, resolvedMedia.documentTexts());
+                    // Phase 13.1 UAT-fix-02 — system-prompt injection of document blocks
+                    // (see blocking path comment for rationale).
+                    final String systemPromptWithDocs = appendDocumentBlocks(
+                            composedSystemPrompt, resolvedMedia.documentTexts());
 
                     Flux<StreamingEvent> content;
                     try {
                         content = chatClient.prompt()
-                                .system(composedSystemPrompt)
+                                .system(systemPromptWithDocs)
                                 .user(u -> {
                                     // AI-SPEC pitfall 6: lambda form REQUIRED when media is non-empty.
-                                    u.text(composedUserText);
+                                    u.text(message);
                                     if (!resolvedMedia.media().isEmpty()) {
                                         u.media(resolvedMedia.media().toArray(new Media[0]));
                                     }
@@ -791,31 +795,36 @@ public class DefaultChatServiceImpl implements ChatService {
     }
 
     /**
-     * Phase 13.1 UAT-fix-02 — compose the user-message text by prepending labeled
-     * blocks for each Tika-extracted document. The block layout is intentionally
-     * boring + obvious for the LLM:
+     * Phase 13.1 UAT-fix-02 — append labeled blocks of Tika-extracted document text
+     * to the SYSTEM prompt (not the user message). System messages are not persisted
+     * by Spring AI's chat memory advisor, so per-turn document context never pollutes
+     * the chat history that is replayed in the UI.
+     *
+     * <p>Block layout (kept intentionally obvious for the LLM):
      * <pre>
-     *   The user has attached the following document(s):
+     *   {existing system prompt}
+     *
+     *   The user has attached the following document(s) for this turn — use them
+     *   as authoritative context when answering:
      *
      *   === Attachment: foo.pdf ===
      *   ...extracted text...
      *   === End ===
-     *
-     *   ...
-     *
-     *   User message:
-     *   {original prompt}
      * </pre>
-     * Returns the original message unchanged when no documents were extracted.
+     *
+     * Returns the system prompt unchanged when no documents were extracted.
      */
-    private static String composeUserText(String message,
-                                          List<AiTaskFileMediaResolver.DocumentText> documents) {
+    private static String appendDocumentBlocks(String systemPrompt,
+                                               List<AiTaskFileMediaResolver.DocumentText> documents) {
         if (documents == null || documents.isEmpty()) {
-            return message == null ? "" : message;
+            return systemPrompt == null ? "" : systemPrompt;
         }
-        StringBuilder sb = new StringBuilder(message == null ? 0 : message.length() + 256);
-        sb.append("The user has attached the following document(s). " +
-                "Use them as authoritative context when answering.\n\n");
+        StringBuilder sb = new StringBuilder(systemPrompt == null ? 0 : systemPrompt.length() + 512);
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            sb.append(systemPrompt).append("\n\n");
+        }
+        sb.append("The user has attached the following document(s) for this turn — " +
+                "use them as authoritative context when answering:\n\n");
         for (AiTaskFileMediaResolver.DocumentText d : documents) {
             sb.append("=== Attachment: ").append(d.filename()).append(" ===\n");
             sb.append(d.text());
@@ -824,7 +833,6 @@ public class DefaultChatServiceImpl implements ChatService {
             }
             sb.append("\n=== End ===\n\n");
         }
-        sb.append("User message:\n").append(message == null ? "" : message);
         return sb.toString();
     }
 }

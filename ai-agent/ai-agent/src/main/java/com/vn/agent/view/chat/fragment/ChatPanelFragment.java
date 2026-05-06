@@ -836,8 +836,21 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (messageListSlot == null) {
             return;
         }
+        // Phase 13.1 UAT-fix-02 — auto-scroll across all candidate scroll containers.
+        // Vaadin's <vaadin-message-list> scrolls INTERNALLY (its bubble area has its
+        // own overflow:auto), and we also have a sibling NOTICE div after the list.
+        // To keep the latest streaming token visible, force-scroll BOTH the slot vbox
+        // and the inner message-list to their bottom on each token append. setTimeout
+        // defers the scroll one paint frame so newly-appended bubble content has been
+        // measured into scrollHeight before we read it.
         messageListSlot.getElement().executeJs(
-                "setTimeout(() => { this.scrollTop = this.scrollHeight; }, 50);");
+                "setTimeout(() => { " +
+                "  this.scrollTop = this.scrollHeight; " +
+                "  const list = this.querySelector('vaadin-message-list'); " +
+                "  if (list) { list.scrollTop = list.scrollHeight; } " +
+                "  const last = this.lastElementChild; " +
+                "  if (last) last.scrollIntoView({behavior: 'smooth', block: 'end'}); " +
+                "}, 50);");
     }
 
     private void accessUi(Runnable action) {

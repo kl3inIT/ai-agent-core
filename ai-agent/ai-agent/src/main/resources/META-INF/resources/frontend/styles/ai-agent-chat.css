@@ -69,6 +69,42 @@
     line-height: 1;
 }
 
+/* --- Phase 13.1 UAT-fix-02: responsive attachments grid + card -------------- */
+
+/* Right-pane card grid: single column inside the narrow right pane so cards
+ * never overflow when the dialog is resized small. Each card stretches to the
+ * pane width via card width="100%" + min-width:0 to allow inner content to
+ * truncate instead of pushing the card wider than its container. */
+#attachmentsGridLayout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--lumo-space-s);
+    align-content: start;
+}
+
+#attachmentsGridLayout > * {
+    min-width: 0;
+}
+
+#attachmentsGridLayout vaadin-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#attachmentsGridLayout vaadin-card h5,
+#attachmentsGridLayout vaadin-card .text-secondary {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Stack the action icons under the H5 filename when the right-pane is narrow,
+ * preventing the card header from overflowing horizontally. The card's header
+ * row uses flex by default; force-wrap is the cleanest cross-Vaadin solution. */
+#attachmentsGridLayout vaadin-card::part(header) {
+    flex-wrap: wrap;
+    gap: var(--lumo-space-xs);
+}
+
 /* --- Phase 13.1: right-pane attachments dropzone ---------------------------- */
 
 vaadin-upload.attachments-dropzone {

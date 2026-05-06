@@ -239,11 +239,15 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     }
 
     private static void configureDialogWindow(DialogWindow<ChatDialogView> dialogWindow) {
+        // Phase 13.1 UAT-fix-02 — width 35% was too narrow for the right-pane
+        // attachment cards (the H5 filename + dual icon buttons need ~200px of
+        // their own and 32% of 35%-of-viewport on a 1366px laptop is ~150px).
+        // Bumped to 50% + repositioned to 50% left so cards no longer overflow.
         dialogWindow.setModal(false);
-        dialogWindow.setLeft("65%");
+        dialogWindow.setLeft("50%");
         dialogWindow.setTop("5%");
-        dialogWindow.setWidth("35%");
-        dialogWindow.setHeight("75%");
+        dialogWindow.setWidth("50%");
+        dialogWindow.setHeight("85%");
         dialogWindow.setResizable(true);
         dialogWindow.setDraggable(true);
     }

@@ -95,10 +95,16 @@ public class AiConversationTitleService {
             saveConversation(conversationToSave);
             audit(event, title, elapsedMillis(startNanos), AiToolCallOutcome.SUCCESS, null, null);
         } catch (IllegalArgumentException rejectedTitle) {
-            log.warn("Auto-title generation rejected output conversationId={}",
-                    event.conversationId(), rejectedTitle);
-            audit(event, null, elapsedMillis(startNanos), AiToolCallOutcome.ERROR,
-                    "rejected_title", rejectedTitle.getClass().getSimpleName());
+            // Phase 13.1 UAT-fix-02 — auto-title generation is best-effort. When the
+            // model returns blank / sentinel / forbidden tokens, we DO NOT escalate to
+            // an ERROR audit row — the conversation just keeps its default title.
+            // Recording these as ERROR pollutes the audit log with red rows and is
+            // confusing to operators who see a "Lỗi" (error) status next to a
+            // conversation that completed perfectly fine with its default title.
+            log.debug("Auto-title generation rejected output conversationId={} reason={}",
+                    event.conversationId(), rejectedTitle.getMessage());
+            audit(event, null, elapsedMillis(startNanos), AiToolCallOutcome.SUCCESS,
+                    "rejected_title:" + rejectedTitle.getMessage(), null);
         } catch (RuntimeException failure) {
             log.warn("Auto-title generation failed conversationId={}",
                     event.conversationId(), failure);
