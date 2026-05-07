@@ -74,8 +74,24 @@ public class AiConversationTitleService {
             }
 
             Optional<String> defaultTitle = defaultTitle(visibleMessages);
-            if (defaultTitle.isEmpty() || !sameTitle(conversation.getTitle(), defaultTitle.get())) {
+            if (defaultTitle.isEmpty()) {
                 return;
+            }
+            // A conversation is eligible when its current title is either unset (upload-first
+            // path created the row before the user typed) or already matches the truncated
+            // first-user-message default. Anything else means the user manually edited and
+            // we must not clobber.
+            String existingTitle = conversation.getTitle();
+            boolean existingIsBlank = existingTitle == null || existingTitle.isBlank();
+            if (!existingIsBlank && !sameTitle(existingTitle, defaultTitle.get())) {
+                return;
+            }
+            // Seed unseeded conversations with the defaultTitle BEFORE the LLM call so a blank
+            // / sentinel / forbidden model reply still leaves a usable title on the row instead
+            // of a permanently empty entry in the conversations grid.
+            if (existingIsBlank) {
+                conversation.setTitle(defaultTitle.get());
+                saveConversation(conversation);
             }
 
             Locale locale = event.localeHint() == null ? Locale.getDefault() : event.localeHint();
@@ -85,8 +101,13 @@ public class AiConversationTitleService {
             String title = sanitizeTitle(rawTitle, defaultTitle.get());
 
             Optional<AiConversation> reloadedConversation = loadConversation(event.conversationId());
-            if (reloadedConversation.isEmpty()
-                    || !sameTitle(reloadedConversation.get().getTitle(), defaultTitle.get())) {
+            if (reloadedConversation.isEmpty()) {
+                return;
+            }
+            String currentTitle = reloadedConversation.get().getTitle();
+            boolean currentIsBlankOrDefault = currentTitle == null || currentTitle.isBlank()
+                    || sameTitle(currentTitle, defaultTitle.get());
+            if (!currentIsBlankOrDefault) {
                 return;
             }
 
