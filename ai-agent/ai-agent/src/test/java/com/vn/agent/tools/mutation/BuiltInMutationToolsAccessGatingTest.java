@@ -52,7 +52,7 @@ import static org.mockito.Mockito.verify;
  * attribute {@code secret} so the per-attribute gate fires while every other attribute and the
  * entity-level CRUD gate stay permitted.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "jmix.ai-agent.audit.hash-sensitive-fields=true",

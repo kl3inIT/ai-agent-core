@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Test 2 covers the mixed create/update dispatch (id-presence dispatch);
  * Test 3 the {@code bulk-max-rows} DoS guard.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "ai-agent.tools.mutation.bulk-max-rows=100"

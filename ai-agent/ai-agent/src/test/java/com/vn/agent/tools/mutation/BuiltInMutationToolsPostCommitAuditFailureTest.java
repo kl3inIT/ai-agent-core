@@ -38,7 +38,7 @@ import static org.mockito.Mockito.doThrow;
  * {@link MutationCommitCoordinator#safeWriteAudit} absorbs an {@link AuditWriter} failure. The
  * tool still returns SUCCESS, the intent remains COMMITTED, and exact replay is safe.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",

@@ -1,5 +1,6 @@
 package com.vn.agent.tools.mutation;
 
+import com.vn.agent.AITestConfiguration;
 import com.vn.agent.tools.ToolUserError;
 import com.vn.agent.tools.mutation.fixture.MutationChildFixture;
 import com.vn.agent.tools.mutation.fixture.MutationLinkedChildFixture;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Plan 11-07B does NOT add the broad add_related_record / remove_related_record tool tests
  * here — Plans 11-10 / 11-11 own those. This file proves the support matrix only.
  */
-@SpringBootTest
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class})
 class RelatedWriteMetadataResolverTest {
 
     @Autowired

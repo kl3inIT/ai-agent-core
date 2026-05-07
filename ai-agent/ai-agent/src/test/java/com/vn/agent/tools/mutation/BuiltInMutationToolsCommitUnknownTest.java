@@ -37,7 +37,7 @@ import static org.mockito.Mockito.doThrow;
  * write a durable COMMIT_FAILED audit row, keep the intent non-reclaimable, and reject an exact
  * retry without duplicating the host write.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",

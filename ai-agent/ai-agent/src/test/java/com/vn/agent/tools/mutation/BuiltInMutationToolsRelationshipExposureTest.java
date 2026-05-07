@@ -41,7 +41,7 @@ import static org.mockito.Mockito.verify;
  * <p>Asserts the response is {@code access_denied} and {@code MutationSaveExecutor.save/saveAll}
  * is NEVER called.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

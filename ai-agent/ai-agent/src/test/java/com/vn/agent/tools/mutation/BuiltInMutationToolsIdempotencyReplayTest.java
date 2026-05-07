@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * REQUIRES_NEW reservation must commit) before the second invocation runs; otherwise the
  * second invocation would still see the row as PENDING in its own transaction snapshot.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

@@ -8,6 +8,7 @@ import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
+import com.vn.agent.tools.mutation.MutationFixturePersistenceTestConfiguration;
 import com.vn.agent.tools.mutation.MutationToolTestUsersConfiguration;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.CurrentAuthentication;
@@ -35,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "jmix.ai-agent.audit.hash-sensitive-fields=true",

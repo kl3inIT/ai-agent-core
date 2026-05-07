@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code "error":"idempotency_violation"}; no second fixture row may be written; the dedup
  * row count remains exactly 1; correction guidance must mention a fresh idempotency key.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

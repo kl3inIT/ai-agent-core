@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Fixture rows created here are removed in {@code @AfterEach} so concurrent test runs do not
  * collide.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "jmix.ai-agent.audit.hash-sensitive-fields=true",

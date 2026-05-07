@@ -53,7 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * row as COMMITTED. A test-level transaction would hold the row in PENDING
  * snapshot.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

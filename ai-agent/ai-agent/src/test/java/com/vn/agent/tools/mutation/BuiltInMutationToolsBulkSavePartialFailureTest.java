@@ -58,7 +58,7 @@ import static org.mockito.Mockito.doAnswer;
  * <p>All four tests assert ZERO rows persisted in the main store
  * (rollback-all) and exactly ONE audit row per batch.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
