@@ -102,10 +102,10 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 ### Intent-Driven Extraction → Prefilled Jmix Forms
 
 - [ ] **EXTRACT-01**: User selects an intent before sending. Add-on ships a default "auto" intent that uses the current chat path; intents lock the workflow when chosen. v1.1 ships at least one named intent end-to-end (e.g. PDF → customer-draft) plus an SPI for hosts.
-- [ ] **EXTRACT-02**: `IntentExtractor<T>` SPI: `Class<T> targetType()`, `String entityName()`, `T extract(ExtractionInput input)`. Hosts implement per-intent extractors. Add-on ships ONE reference impl using `chatClient.prompt().call().entity(Class)` against a metadata-derived DTO synthesized from `MetaClass`.
-- [ ] **EXTRACT-03**: Intent-extraction model routing: follow active `AiParameters` profile (no separate model pin in v1.1). Operator docs note that weak-JSON-adherence models may produce parse errors.
+- [x] **EXTRACT-02**: `IntentExtractor<T>` SPI: `Class<T> targetType()`, `String entityName()`, `T extract(ExtractionInput input)`. Hosts implement per-intent extractors. Add-on ships ONE reference impl using `chatClient.prompt().call().entity(Class)` against a metadata-derived DTO synthesized from `MetaClass`.
+- [x] **EXTRACT-03**: Intent-extraction model routing: follow active `AiParameters` profile (no separate model pin in v1.1). Operator docs note that weak-JSON-adherence models may produce parse errors.
 - [x] **EXTRACT-04**: `AiExtractionDraft` Jmix entity in `agentstore`: `id`, `userUsername`, `targetEntityName`, `intentId`, `payloadJson`, `sourceConversationId`, `sourceTaskFileId` (nullable), `createdAt`, `expiresAt` (TTL default 1h), `confirmed` boolean. Persisted (NOT `VaadinSession`-cached) so the form load by id survives navigation. Per-user row-level policy.
-- [ ] **EXTRACT-05**: `ExtractionService` orchestrates: receive input (file id from `AiTaskFile` and/or text), dispatch to matching `IntentExtractor`, persist `AiExtractionDraft`, return `draftId` + `instance_name` summary.
+- [x] **EXTRACT-05**: `ExtractionService` orchestrates: receive input (file id from `AiTaskFile` and/or text), dispatch to matching `IntentExtractor`, persist `AiExtractionDraft`, return `draftId` + `instance_name` summary.
 - [ ] **EXTRACT-06**: `ExtractionToolBridge` exposes a single `@Tool prepare_form_draft(intentId, contextRefs)` to the LLM. The LLM has NO `ViewNavigators` or any UI-mutation primitive (P-17 mitigation). Tool result is a structured payload `{ "action": "open_form_with_draft", "draftId": "...", "entityName": "...", "instanceName": "..." }` that the chat UI client recognizes.
 - [ ] **EXTRACT-07**: `ChatPanelFragment` response renderer recognizes the `open_form_with_draft` shape and renders a "Open form to confirm" button. Click invokes `ViewNavigators.detailView(host, X.class).newEntity().withInitializer(e -> draftLoader.apply(draftId, e)).navigate()` — controller-side, after `accessManager.isPermitted(ViewContext)` check.
 - [ ] **EXTRACT-08**: `DraftLoader` helper applies `payloadJson` to the editing entity via Jmix `DataContext.create(...)` and `setValueIfPermitted` (per-attribute `EntityAttributeContext.canModify`) — NOT raw `setValue` (P-18 mitigation). `dataContext.validate()` runs before `Save`.
@@ -127,7 +127,7 @@ All five entities follow CLAUDE.md conventions: `@JmixEntity` + UUID + `@JmixGen
 - [x] **SPI-09**: `ToolFetchPlanCustomizer` (per TOOL-10)
 - [x] **SPI-10**: `MutationGuard` (per MUT-05)
 - [ ] **SPI-11**: `TranscriptionPostProcessor` (per STT-04)
-- [ ] **SPI-12**: `IntentExtractor<T>` (per EXTRACT-02)
+- [x] **SPI-12**: `IntentExtractor<T>` (per EXTRACT-02)
 
 All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only for app-specific behavior" (these all have concrete consumer use cases identified).
 
