@@ -247,8 +247,8 @@ Plans:
 **Requirements**: EXTRACT-01, EXTRACT-02, EXTRACT-03, EXTRACT-04, EXTRACT-05, EXTRACT-06, EXTRACT-07, EXTRACT-08, EXTRACT-09, EXTRACT-10, ENT-08, SPI-12, TEST-15, SEC-06 (row-level read on own `AiExtractionDraft` rows completes here)
 **Success Criteria** (what must be TRUE):
   1. With at least one named intent registered (the add-on ships one reference end-to-end intent plus the SPI for hosts), the user picks an intent, optionally attaches an `AiTaskFile`, and the LLM calls `prepare_form_draft(intentId, contextRefs)` exactly once — the tool returns a structured payload `{ "action": "open_form_with_draft", "draftId": "...", "entityName": "...", "instanceName": "..." }`; the LLM never receives a `ViewNavigators` or any UI-mutation primitive (TEST-15 grep / source-scanner gate).
-  2. `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) invokes `ViewNavigators.detailView(...).newEntity().withInitializer(...)` after `AccessManager.isPermitted(ViewContext)` passes; the Jmix detail view opens prefilled from `AiExtractionDraft.payloadJson`.
-  3. The prefill applies via `DataContext.create(...)` and per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); `dataContext.validate()` runs before Save; on Save the draft is deleted and a normal Jmix-secured save executes.
+  2. `StreamingEvent.ToolResult` carries the structured `prepare_form_draft` payload separately from human-readable summaries; `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) checks `UiShowViewContext` via `AccessManager`, resolves the primary detail view via `ViewRegistry`, and navigates with `ViewNavigators.detailView(...).newEntity().withViewClass(...).withAfterNavigationHandler(...)`.
+  3. The prefill applies to the opened `StandardDetailView`'s `DataContext`-tracked edited entity and uses per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); normal view validation runs before Save; on Save the draft is deleted and close-without-save leaves it for TTL cleanup.
   4. `AiExtractionDraft` rows expire after TTL (default 1h, hourly cleanup job); each row is row-level-scoped to its owner `userUsername` (`AiAgentUserRole` row policy), persisted (not `VaadinSession`-cached), and survives navigation; `prepare_form_draft` invocations are audited via `AuditWriter.writeToolCall` with `eventName=prepare_form_draft`.
 **Plans:** 8 plans
 
@@ -259,14 +259,18 @@ Plans:
 
 **Wave 2 *(blocked on Wave 1 completion)***
 - [ ] 14-03-PLAN.md — Extraction service and `prepare_form_draft` tool bridge with append-only audit and denial handling
-- [ ] 14-04-PLAN.md — Chat-service intent plumbing, named-intent tool gating, and named-intent system-prompt rules
 
 **Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 14-04-PLAN.md — Chat-service intent plumbing, named-intent tool gating, and named-intent system-prompt rules
 - [ ] 14-05-PLAN.md — Draft loader, permission-gated prefill, controller-side navigation, and save-time draft deletion
-- [ ] 14-06-PLAN.md — Jmix intent card-row UI, `open_form_with_draft` rendering, confirm row, CSS, and i18n
 
 **Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 14-06-PLAN.md — Jmix intent card-row UI, `open_form_with_draft` rendering, confirm row, CSS, and i18n
+
+**Wave 5 *(blocked on Wave 4 completion)***
 - [ ] 14-07-PLAN.md — Host `CustomerDraftIntentExtractor` reference implementation and host workflow tests
+
+**Wave 6 *(blocked on Wave 5 completion)***
 - [ ] 14-08-PLAN.md — TEST-15 navigation scanner, setValue/core-boundary scanners, eval fixtures, and final verification gates
 **UI hint**: yes
 

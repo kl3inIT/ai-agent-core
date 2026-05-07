@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: ready_to_execute
+status: Ready to execute
 stopped_at: Phase 14 planned
-last_updated: "2026-05-07T15:24:55.529Z"
+last_updated: "2026-05-07T16:26:40.928Z"
 progress:
   total_phases: 9
   completed_phases: 6
@@ -33,8 +33,8 @@ Plan: 0 of 8 complete (ready to execute)
 |-------|-------|
 | Phase | Phase 14 |
 | Plan | 0 of 8 |
-| Status | Phase 14 planned; research plus 8 executable plans created across 4 waves |
-| Last activity | 2026-05-07 — Created Phase 14 research and plan set; decision coverage passed 22/22 |
+| Status | Phase 14 planned; research plus 8 executable plans replanned across 6 waves with cross-AI review feedback incorporated |
+| Last activity | 2026-05-07 — Replanned Phase 14 with 14-REVIEWS feedback; structured ToolResult payload, Jmix detail-navigation lifecycle, and scanner hardening incorporated |
 
 ## Phase Status
 
@@ -245,7 +245,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-07T15:24:55.529Z
+**Last session:** 2026-05-07T23:23:02.526+07:00
 **Stopped at:** Phase 14 planned
 **Resume file:** .planning/phases/14-intent-driven-extraction-form-prefill/14-01-PLAN.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
