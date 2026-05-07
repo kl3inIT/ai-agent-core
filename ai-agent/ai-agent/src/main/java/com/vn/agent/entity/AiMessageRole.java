@@ -9,7 +9,8 @@ public enum AiMessageRole implements EnumClass<String> {
     USER("USER"),
     ASSISTANT("ASSISTANT"),
     SYSTEM("SYSTEM"),
-    TOOL("TOOL");
+    TOOL("TOOL"),
+    NOTICE("NOTICE"); // Phase 13.1 UX-01
 
     private final String id;
 

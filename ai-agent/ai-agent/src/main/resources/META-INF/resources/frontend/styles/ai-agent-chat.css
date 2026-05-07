@@ -10,7 +10,13 @@
  * Rule: edit this file — NOT the Java components — when tweaking visuals.
  */
 
-/* --- Message bubble (MessageBubbleComponent) -------------------------------- */
+/* --- Message bubble (MessageBubbleComponent) --------------------------------
+ *
+ * Phase 13.1 UAT-fix retains these rules: ChatPanelFragment now renders chat
+ * turns on Vaadin MessageList again, but ConversationDetailView (Plan 07-04
+ * read-only transcript replay) still composes MessageBubbleComponent and
+ * relies on these class names. Removing them would break that view.
+ */
 
 .ai-agent-bubble {
     padding: var(--lumo-space-m);
@@ -30,4 +36,121 @@
 
 .ai-agent-bubble--system {
     border-left: 2px solid var(--lumo-contrast-30pct);
+}
+
+/* --- Phase 13.1 UAT-fix: NOTICE divider row ---------------------------------
+ *
+ * The NOTICE row is rendered as a plain <div class="ai-agent-attachment-notice">
+ * sibling of the <vaadin-message-list> block. Plain-div substrate avoids the
+ * default <vaadin-avatar> upload-arrow fallback that the prior
+ * <vaadin-message class="attachment-event"> substrate exposed when no userName
+ * was set. UI-SPEC §138 explicitly allows "alternatively a custom inline element".
+ */
+.ai-agent-attachment-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lumo-space-xs);
+    padding: var(--lumo-space-s) var(--lumo-space-m);
+    margin: var(--lumo-space-m) auto;
+    max-width: fit-content;
+    color: var(--lumo-primary-text-color);
+    font-size: var(--lumo-font-size-s);
+    font-weight: 500;
+    background: var(--lumo-primary-color-10pct);
+    border: 1px solid var(--lumo-primary-color-50pct);
+    border-radius: var(--lumo-border-radius-l);
+    box-shadow: var(--lumo-box-shadow-xs);
+}
+
+.ai-agent-attachment-notice::before {
+    content: "📎";
+    font-size: var(--lumo-font-size-m);
+    line-height: 1;
+}
+
+/* --- Phase 13.1 UAT-fix-02: responsive attachments grid + card -------------- */
+
+/* Right-pane card grid: single column inside the narrow right pane so cards
+ * never overflow when the dialog is resized small. Each card stretches to the
+ * pane width via card width="100%" + min-width:0 to allow inner content to
+ * truncate instead of pushing the card wider than its container. */
+#attachmentsGridLayout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--lumo-space-s);
+    align-content: start;
+}
+
+#attachmentsGridLayout > * {
+    min-width: 0;
+}
+
+#attachmentsGridLayout vaadin-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#attachmentsGridLayout vaadin-card h5,
+#attachmentsGridLayout vaadin-card .text-secondary {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Stack the action icons under the H5 filename when the right-pane is narrow,
+ * preventing the card header from overflowing horizontally. The card's header
+ * row uses flex by default; force-wrap is the cleanest cross-Vaadin solution. */
+#attachmentsGridLayout vaadin-card::part(header) {
+    flex-wrap: wrap;
+    gap: var(--lumo-space-xs);
+}
+
+/* --- Phase 13.1: right-pane attachments dropzone ---------------------------- */
+
+vaadin-upload.attachments-dropzone {
+    margin-top: auto;
+    min-height: 8rem;
+    border: 1px dashed var(--lumo-contrast-30pct);
+    border-radius: var(--lumo-border-radius-m);
+    background: var(--lumo-contrast-5pct);
+    padding: var(--lumo-space-s);
+}
+
+vaadin-upload.attachments-dropzone::part(drop-label) {
+    color: var(--lumo-secondary-text-color);
+    font-size: var(--lumo-font-size-xs);
+    display: block;
+    width: 100%;
+    text-align: center;
+    white-space: normal;
+    margin-top: var(--lumo-space-xs);
+}
+
+vaadin-upload.attachments-dropzone::part(primary-buttons) {
+    width: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: var(--lumo-space-xs);
+}
+
+.attachment-card-meta {
+    gap: var(--lumo-space-s);
+}
+
+.attachment-card-meta-separator {
+    opacity: 0.8;
+}
+
+.attachment-card-source-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    color: var(--lumo-secondary-text-color);
+}
+
+.attachment-card-source-text {
+    font-size: 0.7rem;
 }

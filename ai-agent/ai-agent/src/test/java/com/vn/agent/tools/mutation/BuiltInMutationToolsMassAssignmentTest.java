@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verify;
  * {@code validation_failed} code. {@link MutationSaveExecutor} is stubbed so the negative
  * invariant remains explicit.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

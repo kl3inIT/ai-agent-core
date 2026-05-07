@@ -99,9 +99,19 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
             docs = retrieveDocuments(query);
             return docs;
         } catch (Throwable t) {
+            // Phase 13.1 UAT-fix-02 — RAG retrieval is best-effort: if the embedding
+            // endpoint dies (e.g. OpenRouter returns null EmbeddingList.data, or the
+            // configured embedding model is unavailable) we log + audit + return an
+            // empty document list so the chat call still runs. Without this, the whole
+            // turn fails before the LLM ever sees the user message, which is wrong —
+            // chat must work even when no KB docs can be retrieved (the user's prompt
+            // and any prepended task-file text are still sufficient context).
             outcome = "ERROR";
             errorClass = t.getClass().getSimpleName();
-            throw t;
+            log.warn("Document retrieval failed; continuing chat turn with no RAG context " +
+                    "(parentId={} runId={} error={})", parentId, runId, t.toString());
+            docs = List.of();
+            return docs;
         } finally {
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
             try {

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Serializes mutation tool argumentsJson + diff JSON for {@code AiAuditEvent.argumentsJson}
@@ -33,10 +34,14 @@ public class DiffSerializer {
 
     private final ObjectMapper objectMapper;
     private final AiAgentAuditProperties auditProperties;
+    private final MutationRequestHasher mutationRequestHasher;
 
-    public DiffSerializer(ObjectMapper objectMapper, AiAgentAuditProperties auditProperties) {
+    public DiffSerializer(ObjectMapper objectMapper,
+                          AiAgentAuditProperties auditProperties,
+                          MutationRequestHasher mutationRequestHasher) {
         this.objectMapper = objectMapper;
         this.auditProperties = auditProperties;
+        this.mutationRequestHasher = mutationRequestHasher;
     }
 
     /**
@@ -145,6 +150,69 @@ public class DiffSerializer {
             diffs.add(diff);
         }
         return writeJson(diffs);
+    }
+
+    /**
+     * Phase 13 — argumentsJson for {@code bulk_save_records} audit rows. Carries ONLY the
+     * batch shape: {@code count}, {@code entityName}, up to 3 {@code sampleHashes}, and
+     * {@code idempotencyKey}. NEVER includes raw row values (P-22 / AUD-07 — Phase 11
+     * invariant for mutation argumentsJson).
+     *
+     * <p>{@code sampleHashes} are SHA-256 over canonical JSON of records[0..min(2,N)] so
+     * operators can correlate audit rows with later complaints / replays without storing
+     * any user-supplied text.
+     */
+    public String serializeBulkArgumentsJson(String entityName,
+                                             List<Map<String, Object>> records,
+                                             String idempotencyKey) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("entityName", entityName);
+        payload.put("count", records == null ? 0 : records.size());
+        List<String> sampleHashes = new ArrayList<>();
+        if (records != null) {
+            int sampleCount = Math.min(records.size(), 3);
+            for (int i = 0; i < sampleCount; i++) {
+                sampleHashes.add(mutationRequestHasher.hashCanonical(records.get(i)));
+            }
+        }
+        payload.put("sampleHashes", sampleHashes);
+        payload.put("idempotencyKey", idempotencyKey);
+        return writeJson(payload);
+    }
+
+    /**
+     * Phase 13 REVIEWS HIGH-11 — resultSummary for {@code bulk_save_records} success +
+     * {@code IDEMPOTENT_REPLAY}. Persisted in {@code AiMutationIntent.RESULT_SUMMARY} so a
+     * replay returns the original {@code savedIds} array. UUIDs are not considered PII per
+     * Phase 11 (already used in single-record DiffSerializer result summaries).
+     */
+    public String serializeBulkResultSummary(List<UUID> savedIds) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("count", savedIds == null ? 0 : savedIds.size());
+        List<String> idStrings = new ArrayList<>();
+        if (savedIds != null) {
+            for (UUID id : savedIds) {
+                idStrings.add(id == null ? null : id.toString());
+            }
+        }
+        summary.put("savedIds", idStrings);
+        return writeJson(summary);
+    }
+
+    /**
+     * Phase 13 — resultSummary for {@code bulk_save_records} failure audit rows. Emits ONLY
+     * the failed row index, the stable error code, and the per-row operation kind ("create"
+     * for rows missing an id; "update" for rows carrying an id). NEVER echoes the failed
+     * attribute name or the failed value (P-22 — Phase 11 mutation invariant).
+     */
+    public String serializeBulkFailureSummary(int failedRowIndex,
+                                              String stableErrorCode,
+                                              String operation) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("failedRowIndex", failedRowIndex);
+        summary.put("errorCode", stableErrorCode);
+        summary.put("operation", operation);
+        return writeJson(summary);
     }
 
     /**

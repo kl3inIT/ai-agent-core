@@ -133,4 +133,92 @@ class LocaleParityTest {
                     .isTrue();
         }
     }
+
+    /**
+     * Phase 13.1 Plan 07 — REQ-9 / I18N-01 attachments-key parity gate.
+     *
+     * <p>Plan 13.1-04 added 14 new {@code chatView.attachments.*} keys (plus the
+     * {@code AiMessageRole.NOTICE} enum caption from Plan 13.1-01) to the EN bundle
+     * and the VI bundle. This test pins the 15 keys in BOTH bundles so a unilateral
+     * key add (or a typo on one side) silently regressing one locale is caught.
+     */
+    @Test
+    void allPhase13Dot1AttachmentsKeysPresentInBothBundles() throws IOException {
+        Properties en = load("/com/vn/agent/messages_en.properties");
+        Properties vi = load("/com/vn/agent/messages_vi.properties");
+
+        List<String> requiredKeys = List.of(
+                // Plan 13.1-04 — 14 chatView.attachments.* keys.
+                "chatView.attachments.title",
+                "chatView.attachments.uploadText",
+                "chatView.attachments.dropLabel",
+                "chatView.attachments.emptyState",
+                "chatView.attachments.notice",
+                "chatView.attachments.budgetExceeded",
+                "chatView.attachments.action.download",
+                "chatView.attachments.action.delete",
+                "chatView.attachments.deleteConfirm.title",
+                "chatView.attachments.deleteConfirm.message",
+                "chatView.attachments.deleteConfirm.confirm",
+                "chatView.attachments.deleteConfirm.cancel",
+                "chatView.attachments.delete.failed",
+                "chatView.attachments.missingFileName",
+                // Plan 13.1-01 — AiMessageRole.NOTICE enum caption.
+                "com.vn.agent.entity/AiMessageRole.NOTICE");
+
+        for (String key : requiredKeys) {
+            assertThat(en.containsKey(key))
+                    .as("Phase 13.1 key %s must exist in messages_en.properties", key)
+                    .isTrue();
+            assertThat(vi.containsKey(key))
+                    .as("Phase 13.1 key %s must exist in messages_vi.properties", key)
+                    .isTrue();
+
+            String enValue = en.getProperty(key);
+            String viValue = vi.getProperty(key);
+            assertThat(enValue)
+                    .as("Phase 13.1 key %s must have a non-blank EN value", key)
+                    .isNotNull()
+                    .isNotBlank();
+            assertThat(viValue)
+                    .as("Phase 13.1 key %s must have a non-blank VI value", key)
+                    .isNotNull()
+                    .isNotBlank();
+        }
+    }
+
+    /**
+     * Phase 13.1 Plan 07 — REQ-9 namespace-symmetry gate. The symmetric difference
+     * between EN and VI key sets restricted to the {@code chatView.attachments.}
+     * namespace MUST be empty. Other namespaces may legitimately differ for legacy
+     * reasons (handled by {@link #bundlesHaveIdenticalKeySets}); this narrower gate
+     * is the Phase 13.1 attachments-only invariant.
+     */
+    @Test
+    void chatViewAttachmentsNamespaceHasIdenticalKeySetAcrossBundles() throws IOException {
+        Properties en = load("/com/vn/agent/messages_en.properties");
+        Properties vi = load("/com/vn/agent/messages_vi.properties");
+
+        Set<Object> enAttachmentsKeys = en.keySet().stream()
+                .filter(k -> ((String) k).startsWith("chatView.attachments."))
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Object> viAttachmentsKeys = vi.keySet().stream()
+                .filter(k -> ((String) k).startsWith("chatView.attachments."))
+                .collect(java.util.stream.Collectors.toSet());
+
+        Set<Object> enOnly = new HashSet<>(enAttachmentsKeys);
+        enOnly.removeAll(viAttachmentsKeys);
+        Set<Object> viOnly = new HashSet<>(viAttachmentsKeys);
+        viOnly.removeAll(enAttachmentsKeys);
+
+        assertThat(new TreeSet<>(enOnly))
+                .as("chatView.attachments.* keys present in EN but missing from VI")
+                .isEmpty();
+        assertThat(new TreeSet<>(viOnly))
+                .as("chatView.attachments.* keys present in VI but missing from EN")
+                .isEmpty();
+        assertThat(enAttachmentsKeys)
+                .as("Phase 13.1 attachments namespace must be non-empty")
+                .isNotEmpty();
+    }
 }

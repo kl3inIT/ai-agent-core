@@ -4,6 +4,7 @@ import com.vn.agent.conversation.AiAgentTitleProperties;
 import com.vn.agent.rag.MdcPropagatingTaskDecorator;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.MutationGuard;
+import com.vn.agent.taskfile.AiTaskFileProperties;
 import io.jmix.core.annotation.JmixModule;
 import io.jmix.core.impl.scanning.AnnotationScanMetadataReaderFactory;
 import io.jmix.data.DataConfiguration;
@@ -14,6 +15,7 @@ import io.jmix.flowui.sys.ViewControllersConfiguration;
 import io.jmix.security.SecurityConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -29,6 +31,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Configuration
 @ComponentScan
 @ConfigurationPropertiesScan
+@EnableConfigurationProperties({AiTaskFileProperties.class})
 @EnableAsync
 @EnableScheduling
 @JmixModule(dependsOn = {

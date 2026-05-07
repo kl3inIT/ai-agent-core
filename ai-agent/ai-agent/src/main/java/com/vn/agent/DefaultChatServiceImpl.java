@@ -30,6 +30,8 @@ import com.vn.agent.rag.RetrievalFilterBuilder;
 import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.ToolVetoedException;
+import com.vn.agent.taskfile.AiTaskFileMediaResolver;
+import com.vn.agent.taskfile.AiTaskFileRepository;
 import com.vn.agent.tools.AgentToolCallbacks;
 import io.jmix.core.security.CurrentAuthentication;
 import jakarta.validation.ConstraintViolationException;
@@ -41,6 +43,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.content.Media;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
@@ -53,8 +56,9 @@ import reactor.core.scheduler.Scheduler;
 
 import com.vn.agent.orchestration.ConversationNotFoundException;
 
-import java.util.Map;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -131,6 +135,12 @@ public class DefaultChatServiceImpl implements ChatService {
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
     private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
+    // Phase 13.1 Plan 03 — per-turn-all Media injection via resolveActive(...). The Phase 13
+    // single-turn pending-state stamp and the standalone two-phase user-message persist seam
+    // are gone; the chat-memory advisor's own AiMessage projection is now the sole user-message
+    // persistence path (RES-01 + project memory feedback_jmix_unconstrained_for_system_writes).
+    private final AiTaskFileMediaResolver taskFileMediaResolver;
+    private final AiTaskFileRepository taskFileRepository;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -148,7 +158,9 @@ public class DefaultChatServiceImpl implements ChatService {
                                   CancellationRegistry cancellationRegistry,
                                   StreamingSinkHolder streamingSinkHolder,
                                   AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
-                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher) {
+                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher,
+                                  AiTaskFileMediaResolver taskFileMediaResolver,
+                                  AiTaskFileRepository taskFileRepository) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -166,6 +178,8 @@ public class DefaultChatServiceImpl implements ChatService {
         this.streamingSinkHolder = streamingSinkHolder;
         this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
         this.titleEligibilityPublisher = titleEligibilityPublisher;
+        this.taskFileMediaResolver = taskFileMediaResolver;
+        this.taskFileRepository = taskFileRepository;
     }
 
     @Override
@@ -244,66 +258,27 @@ public class DefaultChatServiceImpl implements ChatService {
             RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
             RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
-            ChatClientResponse clientResp = chatClient.prompt()
-                    .system(composedSystemPrompt)
-                    .user(message)
-                    .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
-                    .toolContext(auditToolContext(runId, convId))
-                    .advisors(advisorSpec -> {
-                        advisorSpec
-                                .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                                .param("audit.runId", runId)
-                                .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
-                                .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
-                                        retrievalSimilarityThreshold);
-                        if (ragFilter != null) {
-                            advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
-                        }
-                    })
-                    .options(ChatOptions.builder()
-                            .model(model)
-                            .temperature(parametersResolver.effectiveTemperature(active))
-                            .topP(parametersResolver.effectiveTopP(active))
-                            .maxTokens(parametersResolver.effectiveMaxTokens(active))
-                            .build())
-                    .call()
-                    .chatClientResponse();
-
-            ChatResponse springResponse = clientResp.chatResponse();
-            String content = springResponse != null
-                    && springResponse.getResult() != null
-                    && springResponse.getResult().getOutput() != null
-                            ? springResponse.getResult().getOutput().getText()
-                            : "";
-            if (content == null) {
-                content = "";
-            }
-
-            // Post-response token accumulation for the breaker.
-            long tokensUsed = usageTokens(springResponse);
-            tokenBudgetGuard.accumulate(convId, tokensUsed);
-
-            // Promote scanner flag (D-17/D-18 — pattern KEY only, never matched text).
-            String flaggedKey = null;
+            // Phase 13 Plan 04 — opportunistic TTL cleanup. Best-effort; never blocks a chat
+            // turn (CONTEXT.md "TTL cleanup hourly + opportunistic on chat-send"). Wrapped in
+            // try/catch so a transient cleanup-job failure cannot fail the user's request.
             try {
-                Map<String, Object> context = clientResp.context();
-                Object contextFlag = context == null ? null
-                        : context.get(OutputScannerAdvisor.CONTEXT_KEY_FLAGGED_PATTERN);
-                if (contextFlag instanceof String s && !s.isBlank()) {
-                    flaggedKey = s;
-                    auditFlagged(runId, userId, convId, flaggedKey);
-                }
-            } catch (RuntimeException readCtx) {
-                log.debug("Failed to read scanner context flag runId={}", runId, readCtx);
+                taskFileRepository.deleteAllExpired(java.time.OffsetDateTime.now());
+            } catch (Exception cleanupEx) {
+                log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
             }
-            boolean flagged = flaggedKey != null;
 
-            long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
-            log.debug("ChatService.ask convId={} runId={} model={} latencyMs={} flagged={}",
-                    convId, runId, model, latencyMs, flagged);
-            publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
-            return new ChatResponseDto(convId, runId, content, model, latencyMs,
-                    flagged, flaggedKey, null);
+            // Phase 13.1 Plan 03 RES-01 — per-turn-all Media injection. The resolver
+            // loads ALL non-expired AiTaskFile rows for the conversation in DESC order,
+            // applies the per-turn caps, and returns Resolved(media, budgetExceeded).
+            // The Phase 13 single-turn pending-state stamp and the two-phase write seam
+            // are gone; the chat-memory advisor's own AiMessage projection is now the
+            // sole user-message persistence path.
+            final AiTaskFileMediaResolver.Resolved resolvedMedia =
+                    taskFileMediaResolver.resolveActive(convId);
+
+            return executeBlockingTurn(userId, convId, message, effectiveOverrides,
+                    resolvedMedia, composedSystemPrompt, model, active,
+                    ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
             // Iteration-cap request-level audit row is written by GuardedToolCallingManager (D-11).
@@ -321,6 +296,120 @@ public class DefaultChatServiceImpl implements ChatService {
         }
     }
 
+    /**
+     * Executes the blocking-call portion of a chat turn against an ALREADY-RESOLVED
+     * Media list. Used by both the public {@link #ask} entrypoint AND the
+     * {@link #stream} catch-block fallback (D-04 graceful streaming fallback) so
+     * the resolver runs exactly ONCE per turn — the BLK-01 invariant from Phase 13
+     * (gap-closure plan 13-06). Phase 13.1 Plan 03 dropped the
+     * {@code userMessageIdAlreadyPersisted} parameter because the per-turn-all
+     * resolver no longer needs a pending-state marker, so there is nothing left
+     * for an external persister to thread back here.
+     *
+     * @param userId attribution user (for audit/run-context)
+     * @param convId conversation id (already loaded by caller)
+     * @param message raw user-message text (verbatim)
+     * @param effectiveOverrides resolved overrides (NEVER null; caller normalizes)
+     * @param resolvedMedia pre-resolved Media + budgetExceeded; may be empty but never null
+     * @param composedSystemPrompt system prompt already composed by caller
+     * @param model resolved model id (caller already applied Overrides + AiParameters)
+     * @param active resolved {@link AiParameters} snapshot (caller already loaded)
+     * @param ragFilter RAG filter expression or {@code null} (admin-bypass)
+     * @param retrievalTopK already-resolved RAG top-K
+     * @param retrievalSimilarityThreshold already-resolved similarity threshold
+     * @param runId already-allocated run id (caller manages RunContext lifecycle)
+     * @param startNanos start instant for latency calculation
+     * @return blocking ChatResponseDto for the turn (carries
+     *         {@code budgetExceeded} from the resolver per D-D1)
+     */
+    private ChatResponseDto executeBlockingTurn(String userId,
+                                                UUID convId,
+                                                String message,
+                                                Overrides effectiveOverrides,
+                                                AiTaskFileMediaResolver.Resolved resolvedMedia,
+                                                String composedSystemPrompt,
+                                                String model,
+                                                AiParameters active,
+                                                Filter.Expression ragFilter,
+                                                int retrievalTopK,
+                                                double retrievalSimilarityThreshold,
+                                                UUID runId,
+                                                long startNanos) {
+        // Phase 13.1 UAT-fix-02 — Tika-extracted document text rides the SYSTEM prompt,
+        // NOT the user message text. Spring AI's chat memory only persists USER +
+        // ASSISTANT messages, so per-turn rebuilt system prompts never pollute history
+        // replay. The earlier attempt prepended documents into the user message and the
+        // "=== End === / User message:" scaffolding leaked into next-session UI replay.
+        final String systemPromptWithDocs = appendDocumentBlocks(
+                composedSystemPrompt, resolvedMedia.documentTexts());
+        ChatClientResponse clientResp = chatClient.prompt()
+                .system(systemPromptWithDocs)
+                .user(u -> {
+                    // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
+                    u.text(message);
+                    if (!resolvedMedia.media().isEmpty()) {
+                        u.media(resolvedMedia.media().toArray(new Media[0]));
+                    }
+                })
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                .toolContext(auditToolContext(runId, convId))
+                .advisors(advisorSpec -> {
+                    advisorSpec
+                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
+                            .param("audit.runId", runId)
+                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                    retrievalSimilarityThreshold);
+                    if (ragFilter != null) {
+                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
+                    }
+                })
+                .options(ChatOptions.builder()
+                        .model(model)
+                        .temperature(parametersResolver.effectiveTemperature(active))
+                        .topP(parametersResolver.effectiveTopP(active))
+                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
+                        .build())
+                .call()
+                .chatClientResponse();
+
+        ChatResponse springResponse = clientResp.chatResponse();
+        String content = springResponse != null
+                && springResponse.getResult() != null
+                && springResponse.getResult().getOutput() != null
+                        ? springResponse.getResult().getOutput().getText()
+                        : "";
+        if (content == null) {
+            content = "";
+        }
+
+        // Post-response token accumulation for the breaker.
+        long tokensUsed = usageTokens(springResponse);
+        tokenBudgetGuard.accumulate(convId, tokensUsed);
+
+        // Promote scanner flag (D-17/D-18 — pattern KEY only, never matched text).
+        String flaggedKey = null;
+        try {
+            Map<String, Object> ctx = clientResp.context();
+            Object contextFlag = ctx == null ? null
+                    : ctx.get(OutputScannerAdvisor.CONTEXT_KEY_FLAGGED_PATTERN);
+            if (contextFlag instanceof String s && !s.isBlank()) {
+                flaggedKey = s;
+                auditFlagged(runId, userId, convId, flaggedKey);
+            }
+        } catch (RuntimeException readCtx) {
+            log.debug("Failed to read scanner context flag runId={}", runId, readCtx);
+        }
+        boolean flagged = flaggedKey != null;
+
+        long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        log.debug("ChatService.executeBlockingTurn convId={} runId={} model={} latencyMs={} flagged={}",
+                convId, runId, model, latencyMs, flagged);
+        publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
+        return new ChatResponseDto(convId, runId, content, model, latencyMs,
+                flagged, flaggedKey, null, resolvedMedia.budgetExceeded());
+    }
+
     @Override
     public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
@@ -329,12 +418,46 @@ public class DefaultChatServiceImpl implements ChatService {
 
         return Flux.defer(() -> {
                     RunContext.set(runId);
+                    // CR-01 fix: prime the per-thread iteration counter at subscribe time so
+                    // GuardedToolCallingManager sees clean ThreadLocal state regardless of
+                    // transport mode. Counterpart reset() lives in the .doFinally below
+                    // (mirrors ask()'s start() at line 196 + reset() in finally at line 433).
+                    IterationCounter.start();
+
+                    // CR-01 fix: guard preamble — rate-limit BEFORE conversationGateway so a
+                    // denied first turn does not persist an AiConversation row (mirrors
+                    // ask()'s WR-01 ordering at lines 200-208). On denial: emit a terminal
+                    // Error + Final event pair and skip all streaming machinery.
+                    try {
+                        rateLimitGuard.check(userId);
+                    } catch (RateLimitExceededException rate) {
+                        auditDenial(runId, userId, conversationId, "rate-limit-exceeded");
+                        long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Error("ai-agent.guard.rate-limit-exceeded",
+                                        Map.of("retryAfterSec", 60)),
+                                new StreamingEvent.Final(runId, conversationId, denyLatencyMs, 0, 0));
+                    }
+
                     // Tool-event sink — decorator emits ToolCall/ToolResult here; merged with content Flux below.
                     Sinks.Many<StreamingEvent> toolSink = Sinks.many().unicast().onBackpressureBuffer();
                     streamingSinkHolder.register(runId, toolSink);
 
                     final AiConversation conversation = conversationGateway.loadOrCreate(userId, conversationId, message);
                     final UUID convId = conversation.getId();
+
+                    // CR-01 fix: token-budget gate runs AFTER loadOrCreate because it is
+                    // strictly per-conversation (mirrors ask() at lines 215-221).
+                    try {
+                        tokenBudgetGuard.check(convId);
+                    } catch (TokenBudgetExhaustedException budget) {
+                        auditDenial(runId, userId, convId, "token-budget-exhausted");
+                        long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Error("ai-agent.guard.token-budget-exhausted", Map.of()),
+                                new StreamingEvent.Final(runId, convId, denyLatencyMs, 0, 0));
+                    }
+
                     final AtomicBoolean assistantContentSeen = new AtomicBoolean(false);
                     final AtomicBoolean titlePublicationHandled = new AtomicBoolean(false);
 
@@ -364,11 +487,39 @@ public class DefaultChatServiceImpl implements ChatService {
                     RunContext.setRetrievalSimilarityThreshold(retrievalSimilarityThreshold);
                     RunContext.setRetrievalFiltersJson(ragFilter == null ? null : ragFilter.toString());
 
+                    // Phase 13 Plan 04 — opportunistic TTL cleanup, hoisted INSIDE Flux.defer
+                    // so it runs at subscribe time (not flux-build time). Best-effort; never
+                    // blocks a chat turn.
+                    try {
+                        taskFileRepository.deleteAllExpired(java.time.OffsetDateTime.now());
+                    } catch (Exception cleanupEx) {
+                        log.debug("Opportunistic task-file cleanup skipped: {}", cleanupEx.toString());
+                    }
+
+                    // Phase 13.1 Plan 03 RES-01 — per-turn-all Media injection.
+                    // RESEARCH Pitfall 8: hoisted INSIDE Flux.defer so readAllBytes does not
+                    // run on the calling thread before subscription. The Phase 13 single-turn
+                    // pending-state stamp and the two-phase write seam are gone; the chat-memory
+                    // advisor's own AiMessage projection is the sole user-message persistence
+                    // path going forward.
+                    final AiTaskFileMediaResolver.Resolved resolvedMedia =
+                            taskFileMediaResolver.resolveActive(convId);
+                    // Phase 13.1 UAT-fix-02 — system-prompt injection of document blocks
+                    // (see blocking path comment for rationale).
+                    final String systemPromptWithDocs = appendDocumentBlocks(
+                            composedSystemPrompt, resolvedMedia.documentTexts());
+
                     Flux<StreamingEvent> content;
                     try {
                         content = chatClient.prompt()
-                                .system(composedSystemPrompt)
-                                .user(message)
+                                .system(systemPromptWithDocs)
+                                .user(u -> {
+                                    // AI-SPEC pitfall 6: lambda form REQUIRED when media is non-empty.
+                                    u.text(message);
+                                    if (!resolvedMedia.media().isEmpty()) {
+                                        u.media(resolvedMedia.media().toArray(new Media[0]));
+                                    }
+                                })
                                 .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
                                 .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
@@ -403,9 +554,14 @@ public class DefaultChatServiceImpl implements ChatService {
                                 .doOnComplete(toolSink::tryEmitComplete)
                                 .doOnError(ex -> toolSink.tryEmitComplete());
                     } catch (UnsupportedOperationException nonStreaming) {
-                        // D-04 graceful fallback: provider does not support streaming. Fall through to
-                        // blocking ask(...) wrapped as a single Content chunk + Final.
-                        ChatResponseDto blocking = ask(userId, convId, message, effectiveOverrides);
+                        // BLK-01 fix (gap-closure plan 13-06): D-04 graceful fallback. The chat model
+                        // does not support streaming. Reuse the ALREADY-RESOLVED Media by delegating
+                        // to executeBlockingTurn(...) — do NOT recurse through ask(...) (which would
+                        // re-resolve, double-running the resolver and re-emitting the budget-exceeded
+                        // audit row).
+                        ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
+                                resolvedMedia, composedSystemPrompt, model, active,
+                                ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
@@ -419,8 +575,12 @@ public class DefaultChatServiceImpl implements ChatService {
                         if (assistantContentSeen.get() && !titlePublicationHandled.get()) {
                             publishTitleEligibilityIfAssistantReply(convId, userId, runId, "streamed");
                         }
+                        // Phase 13.1 D-D1: propagate the resolver's budgetExceeded flag onto the
+                        // terminal Final event so the streaming-path subscriber can render the
+                        // same toast as the blocking-path subscriber.
                         return Flux.<StreamingEvent>just(
-                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0));
+                                new StreamingEvent.Final(runId, convId, latencyMs, 0, 0,
+                                        resolvedMedia.budgetExceeded()));
                     }));
                 })
         .subscribeOn(chatStreamingScheduler)
@@ -435,6 +595,10 @@ public class DefaultChatServiceImpl implements ChatService {
                 cancellationRegistry.register(runId, subscription::cancel))
         .onErrorResume(ex -> Flux.just(mapToStreamingError(ex)))
         .doFinally(signalType -> {
+            // CR-01 fix: reset iteration counter on every terminal signal (complete,
+            // cancel, error). Pairs with IterationCounter.start() at the top of Flux.defer
+            // — mirrors ask()'s finally at line 433.
+            IterationCounter.reset();
             RunContext.clear();
             streamingSinkHolder.unregister(runId);
             cancellationRegistry.clearDisposable(runId);
@@ -628,5 +792,47 @@ public class DefaultChatServiceImpl implements ChatService {
         } catch (RuntimeException anonymous) {
             return Locale.getDefault();
         }
+    }
+
+    /**
+     * Phase 13.1 UAT-fix-02 — append labeled blocks of Tika-extracted document text
+     * to the SYSTEM prompt (not the user message). System messages are not persisted
+     * by Spring AI's chat memory advisor, so per-turn document context never pollutes
+     * the chat history that is replayed in the UI.
+     *
+     * <p>Block layout (kept intentionally obvious for the LLM):
+     * <pre>
+     *   {existing system prompt}
+     *
+     *   The user has attached the following document(s) for this turn — use them
+     *   as authoritative context when answering:
+     *
+     *   === Attachment: foo.pdf ===
+     *   ...extracted text...
+     *   === End ===
+     * </pre>
+     *
+     * Returns the system prompt unchanged when no documents were extracted.
+     */
+    private static String appendDocumentBlocks(String systemPrompt,
+                                               List<AiTaskFileMediaResolver.DocumentText> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return systemPrompt == null ? "" : systemPrompt;
+        }
+        StringBuilder sb = new StringBuilder(systemPrompt == null ? 0 : systemPrompt.length() + 512);
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            sb.append(systemPrompt).append("\n\n");
+        }
+        sb.append("The user has attached the following document(s) for this turn — " +
+                "use them as authoritative context when answering:\n\n");
+        for (AiTaskFileMediaResolver.DocumentText d : documents) {
+            sb.append("=== Attachment: ").append(d.filename()).append(" ===\n");
+            sb.append(d.text());
+            if (d.truncated()) {
+                sb.append("\n[...truncated to fit token budget...]");
+            }
+            sb.append("\n=== End ===\n\n");
+        }
+        return sb.toString();
     }
 }

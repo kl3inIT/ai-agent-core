@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
  * composition fixtures and mocked access/exposure gates to prove denied paths stop before
  * {@link MutationSaveExecutor}.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",

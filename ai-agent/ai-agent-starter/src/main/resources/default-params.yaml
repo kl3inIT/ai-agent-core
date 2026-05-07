@@ -1,4 +1,4 @@
-model: openai/gpt-4o-mini
+model: qwen/qwen3.6-35b-a3b
 temperature: 0.2
 topP: 1.0
 maxTokens: 2048

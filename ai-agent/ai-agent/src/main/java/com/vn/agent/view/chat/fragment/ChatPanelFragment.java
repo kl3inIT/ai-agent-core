@@ -12,17 +12,25 @@ import com.vaadin.flow.component.messages.MessageListItem;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.component.upload.FileRejectedEvent;
+import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
+import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
+import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
 import io.jmix.core.DataManager;
+import io.jmix.core.FileRef;
+import io.jmix.core.FileStorage;
+import io.jmix.core.FileStorageLocator;
 import io.jmix.core.Messages;
+import io.jmix.core.Metadata;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
@@ -30,38 +38,64 @@ import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
+import io.jmix.flowui.component.gridlayout.GridLayout;
+import io.jmix.flowui.component.upload.JmixUpload;
 import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
 import io.jmix.flowui.fragment.FragmentDescriptor;
 import io.jmix.flowui.fragment.FragmentOwner;
 import io.jmix.flowui.kit.action.ActionVariant;
 import io.jmix.flowui.kit.component.button.JmixButton;
+import io.jmix.flowui.model.CollectionContainer;
+import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.event.EventListener;
 import org.springframework.lang.NonNull;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.text.MessageFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
-/** D-29 substrate on Vaadin MessageList + MessageInput. D-03 per-event ui.access; D-04 Stop
- *  via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach. Public API for ChatView:
- *  setConversationId / hasMessages / isStreaming / startNewChat. */
+/** D-29 substrate: Phase 13.1 UAT-fix — left chat column renders USER/ASSISTANT turns
+ *  on Vaadin {@link MessageList} + {@link MessageListItem} (Phase 7.1 baseline,
+ *  feedback_jmix_first_ui — these ARE Vaadin components shipped by Jmix). NOTICE rows
+ *  render as plain {@code <div class="ai-agent-attachment-notice">} sibling elements
+ *  appended to the message-list slot AFTER the {@code <vaadin-message-list>} block;
+ *  this avoids the default {@code <vaadin-avatar>} upload-arrow fallback that the
+ *  prior {@code <vaadin-message class="attachment-event">} substrate exposed when no
+ *  userName was set. UI-SPEC §138 explicitly allows "alternatively a custom inline
+ *  element" for the NOTICE row, so this satisfies the visual contract.
+ *  The right pane stays data-loader driven via {@code taskFilesDl}; empty-state
+ *  visibility toggles on {@link CollectionLoader.PostLoadEvent}. D-03 per-event
+ *  ui.access; D-04 Stop via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach.
+ *  Public API for ChatView: setConversationId / hasMessages / isStreaming / startNewChat. */
 @FragmentDescriptor("chat-panel-fragment.xml")
 public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private static final Logger log = LoggerFactory.getLogger(ChatPanelFragment.class);
+    private static final OffsetDateTime NON_EXPIRING_EXPIRES_AT =
+            OffsetDateTime.of(9999, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC);
     private static final int USER_COLOR = 0;
     private static final int AI_COLOR = 2;
 
@@ -72,6 +106,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @ViewComponent private VerticalLayout messageListSlot;
     @ViewComponent private VerticalLayout messageInputSlot;
 
+    // Phase 13.1 REQ-7 / Pitfall 6 — slot id contract preserved; field type stays
+    // VerticalLayout exactly because Phase 12 ChatSurfaceMounter binds by this type.
+    @ViewComponent private VerticalLayout attachmentsPanel;
+    // Phase 13.1 UI-01 — right-pane data container + loader for the card grid.
+    @ViewComponent private CollectionContainer<AiTaskFile> taskFilesDc;
+    @ViewComponent private CollectionLoader<AiTaskFile> taskFilesDl;
+    @ViewComponent private VerticalLayout attachmentsEmptyState;
+    @ViewComponent private GridLayout attachmentsGridLayout;
+    @ViewComponent private JmixUpload taskFileUpload;
+
     @Autowired private ChatService chatService;
     @Autowired private ConversationGateway conversationGateway;
     @Autowired private CancellationRegistry cancellationRegistry;
@@ -81,6 +125,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
+    // Phase 13 Plan 04 — task-file persistence collaborators.
+    @Autowired private Metadata metadataApi;
+    @Autowired private FileStorageLocator fileStorageLocator;
+    @Autowired private AiTaskFileProperties taskFileProperties;
 
     private MessageList messageList;
     private MessageInput messageInput;
@@ -88,20 +136,72 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
 
+    private Path uploadTempDir;
+
+    /**
+     * REVIEWS HIGH-5 — server-side MIME allowlist re-validated INSIDE the upload handler
+     * BEFORE FileStorage.saveStream and BEFORE Metadata.create(AiTaskFile.class). Mirrors
+     * the 13-entry allowlist consumed by AiTaskFileMediaResolver (Plan 13-02). Client-side
+     * acceptedFileTypes on the &lt;upload&gt; element is bypassable via dev tools, so we
+     * MUST repeat the check server-side (see threat T-13-15).
+     */
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "text/csv",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/html",
+            "text/plain",
+            "text/markdown",
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp"
+    );
+
+    /**
+     * Extension-based fallback when the browser sends a generic content type (e.g.
+     * application/octet-stream). Mirrors AiTaskFileMediaResolver#EXTENSION_MIME_TYPES.
+     */
+    private static final Map<String, String> EXTENSION_TO_CONTENT_TYPE = Map.ofEntries(
+            Map.entry(".pdf", "application/pdf"),
+            Map.entry(".csv", "text/csv"),
+            Map.entry(".doc", "application/msword"),
+            Map.entry(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+            Map.entry(".xls", "application/vnd.ms-excel"),
+            Map.entry(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            Map.entry(".html", "text/html"),
+            Map.entry(".htm", "text/html"),
+            Map.entry(".txt", "text/plain"),
+            Map.entry(".md", "text/markdown"),
+            Map.entry(".png", "image/png"),
+            Map.entry(".jpg", "image/jpeg"),
+            Map.entry(".jpeg", "image/jpeg"),
+            Map.entry(".gif", "image/gif"),
+            Map.entry(".webp", "image/webp")
+    );
+
     private UUID conversationId;
     private UUID activeRunId;
     private volatile Disposable activeStream;
     private MessageListItem botMsg;
     private volatile UI ownerUi;
     private Registration conversationIdStateRegistration;
+    // Phase 13.1 UAT-fix — tracks visible turns across the mixed substrate
+    // (MessageList items + NOTICE divs) so hasMessages() is O(1).
+    private int messageCount;
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
+        // Phase 13.1 UAT-fix — restore Vaadin MessageList substrate (Phase 7.1 baseline).
         messageList = new MessageList();
         messageList.setMarkdown(true);
         messageList.setWidthFull();
         messageList.getStyle().set("flex-grow", "1");
         messageListSlot.add(messageList);
+        messageList.setItems(items);
 
         messageInput = new MessageInput();
         messageInput.setWidthFull();
@@ -116,7 +216,95 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
         resolveLabels();
         updateTitleEditState();
-        messageList.setItems(items);
+
+        // Phase 13.1 UI-01 — right-pane upload handler + loader binding.
+        initAttachmentsAndUpload();
+        if (conversationId != null) {
+            taskFilesDl.setParameter("conversationId", conversationId);
+            taskFilesDl.load();
+        }
+        // Initial empty-state toggle (loader may already be primed by setConversationIdInternal).
+        refreshTaskFiles();
+    }
+
+    /**
+     * Phase 13.1 UI-01 — server-side validation + UploadHandler.toFile registration on the
+     * reshaped {@code taskFileUpload} element (right-pane). The handler body (file save →
+     * AiTaskFile insert → handleUploadedFile callback) is unchanged from Phase 13 except
+     * the id rename and the chip-strip removal.
+     *
+     * <p>REVIEWS HIGH-4 carry-over: Vaadin 24.8 marks the legacy Upload receiver API
+     * forRemoval; the {@code UploadHandler.toFile} path is the canonical Jmix 2.8 contract
+     * per project memory feedback_jmix_upload_receiver_deprecated.</p>
+     */
+    private void initAttachmentsAndUpload() {
+        try {
+            uploadTempDir = Files.createTempDirectory("ai-agent-task-file-upload-");
+        } catch (IOException ex) {
+            log.warn("Failed to create upload temp directory; falling back to default temp", ex);
+            uploadTempDir = Path.of(System.getProperty("java.io.tmpdir", "."));
+        }
+
+        // REVIEWS HIGH-4 — UploadHandler.toFile: each accepted multi-file upload is streamed
+        // by Jmix into a temp file under uploadTempDir; the lambda runs ONCE per file with
+        // the metadata + Path. MIME / size validation runs INSIDE the lambda (REVIEWS HIGH-5)
+        // BEFORE FileStorage.saveStream and BEFORE Metadata.create(AiTaskFile.class).
+        taskFileUpload.setMaxFileSize((int) Math.min(taskFileProperties.getMaxFileSizeBytes(), Integer.MAX_VALUE));
+        taskFileUpload.setUploadHandler(UploadHandler.toFile(
+                (uploadMetadata, stagedFile) -> handleUploadedFile(
+                        uploadMetadata.fileName(),
+                        uploadMetadata.contentType(),
+                        uploadMetadata.contentLength(),
+                        stagedFile.toPath()),
+                fileMetadata -> uploadTempDir.resolve(
+                        UUID.randomUUID() + "-" + safeFileName(fileMetadata.fileName())).toFile()));
+    }
+
+    /**
+     * Phase 13.1 UI-01 — empty-state visibility toggle, fired by Jmix's typed
+     * {@link CollectionLoader.PostLoadEvent}. Matches project memory
+     * {@code feedback_jmix_data_loader_events}: data-loader events use
+     * {@code @Subscribe(id="...", target=Target.DATA_LOADER)} with typed event records,
+     * not {@code loader.addPostLoadListener(...)}.
+     */
+    @Subscribe(id = "taskFilesDl", target = Target.DATA_LOADER)
+    public void onTaskFilesPostLoad(final CollectionLoader.PostLoadEvent<AiTaskFile> event) {
+        refreshTaskFiles();
+    }
+
+    @EventListener
+    public void onTaskFileDeleted(final AiTaskFileDeletedUiEvent event) {
+        if (event.getConversationId() != null
+                && !Objects.equals(conversationId, event.getConversationId())) {
+            return;
+        }
+        if (taskFilesDl != null) {
+            taskFilesDl.load();
+        } else {
+            refreshTaskFiles();
+        }
+    }
+
+    private void refreshTaskFiles() {
+        if (taskFilesDc == null || attachmentsEmptyState == null || attachmentsGridLayout == null) {
+            return;
+        }
+        boolean empty = taskFilesDc.getItems().isEmpty();
+        attachmentsEmptyState.setVisible(empty);
+        attachmentsGridLayout.setVisible(!empty);
+    }
+
+    /**
+     * @return the input filename with anything outside {@code [A-Za-z0-9.-]} replaced by
+     *         {@code _}, so the staging-temp path never carries a directory separator or
+     *         shell metacharacter from a user-supplied filename. The final stored filename
+     *         comes from FileStorage and is independent of this temp-only sanitisation.
+     */
+    private String safeFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "upload";
+        }
+        return fileName.replaceAll("[^A-Za-z0-9.\\-]", "_");
     }
 
     @Override
@@ -198,11 +386,18 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             stopActiveStream();
         }
         this.conversationId = cid;
-        items.clear();
+        clearMessageList();
         if (cid == null) {
-            if (messageList != null) messageList.setItems(items);
             updateConversationTitle(null);
             updateTitleEditState();
+            // Reset right-pane loader so empty-state shows when no conversation is active.
+            if (taskFilesDl != null) {
+                taskFilesDl.removeParameter("conversationId");
+            }
+            if (taskFilesDc != null) {
+                taskFilesDc.setItems(List.of());
+            }
+            refreshTaskFiles();
             return;
         }
         // Ownership check (D-09) — foreign / missing ids throw ConversationNotFoundException.
@@ -211,29 +406,49 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         updateConversationTitle(conversation.getTitle());
         updateTitleEditState();
 
+        // Phase 13.1 UI-01 — re-bind right-pane loader on conversation switch.
+        if (taskFilesDl != null) {
+            taskFilesDl.setParameter("conversationId", cid);
+            taskFilesDl.load();
+        }
+
         List<AiMessage> history = dataManager.load(AiMessage.class)
                 .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
-                       "order by m.createdDate asc, m.seq asc")
+                       "order by m.seq asc, m.createdDate asc")
                 .parameter("cid", cid)
                 .list();
 
+        // Phase 13.1 UAT-fix — dispatch by role across mixed substrate:
+        //   USER / ASSISTANT  → MessageListItem accumulated into the items list, then
+        //                        flushed with a single setItems at the end of replay
+        //                        (Pitfall #5 — only the turn boundary calls setItems).
+        //   NOTICE            → plain <div class="ai-agent-attachment-notice"> appended
+        //                        as sibling of the MessageList element. Strict
+        //                        chronological in-bubble interleaving is approximated as
+        //                        end-of-list (UI-SPEC §138 allows custom inline element).
+        //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only).
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
         for (AiMessage m : history) {
             AiMessageRole role = m.getRole();
-            // SYSTEM / TOOL roles skipped — replay shows user-visible turns only.
             if (role == AiMessageRole.USER) {
                 items.add(buildItem(m, userName, USER_COLOR));
+                messageCount++;
             } else if (role == AiMessageRole.ASSISTANT) {
                 items.add(buildItem(m, aiName, AI_COLOR));
+                messageCount++;
+            } else if (role == AiMessageRole.NOTICE) {
+                appendNoticeRow(m.getContent());
             }
         }
-        if (messageList != null) messageList.setItems(items);
+        if (messageList != null) {
+            messageList.setItems(new ArrayList<>(items));
+        }
     }
 
     public UUID getConversationId() { return conversationId; }
 
-    public boolean hasMessages() { return !items.isEmpty(); }
+    public boolean hasMessages() { return messageCount > 0; }
 
     public boolean isStreaming() {
         Disposable d = activeStream;
@@ -327,14 +542,17 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+
         MessageListItem userItem = new MessageListItem(text, Instant.now(), userName);
         userItem.setUserColorIndex(USER_COLOR);
         items.add(userItem);
+        messageCount++;
 
         botMsg = new MessageListItem("", Instant.now(), aiName);
         botMsg.setUserColorIndex(AI_COLOR);
         items.add(botMsg);
-        // Last setItems of the turn — mid-stream mutations use appendText only (Pitfall #5).
+        messageCount++;
+        // Pitfall #5 — last setItems of the turn; mid-stream chunks use appendText only.
         messageList.setItems(new ArrayList<>(items));
 
         setStreamingUiState(true);
@@ -351,17 +569,28 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     }
                 })
                 .doOnNext(evt -> {
-                    if (evt instanceof StreamingEvent.Final f && activeRunId == null) {
-                        activeRunId = f.runId();
+                    if (evt instanceof StreamingEvent.Final f) {
+                        if (activeRunId == null) {
+                            activeRunId = f.runId();
+                        }
                         if (conversationId == null && f.conversationId() != null) {
                             conversationId = f.conversationId();
                             updateSessionConversationId(conversationId);
+                        }
+                        // Phase 13.1 D-D1 — streaming-path budget-exceeded toast (CONTEXT D-D1
+                        // demands the toast on BOTH transports; the streaming Final event
+                        // carries the same flag as ChatResponseDto.budgetExceeded per Plan 03
+                        // Option A).
+                        if (f.budgetExceeded()) {
+                            showBudgetExceededToast();
                         }
                     }
                     String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
                     if (md.isEmpty()) return;
                     accessUi(() -> {
-                        if (botMsg != null) botMsg.appendText(md);
+                        if (botMsg != null) {
+                            botMsg.appendText(md);
+                        }
                         scrollToBottom();
                     });
                 })
@@ -371,6 +600,37 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnComplete(() -> accessUi(this::finishStreamInternal))
                 .subscribe();
+    }
+
+    /**
+     * Phase 13.1 D-D1 — blocking-path budget-exceeded consumer (CONTEXT D-D1: the toast must
+     * surface on the {@code .ask(...)} blocking transport AS WELL AS the streaming
+     * {@code Final} event consumer above). Currently invoked indirectly: the streaming
+     * fallback inside {@code DefaultChatServiceImpl.stream()} catches
+     * {@code UnsupportedOperationException} and routes through {@code executeBlockingTurn},
+     * propagating the same budgetExceeded flag back through the streaming Final event. This
+     * accessor is the test-visible blocking-path consumer surface; it is wired by integration
+     * tests (Plan 13.1-06 SurfaceMountingTest) and by future hosts that consume {@code .ask}
+     * directly.
+     */
+    void onBlockingResponse(com.vn.agent.orchestration.ChatResponseDto response) {
+        if (response == null) {
+            return;
+        }
+        if (response.budgetExceeded()) {
+            showBudgetExceededToast();
+        }
+    }
+
+    private void showBudgetExceededToast() {
+        // Per project memory feedback_jmix_messages_over_spring: keep keys in the root
+        // (com.vn.agent) bundle and resolve via the Class-less Messages.getMessage(key)
+        // form. The class-scoped form would derive the group from the fragment's package
+        // and miss the root-bundle entry.
+        accessUi(() -> notifications.create(
+                        messages.getMessage("chatView.attachments.budgetExceeded"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show());
     }
 
     private void finishStreamInternal() {
@@ -412,6 +672,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         updateConversationTitle(conversation.getTitle());
         updateTitleEditState();
         updateSessionConversationId(resolved);
+        if (taskFilesDl != null) {
+            taskFilesDl.setParameter("conversationId", resolved);
+            taskFilesDl.load();
+        }
         return resolved;
     }
 
@@ -474,6 +738,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         }
     }
 
+    /**
+     * Phase 13.1 UAT-fix — build a {@link MessageListItem} for replay from a persisted
+     * {@link AiMessage}. Keeps the original timestamp so MessageList renders the historical
+     * order naturally.
+     */
     private MessageListItem buildItem(AiMessage m, String name, int colorIndex) {
         String content = m.getContent() == null ? "" : m.getContent();
         OffsetDateTime created = m.getCreatedDate();
@@ -481,6 +750,45 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         MessageListItem item = new MessageListItem(content, time, name);
         item.setUserColorIndex(colorIndex);
         return item;
+    }
+
+    /**
+     * Phase 13.1 UAT-fix — append a NOTICE divider as a plain {@code <div>} sibling of
+     * the {@code <vaadin-message-list>} block. The plain-div substrate avoids the default
+     * {@code <vaadin-avatar>} upload-arrow fallback that the prior {@code <vaadin-message
+     * class="attachment-event">} substrate exposed when no userName was set. The
+     * {@code <div>} text content is set via {@code setText}, which is HTML-escaped by the
+     * Vaadin Element API (T-13.1-17 mitigation), so even a filename containing script tags
+     * cannot inject HTML.
+     */
+    private void appendNoticeRow(String text) {
+        if (text == null) {
+            text = "";
+        }
+        com.vaadin.flow.dom.Element notice = new com.vaadin.flow.dom.Element("div");
+        notice.getClassList().add("ai-agent-attachment-notice");
+        notice.setText(text);
+        messageListSlot.getElement().appendChild(notice);
+        messageCount++;
+    }
+
+    private void clearMessageList() {
+        items.clear();
+        if (messageListSlot != null) {
+            // Wipe the underlying element children so both the MessageList component AND any
+            // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.
+            messageListSlot.removeAll();
+            messageListSlot.getElement().removeAllChildren();
+            // Re-attach a fresh MessageList so subsequent items render into a clean substrate.
+            messageList = new MessageList();
+            messageList.setMarkdown(true);
+            messageList.setWidthFull();
+            messageList.getStyle().set("flex-grow", "1");
+            messageListSlot.add(messageList);
+            messageList.setItems(items);
+        }
+        botMsg = null;
+        messageCount = 0;
     }
 
     private void resolveLabels() {
@@ -525,7 +833,24 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void scrollToBottom() {
-        messageList.getElement().executeJs("setTimeout(() => { this.scrollTop = this.scrollHeight; }, 50);");
+        if (messageListSlot == null) {
+            return;
+        }
+        // Phase 13.1 UAT-fix-02 — auto-scroll across all candidate scroll containers.
+        // Vaadin's <vaadin-message-list> scrolls INTERNALLY (its bubble area has its
+        // own overflow:auto), and we also have a sibling NOTICE div after the list.
+        // To keep the latest streaming token visible, force-scroll BOTH the slot vbox
+        // and the inner message-list to their bottom on each token append. setTimeout
+        // defers the scroll one paint frame so newly-appended bubble content has been
+        // measured into scrollHeight before we read it.
+        messageListSlot.getElement().executeJs(
+                "setTimeout(() => { " +
+                "  this.scrollTop = this.scrollHeight; " +
+                "  const list = this.querySelector('vaadin-message-list'); " +
+                "  if (list) { list.scrollTop = list.scrollHeight; } " +
+                "  const last = this.lastElementChild; " +
+                "  if (last) last.scrollIntoView({behavior: 'smooth', block: 'end'}); " +
+                "}, 50);");
     }
 
     private void accessUi(Runnable action) {
@@ -533,5 +858,276 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (ui == null) ui = getUI().orElse(null);
         if (ui == null) return; // detached — drop update
         ui.access(action::run);
+    }
+
+    // ---- Phase 13 Plan 04 — D-04 + REVIEWS HIGH-4 + HIGH-5 attachments wiring -------
+
+    /**
+     * Wired declaratively because {@link FileRejectedEvent} does not reference the
+     * deprecated receiver API (memory {@code feedback_jmix_upload_receiver_deprecated}).
+     * Client-side rejection fires when the user selects a file exceeding the
+     * {@code maxFileSize} or outside {@code acceptedFileTypes}; server-side validation
+     * inside {@link #handleUploadedFile} re-checks both for defence-in-depth.
+     */
+    @Subscribe("taskFileUpload")
+    public void onUploadFileRejected(final FileRejectedEvent event) {
+        log.debug("Upload rejected client-side: {}", event.getErrorMessage());
+        notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show();
+    }
+
+    /**
+     * Handles one accepted upload (REVIEWS HIGH-4 + HIGH-5 + Phase 13.1 UX-01).
+     *
+     * <p>Order of operations is load-bearing:
+     * <ol>
+     *   <li>Resolve target conversation id (fail fast if no chat session).</li>
+     *   <li><b>REVIEWS HIGH-5</b> — validate size + MIME against the server-side allowlist
+     *       BEFORE any blob persist or row create. A {@code .exe} upload bypassing the
+     *       client-side {@code acceptedFileTypes} attribute lands here, gets rejected, and
+     *       the temp file is deleted. No FileStorage blob, no AiTaskFile row.</li>
+     *   <li>Stream the temp file into FileStorage to get a {@link FileRef}.</li>
+     *   <li>Build the {@link AiTaskFile} via {@link Metadata#create(Class)} (CLAUDE.md
+     *       forbids {@code new AiTaskFile()}).</li>
+     *   <li>Save under the regular {@code DataManager} so the user row-level policy from
+     *       Plan 13-01 stamps the row with {@code userUsername} and prevents cross-user reads.</li>
+     *   <li><b>Phase 13.1 UX-01</b> — persist a NOTICE {@link AiMessage} attributed to the
+     *       uploading user and append a {@code <div class="ai-agent-attachment-notice">}
+     *       sibling row to {@code messageListSlot}. Failure is logged and the upload still
+     *       succeeds (per CONTEXT integration-points "log-and-continue").</li>
+     *   <li>Reload {@code taskFilesDl} so the right-pane card grid + empty-state toggle
+     *       reflect the new row.</li>
+     * </ol>
+     *
+     * <p>Best-effort temp-file cleanup runs in the {@code finally} block; a missing temp
+     * file is not a failure (Jmix may have already removed it).
+     */
+    private void handleUploadedFile(String fileName, String declaredContentType,
+                                    long declaredSizeBytes, Path tempFile) {
+        try {
+            UUID convId = ensureConversationIdForUpload();
+            if (convId == null) {
+                log.warn("Upload arrived without an active conversation; dropping file {}", fileName);
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+
+            long actualSizeBytes;
+            try {
+                actualSizeBytes = Files.size(tempFile);
+            } catch (IOException sizeFailure) {
+                log.warn("Failed to measure staged upload {}; rejecting", fileName, sizeFailure);
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                        .show();
+                return;
+            }
+            if (declaredSizeBytes >= 0 && declaredSizeBytes != actualSizeBytes) {
+                log.debug("Upload metadata size mismatch for {}: declared={} actual={}",
+                        fileName, declaredSizeBytes, actualSizeBytes);
+            }
+
+            // REVIEWS HIGH-5 — server-side size cap re-validated BEFORE blob persist.
+            long maxBytes = taskFileProperties.getMaxFileSizeBytes();
+            if (actualSizeBytes > maxBytes) {
+                log.warn("Upload rejected (size {} > cap {}): {}", actualSizeBytes, maxBytes, fileName);
+                notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+            // REVIEWS HIGH-5 — server-side MIME allowlist re-validated BEFORE blob persist.
+            String resolvedContentType = resolveAllowedContentType(declaredContentType, fileName);
+            if (resolvedContentType == null) {
+                log.warn("Upload rejected (unsupported MIME): name={} declared={}", fileName, declaredContentType);
+                notifications.create(messages.getMessage("chatView.attachments.upload.unsupportedType"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+
+            FileRef fileRef = saveBlob(fileName, tempFile);
+            if (fileRef == null) {
+                notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                        .show();
+                return;
+            }
+
+            // Pitfall 2 — load the conversation fresh AFTER ensureConversationIdForUpload so
+            // both the AiTaskFile row AND the NOTICE AiMessage row reference a managed entity
+            // pointing at the just-created conversation (avoids a stale managed reference if
+            // ensureConversationIdForUpload created the conversation this turn).
+            AiConversation conversation = dataManager.load(AiConversation.class).id(convId).one();
+
+            AiTaskFile row = metadataApi.create(AiTaskFile.class);
+            row.setConversation(conversation);
+            row.setStorageRef(fileRef);
+            row.setFilename(fileName);
+            row.setContentType(resolvedContentType);
+            row.setSizeBytes(actualSizeBytes);
+            row.setUserUsername(currentAuthentication.getUser().getUsername());
+            // Phase 13.1 LIFE-01: ttlSeconds is the operator-facing TTL knob; sentinel
+            // -1 disables purge and active-row filtering. Persist a DB-safe far-future
+            // timestamp instead of the 24h default so sentinel uploads do not age out.
+            long ttlSeconds = taskFileProperties.getTtlSeconds();
+            row.setExpiresAt(ttlSeconds == -1L
+                    ? NON_EXPIRING_EXPIRES_AT
+                    : OffsetDateTime.now().plusSeconds(ttlSeconds));
+
+            AiTaskFile saved = dataManager.save(row);
+
+            // Phase 13.1 UX-01 — bilingual NOTICE row. Log-and-continue per CONTEXT
+            // integration-points: a NOTICE-write failure does NOT roll back the upload.
+            try {
+                AiMessage notice = metadataApi.create(AiMessage.class);
+                notice.setConversation(conversation);
+                notice.setRole(AiMessageRole.NOTICE);
+                // Phase 13.1 UAT-fix-02 — Java overload-resolution trap: when calling
+                // messages.formatMessage(key, arg1, arg2) with three String args, the compiler
+                // picks the more-specific (String pack, String key, Object... params) overload,
+                // treating arg1 as the key and arg2 as the only param. That returned just
+                // arg1 ("admin") because the resolver failed to find a key called "admin"
+                // and fell back to returning the key literal. Workaround: fetch the raw
+                // template via getMessage(key) and interpolate with java.text.MessageFormat
+                // so we never touch the ambiguous formatMessage signature.
+                String noticeTemplate = messages.getMessage("chatView.attachments.notice");
+                notice.setContent(MessageFormat.format(noticeTemplate,
+                        currentAuthentication.getUser().getUsername(),
+                        saved.getFilename()));
+                notice.setCreatedDate(OffsetDateTime.now());
+                notice.setSeq(nextSeq(conversation.getId()));
+                AiMessage savedNotice = dataManager.save(notice);
+                final String noticeText = savedNotice.getContent();
+                accessUi(() -> appendNoticeRow(noticeText));
+            } catch (RuntimeException noticeEx) {
+                log.warn("Failed to write NOTICE AiMessage for upload {}", fileName, noticeEx);
+            }
+
+            // Refresh the right-pane grid + emptyState toggle via PostLoadEvent.
+            if (taskFilesDl != null) {
+                accessUi(() -> taskFilesDl.load());
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Task-file upload failed for {}", fileName, ex);
+            notifications.create(messages.getMessage("chatView.attachments.upload.failed"))
+                    .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                    .show();
+        } finally {
+            tryDeleteTemp(tempFile);
+        }
+    }
+
+    /**
+     * Computes the next {@code seq} for a NOTICE row in the given conversation by reading
+     * {@code max(m.seq)} via {@link DataManager#loadValue}. Per project memory
+     * {@code feedback_jmix_loadvalue_store}, raw-JPQL {@code loadValue} on agentstore
+     * entities does NOT auto-resolve the store from the entity name — must call
+     * {@code .store("agentstore")} explicitly.
+     *
+     * @param conversationId conversation FK to scope the max-seq query
+     * @return {@code maxSeq + 1}, or {@code 0} when the conversation has no messages yet
+     */
+    private int nextSeq(UUID conversationId) {
+        Integer maxSeq = dataManager.loadValue(
+                        "select max(m.seq) from ai_AiMessage m where m.conversation.id = :cid",
+                        Integer.class)
+                .store("agentstore")
+                .parameter("cid", conversationId)
+                .optional()
+                .orElse(null);
+        return maxSeq == null ? 0 : maxSeq + 1;
+    }
+
+    private FileRef saveBlob(String fileName, Path tempFile) {
+        FileStorage storage = fileStorageLocator.getDefault();
+        try (InputStream in = Files.newInputStream(tempFile)) {
+            return storage.saveStream(fileName, in);
+        } catch (IOException io) {
+            log.warn("Failed to stream upload {} into FileStorage", fileName, io);
+            return null;
+        } catch (RuntimeException rt) {
+            log.warn("FileStorage rejected upload {}", fileName, rt);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the canonical allowed MIME type for the upload, or {@code null} if neither
+     * the declared content type nor the filename extension match the allowlist. Trims any
+     * {@code charset=} parameters before the allowlist lookup.
+     */
+    private String resolveAllowedContentType(String declaredContentType, String fileName) {
+        if (declaredContentType != null && !declaredContentType.isBlank()) {
+            String normalized = declaredContentType.toLowerCase(Locale.ROOT);
+            int semi = normalized.indexOf(';');
+            if (semi >= 0) {
+                normalized = normalized.substring(0, semi).trim();
+            }
+            if (ALLOWED_CONTENT_TYPES.contains(normalized)) {
+                return normalized;
+            }
+        }
+        if (fileName == null) {
+            return null;
+        }
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        for (Map.Entry<String, String> entry : EXTENSION_TO_CONTENT_TYPE.entrySet()) {
+            if (lower.endsWith(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** REVIEWS HIGH-5 hook for the verifier grep gate. Server-side MIME validation. */
+    @SuppressWarnings("unused")
+    private boolean isAllowedMimeType(String contentType, String fileName) {
+        return resolveAllowedContentType(contentType, fileName) != null;
+    }
+
+    private void tryDeleteTemp(Path tempFile) {
+        if (tempFile == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(tempFile);
+        } catch (IOException ignored) {
+            // Best-effort; OS will clean up the temp directory eventually.
+        }
+    }
+
+    /**
+     * Ensures a conversation id is available for the upload row's required FK. If the user
+     * uploads BEFORE typing their first message, eagerly create the conversation so the row
+     * has a stable conversation FK; the same id is reused when the user later submits.
+     */
+    private UUID ensureConversationIdForUpload() {
+        if (conversationId != null) {
+            return conversationId;
+        }
+        try {
+            String username = currentAuthentication.getUser().getUsername();
+            AiConversation conversation = conversationGateway.loadOrCreate(username, null, null);
+            UUID resolved = conversation.getId();
+            if (resolved == null) {
+                return null;
+            }
+            conversationId = resolved;
+            updateConversationTitle(conversation.getTitle());
+            updateTitleEditState();
+            updateSessionConversationId(resolved);
+            if (taskFilesDl != null) {
+                taskFilesDl.setParameter("conversationId", resolved);
+                taskFilesDl.load();
+            }
+            return resolved;
+        } catch (RuntimeException ex) {
+            log.warn("Failed to create conversation for upload", ex);
+            return null;
+        }
     }
 }

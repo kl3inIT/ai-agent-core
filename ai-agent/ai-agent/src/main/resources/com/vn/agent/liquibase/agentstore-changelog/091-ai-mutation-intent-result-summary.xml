@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Phase 13 REVIEWS HIGH-11: extend AI_MUTATION_INTENT with RESULT_SUMMARY column so
+        bulk tools (bulk_save_records) can persist the full savedIds JSON for IDEMPOTENT_REPLAY.
+
+        Single-record tools (create_record / update_record / add_related_record /
+        remove_related_record) leave the column null and behave identically to before.
+
+        Auto-included by <includeAll path="/com/vn/agent/liquibase/agentstore-changelog">
+        (root agentstore-changelog.xml line 15) — no manual <include> needed.
+    -->
+    <changeSet id="1" author="ai-agent">
+        <addColumn tableName="AI_MUTATION_INTENT">
+            <column name="RESULT_SUMMARY" type="varchar(4000)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

@@ -10,7 +10,7 @@ class AgentSystemPromptRulesComposerTest {
     @Test
     void defaultConfigUsesBaselineRulesWithoutMutationOnlyTerms() {
         AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
-                new AiAgentMutationProperties(null, null, null, null));
+                new AiAgentMutationProperties(null, null, null, null, null));
 
         String rules = composer.effectiveRules();
 
@@ -20,14 +20,14 @@ class AgentSystemPromptRulesComposerTest {
                 .doesNotContain("idempotencyKey")
                 .doesNotContain("parameter_conversion_error")
                 .doesNotContain("concurrent_modification")
-                .doesNotContain("generate_entity_detail_link")
+                .contains("generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
     }
 
     @Test
     void mutationEnabledConfigAppendsMutationRulesWithoutForwardReferenceTools() {
         AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
-                new AiAgentMutationProperties(true, null, null, null));
+                new AiAgentMutationProperties(true, null, null, null, null));
 
         String rules = composer.effectiveRules();
 

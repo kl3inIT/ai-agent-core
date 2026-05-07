@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: In Progress
-stopped_at: Completed 12-06-PLAN.md
-last_updated: "2026-05-05T06:40:42.419Z"
+status: phase_shipped
+stopped_at: Phase 13.1 shipped — PR #25 opened; release version prepared as 1.0.5
+last_updated: "2026-05-07T08:21:43.902Z"
 progress:
-  total_phases: 7
-  completed_phases: 5
-  total_plans: 39
-  completed_plans: 39
+  total_phases: 9
+  completed_phases: 6
+  total_plans: 53
+  completed_plans: 53
   percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-05-05
+**Last updated:** 2026-05-07
 
 ## Project Reference
 
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 12 — configurable-chat-surfaces (shipped in PR #24)
+**Current focus:** Phase 13.1 — Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context
 
 ## Current Position
 
-Phase: 12 (configurable-chat-surfaces) — SHIPPED (PR #24)
-Plan: 6 of 6
+Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context) — COMPLETE
+Plan: 7 of 7 complete (gate-ready)
 | Field | Value |
 |-------|-------|
-| Phase | Phase 12 |
-| Plan | 6 of 6 |
-| Status | Phase 12 shipped — PR #24 |
-| Last activity | 2026-05-05 — Phase 12 shipped in PR #24 |
+| Phase | Phase 13.1 |
+| Plan | 7 of 7 |
+| Status | Phase 13.1 shipped via PR #25; `ai-agent/gradle.properties` prepared for version 1.0.5; Spring-context boot regression still deferred (see Phase 13 deferred-items.md) |
+| Last activity | 2026-05-07 — Shipped Phase 13.1 PR and removed Playwright/UAT artifact files from the branch |
 
 ## Phase Status
 
@@ -44,8 +44,10 @@ Plan: 6 of 6
 | 10. AI-Specific LLM Exposure Policy | Shipped | 10/10 | 2026-04-27 | 2026-04-28 |
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
-| 13. Chat Task Input — STT + Task-Scoped File | Not started | 0/0 | - | - |
+| 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
+| 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
+| 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
 
@@ -167,6 +169,19 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 12]: Use the repository composite Gradle path :ai-agent:ai-agent:* for add-on verification. — The root checkout exposes the functional module through an included build, matching prior Phase 12 verification.
 - [Phase 12]: Plan 12-05: Use ConversationTitleEligibilityPublisher to isolate title eligibility from DefaultChatServiceImpl. — Keeps chat runtime changes narrow while proving publication happens only after assistant response handling returns.
 - [Phase 12]: Plan 12-05: Manual title edits check ownership through ConversationGateway and save through secured DataManager. — Preserves the AI-as-Jmix-client security model while allowing user-visible title overrides to block future auto-title clobbering.
+- [Phase ?]: Phase 13 Plan 13-01: AiTaskFile entity foundation + qwen/qwen3.6-35b-a3b model swap shipped; D-03 schema lock (separate addForeignKeyConstraint with onDelete=SET NULL for MESSAGE_ID, REVIEWS HIGH-2); injectedAt is authoritative pending marker (REVIEWS HIGH-1); user role gains DELETE for Plan 04 chip removal (REVIEWS HIGH-3); default-params.yaml model swapped (REVIEWS HIGH-9).
+- [Phase ?]: Phase 13 Plan 13-02: AiTaskFileRepository + AiTaskFileMediaResolver + AiTaskFileCleanupJob + package-info shipped. Resolver predicate is injectedAt IS NULL per REVIEWS HIGH-1. markInjected runs in REQUIRES_NEW agentstore tx; deleteRow uses blob-first ordering with retry-on-failure semantics. TEST-16 forbidden-token grep gates at zero across all .java sources except the allowlisted package-info.java JavaDoc (REVIEWS HIGH-8).
+- [Phase ?]: 13-03: bulk_save_records as single @Tool with id-presence dispatch (D-02 mixed-batch); ONE @Transactional boundary on MutationSaveExecutor.bulkSave
+- [Phase ?]: 13-03: AiMutationIntent.RESULT_SUMMARY column persists bulk savedIds for IDEMPOTENT_REPLAY (REVIEWS HIGH-11)
+- [Phase ?]: 13-03: Per-row CrudEntityContext after entity load/create satisfies MUT-14 row-state-dependent constraint enforcement (REVIEWS HIGH-13)
+- [Phase 13]: Plan 13-06 gap closure: extracted `DefaultChatServiceImpl.executeBlockingTurn(...)` private helper to eliminate the BLK-01 streaming-fallback double-write — both `ask(...)` and the streaming `catch(UnsupportedOperationException)` now delegate to the same helper passing already-resolved Media + already-persisted user-message id, so `userMessagePersister.persistUserMessage` and `taskFileMediaResolver.resolvePending` each fire EXACTLY ONCE per turn on the D-04 graceful-fallback path. D-03 streaming-success doOnComplete invariant left untouched. BLK-04 (prompt-build orphan) closed implicitly. Regression locked by `DefaultChatServiceImplStreamFallbackTest` (5 Mockito tests, pure JUnit — sidesteps deferred AiAuditEvent boot regression).
+- [Phase ?]: Phase 13.1 Plan 01: Wave-0 schema lock — dropped AI_TASK_FILE.MESSAGE_ID/INJECTED_AT (Liquibase 100), removed AiTaskFile.message/injectedAt fields, flipped AiTaskFileProperties to long ttlSeconds + perTurnMaxFiles + perTurnMaxTotalBytes with -1 sentinel, added AiMessageRole.NOTICE + bilingual captions. Compile passes via Rule 3 stubs in AiTaskFileRepository.markInjected, ConversationDetailView switch, and ChatPanelFragment.setExpiresAt; full rewrite in Plans 13.1-02/04. Three Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H deferred to Plan 13.1-06.
+- [Phase 13.1]: Plan 02: AiTaskFileMediaResolver.resolveActive(UUID) per-turn-all + LRU budget cap + task_file_budget_exceeded audit (REQUIRES_NEW; failure swallowed to log.warn). Resolved record now (media, budgetExceeded); taskFileIds dropped. AiTaskFileRepository slimmed to {loadExpired, deleteRow, deleteAllExpired} — markInjected and loadPending deleted with their AiMessage/Optional imports. New BudgetExceededAuditKeys constants are the single source of truth shared with the upcoming BudgetCapTest (Plan 13.1-06) — 9-key argumentsJson order locked via LinkedHashMap; Jackson JsonProcessingException falls back to a String.format literal that ALSO references the constants. Rule-3 stub: DefaultChatServiceImpl resolvePending/markInjected/taskFileIds call sites swapped for resolveActive + structural no-ops; Plan 13.1-03 deletes the dead UserMessagePersister wiring + executeBlockingTurn parameter end-to-end.
+- [Phase 13.1]: Plan 03: ProjectingChatMemoryRepository.saveAll JPQL excludes role=NOTICE so notice rows survive the delete-recreate projection wipe each turn (D-A1). DefaultChatServiceImpl now calls AiTaskFileMediaResolver.resolveActive(convId) once per turn on both the blocking ask() and the streaming stream() transports; UserMessagePersister field/parameter and the markInjected stamping path are removed; executeBlockingTurn signature drops userMessageIdAlreadyPersisted while preserving the BLK-01 single-write streaming-fallback invariant. ChatResponseDto + StreamingEvent.Final extended with a budgetExceeded boolean propagated from Resolved.budgetExceeded() on both transports (D-D1). UserMessagePersister.java deleted; chat-memory advisor's own AiMessage projection is the sole user-message persistence path. DefaultChatServiceImplStreamFallbackTest rewritten with 4 cases (A/B/C/D) covering resolveActive-once-per-turn on both transports + budgetExceeded propagation on both — all green on pure JUnit 5 + Mockito. Rule-3 stubs on the 3 deferred Plan-13.1-01 test files (AiTaskFileCleanupJobTest, AiTaskFileMediaResolverIntegrationTest, AiTaskFileNoVectorStoreInvocationTest) were the minimum-diff required to unblock :compileTestJava; Plan 13.1-06 owns the proper rewrite.
+- [Phase 13.1]: Plan 04: chat-panel-fragment.xml reshaped into a horizontal `<split splitterPosition="68">` with chatPanel left and attachmentsPanel right; right-pane vbox keeps id="attachmentsPanel" so the Phase 12 ChatSurfaceMounter slot contract is preserved (REQ-7 zero-diff). New ai-task-file-card-fragment.xml + AiTaskFileCardFragmentRenderer.java (extends FragmentRenderer<JmixCard, AiTaskFile> + @RendererItemContainer("taskFileDc")) ship the per-row card with DOWNLOAD action via Jmix Downloader and TRASH action via Dialogs option-confirm; performDelete removes the JPA row first and best-effort removes the storage blob (log-and-continue on blob failure — TTL cleanup sweeps orphans, D-B1). resolveIcon adds an image-extension arm (png/jpg/jpeg/gif/webp → FILE_PICTURE) on top of the CRM csv/xlsx → TABLE and pdf/html/md/txt → FILE_TEXT_O switch. ai-agent-chat.css gets a verbatim CRM appendix (14 new top-level rules) with the single mechanical rename .ai-conversation-message-list → .ai-agent-chat-panel__messages. 13 new chatView.attachments.* keys land in both messages_en.properties and messages_vi.properties. Java fragment controller wiring (taskFilesDl loader binding, empty-state toggle, NOTICE rendering, budgetExceeded toast) is owned by Plan 13.1-05 — this plan delivers the stable XML/CSS/i18n surface against which Plan 05 builds. One Rule-1 deviation: the documentation comment in chat-panel-fragment.xml was rephrased so it doesn't name the deleted `attachRow`/`chip-strip` ids (the verify regex scans comments alongside elements).
+- [Phase 13.1]: Plan 05: ChatPanelFragment.java rewired in a single-file rewrite — chip-strip + MessageList substrate retired; right-pane data loader (taskFilesDl) bound programmatically with :conversationId in onReady, setConversationIdInternal, ensureConversationIdForSubmit, ensureConversationIdForUpload; empty-state toggle wired via @Subscribe(id="taskFilesDl", target=Target.DATA_LOADER) onTaskFilesPostLoad over CollectionLoader.PostLoadEvent. messageListSlot migrated from MessageList to a VerticalLayout of MessageBubbleComponent Composites for USER/ASSISTANT plus raw <vaadin-message class="attachment-event"> sibling Elements for NOTICE (Pitfall 7 Option A). handleUploadedFile persists an AiMessage(role=NOTICE) via metadataApi.create with seq computed via DataManager.loadValue(...).store("agentstore") (memory feedback_jmix_loadvalue_store), log-and-continue on failure. Budget-exceeded toast invoked via single showBudgetExceededToast() helper from BOTH paths: streaming consumer reads StreamingEvent.Final.budgetExceeded() inside doOnNext; package-private onBlockingResponse(ChatResponseDto) reads ChatResponseDto.budgetExceeded() (covers blocking-path consumers and tests per CONTEXT D-D1). attachmentsPanel field type stays VerticalLayout (REQ-7 / Pitfall 6); Phase 12 contract files (ChatSurfaceMounter, AiUiSettingsService, AiUiSettings, ChatView, ChatDialogView) have ZERO diff. Two Rule-3 auto-fixes: (a) bundle-key resolution form switched from class-scoped Messages.getMessage(class, key) to bare Messages.getMessage(key) + explicit-group Messages.formatMessage("com.vn.agent", key, params) per memory feedback_jmix_messages_over_spring; (b) field-block comment rephrased to remove a literal "MessageListItem" token that tripped the verify regex.
+- [Phase 13.1]: Plan 06: 4 new @SpringBootTest regressions land — PerTurnMediaInjectionTest (TEST-18 — 3 sequential resolveActive calls return the same Media bytes; reflection guard via Class#getDeclaredMethods asserts no markInjected/loadPending overload survives on AiTaskFileRepository), BudgetCapTest + BudgetCapSentinelTest (REQ-3 default-caps drop-oldest + LRU + 9-key argumentsJson via BudgetExceededAuditKeys constants; sentinel caps=-1 returns all rows + zero audit rows), TtlConfigTest + TtlConfigSentinelSkipsCleanupTest + TtlConfigFkCascadeUnderSentinelTest (REQ-4 default ttlSeconds=86400; sentinel ttl-seconds=-1 skip on cleanup-job; FK cascade still reaps under sentinel), NoticeFilterTest (REQ-5 D-A1 NOTICE survives ProjectingChatMemoryRepository.saveAll wipe + D-A2 Spring AI store never carries NOTICE). Sentinel-context fixtures ship as TOP-LEVEL sibling classes (NOT @Nested) so Spring Boot context cache stays clean. The 3 existing Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H now use ttl-seconds=3600; AiTaskFileMediaResolverIntegrationTest's @Disabled placeholder replaced with 3 happy-path cases against resolveActive. TaskFileNoVectorStoreSourceScannerTest scope widened to AiTaskFileCardFragmentRenderer.java + chat-panel-fragment.xml — both pass with 0 forbidden-token references. compileTestJava + scanner test BUILD SUCCESSFUL. Test runtime for the 4 new @SpringBootTest classes inherits the pre-existing Phase 11/13 atmosphere-runtime / agentstoreEntityManagerFactory boot regression documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md (verified by reproducing on the pre-Plan-06 AiTaskFileMediaResolverIntegrationTest @Disabled placeholder); not introduced by this plan, surface stays compileTestJava-green and source-correct.
+- [Phase 13.1]: Plan 07: 5 plan-required tests land green TODAY (sidesteps the deferred Spring-context boot regression). CrmStyleLayoutTest (3 cases) parses chat-panel-fragment.xml + chat-view.xml + chat-dialog-view.xml directly to assert split splitterPosition=68 + the documented right-pane slot ids (attachmentsPanel/Title/EmptyState/GridLayout/taskFileUpload) + zero attachRow/attachButton residue + both surfaces mount the same ChatPanelFragment. NoticeRenderTest (3 cases) source-scans ChatPanelFragment.java for the appendNoticeRow helper + raw <vaadin-message class="attachment-event"> Element substrate + setProperty("text",...) T-13.1-17 escape mitigation + clearMessageList wipes both Component and raw Element children + zero MessageListItem residue + AiMessageRole.NOTICE enum guard. SurfaceMountingTest (2 cases) asserts both surface descriptors mount the fragment with no slot-id overrides + git diff against origin/main on the 5 Phase 12 contract files (ChatSurfaceMounter, AiUiSettingsService, AiUiSettings, ChatView, ChatDialogView) returns empty; falls back to assertContractMarkers structural sanity check when git is unavailable in CI. LiquibaseSchemaTest (5 cases) parses 100-ai-task-file-drop-dead-columns.xml + 090-ai-task-file.xml directly: exactly one <dropForeignKeyConstraint> for FK_AI_TASK_FILE__ON_MESSAGE, two <dropIndex> for IDX_..._ON_MESSAGE + IDX_..._INJECTED_AT, two <dropColumn> for MESSAGE_ID + INJECTED_AT, FK-drop changeSet precedes column-drop changeSet, FK_AI_TASK_FILE__ON_CONVERSATION declared INLINE on CONVERSATION_ID column with deleteCascade=true (Pitfall 10 invariant), no <addForeignKeyConstraint> ever names the conversation FK. LocaleParityTest extension (+2 tests) asserts all 14 chatView.attachments.* + AiMessageRole.NOTICE keys present + non-blank in BOTH bundles + chatView.attachments.* namespace symmetric difference is empty. One Rule-3 auto-fix: conversationCascadeFkSurvivesInTheCreateChangelog initially asserted via <addForeignKeyConstraint> but the conversation FK is INLINE on the CONVERSATION_ID <column> per Phase 13 D-03 — fixed before commit. UI/schema substrate is XML/source-scan rather than @UiTest/@SpringBootTest per the plan's project_context preamble explicitly authorizing the deferred-items.md mirror. All 16 testcases green.
 
 ### Performance Metrics
 
@@ -209,6 +224,18 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 12 P04 | 38 min | 3 tasks | 9 files |
 | Phase 12 P05 | 43 min | 3 tasks | 17 files |
 | Phase 12 P06 | 29 min | 3 tasks | 5 files |
+| Phase 13 P13-01 | 25min | 2 tasks | 11 files |
+| Phase 13 P13-02 | 25min | 2 tasks | 4 files |
+| Phase 13 P03 | 9m | 2 tasks | 11 files |
+| Phase 13 P13-04 | ~10m | 2 tasks | 4 files |
+| Phase 13 P13-06 (gap) | ~22m | 2 tasks | 2 files |
+| Phase 13.1 P01 | 25min | 2 tasks | 10 files |
+| Phase 13.1 P02 | ~20min | 2 tasks | 4 files |
+| Phase 13.1 P03 | ~25min | 2 tasks | 10 files |
+| Phase 13.1 P04 | ~15min | 2 tasks | 6 files |
+| Phase 13.1 P05 | ~30min | 3 tasks | 1 file |
+| Phase 13.1 P06 | ~50min | 2 tasks | 8 files |
+| Phase 13.1 P07 | ~25min | 2 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -218,8 +245,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-02T09:22:52.749Z
-**Stopped at:** Completed 12-06-PLAN.md
+**Last session:** 2026-05-07T02:00:00.000Z
+**Stopped at:** Phase 13.1 Plan 07 complete (UI/schema/locale/contract test wave — 5 plan-required tests landed green via XML descriptor parse + source-scan substrate; phase 13.1 gate-ready)
 **Resume file:** None
-**Blockers:** None.
-**Next action:** Verify Phase 12 configurable chat surfaces.
+**Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
+**Next action:** Phase 14 — Intent-Driven Extraction → Form Prefill (or Phase 15 — Chat Voice Input — Soniox STT, both depend only on Phase 9/10 and 12 respectively; either ordering acceptable).

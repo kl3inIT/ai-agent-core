@@ -44,7 +44,7 @@ import static org.mockito.Mockito.doAnswer;
  * NOT need to seed real fixture rows or run host save — the gate stops AFTER the guard runs,
  * BEFORE {@link MutationSaveExecutor#save}.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {"ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

@@ -86,7 +86,7 @@ class AiConversationTitleServiceTest {
     }
 
     @Test
-    void sanitizerRejectionDoesNotPersistAndAuditsError() {
+    void sanitizerRejectionDoesNotPersistAndAuditsAsSuccessWithRejectionReason() {
         UUID conversationId = UUID.randomUUID();
         UUID runId = UUID.randomUUID();
         AiConversation conversation = conversation(conversationId, "Show recent customers");
@@ -101,10 +101,14 @@ class AiConversationTitleServiceTest {
         service.onConversationTitleEligible(new ConversationTitleEligibleEvent(
                 conversationId, "alice", runId, Locale.ENGLISH));
 
+        // Existing title (matches default) was non-blank, so no extra seed-save.
         assertThat(service.savedConversations).isEmpty();
+        // Phase 13.1 UAT-fix-02: rejected output → SUCCESS audit (not ERROR), with the reason
+        // captured in denialReason and errorClass left null. Keeps the audit log free of red rows
+        // for an LLM behavior that is best-effort by design.
         verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
                 eq("conversation_title"), any(), isNull(), anyLong(),
-                eq(AiToolCallOutcome.ERROR), eq("rejected_title"), eq("IllegalArgumentException"));
+                eq(AiToolCallOutcome.SUCCESS), eq("rejected_title:internal title token"), isNull());
     }
 
     @Test
@@ -128,8 +132,60 @@ class AiConversationTitleServiceTest {
             assertThat(service.savedConversations).isEmpty();
             verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
                     eq("conversation_title"), any(), isNull(), anyLong(),
-                    eq(AiToolCallOutcome.ERROR), eq("rejected_title"), eq("IllegalArgumentException"));
+                    eq(AiToolCallOutcome.SUCCESS), eq("rejected_title:default sentinel"), isNull());
         }
+    }
+
+    @Test
+    void uploadFirstConversationWithNullTitleIsSeededAndUpgradedByModel() {
+        UUID conversationId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        AiConversation firstLoad = conversation(conversationId, null);
+        AiConversation reloadBeforeSave = conversation(conversationId, null);
+        TestTitleService service = serviceBuilder()
+                .withLoadedConversations(firstLoad, reloadBeforeSave)
+                .withMessages(
+                        message(AiMessageRole.USER, "Tóm tắt các file đính kèm.", 1),
+                        message(AiMessageRole.ASSISTANT, "Đây là tóm tắt 11 file.", 2))
+                .withModelTitle("Tóm tắt tệp đính kèm")
+                .build();
+
+        service.onConversationTitleEligible(new ConversationTitleEligibleEvent(
+                conversationId, "alice", runId, Locale.forLanguageTag("vi")));
+
+        // Two saves: (1) seed defaultTitle on the first load (firstLoad) so the convo is never
+        // left blank; (2) overwrite with the model-generated title on the second load.
+        assertThat(service.savedConversations).containsExactly(firstLoad, reloadBeforeSave);
+        assertThat(firstLoad.getTitle()).isEqualTo("Tóm tắt các file đính kèm.");
+        assertThat(reloadBeforeSave.getTitle()).isEqualTo("Tóm tắt tệp đính kèm");
+        verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
+                eq("conversation_title"), any(), eq("Tóm tắt tệp đính kèm"), anyLong(),
+                eq(AiToolCallOutcome.SUCCESS), isNull(), isNull());
+    }
+
+    @Test
+    void uploadFirstConversationKeepsSeededTitleWhenModelReturnsBlank() {
+        UUID conversationId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        AiConversation firstLoad = conversation(conversationId, null);
+        TestTitleService service = serviceBuilder()
+                .withLoadedConversations(firstLoad)
+                .withMessages(
+                        message(AiMessageRole.USER, "Phân tích doanh số", 1),
+                        message(AiMessageRole.ASSISTANT, "Doanh số tăng 10%.", 2))
+                .withModelTitle("   ")
+                .build();
+
+        service.onConversationTitleEligible(new ConversationTitleEligibleEvent(
+                conversationId, "alice", runId, Locale.forLanguageTag("vi")));
+
+        // Seed-save happened before the model call; model returned blank → sanitizeTitle threw →
+        // no second save, but the conversation already carries the seeded defaultTitle.
+        assertThat(service.savedConversations).containsExactly(firstLoad);
+        assertThat(firstLoad.getTitle()).isEqualTo("Phân tích doanh số");
+        verify(service.auditWriter).writeToolCall(isNull(), eq(runId), eq("alice"), eq(conversationId),
+                eq("conversation_title"), any(), isNull(), anyLong(),
+                eq(AiToolCallOutcome.SUCCESS), eq("rejected_title:blank title"), isNull());
     }
 
     @Test

@@ -138,7 +138,12 @@ class AskTypedRetryTest {
                 /* cancellationRegistry */ null,
                 /* streamingSinkHolder */ null,
                 rulesComposer,
-                mock(ConversationTitleEligibilityPublisher.class));
+                mock(ConversationTitleEligibilityPublisher.class),
+                // Phase 13.1 Plan 03: task-file media + repository dependencies. AskTypedRetryTest
+                // exercises only the typed-retry path with no attached files, so the resolver is
+                // stubbed to return an empty Resolved record and the repository is unused.
+                stubEmptyTaskFileResolver(),
+                mock(com.vn.agent.taskfile.AiTaskFileRepository.class));
     }
 
     /**
@@ -241,5 +246,19 @@ class AskTypedRetryTest {
         stageReplies(List.of("{\"name\":\"Carol\"}"));
         Greeting g = service.askTyped("alice", null, "hello", Greeting.class);
         assertThat(g.name()).isEqualTo("Carol");
+    }
+
+    /**
+     * Phase 13.1 Plan 03: {@code DefaultChatServiceImpl.ask} dereferences
+     * {@code resolveActive(...).isEmpty()} unconditionally. A bare Mockito
+     * mock would return {@code null} and NPE on the dereference, so stub a
+     * non-null empty {@code Resolved} record for the no-attached-files path.
+     */
+    private static com.vn.agent.taskfile.AiTaskFileMediaResolver stubEmptyTaskFileResolver() {
+        com.vn.agent.taskfile.AiTaskFileMediaResolver resolver =
+                mock(com.vn.agent.taskfile.AiTaskFileMediaResolver.class);
+        when(resolver.resolveActive(any()))
+                .thenReturn(com.vn.agent.taskfile.AiTaskFileMediaResolver.Resolved.empty());
+        return resolver;
     }
 }

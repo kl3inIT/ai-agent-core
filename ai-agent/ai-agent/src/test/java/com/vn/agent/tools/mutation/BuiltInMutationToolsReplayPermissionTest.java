@@ -43,7 +43,7 @@ import static org.mockito.Mockito.when;
  * through {@link AccessManager}. The retry must still short-circuit through idempotency replay:
  * entityId is preserved, instanceName is null, and no record fields leak.
  */
-@SpringBootTest(classes = AITestConfiguration.class,
+@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
                 "ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",

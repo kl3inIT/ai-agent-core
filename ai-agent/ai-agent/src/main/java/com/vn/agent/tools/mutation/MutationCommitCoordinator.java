@@ -1,5 +1,7 @@
 package com.vn.agent.tools.mutation;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.exposure.LlmExposurePolicy;
@@ -76,6 +78,7 @@ public class MutationCommitCoordinator {
     private final DataManager dataManager;
     private final LlmExposurePolicy llmExposurePolicy;
     private final MutationAuthorizationService mutationAuthorizationService;
+    private final ObjectMapper objectMapper;
 
     public MutationCommitCoordinator(MutationIntentRepository mutationIntentRepository,
                                      MutationErrorTranslator mutationErrorTranslator,
@@ -85,7 +88,8 @@ public class MutationCommitCoordinator {
                                      MetadataTools metadataTools,
                                      DataManager dataManager,
                                      LlmExposurePolicy llmExposurePolicy,
-                                     MutationAuthorizationService mutationAuthorizationService) {
+                                     MutationAuthorizationService mutationAuthorizationService,
+                                     ObjectMapper objectMapper) {
         this.mutationIntentRepository = mutationIntentRepository;
         this.mutationErrorTranslator = mutationErrorTranslator;
         this.auditWriter = auditWriter;
@@ -95,6 +99,7 @@ public class MutationCommitCoordinator {
         this.dataManager = dataManager;
         this.llmExposurePolicy = llmExposurePolicy;
         this.mutationAuthorizationService = mutationAuthorizationService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -192,6 +197,23 @@ public class MutationCommitCoordinator {
         result.put("outcome", AiToolCallOutcome.IDEMPOTENT_REPLAY.getId());
         result.put("entityId", existing.getResultEntityId());
         result.put("instanceName", freshName);
+        // Phase 13 REVIEWS HIGH-11: surface bulk-tool resultSummary on replay so
+        // bulk_save_records returns the original savedIds array instead of just one
+        // entityId. Single-record tools persist null and the key is omitted.
+        if (existing.getResultSummary() != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = objectMapper.readValue(
+                        existing.getResultSummary(), Map.class);
+                result.put("resultSummary", parsed);
+            } catch (JsonProcessingException parseFailure) {
+                log.warn("AI_AGENT_MUTATION_REPLAY_RESULT_SUMMARY_PARSE_FAILED toolName={} runId={} rootAuditId={} exceptionClass={}",
+                        toolName,
+                        RunContext.get(),
+                        RunContext.getRootAuditId(),
+                        parseFailure.getClass().getName());
+            }
+        }
 
         safeWriteAudit(toolName, argumentsJson, null,
                 System.currentTimeMillis() - startedAt,

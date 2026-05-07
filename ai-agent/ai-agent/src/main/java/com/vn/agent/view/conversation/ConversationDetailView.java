@@ -112,6 +112,8 @@ public class ConversationDetailView extends StandardDetailView<AiConversation> {
                 case SYSTEM -> MessageBubbleComponent.Role.SYSTEM;
                 // TOOL handled above; exhaustive switch guards against new enum values.
                 case TOOL -> null;
+                // Phase 13.1 UX-01: NOTICE rendering wired in Plan 13.1-04.
+                case NOTICE -> null;
             };
             if (bubbleRole == null) {
                 continue;

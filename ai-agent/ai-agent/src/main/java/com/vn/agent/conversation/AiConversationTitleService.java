@@ -74,8 +74,24 @@ public class AiConversationTitleService {
             }
 
             Optional<String> defaultTitle = defaultTitle(visibleMessages);
-            if (defaultTitle.isEmpty() || !sameTitle(conversation.getTitle(), defaultTitle.get())) {
+            if (defaultTitle.isEmpty()) {
                 return;
+            }
+            // A conversation is eligible when its current title is either unset (upload-first
+            // path created the row before the user typed) or already matches the truncated
+            // first-user-message default. Anything else means the user manually edited and
+            // we must not clobber.
+            String existingTitle = conversation.getTitle();
+            boolean existingIsBlank = existingTitle == null || existingTitle.isBlank();
+            if (!existingIsBlank && !sameTitle(existingTitle, defaultTitle.get())) {
+                return;
+            }
+            // Seed unseeded conversations with the defaultTitle BEFORE the LLM call so a blank
+            // / sentinel / forbidden model reply still leaves a usable title on the row instead
+            // of a permanently empty entry in the conversations grid.
+            if (existingIsBlank) {
+                conversation.setTitle(defaultTitle.get());
+                saveConversation(conversation);
             }
 
             Locale locale = event.localeHint() == null ? Locale.getDefault() : event.localeHint();
@@ -85,8 +101,13 @@ public class AiConversationTitleService {
             String title = sanitizeTitle(rawTitle, defaultTitle.get());
 
             Optional<AiConversation> reloadedConversation = loadConversation(event.conversationId());
-            if (reloadedConversation.isEmpty()
-                    || !sameTitle(reloadedConversation.get().getTitle(), defaultTitle.get())) {
+            if (reloadedConversation.isEmpty()) {
+                return;
+            }
+            String currentTitle = reloadedConversation.get().getTitle();
+            boolean currentIsBlankOrDefault = currentTitle == null || currentTitle.isBlank()
+                    || sameTitle(currentTitle, defaultTitle.get());
+            if (!currentIsBlankOrDefault) {
                 return;
             }
 
@@ -95,10 +116,16 @@ public class AiConversationTitleService {
             saveConversation(conversationToSave);
             audit(event, title, elapsedMillis(startNanos), AiToolCallOutcome.SUCCESS, null, null);
         } catch (IllegalArgumentException rejectedTitle) {
-            log.warn("Auto-title generation rejected output conversationId={}",
-                    event.conversationId(), rejectedTitle);
-            audit(event, null, elapsedMillis(startNanos), AiToolCallOutcome.ERROR,
-                    "rejected_title", rejectedTitle.getClass().getSimpleName());
+            // Phase 13.1 UAT-fix-02 — auto-title generation is best-effort. When the
+            // model returns blank / sentinel / forbidden tokens, we DO NOT escalate to
+            // an ERROR audit row — the conversation just keeps its default title.
+            // Recording these as ERROR pollutes the audit log with red rows and is
+            // confusing to operators who see a "Lỗi" (error) status next to a
+            // conversation that completed perfectly fine with its default title.
+            log.debug("Auto-title generation rejected output conversationId={} reason={}",
+                    event.conversationId(), rejectedTitle.getMessage());
+            audit(event, null, elapsedMillis(startNanos), AiToolCallOutcome.SUCCESS,
+                    "rejected_title:" + rejectedTitle.getMessage(), null);
         } catch (RuntimeException failure) {
             log.warn("Auto-title generation failed conversationId={}",
                     event.conversationId(), failure);

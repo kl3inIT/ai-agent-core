@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Plan 11-10 Task 1 — TEST-13 mutation-enabled proof. Two contexts:
  * <ul>
  *   <li>{@code AgentToolCallbacksMutationEnabledTest} — {@code mutation.enabled=true} only.
- *       Asserts the 4 mutation callbacks plus all 6 read + 2 link callbacks are exposed (12),
+ *       Asserts the 5 mutation callbacks plus all 6 read + 2 link callbacks are exposed (13),
  *       and {@code delete_record} is absent.</li>
  *   <li>{@code AgentToolCallbacksMutationEnabledAllowDeleteTest} — {@code enabled=true} plus
  *       {@code allowDelete=true}. Asserts {@code delete_record} is STILL absent (D-07 absolute);
@@ -51,8 +51,8 @@ class AgentToolCallbacksMutationEnabledTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        // Diagnostic — no host ToolContributor beans on the test classpath, exact 12.
-        assertThat(names).hasSize(12);
+        // Diagnostic — no host ToolContributor beans on the test classpath, exact 13.
+        assertThat(names).hasSize(13);
 
         assertThat(names).contains(
                 "list_entities", "describe_entity", "find_records",
@@ -60,7 +60,8 @@ class AgentToolCallbacksMutationEnabledTest {
                 "generate_entity_list_link", "generate_entity_detail_link");
 
         assertThat(names).contains(
-                "create_record", "update_record", "add_related_record", "remove_related_record");
+                "create_record", "update_record", "add_related_record", "remove_related_record",
+                "bulk_save_records");
 
         // delete_record is reserved for v1.2; never shipped in v1.1 under any flag combination.
         assertThat(names).doesNotContain("delete_record");
@@ -94,7 +95,8 @@ class AgentToolCallbacksMutationEnabledAllowDeleteTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        assertThat(names).hasSize(12);
+        assertThat(names).hasSize(13);
+        assertThat(names).contains("bulk_save_records");
         assertThat(names).doesNotContain("delete_record");
     }
 }

@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiAuditEvent;
+import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.entity.AiUiSettings;
 import com.vn.agent.exposure.AiExposureRule;
 import com.vn.agent.tools.mutation.AiMutationIntent;
@@ -32,6 +33,7 @@ public interface AiAgentAdminRole {
     @EntityPolicy(entityClass = AiKnowledgeDocument.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiExposureRule.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiMutationIntent.class, actions = EntityPolicyAction.ALL)
+    @EntityPolicy(entityClass = AiTaskFile.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiUiSettings.class, actions = {
             EntityPolicyAction.READ,
             EntityPolicyAction.UPDATE})
