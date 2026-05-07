@@ -120,6 +120,8 @@ public class AiAuditEventDetailDialog extends StandardView {
         }
         return switch (outcome) {
             case SUCCESS -> "success";
+            case DENIED -> "warning";
+            case FAILED -> "error";
             case ERROR -> "error";
             case BLOCKED -> "warning";
             case FLAGGED -> "contrast";
