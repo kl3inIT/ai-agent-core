@@ -1,6 +1,7 @@
 package com.vn.agent.security;
 
 import com.vn.agent.entity.AiConversation;
+import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiTaskFile;
 import io.jmix.security.model.EntityPolicyAction;
@@ -35,6 +36,9 @@ public interface AiAgentUserRole {
     // OWN rows.
     @EntityPolicy(entityClass = AiTaskFile.class,
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.DELETE})
+    @EntityPolicy(entityClass = AiExtractionDraft.class,
+            actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE,
+                    EntityPolicyAction.UPDATE, EntityPolicyAction.DELETE})
     void userAccess();
 
     /**
