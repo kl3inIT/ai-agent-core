@@ -1,8 +1,0 @@
-- generic [ref=e2]:
-  - heading "Login with OAuth 2.0" [level=2] [ref=e3]
-  - table [ref=e4]:
-    - rowgroup [ref=e5]:
-      - row "Google" [ref=e6]:
-        - cell "Google" [ref=e7]:
-          - link "Google" [ref=e8] [cursor=pointer]:
-            - /url: /oauth2/authorization/google

@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 13.1 Plan 07 complete (UI/schema/locale/contract test wave — phase 13.1 gate-ready)
-last_updated: "2026-05-07T02:00:00.000Z"
+status: phase_shipped
+stopped_at: Phase 13.1 shipped — PR #25 opened; release version prepared as 1.0.5
+last_updated: "2026-05-07T08:21:43.902Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 53
-  completed_plans: 51
-  percent: 96
+  completed_plans: 53
+  percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-07
 
 ## Project Reference
 
@@ -31,10 +31,10 @@ Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn C
 Plan: 7 of 7 complete (gate-ready)
 | Field | Value |
 |-------|-------|
-| Phase | Phase 13 |
-| Plan | 5 of 5 |
-| Status | Phase 13 Plan 13-06 gap-closure complete (BLK-01 fixed); Spring-context boot regression still deferred (see deferred-items.md) |
-| Last activity | 2026-05-06 — Plan 13-06 gap closure shipped (executeBlockingTurn refactor + Mockito test) |
+| Phase | Phase 13.1 |
+| Plan | 7 of 7 |
+| Status | Phase 13.1 shipped via PR #25; `ai-agent/gradle.properties` prepared for version 1.0.5; Spring-context boot regression still deferred (see Phase 13 deferred-items.md) |
+| Last activity | 2026-05-07 — Shipped Phase 13.1 PR and removed Playwright/UAT artifact files from the branch |
 
 ## Phase Status
 
@@ -45,7 +45,7 @@ Plan: 7 of 7 complete (gate-ready)
 | 11. Mutation-Capable Built-In Tools | Shipped | 16/16 | 2026-04-28 | 2026-04-29 |
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
-| 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Complete | 7/7 | 2026-05-07 | 2026-05-07 |
+| 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
