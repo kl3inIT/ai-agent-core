@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: phase_shipped
-stopped_at: Phase 13.1 shipped — PR #25 opened; release version prepared as 1.0.5
-last_updated: "2026-05-07T08:21:43.902Z"
+stopped_at: Phase 14 context gathered
+last_updated: "2026-05-07T13:41:40.850Z"
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 53
+  total_plans: 52
   completed_plans: 53
   percent: 100
 ---
@@ -245,8 +245,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-07T02:00:00.000Z
-**Stopped at:** Phase 13.1 Plan 07 complete (UI/schema/locale/contract test wave — 5 plan-required tests landed green via XML descriptor parse + source-scan substrate; phase 13.1 gate-ready)
-**Resume file:** None
+**Last session:** 2026-05-07T13:41:40.820Z
+**Stopped at:** Phase 14 context gathered
+**Resume file:** .planning/phases/14-intent-driven-extraction-form-prefill/14-CONTEXT.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
 **Next action:** Phase 14 — Intent-Driven Extraction → Form Prefill (or Phase 15 — Chat Voice Input — Soniox STT, both depend only on Phase 9/10 and 12 respectively; either ordering acceptable).
