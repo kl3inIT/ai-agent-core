@@ -40,7 +40,7 @@ import static org.mockito.Mockito.withSettings;
 class ChatPanelFragmentConversationIdTest {
 
     @Test
-    void descriptorAddsTitleEditAndHiddenAttachmentsSlotWithoutUpload() throws Exception {
+    void descriptorAddsTitleEditAndAttachmentsPaneWithSafeUpload() throws Exception {
         Document document = readDescriptor();
 
         Element conversationTitle = elementById(document, "conversationTitle");
@@ -53,8 +53,13 @@ class ChatPanelFragmentConversationIdTest {
         assertThat(editTitleButton.hasAttribute("text")).isFalse();
         assertThat(editTitleButton.getAttribute("title")).startsWith("msg://");
         assertThat(attachmentsPanel.getTagName()).isEqualTo("vbox");
-        assertThat(attachmentsPanel.getAttribute("visible")).isEqualTo("false");
-        assertThat(document.getElementsByTagName("upload").getLength()).isZero();
+        assertThat(attachmentsPanel.hasAttribute("visible")).isFalse();
+        assertThat(document.getElementsByTagName("upload").getLength()).isEqualTo(1);
+
+        Element taskFileUpload = elementById(document, "taskFileUpload");
+        assertThat(taskFileUpload.getTagName()).isEqualTo("upload");
+        assertThat(taskFileUpload.hasAttribute("receiverType")).isFalse();
+        assertThat(taskFileUpload.getAttribute("maxFiles")).isEqualTo("10");
     }
 
     @Test
