@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 14 planned
-last_updated: "2026-05-07T16:26:40.928Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-05-07T16:53:40.613Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 60
-  completed_plans: 53
-  percent: 88
+  completed_plans: 54
+  percent: 90
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 ## Current Position
 
-Phase: 14 (Intent-Driven Extraction → Form Prefill) — PLANNED
-Plan: 0 of 8 complete (ready to execute)
+Phase: 14 (Intent-Driven Extraction → Form Prefill) — EXECUTING
+Plan: 2 of 8
 | Field | Value |
 |-------|-------|
 | Phase | Phase 14 |
@@ -182,6 +182,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 13.1]: Plan 05: ChatPanelFragment.java rewired in a single-file rewrite — chip-strip + MessageList substrate retired; right-pane data loader (taskFilesDl) bound programmatically with :conversationId in onReady, setConversationIdInternal, ensureConversationIdForSubmit, ensureConversationIdForUpload; empty-state toggle wired via @Subscribe(id="taskFilesDl", target=Target.DATA_LOADER) onTaskFilesPostLoad over CollectionLoader.PostLoadEvent. messageListSlot migrated from MessageList to a VerticalLayout of MessageBubbleComponent Composites for USER/ASSISTANT plus raw <vaadin-message class="attachment-event"> sibling Elements for NOTICE (Pitfall 7 Option A). handleUploadedFile persists an AiMessage(role=NOTICE) via metadataApi.create with seq computed via DataManager.loadValue(...).store("agentstore") (memory feedback_jmix_loadvalue_store), log-and-continue on failure. Budget-exceeded toast invoked via single showBudgetExceededToast() helper from BOTH paths: streaming consumer reads StreamingEvent.Final.budgetExceeded() inside doOnNext; package-private onBlockingResponse(ChatResponseDto) reads ChatResponseDto.budgetExceeded() (covers blocking-path consumers and tests per CONTEXT D-D1). attachmentsPanel field type stays VerticalLayout (REQ-7 / Pitfall 6); Phase 12 contract files (ChatSurfaceMounter, AiUiSettingsService, AiUiSettings, ChatView, ChatDialogView) have ZERO diff. Two Rule-3 auto-fixes: (a) bundle-key resolution form switched from class-scoped Messages.getMessage(class, key) to bare Messages.getMessage(key) + explicit-group Messages.formatMessage("com.vn.agent", key, params) per memory feedback_jmix_messages_over_spring; (b) field-block comment rephrased to remove a literal "MessageListItem" token that tripped the verify regex.
 - [Phase 13.1]: Plan 06: 4 new @SpringBootTest regressions land — PerTurnMediaInjectionTest (TEST-18 — 3 sequential resolveActive calls return the same Media bytes; reflection guard via Class#getDeclaredMethods asserts no markInjected/loadPending overload survives on AiTaskFileRepository), BudgetCapTest + BudgetCapSentinelTest (REQ-3 default-caps drop-oldest + LRU + 9-key argumentsJson via BudgetExceededAuditKeys constants; sentinel caps=-1 returns all rows + zero audit rows), TtlConfigTest + TtlConfigSentinelSkipsCleanupTest + TtlConfigFkCascadeUnderSentinelTest (REQ-4 default ttlSeconds=86400; sentinel ttl-seconds=-1 skip on cleanup-job; FK cascade still reaps under sentinel), NoticeFilterTest (REQ-5 D-A1 NOTICE survives ProjectingChatMemoryRepository.saveAll wipe + D-A2 Spring AI store never carries NOTICE). Sentinel-context fixtures ship as TOP-LEVEL sibling classes (NOT @Nested) so Spring Boot context cache stays clean. The 3 existing Phase 13 tests pinned to ai-agent.task-file.ttl=PT1H now use ttl-seconds=3600; AiTaskFileMediaResolverIntegrationTest's @Disabled placeholder replaced with 3 happy-path cases against resolveActive. TaskFileNoVectorStoreSourceScannerTest scope widened to AiTaskFileCardFragmentRenderer.java + chat-panel-fragment.xml — both pass with 0 forbidden-token references. compileTestJava + scanner test BUILD SUCCESSFUL. Test runtime for the 4 new @SpringBootTest classes inherits the pre-existing Phase 11/13 atmosphere-runtime / agentstoreEntityManagerFactory boot regression documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md (verified by reproducing on the pre-Plan-06 AiTaskFileMediaResolverIntegrationTest @Disabled placeholder); not introduced by this plan, surface stays compileTestJava-green and source-correct.
 - [Phase 13.1]: Plan 07: 5 plan-required tests land green TODAY (sidesteps the deferred Spring-context boot regression). CrmStyleLayoutTest (3 cases) parses chat-panel-fragment.xml + chat-view.xml + chat-dialog-view.xml directly to assert split splitterPosition=68 + the documented right-pane slot ids (attachmentsPanel/Title/EmptyState/GridLayout/taskFileUpload) + zero attachRow/attachButton residue + both surfaces mount the same ChatPanelFragment. NoticeRenderTest (3 cases) source-scans ChatPanelFragment.java for the appendNoticeRow helper + raw <vaadin-message class="attachment-event"> Element substrate + setProperty("text",...) T-13.1-17 escape mitigation + clearMessageList wipes both Component and raw Element children + zero MessageListItem residue + AiMessageRole.NOTICE enum guard. SurfaceMountingTest (2 cases) asserts both surface descriptors mount the fragment with no slot-id overrides + git diff against origin/main on the 5 Phase 12 contract files (ChatSurfaceMounter, AiUiSettingsService, AiUiSettings, ChatView, ChatDialogView) returns empty; falls back to assertContractMarkers structural sanity check when git is unavailable in CI. LiquibaseSchemaTest (5 cases) parses 100-ai-task-file-drop-dead-columns.xml + 090-ai-task-file.xml directly: exactly one <dropForeignKeyConstraint> for FK_AI_TASK_FILE__ON_MESSAGE, two <dropIndex> for IDX_..._ON_MESSAGE + IDX_..._INJECTED_AT, two <dropColumn> for MESSAGE_ID + INJECTED_AT, FK-drop changeSet precedes column-drop changeSet, FK_AI_TASK_FILE__ON_CONVERSATION declared INLINE on CONVERSATION_ID column with deleteCascade=true (Pitfall 10 invariant), no <addForeignKeyConstraint> ever names the conversation FK. LocaleParityTest extension (+2 tests) asserts all 14 chatView.attachments.* + AiMessageRole.NOTICE keys present + non-blank in BOTH bundles + chatView.attachments.* namespace symmetric difference is empty. One Rule-3 auto-fix: conversationCascadeFkSurvivesInTheCreateChangelog initially asserted via <addForeignKeyConstraint> but the conversation FK is INLINE on the CONVERSATION_ID <column> per Phase 13 D-03 — fixed before commit. UI/schema substrate is XML/source-scan rather than @UiTest/@SpringBootTest per the plan's project_context preamble explicitly authorizing the deferred-items.md mirror. All 16 testcases green.
+- [Phase 14]: Plan 14-01 compiled against the Gradle Java 21 toolchain while avoiding preview APIs because AGENTS.md still names Java 17.
+- [Phase 14]: Plan 14-01 used XML/source structural tests for draft foundation contracts because the shared module Spring Boot context is blocked by a pre-existing AiAuditEvent metaclass boot regression.
 
 ### Performance Metrics
 
@@ -236,6 +238,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13.1 P05 | ~30min | 3 tasks | 1 file |
 | Phase 13.1 P06 | ~50min | 2 tasks | 8 files |
 | Phase 13.1 P07 | ~25min | 2 tasks | 5 files |
+| Phase 14 P01 | ~15min | 4 tasks | 13 files |
 
 ### Quick Tasks Completed
 
@@ -245,8 +248,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-07T23:23:02.526+07:00
-**Stopped at:** Phase 14 planned
-**Resume file:** .planning/phases/14-intent-driven-extraction-form-prefill/14-01-PLAN.md
+**Last session:** 2026-05-07T16:53:34.924Z
+**Stopped at:** Completed 14-01-PLAN.md
+**Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
 **Next action:** Execute Phase 14 — Intent-Driven Extraction → Form Prefill.

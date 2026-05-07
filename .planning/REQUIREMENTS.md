@@ -104,12 +104,12 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [ ] **EXTRACT-01**: User selects an intent before sending. Add-on ships a default "auto" intent that uses the current chat path; intents lock the workflow when chosen. v1.1 ships at least one named intent end-to-end (e.g. PDF → customer-draft) plus an SPI for hosts.
 - [ ] **EXTRACT-02**: `IntentExtractor<T>` SPI: `Class<T> targetType()`, `String entityName()`, `T extract(ExtractionInput input)`. Hosts implement per-intent extractors. Add-on ships ONE reference impl using `chatClient.prompt().call().entity(Class)` against a metadata-derived DTO synthesized from `MetaClass`.
 - [ ] **EXTRACT-03**: Intent-extraction model routing: follow active `AiParameters` profile (no separate model pin in v1.1). Operator docs note that weak-JSON-adherence models may produce parse errors.
-- [ ] **EXTRACT-04**: `AiExtractionDraft` Jmix entity in `agentstore`: `id`, `userUsername`, `targetEntityName`, `intentId`, `payloadJson`, `sourceConversationId`, `sourceTaskFileId` (nullable), `createdAt`, `expiresAt` (TTL default 1h), `confirmed` boolean. Persisted (NOT `VaadinSession`-cached) so the form load by id survives navigation. Per-user row-level policy.
+- [x] **EXTRACT-04**: `AiExtractionDraft` Jmix entity in `agentstore`: `id`, `userUsername`, `targetEntityName`, `intentId`, `payloadJson`, `sourceConversationId`, `sourceTaskFileId` (nullable), `createdAt`, `expiresAt` (TTL default 1h), `confirmed` boolean. Persisted (NOT `VaadinSession`-cached) so the form load by id survives navigation. Per-user row-level policy.
 - [ ] **EXTRACT-05**: `ExtractionService` orchestrates: receive input (file id from `AiTaskFile` and/or text), dispatch to matching `IntentExtractor`, persist `AiExtractionDraft`, return `draftId` + `instance_name` summary.
 - [ ] **EXTRACT-06**: `ExtractionToolBridge` exposes a single `@Tool prepare_form_draft(intentId, contextRefs)` to the LLM. The LLM has NO `ViewNavigators` or any UI-mutation primitive (P-17 mitigation). Tool result is a structured payload `{ "action": "open_form_with_draft", "draftId": "...", "entityName": "...", "instanceName": "..." }` that the chat UI client recognizes.
 - [ ] **EXTRACT-07**: `ChatPanelFragment` response renderer recognizes the `open_form_with_draft` shape and renders a "Open form to confirm" button. Click invokes `ViewNavigators.detailView(host, X.class).newEntity().withInitializer(e -> draftLoader.apply(draftId, e)).navigate()` — controller-side, after `accessManager.isPermitted(ViewContext)` check.
 - [ ] **EXTRACT-08**: `DraftLoader` helper applies `payloadJson` to the editing entity via Jmix `DataContext.create(...)` and `setValueIfPermitted` (per-attribute `EntityAttributeContext.canModify`) — NOT raw `setValue` (P-18 mitigation). `dataContext.validate()` runs before `Save`.
-- [ ] **EXTRACT-09**: Draft lifecycle: deleted on confirmed Save (or explicit cancel) or after TTL. Cleanup job runs hourly.
+- [x] **EXTRACT-09**: Draft lifecycle: deleted on confirmed Save (or explicit cancel) or after TTL. Cleanup job runs hourly.
 - [ ] **EXTRACT-10**: Negative test: LLM cannot bypass the draft → confirm flow (no direct `ViewNavigators` call from any `@Tool`-bearing class — design rule + grep-based test).
 
 ### New Entities
@@ -117,7 +117,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 - [x] **ENT-05**: `AiExposureRule` (per EXP-01)
 - [x] **ENT-06**: `AiUiSettings` (per SURF-02)
 - [x] **ENT-07**: `AiTaskFile` (per TASK-03)
-- [ ] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
+- [x] **ENT-08**: `AiExtractionDraft` (per EXTRACT-04)
 - [x] **ENT-09**: `AiMutationIntent` (per MUT-04 — idempotency dedup table)
 
 All five entities follow CLAUDE.md conventions: `@JmixEntity` + UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`, no Lombok. Liquibase changelogs included in root `changelog.xml`.
