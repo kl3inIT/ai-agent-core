@@ -117,13 +117,13 @@ class PerTurnMediaInjectionTest {
 
         UUID conversationId = createConversation("alice");
         FileRef blobRef = saveBlob("sample.txt", originalBytes);
-        seedTaskFile(conversationId, "system", "sample.txt",
+        seedTaskFile(conversationId, "alice", "sample.txt",
                 "text/plain",
                 blobRef, (long) originalBytes.length,
                 OffsetDateTime.now().plusHours(24));
 
         for (int turn = 0; turn < 3; turn++) {
-            AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+            AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                     resolver.resolveActive(conversationId));
 
             assertThat(result.media())

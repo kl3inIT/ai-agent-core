@@ -108,14 +108,14 @@ class AiTaskFileMediaResolverIntegrationTest {
     @Test
     void resolveActiveReturnsDocumentTextForPlainTextFile() {
         byte[] originalBytes = "hello task-file world".getBytes(StandardCharsets.UTF_8);
-        UUID conversationId = createConversation("resolver-happy-user");
+        UUID conversationId = createConversation("alice");
         FileRef blobRef = saveBlob("resolver-happy.txt", originalBytes);
-        seedTaskFile(conversationId, "system",
+        seedTaskFile(conversationId, "alice",
                 "resolver-happy.txt", "text/plain", blobRef,
                 (long) originalBytes.length,
                 OffsetDateTime.now().plusHours(1));
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result).isNotNull();
@@ -142,14 +142,14 @@ class AiTaskFileMediaResolverIntegrationTest {
     @Test
     void resolveActiveReturnsMediaForImageFile() {
         byte[] imageBytes = new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
-        UUID conversationId = createConversation("resolver-image-user");
+        UUID conversationId = createConversation("alice");
         FileRef blobRef = saveBlob("resolver-image.png", imageBytes);
-        seedTaskFile(conversationId, "system",
+        seedTaskFile(conversationId, "alice",
                 "resolver-image.png", "image/png", blobRef,
                 (long) imageBytes.length,
                 OffsetDateTime.now().plusHours(1));
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result.media())
@@ -168,9 +168,9 @@ class AiTaskFileMediaResolverIntegrationTest {
      */
     @Test
     void resolveActiveReturnsEmptyWhenNoRows() {
-        UUID conversationId = createConversation("resolver-empty-user");
+        UUID conversationId = createConversation("alice");
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result.isEmpty())

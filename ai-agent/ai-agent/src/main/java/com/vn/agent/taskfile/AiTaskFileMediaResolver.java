@@ -152,13 +152,19 @@ public class AiTaskFileMediaResolver {
         if (conversationId == null) {
             return Resolved.empty();
         }
-        List<AiTaskFile> rows = dataManager.load(AiTaskFile.class)
-                .query("select e from ai_AiTaskFile e " +
+        boolean ttlDisabled = taskFileProperties.getTtlSeconds() == -1L;
+        var loader = dataManager.load(AiTaskFile.class)
+                .query(ttlDisabled
+                        ? "select e from ai_AiTaskFile e " +
+                        "where e.conversation.id = :cid order by e.createdDate desc"
+                        : "select e from ai_AiTaskFile e " +
                         "where e.conversation.id = :cid and e.expiresAt > :now " +
                         "order by e.createdDate desc")
-                .parameter("cid", conversationId)
-                .parameter("now", OffsetDateTime.now())
-                .list();
+                .parameter("cid", conversationId);
+        if (!ttlDisabled) {
+            loader.parameter("now", OffsetDateTime.now());
+        }
+        List<AiTaskFile> rows = loader.list();
         if (rows.isEmpty()) {
             return Resolved.empty();
         }

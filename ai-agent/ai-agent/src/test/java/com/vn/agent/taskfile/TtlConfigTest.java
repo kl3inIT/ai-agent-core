@@ -97,12 +97,12 @@ class TtlConfigSentinelSkipsCleanupTest {
         assertThat(taskFileProperties.getTtlSeconds()).isEqualTo(-1L);
 
         UUID conversationId = TtlConfigTestSupport.createConversation(systemAuthenticator,
-                unconstrainedDataManager, metadata, seededConversationIds, "ttl-sentinel-user");
+                unconstrainedDataManager, metadata, seededConversationIds, "alice");
         FileRef blobRef = TtlConfigTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
                 seededBlobs, "ttl-sentinel.png", "sentinel".getBytes(StandardCharsets.UTF_8));
         UUID taskFileId = TtlConfigTestSupport.seedTaskFile(systemAuthenticator,
                 unconstrainedDataManager, metadata, seededTaskFileIds,
-                conversationId, "system", "ttl-sentinel.png", "image/png", blobRef,
+                conversationId, "alice", "ttl-sentinel.png", "image/png", blobRef,
                 /* sizeBytes */ 8L,
                 /* expiresAt — already past the wall-clock so a non-sentinel cleanup would reap it */
                 OffsetDateTime.now().minusHours(1));
@@ -126,7 +126,7 @@ class TtlConfigSentinelSkipsCleanupTest {
                         "must also honor ttl-seconds=-1")
                 .isZero();
 
-        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
         assertThat(resolved.media())
                 .as("sentinel TTL disables active-row expiry filtering; old rows remain model context")

@@ -1,6 +1,7 @@
 package com.vn.agent;
 
 import io.jmix.core.annotation.JmixModule;
+import com.vn.agent.tools.mutation.MutationFixturePersistenceTestConfiguration;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -20,7 +21,7 @@ import static org.mockito.Mockito.when;
 
 @SpringBootConfiguration
 @EnableAutoConfiguration
-@Import(AIConfiguration.class)
+@Import({AIConfiguration.class, MutationFixturePersistenceTestConfiguration.class})
 @PropertySource("classpath:/com/vn/agent/test-app.properties")
 @JmixModule(id = "com.vn.agent.test", dependsOn = AIConfiguration.class)
 public class AITestConfiguration {
@@ -50,6 +51,7 @@ public class AITestConfiguration {
         when(builder.build()).thenReturn(client);
         when(client.prompt()).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.call()).thenReturn(callSpec);
         when(callSpec.content()).thenReturn("test");

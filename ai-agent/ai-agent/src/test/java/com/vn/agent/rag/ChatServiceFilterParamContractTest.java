@@ -126,6 +126,7 @@ class ChatServiceFilterParamContractTest {
         when(chatClient.prompt()).thenReturn(requestSpec);
         when(requestSpec.system(anyString())).thenReturn(requestSpec);
         when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
         when(requestSpec.toolCallbacks(any(org.springframework.ai.tool.ToolCallback[].class))).thenReturn(requestSpec);
         when(requestSpec.toolContext(any())).thenReturn(requestSpec);
         when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);

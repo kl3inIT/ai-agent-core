@@ -20,7 +20,7 @@ class AgentSystemPromptRulesComposerTest {
                 .doesNotContain("idempotencyKey")
                 .doesNotContain("parameter_conversion_error")
                 .doesNotContain("concurrent_modification")
-                .doesNotContain("generate_entity_detail_link")
+                .contains("generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
     }
 

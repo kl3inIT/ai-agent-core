@@ -130,7 +130,7 @@ class AiTaskFileNoVectorStoreInvocationTest {
     void resolveActive_neverIngests_andRepositoryDoesNotInjectVectorStore() {
         UUID conversationId = systemAuthenticator.withSystem(() -> {
             AiConversation conversation = metadata.create(AiConversation.class);
-            conversation.setCreatedBy("test16-runtime-user");
+            conversation.setCreatedBy("alice");
             conversation.setTitle("test-16 runtime");
             return unconstrainedDataManager.save(conversation).getId();
         });
@@ -149,7 +149,7 @@ class AiTaskFileNoVectorStoreInvocationTest {
             AiConversation conversationRef = unconstrainedDataManager.load(AiConversation.class)
                     .id(conversationId).one();
             row.setConversation(conversationRef);
-            row.setUserUsername("system");
+            row.setUserUsername("alice");
             row.setFilename("test16.txt");
             row.setContentType("text/plain");
             row.setSizeBytes((long) originalBytes.length);
@@ -159,7 +159,7 @@ class AiTaskFileNoVectorStoreInvocationTest {
         });
         seededTaskFileIds.add(taskFileId);
 
-        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
         org.assertj.core.api.Assertions.assertThat(resolved.media())
                 .as("text/plain task files are extracted to DocumentText, not Media")

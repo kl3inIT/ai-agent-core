@@ -84,7 +84,7 @@ class BudgetCapTest {
     @Test
     void eleven1KbFilesDropsOldestEmitsOneAuditRow() throws Exception {
         UUID conversationId = BudgetCapTestSupport.createConversation(systemAuthenticator,
-                unconstrainedDataManager, metadata, seededConversationIds, "budget-default-user");
+                unconstrainedDataManager, metadata, seededConversationIds, "alice");
 
         // 11 × 1 KB. Sleep between saves so JPA-managed createdDate is strictly monotonic
         // — the resolver iterates DESC and drops the OLDEST first (LRU).
@@ -93,13 +93,13 @@ class BudgetCapTest {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
                     seededBlobs, "budget-default-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "system",
+                    metadata, seededTaskFileIds, conversationId, "alice",
                     "budget-default-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result.media())
@@ -140,7 +140,7 @@ class BudgetCapTest {
     @Test
     void sixTenMbFilesByteCapEnforcement() throws Exception {
         UUID conversationId = BudgetCapTestSupport.createConversation(systemAuthenticator,
-                unconstrainedDataManager, metadata, seededConversationIds, "budget-byte-user");
+                unconstrainedDataManager, metadata, seededConversationIds, "alice");
 
         // 6 × 10 MB rows = 60 MB. With a 50 MB byte cap, the 5 newest rows fit (50 MB exactly);
         // row 0 (oldest) is dropped.
@@ -149,13 +149,13 @@ class BudgetCapTest {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
                     seededBlobs, "budget-byte-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "system",
+                    metadata, seededTaskFileIds, conversationId, "alice",
                     "budget-byte-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result.media())
@@ -228,20 +228,20 @@ class BudgetCapSentinelTest {
     @Test
     void sentinelDisablesCapsReturnsAllRowsZeroAuditRows() throws Exception {
         UUID conversationId = BudgetCapTestSupport.createConversation(systemAuthenticator,
-                unconstrainedDataManager, metadata, seededConversationIds, "budget-sentinel-user");
+                unconstrainedDataManager, metadata, seededConversationIds, "alice");
 
         byte[] payload = new byte[1024];
         for (int i = 0; i < 11; i++) {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
                     seededBlobs, "budget-sentinel-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "system",
+                    metadata, seededTaskFileIds, conversationId, "alice",
                     "budget-sentinel-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }
 
-        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withUser("alice", () ->
                 resolver.resolveActive(conversationId));
 
         assertThat(result.media())
