@@ -231,7 +231,10 @@ Plans:
   2. `TranscriptionService` is a strategy interface with a default `SonioxTranscriptionService` impl (custom Spring `RestClient`-based — Soniox has no Java SDK) and an optional `SpringAiTranscriptionService` OpenAI-direct impl; selected via `ai-agent.stt.provider=soniox|openai|<custom-bean-name>` (default `soniox`). Hosts can register their own `TranscriptionService` bean and select it by bean name.
   3. By default the `STT_TRANSCRIPTION` audit row (via `AuditWriter.writeToolCall` `eventName=stt_transcription`, no new `AuditKind`) records duration, language, model, outcome, and SHA-256 transcript hash (NOT raw text); flipping `ai-agent.stt.audit.storeTranscript=true` stores raw transcript instead (TEST-17 covers both modes).
   4. STT failures (provider 4xx, recording too long, network) surface a non-blocking error message + retry button in the input area; the chat flow itself remains usable. An optional `TranscriptionPostProcessor` SPI bean rewrites transcripts (PII redaction / vocabulary normalization) before they reach the input field.
-**Plans**: TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD
 **UI hint**: yes
 **Cross-cutting constraints:**
 - Operator docs note: Soniox uses an independent API key from OpenAI/OpenRouter chat key. OpenRouter does NOT proxy `/audio/transcriptions`; if `provider=openai` is selected, OpenAI key is required directly.
@@ -247,7 +250,24 @@ Plans:
   2. `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) invokes `ViewNavigators.detailView(...).newEntity().withInitializer(...)` after `AccessManager.isPermitted(ViewContext)` passes; the Jmix detail view opens prefilled from `AiExtractionDraft.payloadJson`.
   3. The prefill applies via `DataContext.create(...)` and per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); `dataContext.validate()` runs before Save; on Save the draft is deleted and a normal Jmix-secured save executes.
   4. `AiExtractionDraft` rows expire after TTL (default 1h, hourly cleanup job); each row is row-level-scoped to its owner `userUsername` (`AiAgentUserRole` row policy), persisted (not `VaadinSession`-cached), and survives navigation; `prepare_form_draft` invocations are audited via `AuditWriter.writeToolCall` with `eventName=prepare_form_draft`.
-**Plans**: TBD
+**Plans:** 8 plans
+
+Plans:
+**Wave 1**
+- [ ] 14-01-PLAN.md — Draft persistence/security/config foundation: `AiExtractionDraft`, Liquibase 110, roles, internal denylist, TTL cleanup
+- [ ] 14-02-PLAN.md — SPI and schema synthesis: `IntentExtractor<T>`, `IntentRegistry`, `ExtractionInput`, `MetaClassDtoSynthesizer`
+
+**Wave 2 *(blocked on Wave 1 completion)***
+- [ ] 14-03-PLAN.md — Extraction service and `prepare_form_draft` tool bridge with append-only audit and denial handling
+- [ ] 14-04-PLAN.md — Chat-service intent plumbing, named-intent tool gating, and named-intent system-prompt rules
+
+**Wave 3 *(blocked on Wave 2 completion)***
+- [ ] 14-05-PLAN.md — Draft loader, permission-gated prefill, controller-side navigation, and save-time draft deletion
+- [ ] 14-06-PLAN.md — Jmix intent card-row UI, `open_form_with_draft` rendering, confirm row, CSS, and i18n
+
+**Wave 4 *(blocked on Wave 3 completion)***
+- [ ] 14-07-PLAN.md — Host `CustomerDraftIntentExtractor` reference implementation and host workflow tests
+- [ ] 14-08-PLAN.md — TEST-15 navigation scanner, setValue/core-boundary scanners, eval fixtures, and final verification gates
 **UI hint**: yes
 
 ## Phase Dependency Graph
@@ -279,7 +299,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1**
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | 6/6 | Complete    | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | 7/7 | Complete | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | 0/0 | Not started | - |
+| 14. Intent-Driven Extraction → Form Prefill | 0/8 | Ready to execute | - |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
 ## Coverage Validation

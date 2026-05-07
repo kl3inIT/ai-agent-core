@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: phase_shipped
-stopped_at: Phase 14 context gathered
-last_updated: "2026-05-07T13:41:40.850Z"
+status: ready_to_execute
+stopped_at: Phase 14 planned
+last_updated: "2026-05-07T15:24:55.529Z"
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 52
+  total_plans: 60
   completed_plans: 53
-  percent: 100
+  percent: 88
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 13.1 — Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context
+**Current focus:** Phase 14 — Intent-Driven Extraction → Form Prefill
 
 ## Current Position
 
-Phase: 13.1 (Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context) — COMPLETE
-Plan: 7 of 7 complete (gate-ready)
+Phase: 14 (Intent-Driven Extraction → Form Prefill) — PLANNED
+Plan: 0 of 8 complete (ready to execute)
 | Field | Value |
 |-------|-------|
-| Phase | Phase 13.1 |
-| Plan | 7 of 7 |
-| Status | Phase 13.1 shipped via PR #25; `ai-agent/gradle.properties` prepared for version 1.0.5; Spring-context boot regression still deferred (see Phase 13 deferred-items.md) |
-| Last activity | 2026-05-07 — Shipped Phase 13.1 PR and removed Playwright/UAT artifact files from the branch |
+| Phase | Phase 14 |
+| Plan | 0 of 8 |
+| Status | Phase 14 planned; research plus 8 executable plans created across 4 waves |
+| Last activity | 2026-05-07 — Created Phase 14 research and plan set; decision coverage passed 22/22 |
 
 ## Phase Status
 
@@ -46,7 +46,7 @@ Plan: 7 of 7 complete (gate-ready)
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Not started | 0/0 | - | - |
+| 14. Intent-Driven Extraction → Form Prefill | Ready to execute | 0/8 | 2026-05-07 | - |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
@@ -245,8 +245,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-07T13:41:40.820Z
-**Stopped at:** Phase 14 context gathered
-**Resume file:** .planning/phases/14-intent-driven-extraction-form-prefill/14-CONTEXT.md
+**Last session:** 2026-05-07T15:24:55.529Z
+**Stopped at:** Phase 14 planned
+**Resume file:** .planning/phases/14-intent-driven-extraction-form-prefill/14-01-PLAN.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Phase 14 — Intent-Driven Extraction → Form Prefill (or Phase 15 — Chat Voice Input — Soniox STT, both depend only on Phase 9/10 and 12 respectively; either ordering acceptable).
+**Next action:** Execute Phase 14 — Intent-Driven Extraction → Form Prefill.
