@@ -125,8 +125,17 @@ configurations.implementation {
     exclude group: 'com.vaadin', module: 'copilot'
 }
 
+tasks.withType(Test).configureEach {
+    // The suite boots many heavyweight Jmix @SpringBootTest contexts. Keep the Spring
+    // context cache bounded and periodically reset the worker JVM so CI does not OOM
+    // before late-suite mutation tests create their context.
+    maxHeapSize = '3g'
+    maxParallelForks = 1
+    forkEvery = 20
+    systemProperty 'spring.test.context.cache.maxSize', '8'
+}
+
 tasks.named('test') {
-    maxHeapSize = '2g'
     // Jmix enhancer generates `$JmixEntityEntry` companions for test-only fixture entities.
     // The `MutationTestFixture` name intentionally contains "Test", so Gradle's test class
     // scanner can treat the enhanced entity/companion classes as executable tests during the
