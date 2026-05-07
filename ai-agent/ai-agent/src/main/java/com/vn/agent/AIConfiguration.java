@@ -1,6 +1,7 @@
 package com.vn.agent;
 
 import com.vn.agent.conversation.AiAgentTitleProperties;
+import com.vn.agent.extraction.AiExtractionProperties;
 import com.vn.agent.rag.MdcPropagatingTaskDecorator;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.spi.MutationGuard;
@@ -31,7 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Configuration
 @ComponentScan
 @ConfigurationPropertiesScan
-@EnableConfigurationProperties({AiTaskFileProperties.class})
+@EnableConfigurationProperties({AiTaskFileProperties.class, AiExtractionProperties.class})
 @EnableAsync
 @EnableScheduling
 @JmixModule(dependsOn = {
