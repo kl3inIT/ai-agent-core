@@ -1,0 +1,171 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - banner [ref=e8]:
+      - button "Menu toggle" [expanded] [ref=e9]:
+        - generic [ref=e11]: 
+        - text: 
+      - heading "Trò chuyện" [level=1] [ref=e12]
+      - menubar [ref=e13]:
+        - menuitem "admin (a) admin" [ref=e15]:
+          - generic [ref=e20]:
+            - img "admin (a)" [ref=e21]:
+              - img [ref=e22]:
+                - generic [ref=e23]: a
+            - generic [ref=e24]: admin
+    - generic [ref=e26]:
+      - heading "Jmix App" [level=2] [ref=e27]:
+        - link "Jmix App" [ref=e28] [cursor=pointer]:
+          - /url: .
+      - navigation "Views" [ref=e29]:
+        - list [ref=e30]:
+          - listitem [ref=e31]:
+            - generic [ref=e32]:
+              - button "Ứng dụng" [expanded] [ref=e33]:
+                - generic [ref=e34]: 
+                - generic [ref=e37]: Ứng dụng
+              - list [ref=e40]:
+                - listitem [ref=e41]:
+                  - link "Người dùng" [ref=e42] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e43]: Người dùng
+                - listitem [ref=e44]:
+                  - link "Khách hàng" [ref=e45] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e46]: Khách hàng
+                - listitem [ref=e47]:
+                  - link "Sản phẩm" [ref=e48] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e49]: Sản phẩm
+                - listitem [ref=e50]:
+                  - link "Đơn hàng" [ref=e51] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e52]: Đơn hàng
+          - listitem [ref=e53]:
+            - generic [ref=e54]:
+              - button "Trợ lý AI" [expanded] [ref=e55]:
+                - generic [ref=e56]: 
+                - generic [ref=e59]: Trợ lý AI
+              - list [ref=e62]:
+                - listitem [ref=e63]:
+                  - link "Cấu hình giao diện" [ref=e64] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e65]: Cấu hình giao diện
+                - listitem [ref=e66]:
+                  - link "Trò chuyện" [ref=e67] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e68]: Trò chuyện
+                - listitem [ref=e69]:
+                  - link "Hội thoại" [ref=e70] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e71]: Hội thoại
+                - listitem [ref=e72]:
+                  - link "Cấu hình AI" [ref=e73] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e74]: Cấu hình AI
+                - listitem [ref=e75]:
+                  - link "Cơ sở tri thức" [ref=e76] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e77]: Cơ sở tri thức
+                - listitem [ref=e78]:
+                  - link "Nhật ký gọi công cụ" [ref=e79] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e80]: Nhật ký gọi công cụ
+          - listitem [ref=e81]:
+            - button "Bảo mật" [ref=e83]:
+              - generic [ref=e84]: 
+              - generic [ref=e87]: Bảo mật
+          - listitem [ref=e88]:
+            - button "Data Tools" [ref=e90]:
+              - generic [ref=e91]: 
+              - generic [ref=e94]: Data Tools
+    - generic [ref=e98]:
+      - generic [ref=e99]:
+        - generic:
+          - generic [ref=e100]:
+            - generic:
+              - heading "Cuộc trò chuyện mới" [level=3] [ref=e101]
+              - button "Sửa tiêu đề" [ref=e135]:
+                - generic [ref=e138]: 
+              - button "Cuộc trò chuyện mới" [ref=e102]:
+                - generic [ref=e105]: 
+          - generic [ref=e106]:
+            - generic:
+              - region [ref=e107]:
+                - list [ref=e182]:
+                  - generic:
+                    - listitem [ref=e183]:
+                      - img [ref=e184]:
+                        - img [ref=e185]:
+                          - generic [ref=e186]: B
+                      - generic [ref=e187]:
+                        - generic [ref=e188]:
+                          - generic [ref=e189]: Bạn
+                          - generic [ref=e190]: 14:37 7 thg 5, 2026
+                        - paragraph [ref=e193]: Liệt kê các cột trong file đính kèm.
+                    - listitem [ref=e194]:
+                      - img [ref=e195]:
+                        - img [ref=e196]:
+                          - generic [ref=e197]: TlA
+                      - generic [ref=e198]:
+                        - generic [ref=e199]:
+                          - generic [ref=e200]: Trợ lý AI
+                          - generic [ref=e201]: 14:37 7 thg 5, 2026
+                        - generic [ref=e206]:
+                          - generic:
+                            - paragraph [ref=e207]:
+                              - text: Các cột trong file
+                              - code [ref=e208]: sample-data.csv
+                              - text: ":"
+                            - list [ref=e209]:
+                              - listitem [ref=e210]:
+                                - strong [ref=e211]: col_a
+                              - listitem [ref=e212]:
+                                - strong [ref=e213]: col_b
+                              - listitem [ref=e214]:
+                                - strong [ref=e215]: col_c
+              - generic [ref=e139]: 📎 [admin] đã đính kèm "sample-data.csv"
+          - generic [ref=e109]:
+            - generic [ref=e112]:
+              - textbox "Message" [ref=e113]
+              - generic: 
+            - button "Send" [ref=e114]:
+              - generic [ref=e116]:
+                - generic: Send
+      - generic [ref=e119]:
+        - generic:
+          - heading "Tệp đính kèm" [level=3] [ref=e120]
+          - region [ref=e144]:
+            - generic [ref=e145]:
+              - img [ref=e147]
+              - heading "sample-data.csv" [level=5] [ref=e151]
+              - generic [ref=e152]:
+                - generic:
+                  - button "Tải tệp về" [ref=e153]:
+                    - generic [ref=e156]: 
+                  - button "Xoá tệp đính kèm" [ref=e157]:
+                    - generic [ref=e160]: 
+            - generic [ref=e163]:
+              - generic:
+                - generic [ref=e164]: 07/05/2026 14:36 +0700
+                - generic [ref=e165]: "|"
+                - generic [ref=e166]: 52 B
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - button "Tải lên" [ref=e130]:
+                - generic [ref=e132]:
+                  - generic: Tải lên
+              - generic [ref=e133]:
+                - generic [ref=e134]: 
+                - text: Thả tệp vào đây
+            - list [ref=e168]:
+              - listitem [ref=e169]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]:
+                    - generic [ref=e173]: 
+                    - text: 
+                    - generic [ref=e175]: sample-data.csv
+                  - generic [ref=e176]:
+                    - text:  
+                    - button "Remove" [ref=e177]: 
+  - generic [ref=e4]: Online
+  - alert [ref=e178]: "sample-data.csv: 100%"

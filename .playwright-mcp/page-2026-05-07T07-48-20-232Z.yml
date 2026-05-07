@@ -1,0 +1,332 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - banner [ref=e8]:
+      - button "Menu toggle" [expanded] [ref=e9]:
+        - generic [ref=e11]: 
+        - text: 
+      - heading "Trò chuyện" [level=1] [ref=e12]
+      - menubar [ref=e13]:
+        - menuitem "admin (a) admin" [ref=e15]:
+          - generic [ref=e20]:
+            - img "admin (a)" [ref=e21]:
+              - img [ref=e22]:
+                - generic [ref=e23]: a
+            - generic [ref=e24]: admin
+    - generic [ref=e26]:
+      - heading "Jmix App" [level=2] [ref=e27]:
+        - link "Jmix App" [ref=e28] [cursor=pointer]:
+          - /url: .
+      - navigation "Views" [ref=e29]:
+        - list [ref=e30]:
+          - listitem [ref=e31]:
+            - generic [ref=e32]:
+              - button "Ứng dụng" [expanded] [ref=e33]:
+                - generic [ref=e34]: 
+                - generic [ref=e37]: Ứng dụng
+              - list [ref=e40]:
+                - listitem [ref=e41]:
+                  - link "Người dùng" [ref=e42] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e43]: Người dùng
+                - listitem [ref=e44]:
+                  - link "Khách hàng" [ref=e45] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e46]: Khách hàng
+                - listitem [ref=e47]:
+                  - link "Sản phẩm" [ref=e48] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e49]: Sản phẩm
+                - listitem [ref=e50]:
+                  - link "Đơn hàng" [ref=e51] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e52]: Đơn hàng
+          - listitem [ref=e53]:
+            - generic [ref=e54]:
+              - button "Trợ lý AI" [expanded] [ref=e55]:
+                - generic [ref=e56]: 
+                - generic [ref=e59]: Trợ lý AI
+              - list [ref=e62]:
+                - listitem [ref=e63]:
+                  - link "Cấu hình giao diện" [ref=e64] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e65]: Cấu hình giao diện
+                - listitem [ref=e66]:
+                  - link "Trò chuyện" [ref=e67] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e68]: Trò chuyện
+                - listitem [ref=e69]:
+                  - link "Hội thoại" [ref=e70] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e71]: Hội thoại
+                - listitem [ref=e72]:
+                  - link "Cấu hình AI" [ref=e73] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e74]: Cấu hình AI
+                - listitem [ref=e75]:
+                  - link "Cơ sở tri thức" [ref=e76] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e77]: Cơ sở tri thức
+                - listitem [ref=e78]:
+                  - link "Nhật ký gọi công cụ" [ref=e79] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e80]: Nhật ký gọi công cụ
+          - listitem [ref=e81]:
+            - button "Bảo mật" [ref=e83]:
+              - generic [ref=e84]: 
+              - generic [ref=e87]: Bảo mật
+          - listitem [ref=e88]:
+            - button "Data Tools" [ref=e90]:
+              - generic [ref=e91]: 
+              - generic [ref=e94]: Data Tools
+    - generic [ref=e98]:
+      - generic [ref=e99]:
+        - generic:
+          - generic [ref=e100]:
+            - generic:
+              - heading "Cuộc trò chuyện mới" [level=3] [ref=e101]
+              - button "Sửa tiêu đề" [ref=e135]:
+                - generic [ref=e138]: 
+              - button "Cuộc trò chuyện mới" [ref=e102]:
+                - generic [ref=e105]: 
+              - button "Dừng" [ref=e779]:
+                - generic [ref=e781]:
+                  - generic: Dừng
+          - generic [ref=e106]:
+            - generic:
+              - region [ref=e107]:
+                - list [ref=e782]:
+                  - generic:
+                    - listitem [ref=e783]:
+                      - img [ref=e784]:
+                        - img [ref=e785]:
+                          - generic [ref=e786]: B
+                      - generic [ref=e787]:
+                        - generic [ref=e788]:
+                          - generic [ref=e789]: Bạn
+                          - generic [ref=e790]: 14:48 7 thg 5, 2026
+                        - paragraph [ref=e793]: Tóm tắt các file đính kèm.
+                    - listitem [ref=e794]:
+                      - img [ref=e795]:
+                        - img [ref=e796]:
+                          - generic [ref=e797]: TlA
+                      - generic [ref=e799]:
+                        - generic [ref=e800]: Trợ lý AI
+                        - generic [ref=e801]: 14:48 7 thg 5, 2026
+              - generic [ref=e139]: 📎 [admin] đã đính kèm "file_01.csv"
+              - generic [ref=e140]: 📎 [admin] đã đính kèm "file_03.csv"
+              - generic [ref=e141]: 📎 [admin] đã đính kèm "file_04.csv"
+              - generic [ref=e142]: 📎 [admin] đã đính kèm "file_02.csv"
+              - generic [ref=e143]: 📎 [admin] đã đính kèm "file_05.csv"
+              - generic [ref=e144]: 📎 [admin] đã đính kèm "file_06.csv"
+              - generic [ref=e145]: 📎 [admin] đã đính kèm "file_08.csv"
+              - generic [ref=e146]: 📎 [admin] đã đính kèm "file_10.csv"
+              - generic [ref=e147]: 📎 [admin] đã đính kèm "file_07.csv"
+              - generic [ref=e148]: 📎 [admin] đã đính kèm "file_09.csv"
+              - generic [ref=e494]: 📎 [admin] đã đính kèm "file_11.csv"
+          - generic [ref=e108]:
+            - generic:
+              - progressbar [ref=e802]
+              - generic [ref=e109]:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - textbox "Message" [disabled]
+                        - generic: 
+                - generic:
+                  - button "Send" [disabled]:
+                    - generic:
+                      - generic:
+                        - generic: Send
+      - generic [ref=e119]:
+        - generic:
+          - heading "Tệp đính kèm" [level=3] [ref=e120]
+          - generic [ref=e150]:
+            - generic:
+              - region [ref=e497]:
+                - generic [ref=e498]:
+                  - img [ref=e500]
+                  - heading "file_11.csv" [level=5] [ref=e504]
+                  - generic [ref=e505]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e506]:
+                        - generic [ref=e509]: 
+                      - button "Xoá tệp đính kèm" [ref=e510]:
+                        - generic [ref=e513]: 
+                - generic [ref=e516]:
+                  - generic:
+                    - generic [ref=e517]: 07/05/2026 14:47 +0700
+                    - generic [ref=e518]: "|"
+                    - generic [ref=e519]: 37 B
+              - region [ref=e522]:
+                - generic [ref=e523]:
+                  - img [ref=e525]
+                  - heading "file_09.csv" [level=5] [ref=e529]
+                  - generic [ref=e530]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e531]:
+                        - generic [ref=e534]: 
+                      - button "Xoá tệp đính kèm" [ref=e535]:
+                        - generic [ref=e538]: 
+                - generic [ref=e541]:
+                  - generic:
+                    - generic [ref=e542]: 07/05/2026 14:46 +0700
+                    - generic [ref=e543]: "|"
+                    - generic [ref=e544]: 35 B
+              - region [ref=e547]:
+                - generic [ref=e548]:
+                  - img [ref=e550]
+                  - heading "file_07.csv" [level=5] [ref=e554]
+                  - generic [ref=e555]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e556]:
+                        - generic [ref=e559]: 
+                      - button "Xoá tệp đính kèm" [ref=e560]:
+                        - generic [ref=e563]: 
+                - generic [ref=e566]:
+                  - generic:
+                    - generic [ref=e567]: 07/05/2026 14:46 +0700
+                    - generic [ref=e568]: "|"
+                    - generic [ref=e569]: 35 B
+              - region [ref=e572]:
+                - generic [ref=e573]:
+                  - img [ref=e575]
+                  - heading "file_10.csv" [level=5] [ref=e579]
+                  - generic [ref=e580]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e581]:
+                        - generic [ref=e584]: 
+                      - button "Xoá tệp đính kèm" [ref=e585]:
+                        - generic [ref=e588]: 
+                - generic [ref=e591]:
+                  - generic:
+                    - generic [ref=e592]: 07/05/2026 14:46 +0700
+                    - generic [ref=e593]: "|"
+                    - generic [ref=e594]: 37 B
+              - region [ref=e597]:
+                - generic [ref=e598]:
+                  - img [ref=e600]
+                  - heading "file_08.csv" [level=5] [ref=e604]
+                  - generic [ref=e605]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e606]:
+                        - generic [ref=e609]: 
+                      - button "Xoá tệp đính kèm" [ref=e610]:
+                        - generic [ref=e613]: 
+                - generic [ref=e616]:
+                  - generic:
+                    - generic [ref=e617]: 07/05/2026 14:46 +0700
+                    - generic [ref=e618]: "|"
+                    - generic [ref=e619]: 35 B
+              - region [ref=e622]:
+                - generic [ref=e623]:
+                  - img [ref=e625]
+                  - heading "file_06.csv" [level=5] [ref=e629]
+                  - generic [ref=e630]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e631]:
+                        - generic [ref=e634]: 
+                      - button "Xoá tệp đính kèm" [ref=e635]:
+                        - generic [ref=e638]: 
+                - generic [ref=e641]:
+                  - generic:
+                    - generic [ref=e642]: 07/05/2026 14:46 +0700
+                    - generic [ref=e643]: "|"
+                    - generic [ref=e644]: 35 B
+              - region [ref=e647]:
+                - generic [ref=e648]:
+                  - img [ref=e650]
+                  - heading "file_05.csv" [level=5] [ref=e654]
+                  - generic [ref=e655]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e656]:
+                        - generic [ref=e659]: 
+                      - button "Xoá tệp đính kèm" [ref=e660]:
+                        - generic [ref=e663]: 
+                - generic [ref=e666]:
+                  - generic:
+                    - generic [ref=e667]: 07/05/2026 14:46 +0700
+                    - generic [ref=e668]: "|"
+                    - generic [ref=e669]: 35 B
+              - region [ref=e672]:
+                - generic [ref=e673]:
+                  - img [ref=e675]
+                  - heading "file_02.csv" [level=5] [ref=e679]
+                  - generic [ref=e680]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e681]:
+                        - generic [ref=e684]: 
+                      - button "Xoá tệp đính kèm" [ref=e685]:
+                        - generic [ref=e688]: 
+                - generic [ref=e691]:
+                  - generic:
+                    - generic [ref=e692]: 07/05/2026 14:46 +0700
+                    - generic [ref=e693]: "|"
+                    - generic [ref=e694]: 35 B
+              - region [ref=e697]:
+                - generic [ref=e698]:
+                  - img [ref=e700]
+                  - heading "file_04.csv" [level=5] [ref=e704]
+                  - generic [ref=e705]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e706]:
+                        - generic [ref=e709]: 
+                      - button "Xoá tệp đính kèm" [ref=e710]:
+                        - generic [ref=e713]: 
+                - generic [ref=e716]:
+                  - generic:
+                    - generic [ref=e717]: 07/05/2026 14:46 +0700
+                    - generic [ref=e718]: "|"
+                    - generic [ref=e719]: 35 B
+              - region [ref=e722]:
+                - generic [ref=e723]:
+                  - img [ref=e725]
+                  - heading "file_03.csv" [level=5] [ref=e729]
+                  - generic [ref=e730]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e731]:
+                        - generic [ref=e734]: 
+                      - button "Xoá tệp đính kèm" [ref=e735]:
+                        - generic [ref=e738]: 
+                - generic [ref=e741]:
+                  - generic:
+                    - generic [ref=e742]: 07/05/2026 14:46 +0700
+                    - generic [ref=e743]: "|"
+                    - generic [ref=e744]: 35 B
+              - region [ref=e747]:
+                - generic [ref=e748]:
+                  - img [ref=e750]
+                  - heading "file_01.csv" [level=5] [ref=e754]
+                  - generic [ref=e755]:
+                    - generic:
+                      - button "Tải tệp về" [ref=e756]:
+                        - generic [ref=e759]: 
+                      - button "Xoá tệp đính kèm" [ref=e760]:
+                        - generic [ref=e763]: 
+                - generic [ref=e766]:
+                  - generic:
+                    - generic [ref=e767]: 07/05/2026 14:46 +0700
+                    - generic [ref=e768]: "|"
+                    - generic [ref=e769]: 35 B
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - button "Tải lên" [ref=e130]:
+                - generic [ref=e132]:
+                  - generic: Tải lên
+              - generic [ref=e133]:
+                - generic [ref=e134]: 
+                - text: Thả tệp vào đây
+            - list [ref=e402]:
+              - listitem [ref=e770]:
+                - generic [ref=e772]:
+                  - generic [ref=e773]:
+                    - generic [ref=e774]: 
+                    - text: 
+                    - generic [ref=e776]: file_11.csv
+                  - generic [ref=e777]:
+                    - text:  
+                    - button "Remove" [ref=e778]: 
+  - generic [ref=e4]: Online
+  - alert [ref=e493]: "file_11.csv: 100%"

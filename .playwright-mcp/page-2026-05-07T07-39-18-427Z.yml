@@ -1,0 +1,292 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - banner:
+            - button [expanded]:
+              - generic:
+                - generic: 
+              - text: 
+            - heading [level=1]: Trò chuyện
+            - menubar:
+              - generic:
+                - menuitem:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img:
+                              - img:
+                                - generic: a
+                            - generic: admin
+        - generic:
+          - generic:
+            - heading [level=2]:
+              - link:
+                - /url: .
+                - text: Jmix App
+            - navigation:
+              - list:
+                - listitem:
+                  - generic:
+                    - button [expanded]:
+                      - generic: 
+                      - generic:
+                        - generic:
+                          - generic: Ứng dụng
+                    - generic:
+                      - generic:
+                        - list:
+                          - listitem:
+                            - link:
+                              - /url: users
+                              - generic: Người dùng
+                          - listitem:
+                            - link:
+                              - /url: customers
+                              - generic: Khách hàng
+                          - listitem:
+                            - link:
+                              - /url: products
+                              - generic: Sản phẩm
+                          - listitem:
+                            - link:
+                              - /url: orders
+                              - generic: Đơn hàng
+                - listitem:
+                  - generic:
+                    - button [expanded]:
+                      - generic: 
+                      - generic:
+                        - generic:
+                          - generic: Trợ lý AI
+                    - generic:
+                      - generic:
+                        - list:
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/ui-settings
+                              - generic: Cấu hình giao diện
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/chat
+                              - generic: Trò chuyện
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/conversations
+                              - generic: Hội thoại
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/configuration
+                              - generic: Cấu hình AI
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/knowledge
+                              - generic: Cơ sở tri thức
+                          - listitem:
+                            - link:
+                              - /url: ai-agent/audit
+                              - generic: Nhật ký gọi công cụ
+                - listitem:
+                  - generic:
+                    - button:
+                      - generic: 
+                      - generic:
+                        - generic:
+                          - generic: Bảo mật
+                - listitem:
+                  - generic:
+                    - button:
+                      - generic: 
+                      - generic:
+                        - generic:
+                          - generic: Data Tools
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading [level=3]: Cuộc trò chuyện mới
+                    - button:
+                      - generic:
+                        - generic:
+                          - generic: 
+                    - button:
+                      - generic:
+                        - generic:
+                          - generic: 
+                  - generic:
+                    - region:
+                      - list:
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: B
+                          - generic:
+                            - generic:
+                              - generic: Bạn
+                              - generic: 14:37 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph: Liệt kê các cột trong file đính kèm.
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: TlA
+                          - generic:
+                            - generic:
+                              - generic: Trợ lý AI
+                              - generic: 14:37 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph:
+                                  - text: Các cột trong file
+                                  - code: sample-data.csv
+                                  - text: ":"
+                                - list:
+                                  - listitem:
+                                    - strong: col_a
+                                  - listitem:
+                                    - strong: col_b
+                                  - listitem:
+                                    - strong: col_c
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: B
+                          - generic:
+                            - generic:
+                              - generic: Bạn
+                              - generic: 14:37 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph: Đếm số dòng dữ liệu (không tính header).
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: TlA
+                          - generic:
+                            - generic:
+                              - generic: Trợ lý AI
+                              - generic: 14:37 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph:
+                                  - text: File có
+                                  - strong: 3 dòng dữ liệu
+                                  - text: "(không tính header):"
+                                - list:
+                                  - listitem:
+                                    - code: 1, Alice, 100
+                                  - listitem:
+                                    - code: 2, Bob, 200
+                                  - listitem:
+                                    - code: 3, Carol, 300
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: B
+                          - generic:
+                            - generic:
+                              - generic: Bạn
+                              - generic: 14:38 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph: Tóm tắt giá trị tối đa và tối thiểu của col_c.
+                        - listitem:
+                          - img:
+                            - img:
+                              - generic: TlA
+                          - generic:
+                            - generic:
+                              - generic: Trợ lý AI
+                              - generic: 14:38 7 thg 5, 2026
+                            - generic:
+                              - generic:
+                                - paragraph:
+                                  - text: Giá trị của
+                                  - strong: col_c
+                                  - text: ":"
+                                - list:
+                                  - listitem:
+                                    - strong: Tối thiểu
+                                    - text: ": 100 (Alice)"
+                                  - listitem:
+                                    - strong: Tối đa
+                                    - text: ": 300 (Carol)"
+                    - generic: 📎 [admin] đã đính kèm "sample-data.csv"
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - textbox:
+                              - /placeholder: Message
+                            - text: 
+                      - button
+                - generic:
+                  - heading [level=3]: Tệp đính kèm
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - region:
+                            - generic:
+                              - generic:
+                                - img
+                              - heading [level=5]: sample-data.csv
+                              - generic:
+                                - button:
+                                  - generic:
+                                    - generic:
+                                      - generic: 
+                                - button:
+                                  - generic:
+                                    - generic:
+                                      - generic: 
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic: 07/05/2026 14:36 +0700
+                                  - generic: "|"
+                                  - generic: 52 B
+                  - generic:
+                    - generic:
+                      - button
+                      - generic:
+                        - generic: 
+                        - text: Thả tệp vào đây
+                    - generic:
+                      - list:
+                        - listitem:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic: 
+                                - text: 
+                                - generic:
+                                  - generic: sample-data.csv
+                              - generic:
+                                - text:  
+                                - button: 
+  - generic:
+    - generic: Online
+  - alert: "sample-data.csv: 100%"
+  - dialog "Xoá tệp đính kèm":
+    - generic [ref=e276]:
+      - heading "Xoá tệp đính kèm" [level=2] [ref=e277]
+      - paragraph [ref=e279]: Xoá tệp "sample-data.csv"? Tệp sẽ không còn trong ngữ cảnh của trợ lý cho các lượt tiếp theo.
+      - generic [ref=e281]:
+        - button "Xoá" [active] [ref=e282]:
+          - generic [ref=e283]:
+            - generic [ref=e285]: 
+            - generic [ref=e286]:
+              - generic: Xoá
+        - button "Huỷ" [ref=e287]:
+          - generic [ref=e288]:
+            - generic [ref=e290]: 
+            - generic [ref=e291]:
+              - generic: Huỷ

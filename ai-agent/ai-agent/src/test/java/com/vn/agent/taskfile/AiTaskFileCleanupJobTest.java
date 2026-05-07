@@ -3,6 +3,7 @@ package com.vn.agent.taskfile;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
@@ -56,7 +57,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class AiTaskFileCleanupJobTest {
 
     @Autowired
@@ -234,10 +236,9 @@ class AiTaskFileCleanupJobTest {
             row.setContentType(contentType);
             row.setSizeBytes(0L);
             row.setStorageRef(storageRef);
-            // Plan 13.1-01 dropped AiTaskFile.injectedAt; Plan 13.1-06 owns the full
-            // rewrite of this test against the new resolveActive contract. Suppress
-            // the now-unused parameter so the helper signature stays stable until then.
-            java.util.Objects.requireNonNullElse(injectedAt, java.time.OffsetDateTime.now());
+            assertThat(injectedAt)
+                    .as("AiTaskFile.injectedAt was dropped by the Phase 13.1 schema migration")
+                    .isNull();
             row.setExpiresAt(expiresAt);
             return unconstrainedDataManager.save(row).getId();
         });

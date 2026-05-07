@@ -14,7 +14,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -76,41 +79,50 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
     @Transactional
     public void saveAll(@NonNull String conversationId, @NonNull List<Message> messages) {
         delegate.saveAll(conversationId, messages);
-        if (messages == null) {
-            return;
-        }
-        UUID convUuid = UUID.fromString(conversationId);
+        UUID conversationUuid = UUID.fromString(conversationId);
         // Mirror JdbcChatMemoryRepository.saveAll semantics: delete-then-insert the whole
         // conversation. MessageWindowChatMemory calls saveAll with the CUMULATIVE list each turn,
         // so an append-only projection would duplicate rows; JDBC replaces the set atomically.
         // Phase 13.1 D-A1: NOTICE rows survive the projection wipe so the upload ledger persists across turns.
+        Set<Integer> reservedNoticeSequences = dataManager.load(AiMessage.class)
+                .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
+                        "and m.role = :noticeRole")
+                .parameter("cid", conversationUuid)
+                .parameter("noticeRole", AiMessageRole.NOTICE.getId())
+                .list()
+                .stream()
+                .map(AiMessage::getSeq)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
         dataManager.load(AiMessage.class)
                 .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
                         "and m.role <> :noticeRole")
-                .parameter("cid", convUuid)
+                .parameter("cid", conversationUuid)
                 .parameter("noticeRole", AiMessageRole.NOTICE.getId())
                 .list()
                 .forEach(dataManager::remove);
         if (messages.isEmpty()) {
             return;
         }
-        AiConversation conv = dataManager.load(AiConversation.class).id(convUuid).one();
+        AiConversation conversation = dataManager.load(AiConversation.class).id(conversationUuid).one();
         OffsetDateTime base = OffsetDateTime.now();
-        int seq = 0;
-        for (Message m : messages) {
+        int seq = nextAvailableSequence(0, reservedNoticeSequences);
+        int messageOrdinal = 0;
+        for (Message message : messages) {
             AiMessage row = metadata.create(AiMessage.class);
-            row.setConversation(conv);
-            row.setContent(m.getText());
+            row.setConversation(conversation);
+            row.setContent(message.getText());
             // Preserve insertion order by giving each row a monotonically increasing timestamp.
             // MessageWindowChatMemory supplies the cumulative list in conversation order, so the
             // ORDER BY createdDate query in DualLayerParityTest lines up with JDBC's native order.
-            row.setCreatedDate(base.plusNanos(seq));
+            row.setCreatedDate(base.plusNanos(messageOrdinal));
             row.setSeq(seq);
             // AiMessage exposes role only through the AiMessageRole enum setter; the message's
             // MessageType value (USER/ASSISTANT/SYSTEM/TOOL) maps 1:1 by uppercase id.
-            row.setRole(resolveRole(m));
+            row.setRole(resolveRole(message));
             dataManager.save(row);
-            seq++;
+            messageOrdinal++;
+            seq = nextAvailableSequence(seq + 1, reservedNoticeSequences);
         }
     }
 
@@ -137,8 +149,15 @@ public class ProjectingChatMemoryRepository implements ChatMemoryRepository {
      * used by the projected row. The enum ids are uppercase (USER/ASSISTANT/SYSTEM/TOOL), which
      * matches {@code MessageType#name()}.
      */
-    private static com.vn.agent.entity.AiMessageRole resolveRole(Message m) {
-        String id = m.getMessageType() == null ? null : m.getMessageType().name();
-        return id == null ? null : com.vn.agent.entity.AiMessageRole.fromId(id);
+    private static int nextAvailableSequence(int candidate, Set<Integer> reservedSequences) {
+        int sequence = candidate;
+        while (reservedSequences.contains(sequence)) {
+            sequence++;
+        }
+        return sequence;
+    }
+
+    private static com.vn.agent.entity.AiMessageRole resolveRole(Message message) {
+        return AiMessageRole.fromId(message.getMessageType().name());
     }
 }

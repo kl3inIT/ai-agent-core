@@ -3,6 +3,7 @@ package com.vn.agent.taskfile;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
@@ -40,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class TtlConfigTest {
 
     @Autowired
@@ -66,11 +68,14 @@ class TtlConfigTest {
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class TtlConfigSentinelSkipsCleanupTest {
 
     @Autowired private AiTaskFileProperties taskFileProperties;
     @Autowired private AiTaskFileCleanupJob cleanupJob;
+    @Autowired private AiTaskFileRepository repository;
+    @Autowired private AiTaskFileMediaResolver resolver;
     @Autowired private UnconstrainedDataManager unconstrainedDataManager;
     @Autowired private Metadata metadata;
     @Autowired private FileStorageLocator fileStorageLocator;
@@ -94,10 +99,10 @@ class TtlConfigSentinelSkipsCleanupTest {
         UUID conversationId = TtlConfigTestSupport.createConversation(systemAuthenticator,
                 unconstrainedDataManager, metadata, seededConversationIds, "ttl-sentinel-user");
         FileRef blobRef = TtlConfigTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
-                seededBlobs, "ttl-sentinel.txt", "sentinel".getBytes(StandardCharsets.UTF_8));
+                seededBlobs, "ttl-sentinel.png", "sentinel".getBytes(StandardCharsets.UTF_8));
         UUID taskFileId = TtlConfigTestSupport.seedTaskFile(systemAuthenticator,
                 unconstrainedDataManager, metadata, seededTaskFileIds,
-                conversationId, "ttl-sentinel-user", "ttl-sentinel.txt", "text/plain", blobRef,
+                conversationId, "system", "ttl-sentinel.png", "image/png", blobRef,
                 /* sizeBytes */ 8L,
                 /* expiresAt — already past the wall-clock so a non-sentinel cleanup would reap it */
                 OffsetDateTime.now().minusHours(1));
@@ -113,6 +118,19 @@ class TtlConfigSentinelSkipsCleanupTest {
                 .as("sentinel TTL must skip the cleanup-job purge even on already-expired rows " +
                         "(FK cascade is the only growth bound)")
                 .isTrue();
+
+        int directRepositoryRemoved = systemAuthenticator.withSystem(() ->
+                repository.deleteAllExpired(OffsetDateTime.now()));
+        assertThat(directRepositoryRemoved)
+                .as("opportunistic chat cleanup calls the repository directly, so the repository " +
+                        "must also honor ttl-seconds=-1")
+                .isZero();
+
+        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withSystem(() ->
+                resolver.resolveActive(conversationId));
+        assertThat(resolved.media())
+                .as("sentinel TTL disables active-row expiry filtering; old rows remain model context")
+                .hasSize(1);
     }
 }
 
@@ -128,7 +146,8 @@ class TtlConfigSentinelSkipsCleanupTest {
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class TtlConfigFkCascadeUnderSentinelTest {
 
     @Autowired private UnconstrainedDataManager unconstrainedDataManager;

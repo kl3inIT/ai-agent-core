@@ -3,6 +3,7 @@ package com.vn.agent.taskfile;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
@@ -32,12 +33,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Phase 13.1 TEST-18 / REQ-2 (RES-01) — pins the per-turn-all multi-turn injection contract.
  *
- * <p>Seeds a single 100 KB synthetic xlsx attachment into a conversation, then calls
+ * <p>Seeds a single text attachment into a conversation, then calls
  * {@link AiTaskFileMediaResolver#resolveActive(UUID)} 3 times in sequence (mimicking 3
  * sequential chat turns over the same conversation). All 3 invocations MUST return a
- * {@link org.springframework.ai.content.Media} list of size 1 whose bytes equal the original
- * xlsx bytes — proving the resolver re-emits the same Media on every turn rather than
- * marking the row as "consumed" after the first turn (the Phase 13 single-turn semantics).
+ * {@link AiTaskFileMediaResolver.DocumentText} list of size 1 whose text contains the
+ * original file contents — proving the resolver re-emits file context on every turn rather
+ * than marking the row as "consumed" after the first turn (the Phase 13 single-turn semantics).
  *
  * <p>Also asserts that {@link AiTaskFileRepository} carries NO method named {@code markInjected}
  * or {@code loadPending} (any overload, via {@link Class#getDeclaredMethods()}). The Phase 13
@@ -57,7 +58,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class PerTurnMediaInjectionTest {
 
     @Autowired
@@ -109,19 +111,14 @@ class PerTurnMediaInjectionTest {
      * single-turn pending-state marker is structurally gone; every turn re-injects.
      */
     @Test
-    void threeSequentialTurnsOverSameXlsxAllReceiveMedia() {
-        // 100 KB synthetic xlsx payload — content shape is irrelevant since the resolver
-        // streams raw bytes; the .xlsx extension drives the MIME mapping in
-        // AiTaskFileMediaResolver#mimeTypeFromExtension.
-        byte[] originalBytes = new byte[100_000];
-        for (int i = 0; i < originalBytes.length; i++) {
-            originalBytes[i] = (byte) (i & 0xFF);
-        }
+    void threeSequentialTurnsOverSameDocumentAllReceiveDocumentText() {
+        String originalText = "phase 13.1 persistent context sample\nrow-count=3\nsummary=ok";
+        byte[] originalBytes = originalText.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         UUID conversationId = createConversation("alice");
-        FileRef blobRef = saveBlob("sample.xlsx", originalBytes);
-        seedTaskFile(conversationId, "alice", "sample.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        FileRef blobRef = saveBlob("sample.txt", originalBytes);
+        seedTaskFile(conversationId, "system", "sample.txt",
+                "text/plain",
                 blobRef, (long) originalBytes.length,
                 OffsetDateTime.now().plusHours(24));
 
@@ -130,14 +127,17 @@ class PerTurnMediaInjectionTest {
                     resolver.resolveActive(conversationId));
 
             assertThat(result.media())
-                    .as("turn %d: resolveActive must return one Media object for the seeded row", turn)
+                    .as("turn %d: text documents are sent as DocumentText, not Media", turn)
+                    .isEmpty();
+            assertThat(result.documentTexts())
+                    .as("turn %d: resolveActive must return one DocumentText object for the seeded row", turn)
                     .hasSize(1);
             assertThat(result.budgetExceeded())
-                    .as("turn %d: single 100 KB file must not trip the budget cap (10 files / 50 MB)", turn)
+                    .as("turn %d: single small file must not trip the budget cap (10 files / 50 MB)", turn)
                     .isFalse();
-            assertThat(result.media().get(0).getDataAsByteArray())
-                    .as("turn %d: Media bytes must equal the original xlsx bytes (per-turn-all RES-01)", turn)
-                    .isEqualTo(originalBytes);
+            assertThat(result.documentTexts().getFirst().text())
+                    .as("turn %d: DocumentText must contain the original file contents (per-turn-all RES-01)", turn)
+                    .contains(originalText);
         }
     }
 

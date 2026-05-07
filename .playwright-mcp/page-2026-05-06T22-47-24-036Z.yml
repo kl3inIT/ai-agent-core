@@ -1,0 +1,226 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - banner [ref=e8]:
+        - button [expanded] [ref=e221]:
+          - generic [ref=e11]: 
+          - text: 
+        - heading [level=1] [ref=e222]: Người dùng
+        - menubar [ref=e13]:
+          - menuitem [ref=e223]:
+            - generic [ref=e20]:
+              - img [ref=e224]:
+                - img [ref=e22]:
+                  - generic [ref=e23]: a
+              - generic [ref=e24]: admin
+      - button [ref=e225]:
+        - img [ref=e29]
+    - generic [ref=e41]:
+      - heading [level=2] [ref=e226]:
+        - link [ref=e227] [cursor=pointer]:
+          - /url: .
+          - text: Jmix App
+      - navigation [ref=e228]:
+        - list [ref=e45]:
+          - listitem [ref=e46]:
+            - generic [ref=e47]:
+              - button [expanded] [ref=e229]:
+                - generic [ref=e49]: 
+                - generic [ref=e52]: Ứng dụng
+              - list [ref=e55]:
+                - listitem [ref=e56]:
+                  - link [ref=e230] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e58]: Người dùng
+                - listitem [ref=e59]:
+                  - link [ref=e231] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e61]: Khách hàng
+                - listitem [ref=e62]:
+                  - link [ref=e232] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e64]: Sản phẩm
+                - listitem [ref=e65]:
+                  - link [ref=e233] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e67]: Đơn hàng
+          - listitem [ref=e68]:
+            - generic [ref=e69]:
+              - button [expanded] [ref=e234]:
+                - generic [ref=e71]: 
+                - generic [ref=e74]: Trợ lý AI
+              - list [ref=e77]:
+                - listitem [ref=e78]:
+                  - link [ref=e235] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e80]: Cấu hình giao diện
+                - listitem [ref=e81]:
+                  - link [ref=e236] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e83]: Trò chuyện
+                - listitem [ref=e84]:
+                  - link [ref=e237] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e86]: Hội thoại
+                - listitem [ref=e87]:
+                  - link [ref=e238] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e89]: Cấu hình AI
+                - listitem [ref=e90]:
+                  - link [ref=e239] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e92]: Cơ sở tri thức
+                - listitem [ref=e93]:
+                  - link [ref=e240] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e95]: Nhật ký gọi công cụ
+          - listitem [ref=e96]:
+            - button [ref=e241]:
+              - generic [ref=e99]: 
+              - generic [ref=e102]: Bảo mật
+          - listitem [ref=e103]:
+            - button [ref=e242]:
+              - generic [ref=e106]: 
+              - generic [ref=e109]: Data Tools
+    - generic [ref=e111]:
+      - generic [ref=e112]:
+        - button [expanded] [ref=e243]:
+          - generic [ref=e114]: 
+          - generic [ref=e115]: Filter
+        - generic [ref=e119]:
+          - menubar [ref=e120]:
+            - generic [ref=e121]:
+              - menuitem [ref=e244]
+              - menuitem [ref=e245]:
+                - generic [ref=e132]: 
+          - menubar [ref=e133]:
+            - menuitem [ref=e246]:
+              - generic [ref=e140]: 
+          - button [ref=e247]
+      - generic [ref=e144]:
+        - button [ref=e248]:
+          - generic [ref=e148]: 
+        - button [disabled]:
+          - generic:
+            - generic:
+              - generic: 
+        - button [disabled]:
+          - generic:
+            - generic:
+              - generic: 
+        - button [disabled]:
+          - generic:
+            - generic:
+              - generic: 
+        - menubar [ref=e150]:
+          - menuitem [ref=e249]:
+            - generic [ref=e156]:
+              - generic [ref=e157]: 
+              - img [ref=e159]
+        - generic [ref=e163]:
+          - button [disabled]:
+            - generic:
+              - generic:
+                - generic: 
+          - button [disabled]:
+            - generic:
+              - generic:
+                - generic: 
+          - generic [ref=e165]: 1 row
+          - button [disabled]:
+            - generic:
+              - generic:
+                - generic: 
+          - button [disabled]:
+            - generic:
+              - generic:
+                - generic: 
+      - treegrid [ref=e168]:
+        - rowgroup [ref=e169]:
+          - row [ref=e250]:
+            - columnheader [ref=e251]:
+              - generic [ref=e175]: 
+            - columnheader [ref=e253]:
+              - generic [ref=e181]: 
+            - columnheader [ref=e255]:
+              - generic [ref=e187]: 
+            - columnheader [ref=e257]:
+              - generic [ref=e193]: 
+            - columnheader [ref=e259]:
+              - generic [ref=e199]: 
+            - columnheader [ref=e261]:
+              - generic [ref=e205]: 
+        - rowgroup [ref=e207]:
+          - row [ref=e263]:
+            - gridcell [ref=e264]:
+              - generic [ref=e210]: admin
+            - gridcell [ref=e211]
+            - gridcell [ref=e213]
+            - gridcell [ref=e215]
+            - gridcell [ref=e217]
+            - gridcell [ref=e265]:
+              - generic [ref=e220]: "True"
+  - generic [ref=e4]: Online
+  - alert [ref=e324]: "test-recipe.txt: 100%"
+  - dialog [active]:
+    - generic [ref=e267]:
+      - button "Close this dialog window" [ref=e271]:
+        - generic [ref=e274]: 
+      - generic [ref=e279]:
+        - generic [ref=e280]:
+          - generic:
+            - generic [ref=e281]:
+              - generic:
+                - heading "Cuộc trò chuyện mới" [level=3] [ref=e282]
+                - button "Sửa tiêu đề" [ref=e325]:
+                  - generic [ref=e328]: 
+                - button "Cuộc trò chuyện mới" [ref=e283]:
+                  - generic [ref=e286]: 
+            - generic [ref=e287]:
+              - generic:
+                - region [ref=e288]:
+                  - list
+                - generic [ref=e329]: 📎 [admin] đã đính kèm "test-recipe.txt"
+            - generic [ref=e290]:
+              - generic [ref=e293]:
+                - textbox "Message" [ref=e294]
+                - generic: 
+              - button "Send" [ref=e295]:
+                - generic [ref=e297]:
+                  - generic: Send
+        - generic [ref=e300]:
+          - generic:
+            - heading "Tệp đính kèm" [level=3] [ref=e301]
+            - region [ref=e334]:
+              - generic [ref=e335]:
+                - img [ref=e337]
+                - heading "test-recipe.txt" [level=5] [ref=e344]
+                - generic [ref=e345]:
+                  - generic:
+                    - button "Tải tệp về" [ref=e346]:
+                      - generic [ref=e349]: 
+                    - button "Xoá tệp đính kèm" [ref=e350]:
+                      - generic [ref=e353]: 
+              - generic [ref=e356]:
+                - generic:
+                  - generic [ref=e357]: 07/05/2026 05:47 +0700
+                  - generic [ref=e358]: "|"
+                  - generic [ref=e359]: 810 B
+            - generic [ref=e309]:
+              - generic [ref=e310]:
+                - button "Tải lên" [ref=e311]:
+                  - generic [ref=e313]:
+                    - generic: Tải lên
+                - generic [ref=e314]:
+                  - generic [ref=e315]: 
+                  - text: Thả tệp vào đây
+              - list [ref=e361]:
+                - listitem [ref=e362]:
+                  - generic [ref=e364]:
+                    - generic [ref=e365]:
+                      - generic [ref=e366]: 
+                      - text: 
+                      - generic [ref=e368]: test-recipe.txt
+                    - generic [ref=e369]:
+                      - text:  
+                      - button "Remove" [ref=e370]: 

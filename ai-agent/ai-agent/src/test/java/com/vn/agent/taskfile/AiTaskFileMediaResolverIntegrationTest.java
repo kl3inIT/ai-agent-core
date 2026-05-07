@@ -3,6 +3,7 @@ package com.vn.agent.taskfile;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
@@ -36,8 +37,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Replaces the Phase 13 single-turn pending-state integration test (which has been
  * deleted along with the injected-at and message columns and the post-send stamping
  * path). The new contract: every call to {@link AiTaskFileMediaResolver#resolveActive}
- * returns ALL non-expired AiTaskFile rows for the conversation as Spring AI {@link Media} objects,
- * subject to the per-turn budget caps in {@link AiTaskFileProperties}.
+ * returns ALL non-expired AiTaskFile rows for the conversation as Spring AI {@link Media} objects
+ * for images or bounded document text for non-image documents, subject to the per-turn budget caps
+ * in {@link AiTaskFileProperties}.
  *
  * <p>Sibling regressions live in {@code PerTurnMediaInjectionTest} (TEST-18 multi-turn) and
  * {@code BudgetCapTest} (cap + audit). This class covers the basic single-row, single-turn path.
@@ -51,7 +53,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class AiTaskFileMediaResolverIntegrationTest {
 
     @Autowired
@@ -98,15 +101,16 @@ class AiTaskFileMediaResolverIntegrationTest {
     }
 
     /**
-     * resolveActive returns a Media list whose bytes match the original file contents.
-     * Validates the resolver's blob-read + Media-build path end-to-end.
+     * resolveActive returns a DocumentText list for non-image documents. This pins the
+     * UAT-fix-02 contract: document files are extracted to text instead of being sent as
+     * non-image Media parts.
      */
     @Test
-    void resolveActiveReturnsMediaWithOriginalBytes() {
+    void resolveActiveReturnsDocumentTextForPlainTextFile() {
         byte[] originalBytes = "hello task-file world".getBytes(StandardCharsets.UTF_8);
         UUID conversationId = createConversation("resolver-happy-user");
         FileRef blobRef = saveBlob("resolver-happy.txt", originalBytes);
-        seedTaskFile(conversationId, "resolver-happy-user",
+        seedTaskFile(conversationId, "system",
                 "resolver-happy.txt", "text/plain", blobRef,
                 (long) originalBytes.length,
                 OffsetDateTime.now().plusHours(1));
@@ -116,14 +120,47 @@ class AiTaskFileMediaResolverIntegrationTest {
 
         assertThat(result).isNotNull();
         assertThat(result.media())
-                .as("resolveActive must return one Media object for the single seeded row")
+                .as("plain text files are extracted to DocumentText, not sent as Media")
+                .isEmpty();
+        assertThat(result.documentTexts())
+                .as("resolveActive must return one DocumentText object for the single seeded row")
                 .hasSize(1);
         assertThat(result.budgetExceeded())
                 .as("single small file must not trip the budget cap")
                 .isFalse();
-        assertThat(result.media().get(0).getDataAsByteArray())
-                .as("Media bytes must equal the original file contents")
-                .isEqualTo(originalBytes);
+        AiTaskFileMediaResolver.DocumentText documentText = result.documentTexts().getFirst();
+        assertThat(documentText.filename()).isEqualTo("resolver-happy.txt");
+        assertThat(documentText.text())
+                .as("DocumentText must contain the extracted file contents")
+                .contains("hello task-file world");
+        assertThat(documentText.truncated()).isFalse();
+    }
+
+    /**
+     * Image files remain Media so vision-capable models receive image_url content parts.
+     */
+    @Test
+    void resolveActiveReturnsMediaForImageFile() {
+        byte[] imageBytes = new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
+        UUID conversationId = createConversation("resolver-image-user");
+        FileRef blobRef = saveBlob("resolver-image.png", imageBytes);
+        seedTaskFile(conversationId, "system",
+                "resolver-image.png", "image/png", blobRef,
+                (long) imageBytes.length,
+                OffsetDateTime.now().plusHours(1));
+
+        AiTaskFileMediaResolver.Resolved result = systemAuthenticator.withSystem(() ->
+                resolver.resolveActive(conversationId));
+
+        assertThat(result.media())
+                .as("image files must still be sent as Media")
+                .hasSize(1);
+        assertThat(result.documentTexts())
+                .as("image files should not produce document text blocks")
+                .isEmpty();
+        assertThat(result.media().getFirst().getDataAsByteArray())
+                .as("Media bytes must equal the original image bytes")
+                .isEqualTo(imageBytes);
     }
 
     /**

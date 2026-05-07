@@ -14,8 +14,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * TEST-16 STATIC enforcement (Phase 13 Plan 13-05 Task 1A): asserts that no source
  * file under {@code src/main/java/com/vn/agent/taskfile/**} references any RAG /
- * VectorStore / Ingester / DocumentReader API. Phase 13's task-file pathway is
+ * VectorStore / Ingester API. Phase 13's task-file pathway is
  * structurally disjoint from KB ingestion (see {@code package-info.java}).
+ * Phase 13.1 UAT-fix-02 allows local Apache Tika text extraction only through
+ * {@code TikaDocumentReader} in {@code AiTaskFileMediaResolver}; this still does
+ * not touch the KB ingestion/vector-store path.
  *
  * <p>The static scan is the first half of TEST-16; the runtime invocation half
  * lives in {@code AiTaskFileNoVectorStoreInvocationTest}. Together they enforce
@@ -43,9 +46,11 @@ class TaskFileNoVectorStoreSourceScannerTest {
             "VectorStore",
             "RetrievalAugmentationAdvisor",
             "TokenTextSplitter",
-            "DocumentReader",
             "com.vn.agent.rag."
     );
+
+    private static final String DOCUMENT_READER_TOKEN = "DocumentReader";
+    private static final String TIKA_DOCUMENT_READER_TOKEN = "TikaDocumentReader";
 
     /**
      * Filesystem-relative root the scanner walks. Tests for the {@code ai-agent}
@@ -55,6 +60,9 @@ class TaskFileNoVectorStoreSourceScannerTest {
      */
     private static final Path TASKFILE_SOURCE_ROOT =
             Path.of("src", "main", "java", "com", "vn", "agent", "taskfile");
+
+    private static final Path TIKA_DOCUMENT_READER_ALLOWLIST =
+            TASKFILE_SOURCE_ROOT.resolve("AiTaskFileMediaResolver.java");
 
     /**
      * Phase 13.1 TEST-16-PORT: widened scope. Files outside the
@@ -118,6 +126,23 @@ class TaskFileNoVectorStoreSourceScannerTest {
                             javaFile, token)
                     .doesNotContain(token);
         }
+
+        assertDocumentReaderUseIsTikaOnlyAndLocal(javaFile, scanned);
+    }
+
+    private static void assertDocumentReaderUseIsTikaOnlyAndLocal(Path javaFile, String scanned) {
+        if (!scanned.contains(DOCUMENT_READER_TOKEN)) {
+            return;
+        }
+
+        assertThat(javaFile.normalize())
+                .as("DocumentReader use is allowed only for local Apache Tika extraction in %s",
+                        TIKA_DOCUMENT_READER_ALLOWLIST)
+                .isEqualTo(TIKA_DOCUMENT_READER_ALLOWLIST.normalize());
+        assertThat(scanned.replace(TIKA_DOCUMENT_READER_TOKEN, ""))
+                .as("Only TikaDocumentReader is allowed; generic DocumentReader or other reader APIs "
+                        + "would reconnect task files to the KB ingestion path")
+                .doesNotContain(DOCUMENT_READER_TOKEN);
     }
 
     /**

@@ -1,0 +1,116 @@
+- generic [ref=e1]:
+  - generic [ref=e45]:
+    - banner [ref=e47]:
+      - button "Menu toggle" [expanded] [ref=e48]:
+        - generic [ref=e50]: 
+        - text: 
+      - heading "Trò chuyện" [level=1] [ref=e153]
+      - menubar [ref=e51]:
+        - menuitem "admin (a) admin" [ref=e53]:
+          - generic [ref=e58]:
+            - img "admin (a)" [ref=e59]:
+              - img [ref=e60]:
+                - generic [ref=e61]: a
+            - generic [ref=e62]: admin
+    - generic [ref=e79]:
+      - heading "Jmix App" [level=2] [ref=e80]:
+        - link "Jmix App" [ref=e81] [cursor=pointer]:
+          - /url: .
+      - navigation "Views" [ref=e82]:
+        - list [ref=e83]:
+          - listitem [ref=e84]:
+            - generic [ref=e85]:
+              - button "Ứng dụng" [expanded] [ref=e86]:
+                - generic [ref=e87]: 
+                - generic [ref=e90]: Ứng dụng
+              - list [ref=e93]:
+                - listitem [ref=e94]:
+                  - link "Người dùng" [ref=e95] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e96]: Người dùng
+                - listitem [ref=e97]:
+                  - link "Khách hàng" [ref=e98] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e99]: Khách hàng
+                - listitem [ref=e100]:
+                  - link "Sản phẩm" [ref=e101] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e102]: Sản phẩm
+                - listitem [ref=e103]:
+                  - link "Đơn hàng" [ref=e104] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e105]: Đơn hàng
+          - listitem [ref=e106]:
+            - generic [ref=e107]:
+              - button "Trợ lý AI" [expanded] [ref=e108]:
+                - generic [ref=e109]: 
+                - generic [ref=e112]: Trợ lý AI
+              - list [ref=e115]:
+                - listitem [ref=e116]:
+                  - link "Cấu hình giao diện" [ref=e117] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e118]: Cấu hình giao diện
+                - listitem [ref=e119]:
+                  - link "Trò chuyện" [active] [ref=e120] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e121]: Trò chuyện
+                - listitem [ref=e122]:
+                  - link "Hội thoại" [ref=e123] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e124]: Hội thoại
+                - listitem [ref=e125]:
+                  - link "Cấu hình AI" [ref=e126] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e127]: Cấu hình AI
+                - listitem [ref=e128]:
+                  - link "Cơ sở tri thức" [ref=e129] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e130]: Cơ sở tri thức
+                - listitem [ref=e131]:
+                  - link "Nhật ký gọi công cụ" [ref=e132] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e133]: Nhật ký gọi công cụ
+          - listitem [ref=e134]:
+            - button "Bảo mật" [ref=e136]:
+              - generic [ref=e137]: 
+              - generic [ref=e140]: Bảo mật
+          - listitem [ref=e141]:
+            - button "Data Tools" [ref=e143]:
+              - generic [ref=e144]: 
+              - generic [ref=e147]: Data Tools
+    - generic [ref=e156]:
+      - generic [ref=e157]:
+        - generic:
+          - generic [ref=e158]:
+            - generic:
+              - heading "Cuộc trò chuyện mới" [level=3] [ref=e159]
+              - button "Cuộc trò chuyện mới" [ref=e160]:
+                - generic [ref=e163]: 
+          - region [ref=e165]:
+            - list
+          - generic [ref=e167]:
+            - generic [ref=e170]:
+              - textbox "Message" [ref=e171]
+              - generic: 
+            - button "Send" [ref=e172]:
+              - generic [ref=e174]:
+                - generic: Send
+      - generic [ref=e177]:
+        - generic:
+          - heading "Tệp đính kèm" [level=3] [ref=e178]
+          - generic [ref=e179]:
+            - generic:
+              - img [ref=e181]
+              - generic [ref=e185]: Chưa có tệp nào...
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - button "Tải lên" [ref=e188]:
+                - generic [ref=e190]:
+                  - generic: Tải lên
+              - generic [ref=e191]:
+                - generic [ref=e192]: 
+                - text: Thả tệp vào đây
+            - generic:
+              - generic:
+                - list
+  - generic [ref=e4]: Online

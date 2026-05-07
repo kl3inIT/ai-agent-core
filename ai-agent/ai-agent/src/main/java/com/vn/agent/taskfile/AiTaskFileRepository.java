@@ -15,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Agentstore CRUD seam for {@link AiTaskFile}. Owns the TTL cleanup orchestration
@@ -44,10 +43,12 @@ public class AiTaskFileRepository {
     private final UnconstrainedDataManager unconstrainedDataManager;
     private final FileStorageLocator fileStorageLocator;
     private final TransactionTemplate agentstoreRequiresNew;
+    private final AiTaskFileProperties taskFileProperties;
 
     public AiTaskFileRepository(DataManager dataManager,
                                 UnconstrainedDataManager unconstrainedDataManager,
                                 FileStorageLocator fileStorageLocator,
+                                AiTaskFileProperties taskFileProperties,
                                 @Qualifier("agentstoreTransactionManager")
                                 PlatformTransactionManager agentstoreTransactionManager) {
         // dataManager kept on the constructor signature for now — caller wiring in
@@ -56,6 +57,7 @@ public class AiTaskFileRepository {
         java.util.Objects.requireNonNull(dataManager, "dataManager");
         this.unconstrainedDataManager = unconstrainedDataManager;
         this.fileStorageLocator = fileStorageLocator;
+        this.taskFileProperties = taskFileProperties;
         this.agentstoreRequiresNew = new TransactionTemplate(agentstoreTransactionManager);
         this.agentstoreRequiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -103,9 +105,15 @@ public class AiTaskFileRepository {
      * so a single corrupt row does not roll back the entire batch — failed
      * rows are logged + skipped via {@link #deleteRow}'s false return.
      *
+     * <p>Phase 13.1 LIFE-01: the TTL sentinel is enforced here, not only in the
+     * scheduled job, because chat turns also invoke this method opportunistically.
+     *
      * @return count of rows whose blob+row delete BOTH succeeded.
      */
     public int deleteAllExpired(OffsetDateTime now) {
+        if (taskFileProperties.getTtlSeconds() == -1L) {
+            return 0;
+        }
         Integer removed = agentstoreRequiresNew.execute(status -> {
             List<AiTaskFile> expired = loadExpired(now);
             int count = 0;

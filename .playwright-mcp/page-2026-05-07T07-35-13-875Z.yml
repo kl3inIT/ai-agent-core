@@ -1,0 +1,132 @@
+- generic [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic:
+        - banner [ref=e8]:
+          - button "Menu toggle" [expanded] [ref=e247]:
+            - generic [ref=e11]: 
+            - text: 
+          - heading "Cấu hình giao diện AI" [level=1] [ref=e248]
+          - menubar [ref=e13]:
+            - menuitem "admin (a) admin" [ref=e249]:
+              - generic [ref=e20]:
+                - img "admin (a)" [ref=e250]:
+                  - img [ref=e22]:
+                    - generic [ref=e23]: a
+                - generic [ref=e24]: admin
+        - button "Mở trò chuyện AI" [active] [ref=e251]:
+          - img [ref=e29]
+    - generic [ref=e41]:
+      - heading "Jmix App" [level=2] [ref=e252]:
+        - link "Jmix App" [ref=e253] [cursor=pointer]:
+          - /url: .
+      - navigation "Views" [ref=e254]:
+        - list [ref=e45]:
+          - listitem [ref=e46]:
+            - generic [ref=e47]:
+              - button "Ứng dụng" [expanded] [ref=e255]:
+                - generic [ref=e49]: 
+                - generic [ref=e52]: Ứng dụng
+              - list [ref=e55]:
+                - listitem [ref=e56]:
+                  - link "Người dùng" [ref=e256] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e58]: Người dùng
+                - listitem [ref=e59]:
+                  - link "Khách hàng" [ref=e257] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e61]: Khách hàng
+                - listitem [ref=e62]:
+                  - link "Sản phẩm" [ref=e258] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e64]: Sản phẩm
+                - listitem [ref=e65]:
+                  - link "Đơn hàng" [ref=e259] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e67]: Đơn hàng
+          - listitem [ref=e68]:
+            - generic [ref=e69]:
+              - button "Trợ lý AI" [expanded] [ref=e260]:
+                - generic [ref=e71]: 
+                - generic [ref=e74]: Trợ lý AI
+              - list [ref=e77]:
+                - listitem [ref=e78]:
+                  - link "Cấu hình giao diện" [ref=e261] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e80]: Cấu hình giao diện
+                - listitem [ref=e81]:
+                  - link "Trò chuyện" [ref=e262] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e83]: Trò chuyện
+                - listitem [ref=e84]:
+                  - link "Hội thoại" [ref=e263] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e86]: Hội thoại
+                - listitem [ref=e87]:
+                  - link "Cấu hình AI" [ref=e264] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e89]: Cấu hình AI
+                - listitem [ref=e90]:
+                  - link "Cơ sở tri thức" [ref=e265] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e92]: Cơ sở tri thức
+                - listitem [ref=e93]:
+                  - link "Nhật ký gọi công cụ" [ref=e266] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e95]: Nhật ký gọi công cụ
+          - listitem [ref=e96]:
+            - button "Bảo mật" [ref=e267]:
+              - generic [ref=e99]: 
+              - generic [ref=e102]: Bảo mật
+          - listitem [ref=e103]:
+            - button "Data Tools" [ref=e268]:
+              - generic [ref=e106]: 
+              - generic [ref=e109]: Data Tools
+    - generic [ref=e111]:
+      - generic:
+        - generic [ref=e113]:
+          - generic:
+            - group "Bề mặt trò chuyện được bật" [ref=e269]:
+              - generic [ref=e115]:
+                - generic [ref=e116]:
+                  - generic: Bề mặt trò chuyện được bật
+                  - text: •
+                - generic [ref=e117]:
+                  - generic:
+                    - generic [ref=e119]:
+                      - generic [ref=e120]: 
+                      - checkbox "Trang trò chuyện đầy đủ" [checked] [ref=e270]
+                      - generic [ref=e123]: Trang trò chuyện đầy đủ
+                    - generic [ref=e125]:
+                      - generic [ref=e126]: 
+                      - checkbox "Nút trên thanh đầu trang" [checked] [ref=e271]
+                      - generic [ref=e129]: Nút trên thanh đầu trang
+                - generic [ref=e131]: Chọn nơi người dùng có thể mở trò chuyện.
+            - radiogroup "Bề mặt trò chuyện mặc định" [ref=e272]:
+              - generic [ref=e133]:
+                - generic [ref=e134]:
+                  - generic: Bề mặt trò chuyện mặc định
+                  - text: •
+                - generic [ref=e135]:
+                  - generic:
+                    - generic [ref=e137]:
+                      - radio "Trang trò chuyện đầy đủ" [checked] [ref=e273]
+                      - generic [ref=e140]: Trang trò chuyện đầy đủ
+                    - generic [ref=e142]:
+                      - radio "Nút trên thanh đầu trang" [ref=e274]
+                      - generic [ref=e145]: Nút trên thanh đầu trang
+                - generic [ref=e147]: Dùng khi ứng dụng cần một điểm mở trò chuyện ưu tiên.
+        - generic [ref=e148]:
+          - generic:
+            - button "Lưu cấu hình" [ref=e275]:
+              - generic [ref=e150]:
+                - generic [ref=e152]: 
+                - generic [ref=e153]:
+                  - generic: Lưu cấu hình
+            - button "Cancel" [ref=e276]:
+              - generic [ref=e155]:
+                - generic [ref=e157]: 
+                - generic [ref=e158]:
+                  - generic: Cancel
+  - generic [ref=e4]: Online
+  - text:  

@@ -4,9 +4,12 @@ import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.rag.IngesterManager;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
+import io.jmix.core.FileStorage;
+import io.jmix.core.FileStorageLocator;
 import io.jmix.core.Metadata;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
@@ -20,6 +23,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,10 +60,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * is therefore the strict assertion for the Ingester.
  *
  * <h2>Test surface</h2>
- * Inserts an {@link AiTaskFile} row + (synthetic) {@link FileRef} pointer,
- * then exercises {@code AiTaskFileMediaResolver.resolvePending(...)} (the same
- * call the chat path uses). The resolver streams blob bytes via
- * {@code FileStorage} — never via {@code VectorStore} or {@code IngesterManager}.
+ * Inserts an {@link AiTaskFile} row + real {@link FileRef} blob, then exercises
+ * {@link AiTaskFileMediaResolver#resolveActive(UUID)} (the same call the chat
+ * path uses). The resolver reads blob bytes via {@link FileStorage} and extracts
+ * text locally — never via {@code VectorStore} or {@code IngesterManager}.
  */
 @SpringBootTest(classes = AITestConfiguration.class,
         properties = {
@@ -69,7 +74,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class AiTaskFileNoVectorStoreInvocationTest {
 
     @MockitoSpyBean
@@ -82,9 +88,6 @@ class AiTaskFileNoVectorStoreInvocationTest {
     private AiTaskFileMediaResolver resolver;
 
     @Autowired
-    private AiTaskFileRepository repository;
-
-    @Autowired
     private UnconstrainedDataManager unconstrainedDataManager;
 
     @Autowired
@@ -92,9 +95,12 @@ class AiTaskFileNoVectorStoreInvocationTest {
 
     @Autowired
     private SystemAuthenticator systemAuthenticator;
+    @Autowired
+    private FileStorageLocator fileStorageLocator;
 
     private final List<UUID> seededTaskFileIds = new ArrayList<>();
     private final List<UUID> seededConversationIds = new ArrayList<>();
+    private final List<FileRef> seededBlobs = new ArrayList<>();
 
     @AfterEach
     void cleanRows() {
@@ -107,13 +113,21 @@ class AiTaskFileNoVectorStoreInvocationTest {
                 unconstrainedDataManager.load(AiConversation.class)
                         .id(id).optional().ifPresent(unconstrainedDataManager::remove);
             }
+            for (FileRef ref : seededBlobs) {
+                try {
+                    fileStorageLocator.getByName(ref.getStorageName()).removeFile(ref);
+                } catch (Exception ignored) {
+                    // Best-effort cleanup.
+                }
+            }
         });
         seededTaskFileIds.clear();
         seededConversationIds.clear();
+        seededBlobs.clear();
     }
 
     @Test
-    void resolvePending_neverIngests_andRepositoryDoesNotInjectVectorStore() {
+    void resolveActive_neverIngests_andRepositoryDoesNotInjectVectorStore() {
         UUID conversationId = systemAuthenticator.withSystem(() -> {
             AiConversation conversation = metadata.create(AiConversation.class);
             conversation.setCreatedBy("test16-runtime-user");
@@ -122,33 +136,39 @@ class AiTaskFileNoVectorStoreInvocationTest {
         });
         seededConversationIds.add(conversationId);
 
+        byte[] originalBytes = "hello test16".getBytes(StandardCharsets.UTF_8);
+        FileRef blobRef = systemAuthenticator.withSystem(() -> {
+            FileStorage fileStorage = fileStorageLocator.getDefault();
+            return fileStorage.saveStream("test16.txt", new ByteArrayInputStream(originalBytes));
+        });
+        seededBlobs.add(blobRef);
+
         UUID taskFileId = systemAuthenticator.withSystem(() -> {
             AiTaskFile row = metadata.create(AiTaskFile.class);
             // Reference the saved conversation so the FK is satisfied.
             AiConversation conversationRef = unconstrainedDataManager.load(AiConversation.class)
                     .id(conversationId).one();
             row.setConversation(conversationRef);
-            row.setUserUsername("test16-runtime-user");
+            row.setUserUsername("system");
             row.setFilename("test16.txt");
             row.setContentType("text/plain");
-            row.setSizeBytes(11L);
-            // Synthetic FileRef — the resolver only reads bytes when buildMedia runs.
-            // For this test we ONLY exercise the load+filter path, never opening the
-            // blob, so a synthetic ref with no real backing blob is intentional.
-            row.setStorageRef(new FileRef("fs", "synthetic-test16.txt", "test16.txt"));
+            row.setSizeBytes((long) originalBytes.length);
+            row.setStorageRef(blobRef);
             row.setExpiresAt(OffsetDateTime.now().plusHours(1));
             return unconstrainedDataManager.save(row).getId();
         });
         seededTaskFileIds.add(taskFileId);
 
-        // Phase 13.1 Plan 03 Rule-3 stub: the Phase-13 loadPending() seam was deleted
-        // (the per-turn-all resolver loads via DataManager directly — no repo intermediary).
-        // Plan 13.1-06 rewrites this test against the AiTaskFileMediaResolver.resolveActive
-        // contract; in the meantime exercising the underlying TTL cleanup path keeps the
-        // TEST-16 verifyNoInteractions(ingesterManager) assertion meaningful — the cleanup
-        // job touches the same agentstore JPQL surface a chat turn would.
-        systemAuthenticator.runWithSystem(() ->
-                repository.deleteAllExpired(java.time.OffsetDateTime.now().minusYears(1)));
+        AiTaskFileMediaResolver.Resolved resolved = systemAuthenticator.withSystem(() ->
+                resolver.resolveActive(conversationId));
+        org.assertj.core.api.Assertions.assertThat(resolved.media())
+                .as("text/plain task files are extracted to DocumentText, not Media")
+                .isEmpty();
+        org.assertj.core.api.Assertions.assertThat(resolved.documentTexts())
+                .as("TEST-16 must exercise the runtime resolver path that reads the stored blob")
+                .hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(resolved.documentTexts().getFirst().text())
+                .contains("hello test16");
 
         // TEST-16 invariant: NO ingestion calls. similaritySearch (retrieval) is
         // intentionally NOT asserted to be zero — RAG retrieval is allowed.

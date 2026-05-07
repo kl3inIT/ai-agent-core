@@ -138,6 +138,48 @@ class NoticeFilterTest {
     }
 
     /**
+     * A NOTICE row inserted after the first assistant reply must stay between that reply
+     * and later turns after Spring AI saves a longer cumulative transcript.
+     */
+    @Test
+    void noticeRowsKeepReplayPositionAfterLaterProjection() {
+        UUID conversationId = createConversation("notice-order-user");
+        seedMessage(conversationId, AiMessageRole.USER, "first user turn", 0);
+        seedMessage(conversationId, AiMessageRole.ASSISTANT, "first assistant reply", 1);
+        seedMessage(conversationId, AiMessageRole.NOTICE,
+                "[notice-order-user] added attachment \"sample.xlsx\"", 2);
+
+        List<Message> messages = List.of(
+                new UserMessage("first user turn"),
+                new AssistantMessage("first assistant reply"),
+                new UserMessage("second user turn"),
+                new AssistantMessage("second assistant reply")
+        );
+
+        systemAuthenticator.runWithSystem(() ->
+                projectingChatMemoryRepository.saveAll(conversationId.toString(), messages));
+
+        List<AiMessage> replayRows = systemAuthenticator.withSystem(() ->
+                unconstrainedDataManager.load(AiMessage.class)
+                        .query("select m from ai_AiMessage m where m.conversation.id = :cid " +
+                                "order by m.seq asc, m.createdDate asc")
+                        .parameter("cid", conversationId)
+                        .list());
+        replayRows.forEach(row -> seededMessageIds.add(row.getId()));
+
+        assertThat(replayRows)
+                .as("replay order must keep the upload NOTICE inline between the turns around it")
+                .extracting(AiMessage::getRole, AiMessage::getContent)
+                .containsExactly(
+                        org.assertj.core.api.Assertions.tuple(AiMessageRole.USER, "first user turn"),
+                        org.assertj.core.api.Assertions.tuple(AiMessageRole.ASSISTANT, "first assistant reply"),
+                        org.assertj.core.api.Assertions.tuple(AiMessageRole.NOTICE,
+                                "[notice-order-user] added attachment \"sample.xlsx\""),
+                        org.assertj.core.api.Assertions.tuple(AiMessageRole.USER, "second user turn"),
+                        org.assertj.core.api.Assertions.tuple(AiMessageRole.ASSISTANT, "second assistant reply"));
+    }
+
+    /**
      * The Spring AI primary store ({@code SPRING_AI_CHAT_MEMORY} via
      * {@link JdbcChatMemoryRepository}) is structurally disjoint from the Jmix-projected
      * {@code AI_AGENT_MESSAGE} table. NOTICE rows are written ONLY to the Jmix table by the

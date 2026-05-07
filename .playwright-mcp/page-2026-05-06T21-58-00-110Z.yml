@@ -1,0 +1,158 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - banner [ref=e8]:
+        - button [expanded] [ref=e114]:
+          - generic [ref=e11]: 
+          - text: 
+        - menubar [ref=e12]:
+          - menuitem [ref=e115]:
+            - generic [ref=e19]:
+              - img [ref=e116]:
+                - img [ref=e21]:
+                  - generic [ref=e22]: a
+              - generic [ref=e23]: admin
+      - button [ref=e117]:
+        - img [ref=e28]
+    - generic [ref=e40]:
+      - heading [level=2] [ref=e118]:
+        - link [ref=e119] [cursor=pointer]:
+          - /url: .
+          - text: Jmix App
+      - navigation [ref=e120]:
+        - list [ref=e44]:
+          - listitem [ref=e45]:
+            - generic [ref=e46]:
+              - button [expanded] [ref=e121]:
+                - generic [ref=e48]: 
+                - generic [ref=e51]: Ứng dụng
+              - list [ref=e54]:
+                - listitem [ref=e55]:
+                  - link [ref=e122] [cursor=pointer]:
+                    - /url: users
+                    - generic [ref=e57]: Người dùng
+                - listitem [ref=e58]:
+                  - link [ref=e123] [cursor=pointer]:
+                    - /url: customers
+                    - generic [ref=e60]: Khách hàng
+                - listitem [ref=e61]:
+                  - link [ref=e124] [cursor=pointer]:
+                    - /url: products
+                    - generic [ref=e63]: Sản phẩm
+                - listitem [ref=e64]:
+                  - link [ref=e125] [cursor=pointer]:
+                    - /url: orders
+                    - generic [ref=e66]: Đơn hàng
+          - listitem [ref=e67]:
+            - generic [ref=e68]:
+              - button [expanded] [ref=e126]:
+                - generic [ref=e70]: 
+                - generic [ref=e73]: Trợ lý AI
+              - list [ref=e76]:
+                - listitem [ref=e77]:
+                  - link [ref=e127] [cursor=pointer]:
+                    - /url: ai-agent/ui-settings
+                    - generic [ref=e79]: Cấu hình giao diện
+                - listitem [ref=e80]:
+                  - link [ref=e128] [cursor=pointer]:
+                    - /url: ai-agent/chat
+                    - generic [ref=e82]: Trò chuyện
+                - listitem [ref=e83]:
+                  - link [ref=e129] [cursor=pointer]:
+                    - /url: ai-agent/conversations
+                    - generic [ref=e85]: Hội thoại
+                - listitem [ref=e86]:
+                  - link [ref=e130] [cursor=pointer]:
+                    - /url: ai-agent/configuration
+                    - generic [ref=e88]: Cấu hình AI
+                - listitem [ref=e89]:
+                  - link [ref=e131] [cursor=pointer]:
+                    - /url: ai-agent/knowledge
+                    - generic [ref=e91]: Cơ sở tri thức
+                - listitem [ref=e92]:
+                  - link [ref=e132] [cursor=pointer]:
+                    - /url: ai-agent/audit
+                    - generic [ref=e94]: Nhật ký gọi công cụ
+          - listitem [ref=e95]:
+            - button [ref=e133]:
+              - generic [ref=e98]: 
+              - generic [ref=e101]: Bảo mật
+          - listitem [ref=e102]:
+            - button [ref=e134]:
+              - generic [ref=e105]: 
+              - generic [ref=e108]: Data Tools
+    - generic [ref=e111]:
+      - heading [level=1] [ref=e135]: Jmix App
+      - img [ref=e113]
+  - generic [ref=e4]: Online
+  - dialog:
+    - generic [ref=e137]:
+      - button "Close this dialog window" [ref=e141]:
+        - generic [ref=e144]: 
+      - generic [ref=e149]:
+        - generic [ref=e150]:
+          - generic:
+            - generic [ref=e151]:
+              - generic:
+                - heading "hello" [level=3] [ref=e194]
+                - button "Sửa tiêu đề" [ref=e195]:
+                  - generic [ref=e198]: 
+                - button "Cuộc trò chuyện mới" [ref=e153]:
+                  - generic [ref=e156]: 
+                - button "Dừng" [ref=e199]:
+                  - generic [ref=e201]:
+                    - generic: Dừng
+            - region [ref=e158]:
+              - list [ref=e202]:
+                - generic:
+                  - listitem [ref=e203]:
+                    - img [ref=e204]:
+                      - img [ref=e205]:
+                        - generic [ref=e206]: B
+                    - generic [ref=e207]:
+                      - generic [ref=e208]:
+                        - generic [ref=e209]: Bạn
+                        - generic [ref=e210]: 4:57 7 thg 5, 2026
+                      - paragraph [ref=e213]: hello
+                  - listitem [ref=e214]:
+                    - img [ref=e215]:
+                      - img [ref=e216]:
+                        - generic [ref=e217]: TlA
+                    - generic [ref=e219]:
+                      - generic [ref=e220]: Trợ lý AI
+                      - generic [ref=e221]: 4:57 7 thg 5, 2026
+            - generic [ref=e159]:
+              - generic:
+                - progressbar [ref=e222]
+                - generic [ref=e160]:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - textbox "Message" [disabled]
+                          - generic: 
+                  - generic:
+                    - button "Send" [disabled]:
+                      - generic:
+                        - generic:
+                          - generic: Send
+        - generic [ref=e170]:
+          - generic:
+            - heading "Tệp đính kèm" [level=3] [ref=e171]
+            - generic [ref=e172]:
+              - generic:
+                - img [ref=e174]
+                - generic [ref=e178]: Chưa có tệp nào...
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - button "Tải lên" [ref=e181]:
+                  - generic [ref=e183]:
+                    - generic: Tải lên
+                - generic [ref=e184]:
+                  - generic [ref=e185]: 
+                  - text: Thả tệp vào đây
+              - generic:
+                - generic:
+                  - list

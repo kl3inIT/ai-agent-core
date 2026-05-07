@@ -6,6 +6,7 @@ import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.test_support.InMemoryFileStorageConfiguration;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.FileRef;
@@ -44,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The sentinel branch (caps = -1) lives in the sibling {@link BudgetCapSentinelTest}
  * because Spring Boot test contexts are cached on configuration; mixing a sentinel
- * @TestPropertySource into a nested class would force context reload and risk leaking
+ * {@code @TestPropertySource} into a nested class would force context reload and risk leaking
  * the override into surrounding tests.
  */
 @Tag("integration")
@@ -58,7 +59,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class BudgetCapTest {
 
     @Autowired private AiTaskFileMediaResolver resolver;
@@ -89,10 +91,10 @@ class BudgetCapTest {
         byte[] payload = new byte[1024];
         for (int i = 0; i < 11; i++) {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
-                    seededBlobs, "budget-default-" + i + ".txt", payload);
+                    seededBlobs, "budget-default-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "budget-default-user",
-                    "budget-default-" + i + ".txt", "text/plain", ref,
+                    metadata, seededTaskFileIds, conversationId, "system",
+                    "budget-default-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }
@@ -145,10 +147,10 @@ class BudgetCapTest {
         byte[] payload = new byte[10 * 1024 * 1024];
         for (int i = 0; i < 6; i++) {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
-                    seededBlobs, "budget-byte-" + i + ".txt", payload);
+                    seededBlobs, "budget-byte-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "budget-byte-user",
-                    "budget-byte-" + i + ".txt", "text/plain", ref,
+                    metadata, seededTaskFileIds, conversationId, "system",
+                    "budget-byte-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }
@@ -201,7 +203,8 @@ class BudgetCapTest {
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
+        InMemoryFileStorageConfiguration.class})
 class BudgetCapSentinelTest {
 
     @Autowired private AiTaskFileMediaResolver resolver;
@@ -230,10 +233,10 @@ class BudgetCapSentinelTest {
         byte[] payload = new byte[1024];
         for (int i = 0; i < 11; i++) {
             FileRef ref = BudgetCapTestSupport.saveBlob(systemAuthenticator, fileStorageLocator,
-                    seededBlobs, "budget-sentinel-" + i + ".txt", payload);
+                    seededBlobs, "budget-sentinel-" + i + ".png", payload);
             BudgetCapTestSupport.seedTaskFile(systemAuthenticator, unconstrainedDataManager,
-                    metadata, seededTaskFileIds, conversationId, "budget-sentinel-user",
-                    "budget-sentinel-" + i + ".txt", "text/plain", ref,
+                    metadata, seededTaskFileIds, conversationId, "system",
+                    "budget-sentinel-" + i + ".png", "image/png", ref,
                     (long) payload.length, OffsetDateTime.now().plusHours(24));
             Thread.sleep(2);
         }

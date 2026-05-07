@@ -1,6 +1,7 @@
 /**
- * Phase 13 task-file pathway — attached chat files surfaced to the LLM via
- * Spring AI {@link org.springframework.ai.content.Media}.
+ * Phase 13 task-file pathway — attached chat files surfaced to the LLM as
+ * Spring AI {@link org.springframework.ai.content.Media} for images and bounded
+ * extracted text blocks for documents.
  *
  * <p><b>STRUCTURAL INVARIANT (TEST-16):</b> No source file in this package may
  * reference any of the following — task-file content NEVER reaches the RAG
@@ -10,7 +11,6 @@
  *   <li>{@code VectorStore}</li>
  *   <li>{@code RetrievalAugmentationAdvisor}</li>
  *   <li>{@code TokenTextSplitter}</li>
- *   <li>{@code DocumentReader} (Tika reader)</li>
  *   <li>Anything from {@code com.vn.agent.rag.**}</li>
  * </ul>
  * Enforced by {@code TaskFileNoVectorStoreSourceScannerTest} (Wave 4). The
@@ -21,10 +21,13 @@
  *
  * <p>The task-file pathway is structurally disjoint from KB ingestion: a chat
  * file lives only as bytes in {@link io.jmix.core.FileStorage} plus a metadata
- * row in {@code AI_TASK_FILE} (agentstore); the resolver streams those bytes
- * straight into a multimodal {@code Media} payload on EVERY user turn for the
- * conversation (Phase 13.1 RES-01 per-turn-all), subject to the
- * {@code perTurnMaxFiles} / {@code perTurnMaxTotalBytes} budget caps in
- * {@link com.vn.agent.taskfile.AiTaskFileProperties}.
+ * row in {@code AI_TASK_FILE} (agentstore); the resolver streams image bytes
+ * straight into a multimodal {@code Media} payload and extracts bounded text
+ * for non-image documents on EVERY user turn for the conversation (Phase 13.1
+ * RES-01 per-turn-all), subject to the {@code perTurnMaxFiles} /
+ * {@code perTurnMaxTotalBytes} budget caps in
+ * {@link com.vn.agent.taskfile.AiTaskFileProperties}. The document extraction
+ * path remains local to this package and must not route through KB ingestion,
+ * vector storage, chunking, or retrieval advisors.
  */
 package com.vn.agent.taskfile;

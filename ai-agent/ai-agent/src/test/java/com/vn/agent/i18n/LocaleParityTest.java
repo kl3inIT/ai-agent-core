@@ -137,9 +137,9 @@ class LocaleParityTest {
     /**
      * Phase 13.1 Plan 07 — REQ-9 / I18N-01 attachments-key parity gate.
      *
-     * <p>Plan 13.1-04 added 13 new {@code chatView.attachments.*} keys (plus the
+     * <p>Plan 13.1-04 added 14 new {@code chatView.attachments.*} keys (plus the
      * {@code AiMessageRole.NOTICE} enum caption from Plan 13.1-01) to the EN bundle
-     * and the VI bundle. This test pins the 14 keys in BOTH bundles so a unilateral
+     * and the VI bundle. This test pins the 15 keys in BOTH bundles so a unilateral
      * key add (or a typo on one side) silently regressing one locale is caught.
      */
     @Test
@@ -148,7 +148,7 @@ class LocaleParityTest {
         Properties vi = load("/com/vn/agent/messages_vi.properties");
 
         List<String> requiredKeys = List.of(
-                // Plan 13.1-04 — 13 chatView.attachments.* keys.
+                // Plan 13.1-04 — 14 chatView.attachments.* keys.
                 "chatView.attachments.title",
                 "chatView.attachments.uploadText",
                 "chatView.attachments.dropLabel",
@@ -161,6 +161,7 @@ class LocaleParityTest {
                 "chatView.attachments.deleteConfirm.message",
                 "chatView.attachments.deleteConfirm.confirm",
                 "chatView.attachments.deleteConfirm.cancel",
+                "chatView.attachments.delete.failed",
                 "chatView.attachments.missingFileName",
                 // Plan 13.1-01 — AiMessageRole.NOTICE enum caption.
                 "com.vn.agent.entity/AiMessageRole.NOTICE");
