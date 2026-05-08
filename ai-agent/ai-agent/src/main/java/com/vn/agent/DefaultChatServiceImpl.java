@@ -117,6 +117,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class DefaultChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultChatServiceImpl.class);
+    private static final String AUTO_INTENT_ID = "auto";
 
     private final ChatClient chatClient;
     private final ConversationGateway conversationGateway;
@@ -189,7 +190,14 @@ public class DefaultChatServiceImpl implements ChatService {
 
     @Override
     public ChatResponseDto ask(String userId, UUID conversationId, String message, Overrides overrides) {
+        return ask(userId, conversationId, message, overrides, null);
+    }
+
+    @Override
+    public ChatResponseDto ask(String userId, UUID conversationId, String message,
+                               Overrides overrides, String intentId) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
+        final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
         com.vn.agent.orchestration.RunContext.set(runId);
         IterationCounter.start();
@@ -278,7 +286,8 @@ public class DefaultChatServiceImpl implements ChatService {
 
             return executeBlockingTurn(userId, convId, message, effectiveOverrides,
                     resolvedMedia, composedSystemPrompt, model, active,
-                    ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
+                    ragFilter, retrievalTopK, retrievalSimilarityThreshold,
+                    normalizedIntentId, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
             // Iteration-cap request-level audit row is written by GuardedToolCallingManager (D-11).
@@ -333,6 +342,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                                 Filter.Expression ragFilter,
                                                 int retrievalTopK,
                                                 double retrievalSimilarityThreshold,
+                                                String intentId,
                                                 UUID runId,
                                                 long startNanos) {
         // Phase 13.1 UAT-fix-02 — Tika-extracted document text rides the SYSTEM prompt,
@@ -412,7 +422,14 @@ public class DefaultChatServiceImpl implements ChatService {
 
     @Override
     public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides) {
+        return stream(userId, conversationId, message, overrides, null);
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                       Overrides overrides, String intentId) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
+        final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
         final long startNanos = System.nanoTime();
 
@@ -561,7 +578,8 @@ public class DefaultChatServiceImpl implements ChatService {
                         // audit row).
                         ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
                                 resolvedMedia, composedSystemPrompt, model, active,
-                                ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
+                                ragFilter, retrievalTopK, retrievalSimilarityThreshold,
+                                normalizedIntentId, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
@@ -603,6 +621,14 @@ public class DefaultChatServiceImpl implements ChatService {
             streamingSinkHolder.unregister(runId);
             cancellationRegistry.clearDisposable(runId);
         });
+    }
+
+    private static String normalizeIntentId(String intentId) {
+        if (intentId == null || intentId.isBlank()) {
+            return null;
+        }
+        String trimmedIntentId = intentId.trim();
+        return AUTO_INTENT_ID.equalsIgnoreCase(trimmedIntentId) ? null : trimmedIntentId;
     }
 
     /**
