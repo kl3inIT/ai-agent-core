@@ -4,6 +4,7 @@ import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.audit.MutationArgumentSanitizer;
 import com.vn.agent.audit.MutationToolCallbackBoundaryDecorator;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
+import com.vn.agent.extraction.ExtractionToolBridge;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.spi.ToolContributor;
 import com.vn.agent.tools.link.BuiltInLinkTools;
@@ -63,6 +64,7 @@ public class AgentToolCallbacks {
 
     private final BuiltInDataTools builtIns;
     private final BuiltInLinkTools builtInLinkTools;
+    private final ExtractionToolBridge extractionToolBridge;
     private final ObjectProvider<BuiltInMutationTools> mutationToolsProvider;
     private final List<ToolContributor> contributors;
     private final AuditWriter auditWriter;
@@ -72,6 +74,7 @@ public class AgentToolCallbacks {
 
     public AgentToolCallbacks(BuiltInDataTools builtIns,
                               BuiltInLinkTools builtInLinkTools,
+                              ExtractionToolBridge extractionToolBridge,
                               ObjectProvider<BuiltInMutationTools> mutationToolsProvider,
                               List<ToolContributor> contributors,
                               AuditWriter auditWriter,
@@ -80,6 +83,7 @@ public class AgentToolCallbacks {
                               MutationArgumentSanitizer mutationArgumentSanitizer) {
         this.builtIns = builtIns;
         this.builtInLinkTools = builtInLinkTools;
+        this.extractionToolBridge = extractionToolBridge;
         this.mutationToolsProvider = mutationToolsProvider;
         this.contributors = contributors;
         this.auditWriter = auditWriter;
@@ -106,6 +110,7 @@ public class AgentToolCallbacks {
         // Always-on link tools (Plan 11-08): generic audit wrapping is correct here — link tools
         // do NOT self-audit; they emit a single SUCCESS/ERROR row through the generic decorator.
         Collections.addAll(all, fromBean(builtInLinkTools));
+        Collections.addAll(all, fromBean(extractionToolBridge));
         for (ToolContributor tc : contributors) {
             List<Object> beans = tc.contribute();
             if (beans == null) {

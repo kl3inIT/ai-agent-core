@@ -160,7 +160,8 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
             // outer Flux.
             AiToolCallOutcome outcome = output != null ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
             String emittedSummary = output != null ? cap(output, RESULT_SUMMARY_MAX_CHARS) : null;
-            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
+            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(
+                    toolCallId, toolName, emittedSummary, outcome, null)));
             previousContext.restore();
         }
     }

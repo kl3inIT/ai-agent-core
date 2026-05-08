@@ -32,7 +32,16 @@ public sealed interface StreamingEvent
 
     record ToolCall(UUID toolCallId, String toolName, String argsJson) implements StreamingEvent {}
 
-    record ToolResult(UUID toolCallId, String summary, AiToolCallOutcome outcome) implements StreamingEvent {}
+    record ToolResult(UUID toolCallId,
+                      String toolName,
+                      String summary,
+                      AiToolCallOutcome outcome,
+                      String payloadJson) implements StreamingEvent {
+        /** Backwards-compatible constructor for callers that do not emit structured payloads. */
+        public ToolResult(UUID toolCallId, String summary, AiToolCallOutcome outcome) {
+            this(toolCallId, null, summary, outcome, null);
+        }
+    }
 
     record Citation(int index, UUID documentId, String snippet) implements StreamingEvent {}
 
