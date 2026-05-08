@@ -685,8 +685,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         final String userId = currentAuthentication.getUser().getUsername();
         final UUID targetConversationId = ensureConversationIdForSubmit(userId, text);
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
+        final String selectedIntentId = selectedIntentIdForSubmit();
 
-        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, text, null);
+        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, text, null, selectedIntentId);
+        resetIntentCardRowToAutoIfNamed(selectedIntentId);
         activeStream = source
                 .doOnSubscribe(sub -> {
                     if (sub instanceof Disposable disposable && activeRunId != null) {
@@ -725,6 +727,25 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnComplete(() -> accessUi(this::finishStreamInternal))
                 .subscribe();
+    }
+
+    private String selectedIntentIdForSubmit() {
+        if (intentCardRow == null) {
+            return null;
+        }
+        IntentOption selectedOption = intentCardRow.getValue();
+        if (selectedOption == null || selectedOption.auto()) {
+            return null;
+        }
+        return selectedOption.intentId();
+    }
+
+    private void resetIntentCardRowToAutoIfNamed(String selectedIntentId) {
+        if (selectedIntentId == null || intentCardRow == null) {
+            return;
+        }
+        intentCardRow.setValue(buildAutoIntentOption());
+        refreshIntentCardSelection();
     }
 
     /**
