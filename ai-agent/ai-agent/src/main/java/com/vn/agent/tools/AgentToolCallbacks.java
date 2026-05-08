@@ -62,6 +62,8 @@ import java.util.List;
 @Component
 public class AgentToolCallbacks {
 
+    public static final String PREPARE_FORM_DRAFT_TOOL_NAME = "prepare_form_draft";
+
     private final BuiltInDataTools builtIns;
     private final BuiltInLinkTools builtInLinkTools;
     private final ExtractionToolBridge extractionToolBridge;
@@ -155,7 +157,28 @@ public class AgentToolCallbacks {
      * filtering (Phase 5+); today the implementation delegates to {@link #forCurrentUser()}.
      */
     public ToolCallback[] callbacksFor(String userId, java.util.UUID conversationId) {
-        return forCurrentUser();
+        return callbacksFor(userId, conversationId, null);
+    }
+
+    /**
+     * Per-turn assembly used by chat. Auto/default turns retain the complete tool surface.
+     * Named-intent turns fail closed to exactly the audited prepare_form_draft callback.
+     */
+    public ToolCallback[] callbacksFor(String userId, java.util.UUID conversationId, String intentId) {
+        ToolCallback[] callbacks = forCurrentUser();
+        if (intentId == null || intentId.isBlank()) {
+            return callbacks;
+        }
+        List<ToolCallback> matchingCallbacks = new ArrayList<>();
+        for (ToolCallback callback : callbacks) {
+            if (PREPARE_FORM_DRAFT_TOOL_NAME.equals(callback.getToolDefinition().name())) {
+                matchingCallbacks.add(callback);
+            }
+        }
+        if (matchingCallbacks.size() != 1) {
+            throw new ToolConfigurationException(PREPARE_FORM_DRAFT_TOOL_NAME, matchingCallbacks.size());
+        }
+        return new ToolCallback[] { matchingCallbacks.get(0) };
     }
 
     /** Spring AI 1.1.4 replacement for the plan's {@code ToolCallbacks.from(bean)}. */
@@ -164,5 +187,34 @@ public class AgentToolCallbacks {
                 .toolObjects(bean)
                 .build()
                 .getToolCallbacks();
+    }
+
+    public static class ToolConfigurationException extends RuntimeException {
+
+        public static final String CODE_PREPARE_FORM_DRAFT_MISCONFIGURED =
+                "prepare_form_draft_misconfigured";
+
+        private final String code;
+        private final String toolName;
+        private final int matchingCallbackCount;
+
+        public ToolConfigurationException(String toolName, int matchingCallbackCount) {
+            super("Required extraction tool callback is misconfigured");
+            this.code = CODE_PREPARE_FORM_DRAFT_MISCONFIGURED;
+            this.toolName = toolName;
+            this.matchingCallbackCount = matchingCallbackCount;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public String getToolName() {
+            return toolName;
+        }
+
+        public int getMatchingCallbackCount() {
+            return matchingCallbackCount;
+        }
     }
 }
