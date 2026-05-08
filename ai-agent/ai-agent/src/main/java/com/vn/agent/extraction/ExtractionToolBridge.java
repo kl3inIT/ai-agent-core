@@ -1,5 +1,6 @@
 package com.vn.agent.extraction;
 
+import com.vn.agent.orchestration.RunContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -61,13 +62,31 @@ public class ExtractionToolBridge {
                     required = false)
             Map<String, Object> contextRefs) {
 
-        ExtractionResult result = extractionService.prepare(intentId, copyContextRefs(contextRefs));
+        String effectiveIntentId = RunContext.getIntentId() == null ? intentId : RunContext.getIntentId();
+        ExtractionResult result = runScopedInputAvailable()
+                ? extractionService.prepare(effectiveIntentId, runScopedInput(effectiveIntentId))
+                : extractionService.prepare(effectiveIntentId, copyContextRefs(contextRefs));
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("action", "open_form_with_draft");
         payload.put("draftId", result.draftId());
         payload.put("entityName", result.entityName());
         payload.put("instanceName", result.instanceName());
         return payload;
+    }
+
+    private static boolean runScopedInputAvailable() {
+        return RunContext.getUserMessage() != null
+                || RunContext.getIntentId() != null
+                || !RunContext.getTaskFileIds().isEmpty()
+                || !RunContext.getTaskFileMedia().isEmpty();
+    }
+
+    private static ExtractionInput runScopedInput(String intentId) {
+        if (RunContext.getIntentId() != null && !RunContext.markPrepareFormDraftInvoked()) {
+            throw ExtractionSchemaException.validationFailure(intentId, null, 0);
+        }
+        return new ExtractionInput(intentId, RunContext.getConversationId(), RunContext.getUserMessage(),
+                RunContext.getTaskFileIds(), RunContext.getTaskFileMedia());
     }
 
     private static Map<String, Object> copyContextRefs(Map<String, Object> contextRefs) {

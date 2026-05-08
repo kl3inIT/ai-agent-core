@@ -231,7 +231,10 @@ public class AiTaskFileMediaResolver {
                 documentTexts.add(extractDocumentText(row));
             }
         }
-        return new Resolved(media, documentTexts, budgetExceeded);
+        List<UUID> taskFileIds = kept.stream()
+                .map(AiTaskFile::getId)
+                .toList();
+        return new Resolved(media, documentTexts, budgetExceeded, taskFileIds);
     }
 
     private String buildBudgetArgumentsJson(UUID conversationId,
@@ -413,9 +416,16 @@ public class AiTaskFileMediaResolver {
      */
     public record Resolved(List<Media> media,
                            List<DocumentText> documentTexts,
-                           boolean budgetExceeded) {
+                           boolean budgetExceeded,
+                           List<UUID> taskFileIds) {
+        public Resolved {
+            media = media == null ? List.of() : List.copyOf(media);
+            documentTexts = documentTexts == null ? List.of() : List.copyOf(documentTexts);
+            taskFileIds = taskFileIds == null ? List.of() : List.copyOf(taskFileIds);
+        }
+
         public static Resolved empty() {
-            return new Resolved(List.of(), List.of(), false);
+            return new Resolved(List.of(), List.of(), false, List.of());
         }
 
         public boolean isEmpty() {

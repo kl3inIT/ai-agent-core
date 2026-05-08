@@ -310,6 +310,10 @@ public class DefaultChatServiceImpl implements ChatService {
             // GuardedToolCallingManager before the veto was thrown.
             return ChatResponseDto.denied(convId, runId,
                     "ai-agent.guard.tool-vetoed", Map.of());
+        } catch (AgentToolCallbacks.ToolConfigurationException configurationFailure) {
+            UUID convId = conversation != null ? conversation.getId() : null;
+            return ChatResponseDto.denied(convId, runId,
+                    "chatView.intent.configurationError", Map.of());
         } finally {
             IterationCounter.reset();
             com.vn.agent.orchestration.RunContext.clear();
@@ -363,6 +367,8 @@ public class DefaultChatServiceImpl implements ChatService {
         // "=== End === / User message:" scaffolding leaked into next-session UI replay.
         final String systemPromptWithDocs = appendDocumentBlocks(
                 composedSystemPrompt, resolvedMedia.documentTexts());
+        RunContext.setExtractionTurn(intentId, convId, message,
+                resolvedMedia.taskFileIds(), resolvedMedia.media());
         ChatClientResponse clientResp = chatClient.prompt()
                 .system(systemPromptWithDocs)
                 .user(u -> {
@@ -372,7 +378,7 @@ public class DefaultChatServiceImpl implements ChatService {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
                 })
-                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, intentId))
                 .toolContext(auditToolContext(runId, convId))
                 .advisors(advisorSpec -> {
                     advisorSpec
@@ -544,6 +550,8 @@ public class DefaultChatServiceImpl implements ChatService {
                     // (see blocking path comment for rationale).
                     final String systemPromptWithDocs = appendDocumentBlocks(
                             composedSystemPrompt, resolvedMedia.documentTexts());
+                    RunContext.setExtractionTurn(normalizedIntentId, convId, message,
+                            resolvedMedia.taskFileIds(), resolvedMedia.media());
 
                     Flux<StreamingEvent> content;
                     try {
@@ -556,7 +564,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                         u.media(resolvedMedia.media().toArray(new Media[0]));
                                     }
                                 })
-                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, normalizedIntentId))
                                 .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
                                     advisorSpec
@@ -684,6 +692,8 @@ public class DefaultChatServiceImpl implements ChatService {
             key = "ai-agent.guard.iteration-cap-exceeded";
         } else if (ex instanceof ToolVetoedException) {
             key = "ai-agent.guard.tool-vetoed";
+        } else if (ex instanceof AgentToolCallbacks.ToolConfigurationException) {
+            key = "chatView.intent.configurationError";
         } else if (ex instanceof ConversationNotFoundException) {
             key = "chatView.error.conversationNotFound";
         } else {

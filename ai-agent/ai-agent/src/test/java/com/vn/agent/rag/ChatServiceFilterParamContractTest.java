@@ -121,7 +121,7 @@ class ChatServiceFilterParamContractTest {
         when(parametersResolver.effectiveRagTopK(any(), anyInt())).thenReturn(10);
         when(parametersResolver.effectiveRagSimilarityThreshold(any(), anyDouble())).thenReturn(0.1);
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.*");
-        when(toolCallbacks.callbacksFor(anyString(), any())).thenReturn(new org.springframework.ai.tool.ToolCallback[]{});
+        when(toolCallbacks.callbacksFor(anyString(), any(), any())).thenReturn(new org.springframework.ai.tool.ToolCallback[]{});
 
         // Fluent chain — every builder call returns requestSpec; .call().chatResponse() returns null.
         when(chatClient.prompt()).thenReturn(requestSpec);

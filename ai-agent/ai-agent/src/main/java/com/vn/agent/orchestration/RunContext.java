@@ -1,5 +1,8 @@
 package com.vn.agent.orchestration;
 
+import org.springframework.ai.content.Media;
+
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -30,6 +33,11 @@ public final class RunContext {
     private static final ThreadLocal<Integer> RETRIEVAL_TOPK = new ThreadLocal<>();
     private static final ThreadLocal<Double> RETRIEVAL_SIMILARITY_THRESHOLD = new ThreadLocal<>();
     private static final ThreadLocal<String> RETRIEVAL_FILTERS_JSON = new ThreadLocal<>();
+    private static final ThreadLocal<String> INTENT_ID = new ThreadLocal<>();
+    private static final ThreadLocal<String> USER_MESSAGE = new ThreadLocal<>();
+    private static final ThreadLocal<List<UUID>> TASK_FILE_IDS = new ThreadLocal<>();
+    private static final ThreadLocal<List<Media>> TASK_FILE_MEDIA = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> PREPARE_FORM_DRAFT_INVOKED = new ThreadLocal<>();
 
     private RunContext() { }
 
@@ -71,6 +79,43 @@ public final class RunContext {
     /** Current retrieval filters-JSON or {@code null} when no retrieval is in flight. */
     public static String getRetrievalFiltersJson() { return RETRIEVAL_FILTERS_JSON.get(); }
 
+    public static void setExtractionTurn(String intentId,
+                                         UUID conversationId,
+                                         String userMessage,
+                                         List<UUID> taskFileIds,
+                                         List<Media> taskFileMedia) {
+        INTENT_ID.set(intentId);
+        if (conversationId != null) {
+            setConversationId(conversationId);
+        }
+        USER_MESSAGE.set(userMessage);
+        TASK_FILE_IDS.set(taskFileIds == null ? List.of() : List.copyOf(taskFileIds));
+        TASK_FILE_MEDIA.set(taskFileMedia == null ? List.of() : List.copyOf(taskFileMedia));
+        PREPARE_FORM_DRAFT_INVOKED.set(false);
+    }
+
+    public static String getIntentId() { return INTENT_ID.get(); }
+
+    public static String getUserMessage() { return USER_MESSAGE.get(); }
+
+    public static List<UUID> getTaskFileIds() {
+        List<UUID> taskFileIds = TASK_FILE_IDS.get();
+        return taskFileIds == null ? List.of() : taskFileIds;
+    }
+
+    public static List<Media> getTaskFileMedia() {
+        List<Media> taskFileMedia = TASK_FILE_MEDIA.get();
+        return taskFileMedia == null ? List.of() : taskFileMedia;
+    }
+
+    public static boolean markPrepareFormDraftInvoked() {
+        if (Boolean.TRUE.equals(PREPARE_FORM_DRAFT_INVOKED.get())) {
+            return false;
+        }
+        PREPARE_FORM_DRAFT_INVOKED.set(true);
+        return true;
+    }
+
     /**
      * Remove ALL four thread-local entries — MUST be called in a {@code finally} block.
      *
@@ -84,5 +129,10 @@ public final class RunContext {
         RETRIEVAL_TOPK.remove();
         RETRIEVAL_SIMILARITY_THRESHOLD.remove();
         RETRIEVAL_FILTERS_JSON.remove();
+        INTENT_ID.remove();
+        USER_MESSAGE.remove();
+        TASK_FILE_IDS.remove();
+        TASK_FILE_MEDIA.remove();
+        PREPARE_FORM_DRAFT_INVOKED.remove();
     }
 }
