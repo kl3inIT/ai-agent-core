@@ -686,7 +686,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         setStreamingUiState(true);
 
         final String userId = currentAuthentication.getUser().getUsername();
-        final UUID targetConversationId = ensureConversationIdForSubmit(userId, text);
+        final UUID targetConversationId = conversationId;
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
         final String selectedIntentId = selectedIntentIdForSubmit();
 
@@ -706,6 +706,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         if (conversationId == null && f.conversationId() != null) {
                             conversationId = f.conversationId();
                             updateSessionConversationId(conversationId);
+                            if (taskFilesDl != null) {
+                                taskFilesDl.setParameter("conversationId", conversationId);
+                                taskFilesDl.load();
+                            }
                         }
                         // Phase 13.1 D-D1 — streaming-path budget-exceeded toast (CONTEXT D-D1
                         // demands the toast on BOTH transports; the streaming Final event
@@ -821,30 +825,6 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     // ---- Helpers -----------------------------------------------------------
-
-    /**
-     * Reserve a stable conversation id before streaming starts so follow-up turns always
-     * continue the same thread, even if the stream terminates before a Final event arrives.
-     */
-    UUID ensureConversationIdForSubmit(String userId, String firstMessage) {
-        if (conversationId != null) {
-            return conversationId;
-        }
-        AiConversation conversation = conversationGateway.loadOrCreate(userId, null, firstMessage);
-        UUID resolved = conversation.getId();
-        if (resolved == null) {
-            throw new IllegalStateException("Conversation id must not be null");
-        }
-        conversationId = resolved;
-        updateConversationTitle(conversation.getTitle());
-        updateTitleEditState();
-        updateSessionConversationId(resolved);
-        if (taskFilesDl != null) {
-            taskFilesDl.setParameter("conversationId", resolved);
-            taskFilesDl.load();
-        }
-        return resolved;
-    }
 
     void registerConversationIdStateListener(UI ui) {
         unregisterConversationIdStateListener();

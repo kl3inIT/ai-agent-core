@@ -66,9 +66,11 @@ class IntentCardRowTest {
 
         assertThat(source)
                 .contains("selectedIntentIdForSubmit()")
+                .contains("final UUID targetConversationId = conversationId")
                 .contains("chatService.stream(userId, targetConversationId, text, null, selectedIntentId)")
                 .contains("resetIntentCardRowToAutoIfNamed(selectedIntentId)")
-                .contains("intentCardRow.setValue(buildAutoIntentOption())");
+                .contains("intentCardRow.setValue(buildAutoIntentOption())")
+                .doesNotContain("ensureConversationIdForSubmit(userId, text)");
     }
 
     private static String read(String repositoryPath) throws Exception {

@@ -38,6 +38,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.tool.ToolCallback;
+import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.HashMap;
@@ -53,6 +54,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -214,6 +216,40 @@ class DefaultChatServiceIntentRoutingTest {
     }
 
     @Test
+    void streamingFirstTurnEmitsServiceCreatedConversationId() {
+        stubStreamingChatClient("draft ready");
+        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+                .thenReturn(new ToolCallback[0]);
+
+        List<StreamingEvent> events = service.stream(USER_ID, null, MESSAGE,
+                Overrides.NONE, INTENT_ID).collectList().block();
+
+        assertThat(events).isNotNull();
+        StreamingEvent.Final finalEvent = events.stream()
+                .filter(StreamingEvent.Final.class::isInstance)
+                .map(StreamingEvent.Final.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(finalEvent.conversationId()).isEqualTo(conversationId);
+        verify(conversationGateway).loadOrCreate(USER_ID, null, MESSAGE);
+    }
+
+    @Test
+    void streamingRateLimitDenialDoesNotCreateFirstTurnConversation() {
+        doThrow(new com.vn.agent.guard.RateLimitExceededException(60))
+                .when(rateLimitGuard).check(USER_ID);
+
+        List<StreamingEvent> events = service.stream(USER_ID, null, MESSAGE,
+                Overrides.NONE, INTENT_ID).collectList().block();
+
+        assertThat(events).isNotNull();
+        assertThat(events.get(0)).isInstanceOf(StreamingEvent.Error.class);
+        StreamingEvent.Error error = (StreamingEvent.Error) events.get(0);
+        assertThat(error.messageKey()).isEqualTo("ai-agent.guard.rate-limit-exceeded");
+        verify(conversationGateway, never()).loadOrCreate(anyString(), any(), anyString());
+    }
+
+    @Test
     void streamingFallbackPreservesNamedIntentForBothCallbackAssemblies() {
         stubStreamingFallbackChatClient();
         when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
@@ -269,6 +305,19 @@ class DefaultChatServiceIntentRoutingTest {
         when(requestSpec.stream()).thenReturn(streamSpec);
         when(streamSpec.chatResponse())
                 .thenThrow(new UnsupportedOperationException("streaming unsupported"));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void stubStreamingChatClient(String content) {
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
+        when(requestSpec.toolCallbacks(any(ToolCallback[].class))).thenReturn(requestSpec);
+        when(requestSpec.toolContext(any())).thenReturn(requestSpec);
+        when(requestSpec.advisors(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
+        when(requestSpec.options(any())).thenReturn(requestSpec);
+        when(requestSpec.stream()).thenReturn(streamSpec);
+        when(streamSpec.chatResponse()).thenReturn(Flux.just(chatResponse(content)));
     }
 
     private static AiAgentRagProperties ragProperties() {

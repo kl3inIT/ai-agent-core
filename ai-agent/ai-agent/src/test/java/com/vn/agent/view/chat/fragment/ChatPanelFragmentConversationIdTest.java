@@ -22,6 +22,9 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,11 +34,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.withSettings;
 
 class ChatPanelFragmentConversationIdTest {
 
@@ -63,26 +63,6 @@ class ChatPanelFragmentConversationIdTest {
     }
 
     @Test
-    void ensureConversationIdForSubmit_createsOnce_thenReusesSameId() throws Exception {
-        ChatPanelFragment fragment = new ChatPanelFragment();
-        ConversationGateway gateway = mock(ConversationGateway.class);
-        injectConversationGateway(fragment, gateway);
-
-        UUID conversationId = UUID.randomUUID();
-        AiConversation conversation = mock(AiConversation.class);
-        when(conversation.getId()).thenReturn(conversationId);
-        when(gateway.loadOrCreate("alice", null, "first question")).thenReturn(conversation);
-
-        UUID first = fragment.ensureConversationIdForSubmit("alice", "first question");
-        UUID second = fragment.ensureConversationIdForSubmit("alice", "second question");
-
-        assertThat(first).isEqualTo(conversationId);
-        assertThat(second).isEqualTo(conversationId);
-        verify(gateway, times(1)).loadOrCreate("alice", null, "first question");
-        verifyNoMoreInteractions(gateway);
-    }
-
-    @Test
     void setConversationId_updatesSessionState() throws Exception {
         ChatPanelFragment fragment = new ChatPanelFragment();
         AiChatSessionState sessionState = new AiChatSessionState();
@@ -91,24 +71,6 @@ class ChatPanelFragmentConversationIdTest {
         inject(fragment, "chatSessionState", sessionState);
 
         fragment.setConversationId(conversationId);
-
-        assertThat(sessionState.getCurrentConversationId()).isEqualTo(conversationId);
-    }
-
-    @Test
-    void ensureConversationIdForSubmit_updatesSessionState() throws Exception {
-        ChatPanelFragment fragment = new ChatPanelFragment();
-        ConversationGateway gateway = mock(ConversationGateway.class);
-        AiChatSessionState sessionState = new AiChatSessionState();
-        injectConversationGateway(fragment, gateway);
-        inject(fragment, "chatSessionState", sessionState);
-
-        UUID conversationId = UUID.randomUUID();
-        AiConversation conversation = mock(AiConversation.class);
-        when(conversation.getId()).thenReturn(conversationId);
-        when(gateway.loadOrCreate("alice", null, "first question")).thenReturn(conversation);
-
-        fragment.ensureConversationIdForSubmit("alice", "first question");
 
         assertThat(sessionState.getCurrentConversationId()).isEqualTo(conversationId);
     }
@@ -153,20 +115,6 @@ class ChatPanelFragmentConversationIdTest {
     }
 
     @Test
-    void ensureConversationIdForSubmit_throwsWhenGatewayReturnsNullId() throws Exception {
-        ChatPanelFragment fragment = new ChatPanelFragment();
-        ConversationGateway gateway = mock(ConversationGateway.class);
-        injectConversationGateway(fragment, gateway);
-
-        AiConversation conversation = mock(AiConversation.class, withSettings().stubOnly());
-        when(gateway.loadOrCreate("alice", null, "hello")).thenReturn(conversation);
-
-        assertThatThrownBy(() -> fragment.ensureConversationIdForSubmit("alice", "hello"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Conversation id must not be null");
-    }
-
-    @Test
     void saveManualConversationTitle_trimsChecksOwnershipSavesAndUpdatesVisibleTitle() throws Exception {
         ChatPanelFragment fragment = new ChatPanelFragment();
         UUID conversationId = UUID.randomUUID();
@@ -203,6 +151,17 @@ class ChatPanelFragmentConversationIdTest {
         assertThatThrownBy(() -> invokeSaveManualConversationTitle(fragment, "  "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("chatView.editTitle.validation.required");
+    }
+
+    @Test
+    void submitPassesNullableCurrentConversationIdToService() throws Exception {
+        String source = readSource();
+
+        assertThat(source)
+                .doesNotContain("ensureConversationIdForSubmit(userId, text)")
+                .contains("final UUID targetConversationId = conversationId")
+                .contains("chatService.stream(userId, targetConversationId, text, null, selectedIntentId)")
+                .contains("taskFilesDl.setParameter(\"conversationId\", conversationId)");
     }
 
     private static void prepareSetConversationIdDependencies(ChatPanelFragment fragment,
@@ -274,5 +233,25 @@ class ChatPanelFragmentConversationIdTest {
             }
         }
         throw new AssertionError("Element not found: " + id);
+    }
+
+    private static String readSource() throws Exception {
+        return Files.readString(resolveSourcePath(), StandardCharsets.UTF_8);
+    }
+
+    private static Path resolveSourcePath() throws Exception {
+        String repositoryPath = "ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java";
+        String moduleRelativePath = "src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java";
+        for (Path candidate : new Path[]{
+                Path.of(repositoryPath),
+                Path.of(moduleRelativePath),
+                Path.of(System.getProperty("user.dir")).resolve(repositoryPath).normalize(),
+                Path.of(System.getProperty("user.dir")).resolve(moduleRelativePath).normalize()
+        }) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+        throw new java.nio.file.NoSuchFileException(repositoryPath);
     }
 }
