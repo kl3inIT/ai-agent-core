@@ -250,7 +250,7 @@ Plans:
   2. `StreamingEvent.ToolResult` carries the structured `prepare_form_draft` payload separately from human-readable summaries; `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) checks `UiShowViewContext` via `AccessManager`, resolves the primary detail view via `ViewRegistry`, and navigates with `ViewNavigators.detailView(...).newEntity().withViewClass(...).withAfterNavigationHandler(...)`.
   3. The prefill applies to the opened `StandardDetailView`'s `DataContext`-tracked edited entity and uses per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); normal view validation runs before Save; on Save the draft is deleted and close-without-save leaves it for TTL cleanup.
   4. `AiExtractionDraft` rows expire after TTL (default 1h, hourly cleanup job); each row is row-level-scoped to its owner `userUsername` (`AiAgentUserRole` row policy), persisted (not `VaadinSession`-cached), and survives navigation; `prepare_form_draft` invocations are audited via `AuditWriter.writeToolCall` with `eventName=prepare_form_draft`.
-**Plans:** 2/8 plans executed
+**Plans:** 3/8 plans executed
 
 Plans:
 **Wave 1**
@@ -258,7 +258,7 @@ Plans:
 - [x] 14-02-PLAN.md — SPI and schema synthesis: `IntentExtractor<T>`, `IntentRegistry`, `ExtractionInput`, `MetaClassDtoSynthesizer`
 
 **Wave 2 *(blocked on Wave 1 completion)***
-- [ ] 14-03-PLAN.md — Extraction service and `prepare_form_draft` tool bridge with append-only audit and denial handling
+- [x] 14-03-PLAN.md — Extraction service and `prepare_form_draft` tool bridge with append-only audit and denial handling
 
 **Wave 3 *(blocked on Wave 2 completion)***
 - [ ] 14-04-PLAN.md — Chat-service intent plumbing, named-intent tool gating, and named-intent system-prompt rules
@@ -303,7 +303,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1**
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | 6/6 | Complete    | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | 7/7 | Complete | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | 2/8 | In Progress|  |
+| 14. Intent-Driven Extraction → Form Prefill | 3/8 | In Progress|  |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
 ## Coverage Validation

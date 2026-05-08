@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-05-07T17:11:51.196Z"
+stopped_at: Completed 14-03-PLAN.md
+last_updated: "2026-05-08T03:10:06.977Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 60
-  completed_plans: 55
-  percent: 92
+  completed_plans: 56
+  percent: 93
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 14 — Intent-Driven Extraction → Form Prefill
+**Current focus:** Phase 14 — intent-driven-extraction-form-prefill
 
 ## Current Position
 
-Phase: 14 (Intent-Driven Extraction → Form Prefill) — EXECUTING
+Phase: 14 (intent-driven-extraction-form-prefill) — EXECUTING
 Plan: 3 of 8
 | Field | Value |
 |-------|-------|
 | Phase | Phase 14 |
-| Plan | 0 of 8 |
-| Status | Phase 14 planned; research plus 8 executable plans replanned across 6 waves with cross-AI review feedback incorporated |
-| Last activity | 2026-05-07 — Replanned Phase 14 with 14-REVIEWS feedback; structured ToolResult payload, Jmix detail-navigation lifecycle, and scanner hardening incorporated |
+| Plan | 3 of 8 |
+| Status | Completed 14-03; ready for Plan 14-04 |
+| Last activity | 2026-05-08 — Plan 14-03 completed; prepare_form_draft bridge, service-owned audit, and structured ToolResult payload shipped |
 
 ## Phase Status
 
@@ -46,7 +46,7 @@ Plan: 3 of 8
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Ready to execute | 0/8 | 2026-05-07 | - |
+| 14. Intent-Driven Extraction → Form Prefill | In Progress | 3/8 | 2026-05-07 | - |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
@@ -187,6 +187,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 14]: Plan 14-02 keeps structured-output target as Map/prompt JSON schema; MetaClassDtoSynthesizer emits schema text only, no runtime DTO bytecode. — This preserves the Phase 14 decision that strict mode is prompt-only and avoids generating runtime classes for host metamodels.
 - [Phase 14]: IntentRegistry eligibility is recalculated per request and filters named intents through LlmExposurePolicy plus Jmix create/read permission; Auto remains UI-only. — Exposure, security, and locale are request-sensitive, and Auto is a UI selection rather than an IntentExtractor bean.
 - [Phase 14]: Plan 14-02 uses Mockito/Jackson unit tests for registry and schema contracts instead of Spring Boot tests. — The behavior under test is independent of the Jmix boot context, and this avoids the known shared module Spring context blocker while covering planned contracts.
+- [Phase 14]: Plan 14-03 keeps prepare_form_draft audit ownership inside ExtractionService; ToolCallbackAuditDecorator emits streaming payloadJson but skips duplicate generic audit rows for that tool.
+- [Phase 14]: ExtractionToolBridge is payload-only: it returns open_form_with_draft payloads and has no ViewNavigators or navigation calls.
 
 ### Performance Metrics
 
@@ -243,6 +245,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 13.1 P07 | ~25min | 2 tasks | 5 files |
 | Phase 14 P01 | ~15min | 4 tasks | 13 files |
 | Phase 14 P02 | ~15min | 4 tasks | 9 files |
+| Phase 14 P03 | 34min | 4 tasks | 19 files |
 
 ### Quick Tasks Completed
 
@@ -252,8 +255,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-07T17:11:51.179Z
-**Stopped at:** Completed 14-02-PLAN.md
+**Last session:** 2026-05-08T03:10:06.764Z
+**Stopped at:** Completed 14-03-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Execute Phase 14 — Intent-Driven Extraction → Form Prefill.
+**Next action:** Execute Phase 14 Plan 04 — chat-service intent plumbing and named-intent tool gating.
