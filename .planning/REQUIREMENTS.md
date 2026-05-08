@@ -101,7 +101,7 @@ REQ-IDs continue v1.0 conventions where the category exists (`TOOL-09…`, `AUD-
 
 ### Intent-Driven Extraction → Prefilled Jmix Forms
 
-- [ ] **EXTRACT-01**: User selects an intent before sending. Add-on ships a default "auto" intent that uses the current chat path; intents lock the workflow when chosen. v1.1 ships at least one named intent end-to-end (e.g. PDF → customer-draft) plus an SPI for hosts.
+- [x] **EXTRACT-01**: User selects an intent before sending. Add-on ships a default "auto" intent that uses the current chat path; intents lock the workflow when chosen. v1.1 ships at least one named intent end-to-end (e.g. PDF → customer-draft) plus an SPI for hosts.
 - [x] **EXTRACT-02**: `IntentExtractor<T>` SPI: `Class<T> targetType()`, `String entityName()`, `T extract(ExtractionInput input)`. Hosts implement per-intent extractors. Add-on ships ONE reference impl using `chatClient.prompt().call().entity(Class)` against a metadata-derived DTO synthesized from `MetaClass`.
 - [x] **EXTRACT-03**: Intent-extraction model routing: follow active `AiParameters` profile (no separate model pin in v1.1). Operator docs note that weak-JSON-adherence models may produce parse errors.
 - [x] **EXTRACT-04**: `AiExtractionDraft` Jmix entity in `agentstore`: `id`, `userUsername`, `targetEntityName`, `intentId`, `payloadJson`, `sourceConversationId`, `sourceTaskFileId` (nullable), `createdAt`, `expiresAt` (TTL default 1h), `confirmed` boolean. Persisted (NOT `VaadinSession`-cached) so the form load by id survives navigation. Per-user row-level policy.
