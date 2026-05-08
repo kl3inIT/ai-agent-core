@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Planned 14-09-PLAN.md gap closure
-last_updated: "2026-05-08T08:54:43.560Z"
+status: Ready for verification
+stopped_at: Executed 14-09 gap closure
+last_updated: "2026-05-08T10:23:42.092Z"
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 61
-  completed_plans: 60
-  percent: 98
+  completed_plans: 61
+  percent: 100
 ---
 
 # Project State
@@ -28,13 +28,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 14 (intent-driven-extraction-form-prefill) — EXECUTING
-Plan: 14-09 of 9 (gap closure)
+Plan: 14-09 of 9 (gap closure complete)
 | Field | Value |
 |-------|-------|
 | Phase | Phase 14 |
 | Plan | 14-09 of 9 |
-| Status | Ready to execute gap-closure plan 14-09 |
-| Last activity | 2026-05-08 — Added Plan 14-09 to close verification blockers BL-01 through BL-05 from `14-VERIFICATION.md` |
+| Status | Plan 14-09 complete; ready for Phase 14 re-verification |
+| Last activity | 2026-05-08 — Executed Plan 14-09 for BL-02 through BL-05; BL-01 datasource/UI env migration removed per user correction, leaving only OpenRouter API key env handling |
 
 ## Phase Status
 
@@ -200,7 +200,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 14]: Plan 14-06: StreamEventRenderer parses only prepare_form_draft ToolResult.payloadJson and returns a structured DraftPayload marker; human-readable summaries are never parsed for extraction UI.
 - [Phase 14]: Plan 14-06: Confirm rows are appended by ChatPanelFragment and delegate clicks to OpenFormWithDraftHandler; StreamEventRenderer remains navigation-free.
 - [Phase 14]: Plan 14-06: UI tests use source/XML contract checks because full Jmix UI boot remains affected by the pre-existing agentstore Spring context blocker documented in prior phase summaries.
-- [Phase 14]: Plan 14-09 is a dependent gap-closure pass for `14-VERIFICATION.md` blockers BL-01 through BL-05 only; it intentionally adds no new AI tool, entity table, audit kind, Jmix view/menu, or AI-specific exposure layer.
+- [Phase 14]: Plan 14-09 is a dependent gap-closure pass for `14-VERIFICATION.md` blockers BL-02 through BL-05; BL-01 was narrowed by user correction so datasource/UI defaults stay in application.properties and only OpenRouter API key remains env-backed. It intentionally adds no new AI tool, entity table, audit kind, Jmix view/menu, or AI-specific exposure layer.
 
 ### Performance Metrics
 
@@ -273,7 +273,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 ## Session Continuity
 
 **Last session:** 2026-05-08T07:54:56.705Z
-**Stopped at:** Planned 14-09-PLAN.md gap closure
+**Stopped at:** Executed 14-09-PLAN.md gap closure
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Execute Phase 14 Plan 14-09 — gap closure for BL-01 through BL-05, then rerun Phase 14 verification.
+**Next action:** Rerun Phase 14 verification; then manual UI UAT from `14-UAT-CHECKLIST.md`.
