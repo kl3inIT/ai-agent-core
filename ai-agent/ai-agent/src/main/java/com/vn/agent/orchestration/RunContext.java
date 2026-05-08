@@ -1,5 +1,6 @@
 package com.vn.agent.orchestration;
 
+import com.vn.agent.extraction.ExtractionSourceText;
 import org.springframework.ai.content.Media;
 
 import java.util.List;
@@ -37,6 +38,7 @@ public final class RunContext {
     private static final ThreadLocal<String> USER_MESSAGE = new ThreadLocal<>();
     private static final ThreadLocal<List<UUID>> TASK_FILE_IDS = new ThreadLocal<>();
     private static final ThreadLocal<List<Media>> TASK_FILE_MEDIA = new ThreadLocal<>();
+    private static final ThreadLocal<List<ExtractionSourceText>> SOURCE_TEXTS = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> PREPARE_FORM_DRAFT_INVOKED = new ThreadLocal<>();
 
     private RunContext() { }
@@ -84,6 +86,15 @@ public final class RunContext {
                                          String userMessage,
                                          List<UUID> taskFileIds,
                                          List<Media> taskFileMedia) {
+        setExtractionTurn(intentId, conversationId, userMessage, taskFileIds, taskFileMedia, List.of());
+    }
+
+    public static void setExtractionTurn(String intentId,
+                                         UUID conversationId,
+                                         String userMessage,
+                                         List<UUID> taskFileIds,
+                                         List<Media> taskFileMedia,
+                                         List<ExtractionSourceText> sourceTexts) {
         INTENT_ID.set(intentId);
         if (conversationId != null) {
             setConversationId(conversationId);
@@ -91,6 +102,7 @@ public final class RunContext {
         USER_MESSAGE.set(userMessage);
         TASK_FILE_IDS.set(taskFileIds == null ? List.of() : List.copyOf(taskFileIds));
         TASK_FILE_MEDIA.set(taskFileMedia == null ? List.of() : List.copyOf(taskFileMedia));
+        SOURCE_TEXTS.set(sourceTexts == null ? List.of() : List.copyOf(sourceTexts));
         PREPARE_FORM_DRAFT_INVOKED.set(false);
     }
 
@@ -106,6 +118,11 @@ public final class RunContext {
     public static List<Media> getTaskFileMedia() {
         List<Media> taskFileMedia = TASK_FILE_MEDIA.get();
         return taskFileMedia == null ? List.of() : taskFileMedia;
+    }
+
+    public static List<ExtractionSourceText> getSourceTexts() {
+        List<ExtractionSourceText> sourceTexts = SOURCE_TEXTS.get();
+        return sourceTexts == null ? List.of() : sourceTexts;
     }
 
     public static boolean markPrepareFormDraftInvoked() {
@@ -133,6 +150,7 @@ public final class RunContext {
         USER_MESSAGE.remove();
         TASK_FILE_IDS.remove();
         TASK_FILE_MEDIA.remove();
+        SOURCE_TEXTS.remove();
         PREPARE_FORM_DRAFT_INVOKED.remove();
     }
 }

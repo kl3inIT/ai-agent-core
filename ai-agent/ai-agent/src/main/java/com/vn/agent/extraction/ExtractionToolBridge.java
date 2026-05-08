@@ -78,7 +78,8 @@ public class ExtractionToolBridge {
         return RunContext.getUserMessage() != null
                 || RunContext.getIntentId() != null
                 || !RunContext.getTaskFileIds().isEmpty()
-                || !RunContext.getTaskFileMedia().isEmpty();
+                || !RunContext.getTaskFileMedia().isEmpty()
+                || !RunContext.getSourceTexts().isEmpty();
     }
 
     private static ExtractionInput runScopedInput(String intentId) {
@@ -86,7 +87,7 @@ public class ExtractionToolBridge {
             throw ExtractionSchemaException.validationFailure(intentId, null, 0);
         }
         return new ExtractionInput(intentId, RunContext.getConversationId(), RunContext.getUserMessage(),
-                RunContext.getTaskFileIds(), RunContext.getTaskFileMedia());
+                RunContext.getTaskFileIds(), RunContext.getTaskFileMedia(), RunContext.getSourceTexts());
     }
 
     private static Map<String, Object> copyContextRefs(Map<String, Object> contextRefs) {

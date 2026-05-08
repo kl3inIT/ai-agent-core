@@ -3,6 +3,7 @@ package com.vn.jmixapp.ai;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.extraction.ExtractionInput;
 import com.vn.agent.extraction.ExtractionSchemaException;
+import com.vn.agent.extraction.ExtractionSourceText;
 import com.vn.agent.extraction.MetaClassDtoSynthesizer;
 import com.vn.agent.spi.IntentExtractor;
 import com.vn.jmixapp.entity.Customer;
@@ -15,8 +16,10 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -93,6 +96,7 @@ public class CustomerDraftIntentExtractor implements IntentExtractor<Customer> {
                 .entity(MAP_OUTPUT_TYPE);
 
         LinkedHashMap<String, Object> narrowedPayload = validatePayload(rawPayload, schema);
+        assertSourceFaithful(narrowedPayload, input);
         Customer customer = convertToCustomer(narrowedPayload);
         validateCustomer(customer, narrowedPayload.size());
         return customer;
@@ -147,6 +151,61 @@ public class CustomerDraftIntentExtractor implements IntentExtractor<Customer> {
             }
         }
         return narrowedPayload;
+    }
+
+    private void assertSourceFaithful(LinkedHashMap<String, Object> narrowedPayload,
+                                      ExtractionInput input) {
+        String rawEvidence = sourceEvidence(input);
+        if (!StringUtils.hasText(rawEvidence)) {
+            return;
+        }
+        String lowerCaseEvidence = rawEvidence.toLowerCase(Locale.ROOT);
+        String normalizedEvidence = normalizeText(rawEvidence);
+        String digitEvidence = digitsOnly(rawEvidence);
+
+        for (Map.Entry<String, Object> entry : narrowedPayload.entrySet()) {
+            if (!(entry.getValue() instanceof String value) || !StringUtils.hasText(value)) {
+                continue;
+            }
+            boolean supported = switch (entry.getKey()) {
+                case "email" -> lowerCaseEvidence.contains(value.toLowerCase(Locale.ROOT).trim());
+                case "phone" -> {
+                    String valueDigits = digitsOnly(value);
+                    yield !valueDigits.isEmpty() && digitEvidence.contains(valueDigits);
+                }
+                default -> normalizedEvidence.contains(normalizeText(value));
+            };
+            if (!supported) {
+                throw ExtractionSchemaException.validationFailure(
+                        INTENT_ID, ENTITY_NAME, narrowedPayload.size());
+            }
+        }
+    }
+
+    private String sourceEvidence(ExtractionInput input) {
+        if (input == null) {
+            return "";
+        }
+        List<String> evidence = new ArrayList<>();
+        if (StringUtils.hasText(input.userMessage())) {
+            evidence.add(input.userMessage());
+        }
+        for (ExtractionSourceText sourceText : input.sourceTexts()) {
+            if (sourceText != null && StringUtils.hasText(sourceText.text())) {
+                evidence.add(sourceText.text());
+            }
+        }
+        return String.join("\n", evidence);
+    }
+
+    private static String normalizeText(String value) {
+        return value == null
+                ? ""
+                : value.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+    }
+
+    private static String digitsOnly(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
     }
 
     private boolean isValidPhone(String phone) {

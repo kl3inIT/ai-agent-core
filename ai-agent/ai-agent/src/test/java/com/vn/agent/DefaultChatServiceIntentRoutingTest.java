@@ -8,6 +8,7 @@ import com.vn.agent.extraction.ExtractionInput;
 import com.vn.agent.extraction.ExtractionResult;
 import com.vn.agent.extraction.ExtractionSchemaException;
 import com.vn.agent.extraction.ExtractionService;
+import com.vn.agent.extraction.ExtractionSourceText;
 import com.vn.agent.extraction.ExtractionToolBridge;
 import com.vn.agent.extraction.IntentOption;
 import com.vn.agent.extraction.IntentRegistry;
@@ -41,6 +42,7 @@ import org.springframework.ai.tool.ToolCallback;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -260,6 +262,54 @@ class DefaultChatServiceIntentRoutingTest {
 
         verify(toolCallbacks, times(2)).callbacksFor(USER_ID, conversationId, INTENT_ID);
         verify(taskFileMediaResolver, times(1)).resolveActive(conversationId);
+    }
+
+    @Test
+    void blockingIntentTurnPublishesDocumentSourceTextsToRunContext() {
+        stubBlockingChatClient();
+        UUID taskFileId = UUID.randomUUID();
+        AiTaskFileMediaResolver.DocumentText documentText =
+                new AiTaskFileMediaResolver.DocumentText("customer.txt", "Customer Acme", false);
+        when(taskFileMediaResolver.resolveActive(conversationId))
+                .thenReturn(new AiTaskFileMediaResolver.Resolved(
+                        List.of(), List.of(documentText), false, List.of(taskFileId)));
+        List<List<ExtractionSourceText>> capturedSourceTexts = new ArrayList<>();
+        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+                .thenAnswer(invocation -> {
+                    capturedSourceTexts.add(RunContext.getSourceTexts());
+                    return new ToolCallback[0];
+                });
+
+        service.ask(USER_ID, conversationId, MESSAGE, Overrides.NONE, INTENT_ID);
+
+        assertThat(capturedSourceTexts).hasSize(1);
+        assertThat(capturedSourceTexts.get(0))
+                .containsExactly(new ExtractionSourceText("customer.txt", "Customer Acme", false));
+    }
+
+    @Test
+    void streamingIntentTurnPublishesDocumentSourceTextsToRunContext() {
+        stubStreamingChatClient("draft ready");
+        UUID taskFileId = UUID.randomUUID();
+        AiTaskFileMediaResolver.DocumentText documentText =
+                new AiTaskFileMediaResolver.DocumentText("customer.txt", "Customer Acme", true);
+        when(taskFileMediaResolver.resolveActive(conversationId))
+                .thenReturn(new AiTaskFileMediaResolver.Resolved(
+                        List.of(), List.of(documentText), false, List.of(taskFileId)));
+        List<List<ExtractionSourceText>> capturedSourceTexts = new ArrayList<>();
+        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+                .thenAnswer(invocation -> {
+                    capturedSourceTexts.add(RunContext.getSourceTexts());
+                    return new ToolCallback[0];
+                });
+
+        service.stream(USER_ID, conversationId, MESSAGE, Overrides.NONE, INTENT_ID)
+                .collectList()
+                .block();
+
+        assertThat(capturedSourceTexts).hasSize(1);
+        assertThat(capturedSourceTexts.get(0))
+                .containsExactly(new ExtractionSourceText("customer.txt", "Customer Acme", true));
     }
 
     @Test

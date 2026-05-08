@@ -1,11 +1,12 @@
 package com.vn.agent;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
+import com.vn.agent.extraction.ExtractionSourceText;
 import com.vn.agent.extraction.IntentOption;
 import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.guard.AgentSystemPromptRulesComposer;
@@ -368,7 +369,8 @@ public class DefaultChatServiceImpl implements ChatService {
         final String systemPromptWithDocs = appendDocumentBlocks(
                 composedSystemPrompt, resolvedMedia.documentTexts());
         RunContext.setExtractionTurn(intentId, convId, message,
-                resolvedMedia.taskFileIds(), resolvedMedia.media());
+                resolvedMedia.taskFileIds(), resolvedMedia.media(),
+                sourceTexts(resolvedMedia.documentTexts()));
         ChatClientResponse clientResp = chatClient.prompt()
                 .system(systemPromptWithDocs)
                 .user(u -> {
@@ -551,7 +553,8 @@ public class DefaultChatServiceImpl implements ChatService {
                     final String systemPromptWithDocs = appendDocumentBlocks(
                             composedSystemPrompt, resolvedMedia.documentTexts());
                     RunContext.setExtractionTurn(normalizedIntentId, convId, message,
-                            resolvedMedia.taskFileIds(), resolvedMedia.media());
+                            resolvedMedia.taskFileIds(), resolvedMedia.media(),
+                            sourceTexts(resolvedMedia.documentTexts()));
 
                     Flux<StreamingEvent> content;
                     try {
@@ -909,5 +912,16 @@ public class DefaultChatServiceImpl implements ChatService {
             sb.append("\n=== End ===\n\n");
         }
         return sb.toString();
+    }
+
+    private static List<ExtractionSourceText> sourceTexts(
+            List<AiTaskFileMediaResolver.DocumentText> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return List.of();
+        }
+        return documents.stream()
+                .map(document -> new ExtractionSourceText(
+                        document.filename(), document.text(), document.truncated()))
+                .toList();
     }
 }

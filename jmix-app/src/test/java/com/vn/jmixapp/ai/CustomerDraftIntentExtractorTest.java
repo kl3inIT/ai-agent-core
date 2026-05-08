@@ -2,6 +2,7 @@ package com.vn.jmixapp.ai;
 
 import com.vn.agent.extraction.ExtractionInput;
 import com.vn.agent.extraction.ExtractionSchemaException;
+import com.vn.agent.extraction.ExtractionSourceText;
 import com.vn.agent.extraction.MetaClassDtoSynthesizer;
 import com.vn.jmixapp.entity.Customer;
 import jakarta.validation.Validation;
@@ -71,7 +72,9 @@ class CustomerDraftIntentExtractorTest {
     void mapsFixtureJsonToCustomerFields() {
         stubModelPayload(payload("Acme Trading", "billing@acme.example", "+84 901 234 567"));
 
-        Customer customer = extractor.extract(input("Create a customer draft", List.of()));
+        Customer customer = extractor.extract(input(
+                "Create a customer draft for Acme Trading, billing@acme.example, phone +84 901 234 567",
+                List.of()));
 
         assertThat(customer.getName()).isEqualTo("Acme Trading");
         assertThat(customer.getEmail()).isEqualTo("billing@acme.example");
@@ -82,7 +85,9 @@ class CustomerDraftIntentExtractorTest {
     void promptUsesSchemaLimitedToCustomerReferenceFields() {
         stubModelPayload(payload("Acme Trading", "billing@acme.example", "+84 901 234 567"));
 
-        extractor.extract(input("Use the customer data from this note", List.of()));
+        extractor.extract(input(
+                "Use the customer data from this note: Acme Trading, billing@acme.example, +84 901 234 567",
+                List.of()));
         ChatClient.PromptUserSpec userSpec = runCapturedUserSpec();
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
@@ -98,7 +103,8 @@ class CustomerDraftIntentExtractorTest {
     void zeroFileInputUsesUserMessageAndDoesNotAttachMedia() {
         stubModelPayload(payload("Text Only", "text.only@example.test", "090123456"));
 
-        extractor.extract(input("Customer name Text Only, email text.only@example.test", List.of()));
+        extractor.extract(input("Customer name Text Only, email text.only@example.test, phone 090123456",
+                List.of()));
         ChatClient.PromptUserSpec userSpec = runCapturedUserSpec();
 
         verify(userSpec).text(org.mockito.ArgumentMatchers.contains("Customer name Text Only"));
@@ -114,7 +120,9 @@ class CustomerDraftIntentExtractorTest {
                 .build();
         stubModelPayload(payload("Media Co", "media@example.test", "090123456"));
 
-        extractor.extract(input("Use the attached file", List.of(media)));
+        extractor.extract(input("Use the attached file", List.of(media),
+                List.of(new ExtractionSourceText("customer.txt",
+                        "Customer Media Co, email media@example.test, phone 090123456", false))));
         ChatClient.PromptUserSpec userSpec = runCapturedUserSpec();
 
         ArgumentCaptor<Media[]> mediaCaptor = ArgumentCaptor.forClass(Media[].class);
@@ -157,6 +165,50 @@ class CustomerDraftIntentExtractorTest {
                 .isEqualTo(ExtractionSchemaException.CODE_VALIDATION_FAILURE);
     }
 
+    @Test
+    void fabricatedEmailRejectedWhenSourceTextDoesNotContainIt() {
+        stubModelPayload(payload("Acme Trading", "fabricated@example.test", "+84 901 234 567"));
+
+        assertThatThrownBy(() -> extractor.extract(input("Use the attached source", List.of(),
+                List.of(new ExtractionSourceText("customer.txt",
+                        "Customer Acme Trading phone +84 901 234 567", false)))))
+                .isInstanceOf(ExtractionSchemaException.class)
+                .hasMessageNotContaining("fabricated@example.test")
+                .extracting("code")
+                .isEqualTo(ExtractionSchemaException.CODE_VALIDATION_FAILURE);
+    }
+
+    @Test
+    void documentSourceTextSupportsExtractedValues() {
+        stubModelPayload(payload("Document Co", "document@example.test", "0905550102"));
+
+        Customer customer = extractor.extract(input("Use the attached document", List.of(),
+                List.of(new ExtractionSourceText("customer.txt",
+                        "Create customer Document Co with email document@example.test and phone 0905550102",
+                        false))));
+
+        assertThat(customer.getName()).isEqualTo("Document Co");
+        assertThat(customer.getEmail()).isEqualTo("document@example.test");
+        assertThat(customer.getPhone()).isEqualTo("0905550102");
+    }
+
+    @Test
+    void imageOnlyInputUsesExistingPromptPathWhenNoTextEvidenceExists() {
+        Media media = Media.builder()
+                .mimeType(Media.Format.IMAGE_PNG)
+                .data(new ByteArrayResource(new byte[]{1, 2, 3}))
+                .name("customer.png")
+                .build();
+        stubModelPayload(payload("Image Co", "image@example.test", "090111222"));
+
+        // Image-only attachments have no OCR text evidence here; the existing prompt path remains.
+        Customer customer = extractor.extract(input(null, List.of(media), List.of()));
+
+        assertThat(customer.getName()).isEqualTo("Image Co");
+        assertThat(customer.getEmail()).isEqualTo("image@example.test");
+        assertThat(customer.getPhone()).isEqualTo("090111222");
+    }
+
     private void stubModelPayload(Map<String, Object> payload) {
         when(callSpec.entity(
                 org.mockito.ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
@@ -164,8 +216,14 @@ class CustomerDraftIntentExtractorTest {
     }
 
     private ExtractionInput input(String userMessage, List<Media> media) {
+        return input(userMessage, media, List.of());
+    }
+
+    private ExtractionInput input(String userMessage,
+                                  List<Media> media,
+                                  List<ExtractionSourceText> sourceTexts) {
         return new ExtractionInput(CustomerDraftIntentExtractor.INTENT_ID, UUID.randomUUID(),
-                userMessage, List.of(UUID.randomUUID()), media);
+                userMessage, List.of(UUID.randomUUID()), media, sourceTexts);
     }
 
     private ChatClient.PromptUserSpec runCapturedUserSpec() {

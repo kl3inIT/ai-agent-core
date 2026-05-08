@@ -89,7 +89,7 @@ public class ExtractionService {
                 ? AiTaskFileMediaResolver.Resolved.empty()
                 : taskFileMediaResolver.resolveActive(conversationId);
         return prepare(intentId, new ExtractionInput(intentId, conversationId, userMessage,
-                activeTaskFileIds, resolvedMedia.media()));
+                activeTaskFileIds, resolvedMedia.media(), sourceTexts(resolvedMedia.documentTexts())));
     }
 
     public ExtractionResult prepare(String intentId, ExtractionInput input) {
@@ -154,13 +154,14 @@ public class ExtractionService {
 
     private ExtractionInput normalizeInput(String intentId, ExtractionInput input) {
         if (input == null) {
-            return new ExtractionInput(intentId, RunContext.getConversationId(), null, List.of(), List.of());
+            return new ExtractionInput(intentId, RunContext.getConversationId(), RunContext.getUserMessage(),
+                    RunContext.getTaskFileIds(), RunContext.getTaskFileMedia(), RunContext.getSourceTexts());
         }
         if (intentId.equals(input.intentId())) {
             return input;
         }
         return new ExtractionInput(intentId, input.conversationId(), input.userMessage(),
-                input.taskFileIds(), input.taskFileMedia());
+                input.taskFileIds(), input.taskFileMedia(), input.sourceTexts());
     }
 
     private void validateInput(String intentId, ExtractionInput input) {
@@ -336,6 +337,17 @@ public class ExtractionService {
                 .list()
                 .stream()
                 .map(AiTaskFile::getId)
+                .toList();
+    }
+
+    private static List<ExtractionSourceText> sourceTexts(
+            List<AiTaskFileMediaResolver.DocumentText> documentTexts) {
+        if (documentTexts == null || documentTexts.isEmpty()) {
+            return List.of();
+        }
+        return documentTexts.stream()
+                .map(documentText -> new ExtractionSourceText(
+                        documentText.filename(), documentText.text(), documentText.truncated()))
                 .toList();
     }
 

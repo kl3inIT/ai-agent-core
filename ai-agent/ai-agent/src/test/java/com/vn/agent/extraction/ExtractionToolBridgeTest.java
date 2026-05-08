@@ -3,6 +3,7 @@ package com.vn.agent.extraction;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.audit.MutationArgumentSanitizer;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
+import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.tools.AgentToolCallbacks;
 import com.vn.agent.tools.BuiltInDataTools;
@@ -10,6 +11,7 @@ import com.vn.agent.tools.link.BuiltInLinkTools;
 import com.vn.agent.tools.mutation.BuiltInMutationTools;
 import io.jmix.core.security.CurrentAuthentication;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -24,7 +26,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ExtractionToolBridgeTest {
@@ -47,6 +52,31 @@ class ExtractionToolBridgeTest {
                 .containsEntry("draftId", draftId)
                 .containsEntry("entityName", "jmixapp_Customer")
                 .containsEntry("instanceName", "Customer draft " + draftId);
+    }
+
+    @Test
+    void prepareFormDraft_carriesRunContextSourceTextsIntoScopedInput() {
+        UUID draftId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        UUID taskFileId = UUID.randomUUID();
+        ExtractionSourceText sourceText = new ExtractionSourceText(
+                "customer.txt", "Customer Acme email billing@example.test", false);
+        ExtractionService extractionService = mock(ExtractionService.class);
+        when(extractionService.prepare(eq("customer-from-source"), any(ExtractionInput.class)))
+                .thenReturn(new ExtractionResult(draftId, "jmixapp_Customer", "Customer draft"));
+        ExtractionToolBridge bridge = new ExtractionToolBridge(extractionService);
+
+        RunContext.setExtractionTurn("customer-from-source", conversationId, "prepare draft",
+                List.of(taskFileId), List.of(), List.of(sourceText));
+        try {
+            bridge.prepareFormDraft("ignored-intent", Map.of());
+        } finally {
+            RunContext.clear();
+        }
+
+        ArgumentCaptor<ExtractionInput> inputCaptor = ArgumentCaptor.forClass(ExtractionInput.class);
+        verify(extractionService).prepare(eq("customer-from-source"), inputCaptor.capture());
+        assertThat(inputCaptor.getValue().sourceTexts()).containsExactly(sourceText);
     }
 
     @Test
