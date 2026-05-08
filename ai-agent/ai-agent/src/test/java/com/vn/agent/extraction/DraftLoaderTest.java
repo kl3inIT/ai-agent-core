@@ -45,6 +45,7 @@ class DraftLoaderTest {
 
     private final UUID conversationId = UUID.randomUUID();
     private DataManager dataManager;
+    private ExtractionDraftAccess extractionDraftAccess;
     private Metadata metadata;
     private MetadataTools metadataTools;
     private AccessManager accessManager;
@@ -57,6 +58,7 @@ class DraftLoaderTest {
     @BeforeEach
     void setUp() {
         dataManager = mock(DataManager.class, RETURNS_DEEP_STUBS);
+        extractionDraftAccess = mock(ExtractionDraftAccess.class);
         metadata = mock(Metadata.class);
         metadataTools = mock(MetadataTools.class);
         accessManager = mock(AccessManager.class);
@@ -66,7 +68,7 @@ class DraftLoaderTest {
         currentAuthentication = mock(CurrentAuthentication.class);
         when(currentAuthentication.getUser()).thenReturn(
                 User.withUsername("alice").password("x").authorities("ROLE_USER").build());
-        draftLoader = new DraftLoader(dataManager, metadata, metadataTools, accessManager,
+        draftLoader = new DraftLoader(dataManager, extractionDraftAccess, metadata, metadataTools, accessManager,
                 llmExposurePolicy, filterLiteralValueConverter, auditWriter,
                 currentAuthentication, new ObjectMapper());
     }
@@ -136,6 +138,26 @@ class DraftLoaderTest {
         assertThat(result.deniedAttributeCount()).isZero();
     }
 
+    @Test
+    void expiredDraftIsRejectedBeforeApply() {
+        UUID draftId = UUID.randomUUID();
+        when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> draftLoader.apply(draftId, new MutationTestFixture()))
+                .isInstanceOf(DraftNotFoundException.class);
+    }
+
+    @Test
+    void confirmedDraftIsRejectedBeforeApply() {
+        UUID draftId = UUID.randomUUID();
+        when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> draftLoader.apply(draftId, new MutationTestFixture()))
+                .isInstanceOf(DraftNotFoundException.class);
+    }
+
     private void draftRow(UUID draftId, String targetEntityName, String payloadJson) {
         AiExtractionDraft draft = new AiExtractionDraft();
         draft.setId(draftId);
@@ -145,8 +167,7 @@ class DraftLoaderTest {
         draft.setPayloadJson(payloadJson);
         draft.setCreatedAt(OffsetDateTime.now());
         draft.setExpiresAt(OffsetDateTime.now().plusHours(1));
-        when(dataManager.load(AiExtractionDraft.class).id(draftId).optional())
-                .thenReturn(Optional.of(draft));
+        when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.of(draft));
     }
 
     private MetaClass metaClass(String name, Class<?> javaClass) {

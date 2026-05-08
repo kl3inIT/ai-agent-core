@@ -5,6 +5,7 @@ import com.vaadin.flow.component.ComponentEventListener;
 import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.extraction.DraftApplyResult;
 import com.vn.agent.extraction.DraftLoader;
+import com.vn.agent.extraction.ExtractionDraftAccess;
 import com.vn.agent.tools.mutation.fixture.MutationTestFixture;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
@@ -51,6 +52,7 @@ class SaveDeletesDraftTest {
     private ViewRegistry viewRegistry;
     private Metadata metadata;
     private DataManager dataManager;
+    private ExtractionDraftAccess extractionDraftAccess;
     private DraftLoader draftLoader;
     private OpenFormWithDraftHandler handler;
     private View<?> originView;
@@ -66,6 +68,7 @@ class SaveDeletesDraftTest {
         viewRegistry = mock(ViewRegistry.class);
         metadata = mock(Metadata.class, RETURNS_DEEP_STUBS);
         dataManager = mock(DataManager.class, RETURNS_DEEP_STUBS);
+        extractionDraftAccess = mock(ExtractionDraftAccess.class);
         draftLoader = mock(DraftLoader.class);
         Messages messages = mock(Messages.class);
         Notifications notifications = mock(Notifications.class, RETURNS_DEEP_STUBS);
@@ -85,6 +88,7 @@ class SaveDeletesDraftTest {
                 TestMutationDetailView.class.getName(),
                 TestMutationDetailView.class,
                 "test-mutation-detail-view.xml"));
+        when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.of(draft));
         when(dataManager.load(AiExtractionDraft.class).id(draftId).optional())
                 .thenReturn(Optional.of(draft));
         when(draftLoader.apply(any(UUID.class), any())).thenReturn(
@@ -98,7 +102,7 @@ class SaveDeletesDraftTest {
         when(classNavigator.withAfterNavigationHandler(any())).thenReturn(classNavigator);
 
         handler = new OpenFormWithDraftHandler(viewNavigators, accessManager, viewRegistry,
-                metadata, dataManager, draftLoader, messages, notifications);
+                metadata, dataManager, extractionDraftAccess, draftLoader, messages, notifications);
     }
 
     @Test

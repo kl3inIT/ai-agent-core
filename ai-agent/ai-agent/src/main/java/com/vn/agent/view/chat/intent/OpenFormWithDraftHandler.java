@@ -7,6 +7,7 @@ import com.vaadin.flow.spring.annotation.VaadinSessionScope;
 import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.extraction.DraftApplyResult;
 import com.vn.agent.extraction.DraftLoader;
+import com.vn.agent.extraction.ExtractionDraftAccess;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
 import io.jmix.core.Messages;
@@ -42,6 +43,7 @@ public class OpenFormWithDraftHandler {
     private final ViewRegistry viewRegistry;
     private final Metadata metadata;
     private final DataManager dataManager;
+    private final ExtractionDraftAccess extractionDraftAccess;
     private final DraftLoader draftLoader;
     private final Messages messages;
     private final Notifications notifications;
@@ -51,6 +53,7 @@ public class OpenFormWithDraftHandler {
                                     ViewRegistry viewRegistry,
                                     Metadata metadata,
                                     DataManager dataManager,
+                                    ExtractionDraftAccess extractionDraftAccess,
                                     DraftLoader draftLoader,
                                     Messages messages,
                                     Notifications notifications) {
@@ -59,6 +62,7 @@ public class OpenFormWithDraftHandler {
         this.viewRegistry = viewRegistry;
         this.metadata = metadata;
         this.dataManager = dataManager;
+        this.extractionDraftAccess = extractionDraftAccess;
         this.draftLoader = draftLoader;
         this.messages = messages;
         this.notifications = notifications;
@@ -111,12 +115,7 @@ public class OpenFormWithDraftHandler {
     }
 
     private Optional<AiExtractionDraft> loadDraft(UUID draftId) {
-        if (draftId == null) {
-            return Optional.empty();
-        }
-        return dataManager.load(AiExtractionDraft.class)
-                .id(draftId)
-                .optional();
+        return extractionDraftAccess.loadOpenDraft(draftId);
     }
 
     private ViewInfo resolveDetailViewInfo(MetaClass metaClass) {

@@ -42,6 +42,7 @@ public class DraftLoader {
             };
 
     private final DataManager dataManager;
+    private final ExtractionDraftAccess extractionDraftAccess;
     private final Metadata metadata;
     private final MetadataTools metadataTools;
     private final AccessManager accessManager;
@@ -52,6 +53,7 @@ public class DraftLoader {
     private final ObjectMapper objectMapper;
 
     public DraftLoader(DataManager dataManager,
+                       ExtractionDraftAccess extractionDraftAccess,
                        Metadata metadata,
                        MetadataTools metadataTools,
                        AccessManager accessManager,
@@ -61,6 +63,7 @@ public class DraftLoader {
                        CurrentAuthentication currentAuthentication,
                        ObjectMapper objectMapper) {
         this.dataManager = dataManager;
+        this.extractionDraftAccess = extractionDraftAccess;
         this.metadata = metadata;
         this.metadataTools = metadataTools;
         this.accessManager = accessManager;
@@ -112,9 +115,7 @@ public class DraftLoader {
     }
 
     private AiExtractionDraft loadDraft(UUID draftId) {
-        return dataManager.load(AiExtractionDraft.class)
-                .id(draftId)
-                .optional()
+        return extractionDraftAccess.loadOpenDraft(draftId)
                 .orElseThrow(() -> new DraftNotFoundException(draftId));
     }
 
