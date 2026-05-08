@@ -54,8 +54,8 @@ import java.util.List;
  *
  * <p>D-09 callback counts:
  * <ul>
- *   <li>default (mutation off): 6 read + 2 link = 8 callbacks.</li>
- *   <li>{@code ai-agent.tools.mutation.enabled=true}: 6 + 2 + 4 = 12 callbacks.</li>
+ *   <li>default (mutation off): 6 read + 2 link + 1 extraction = 9 callbacks.</li>
+ *   <li>{@code ai-agent.tools.mutation.enabled=true}: 6 + 2 + 1 + 5 = 14 callbacks.</li>
  *   <li>NEVER: a {@code delete_record} callback under any property combination (D-07).</li>
  * </ul>
  */

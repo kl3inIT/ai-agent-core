@@ -177,9 +177,7 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             if (root != null && OPEN_FORM_WITH_DRAFT_ACTION.equals(root.path("action").asText())) {
                 return output;
             }
-        } catch (RuntimeException ignored) {
-            return null;
-        } catch (java.io.IOException ignored) {
+        } catch (RuntimeException | java.io.IOException ignored) {
             return null;
         }
         return null;
