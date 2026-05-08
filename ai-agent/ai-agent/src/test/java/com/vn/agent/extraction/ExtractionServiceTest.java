@@ -50,6 +50,7 @@ class ExtractionServiceTest {
     private AuditWriter auditWriter;
     private CurrentAuthentication currentAuthentication;
     private AiExtractionProperties extractionProperties;
+    private MetaClassDtoSynthesizer schemaSynthesizer;
     private IntentExtractor<Object> extractor;
     private MetaClass metaClass;
     private ExtractionService service;
@@ -67,6 +68,7 @@ class ExtractionServiceTest {
         currentAuthentication = mock(CurrentAuthentication.class);
         extractionProperties = new AiExtractionProperties();
         extractionProperties.setTtlSeconds(120L);
+        schemaSynthesizer = mock(MetaClassDtoSynthesizer.class);
         extractor = mock(IntentExtractor.class);
         metaClass = mock(MetaClass.class);
 
@@ -81,12 +83,14 @@ class ExtractionServiceTest {
                 .thenAnswer(invocation -> mock(AiExtractionDraft.class, CALLS_REAL_METHODS));
         when(dataManager.save(any(AiExtractionDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(messageTools.getEntityCaption(metaClass)).thenReturn("Customer");
+        when(schemaSynthesizer.buildSchema(metaClass)).thenReturn(schema("name", "email", "phone"));
         when(currentAuthentication.getUser()).thenReturn(
                 User.withUsername("alice").password("x").authorities("ROLE_USER").build());
 
         service = new ExtractionService(intentRegistry, dataManager, metadata, metadataTools,
                 messageTools, llmExposurePolicy, auditWriter, currentAuthentication,
-                extractionProperties, mock(AiTaskFileMediaResolver.class), new ObjectMapper());
+                extractionProperties, mock(AiTaskFileMediaResolver.class), schemaSynthesizer,
+                new ObjectMapper());
     }
 
     @Test
@@ -169,5 +173,51 @@ class ExtractionServiceTest {
         assertThat(summaryCaptor.getValue())
                 .contains("\"failureCode\":\"validation_failed\"")
                 .doesNotContain("secret@example.test");
+    }
+
+    @Test
+    void prepare_filtersDraftPayloadAndAuditSummaryToSchemaAttributes() {
+        UUID conversationId = UUID.randomUUID();
+        LinkedHashMap<String, Object> extracted = new LinkedHashMap<>();
+        extracted.put("name", "Acme");
+        extracted.put("email", "billing@example.test");
+        extracted.put("recommendedProducts", List.of("private recommendation"));
+        extracted.put("version", 9);
+        extracted.put("class", "com.vn.jmixapp.entity.Customer");
+        when(extractor.extract(any())).thenReturn(extracted);
+        when(schemaSynthesizer.buildSchema(metaClass)).thenReturn(schema("name", "email", "phone"));
+
+        service.prepare(INTENT_ID,
+                new ExtractionInput(INTENT_ID, conversationId, "source text", List.of(), List.of()));
+
+        org.mockito.ArgumentCaptor<AiExtractionDraft> draftCaptor =
+                org.mockito.ArgumentCaptor.forClass(AiExtractionDraft.class);
+        verify(dataManager).save(draftCaptor.capture());
+        assertThat(draftCaptor.getValue().getPayloadJson())
+                .contains("\"name\":\"Acme\"")
+                .contains("\"email\":\"billing@example.test\"")
+                .doesNotContain("recommendedProducts")
+                .doesNotContain("version")
+                .doesNotContain("class");
+
+        org.mockito.ArgumentCaptor<String> summaryCaptor =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(auditWriter).writeToolCall(
+                any(), any(), eq("alice"), eq(conversationId), eq("prepare_form_draft"),
+                any(), summaryCaptor.capture(), anyLong(), eq(AiToolCallOutcome.SUCCESS),
+                isNull(), isNull());
+        assertThat(summaryCaptor.getValue())
+                .contains("\"extractedFieldCount\":2")
+                .contains("\"extractedAttributes\":[\"name\",\"email\"]")
+                .doesNotContain("recommendedProducts")
+                .doesNotContain("version")
+                .doesNotContain("class");
+    }
+
+    private static MetaClassDtoSynthesizer.SynthesizedSchema schema(String... attributeNames) {
+        return new MetaClassDtoSynthesizer.SynthesizedSchema(
+                "{}",
+                List.of(attributeNames),
+                List.of());
     }
 }

@@ -49,6 +49,7 @@ public class ExtractionService {
     private final CurrentAuthentication currentAuthentication;
     private final AiExtractionProperties extractionProperties;
     private final AiTaskFileMediaResolver taskFileMediaResolver;
+    private final MetaClassDtoSynthesizer schemaSynthesizer;
     private final ObjectMapper objectMapper;
 
     public ExtractionService(IntentRegistry intentRegistry,
@@ -61,6 +62,7 @@ public class ExtractionService {
                              CurrentAuthentication currentAuthentication,
                              AiExtractionProperties extractionProperties,
                              AiTaskFileMediaResolver taskFileMediaResolver,
+                             MetaClassDtoSynthesizer schemaSynthesizer,
                              ObjectMapper objectMapper) {
         this.intentRegistry = intentRegistry;
         this.dataManager = dataManager;
@@ -72,6 +74,7 @@ public class ExtractionService {
         this.currentAuthentication = currentAuthentication;
         this.extractionProperties = extractionProperties;
         this.taskFileMediaResolver = taskFileMediaResolver;
+        this.schemaSynthesizer = schemaSynthesizer;
         this.objectMapper = objectMapper;
     }
 
@@ -106,8 +109,10 @@ public class ExtractionService {
             Object extractedPayload = extractor.extract(effectiveInput);
             LinkedHashMap<String, Object> payloadMap = ExtractionJsonSupport.toPayloadMap(
                     objectMapper, extractedPayload, intentId, metaClass.getName());
-            String payloadJson = ExtractionJsonSupport.writeJson(objectMapper, payloadMap,
-                    intentId, metaClass.getName(), payloadMap.size());
+            MetaClassDtoSynthesizer.SynthesizedSchema schema = schemaSynthesizer.buildSchema(metaClass);
+            LinkedHashMap<String, Object> filteredPayloadMap = filterPayloadToSchema(payloadMap, schema);
+            String payloadJson = ExtractionJsonSupport.writeJson(objectMapper, filteredPayloadMap,
+                    intentId, metaClass.getName(), filteredPayloadMap.size());
 
             AiExtractionDraft draft = dataManager.create(AiExtractionDraft.class);
             UUID draftId = ensureDraftId(draft);
@@ -128,7 +133,7 @@ public class ExtractionService {
             dataManager.save(draft);
             ExtractionResult result = new ExtractionResult(draftId, metaClass.getName(), instanceName);
             writeSuccessAudit(runId, userUsername, effectiveInput.conversationId(), argumentsJson,
-                    result, payloadMap, elapsedMillis(startNanos));
+                    result, filteredPayloadMap, elapsedMillis(startNanos));
             return result;
         } catch (ExtractionDeniedException denied) {
             writeDeniedAudit(runId, userUsername, effectiveInput.conversationId(), argumentsJson,
@@ -179,6 +184,18 @@ public class ExtractionService {
         if (!llmExposurePolicy.canReadEntity(metaClass) || !llmExposurePolicy.canCreate(metaClass)) {
             throw ExtractionDeniedException.exposureDenied(intentId, metaClass.getName(), "exposure_rule");
         }
+    }
+
+    private LinkedHashMap<String, Object> filterPayloadToSchema(
+            LinkedHashMap<String, Object> payloadMap,
+            MetaClassDtoSynthesizer.SynthesizedSchema schema) {
+        LinkedHashMap<String, Object> filteredPayload = new LinkedHashMap<>();
+        for (String attributeName : schema.attributeNames()) {
+            if (payloadMap.containsKey(attributeName)) {
+                filteredPayload.put(attributeName, payloadMap.get(attributeName));
+            }
+        }
+        return filteredPayload;
     }
 
     private String computeInstanceName(Object extractedPayload, MetaClass metaClass, UUID draftId) {
