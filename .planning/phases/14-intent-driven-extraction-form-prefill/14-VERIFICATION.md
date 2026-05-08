@@ -1,149 +1,146 @@
 ---
 phase: 14-intent-driven-extraction-form-prefill
-verified: 2026-05-08T15:34:36+07:00
-status: gaps_found
-score: 10/14 requirements verified; 4 phase-goal gaps and 1 inherited release blocker remain
-schema_drift:
-  status: passed
-  drift_detected: false
-codebase_drift:
-  status: skipped
-  reason: no-structure-md
-human_verification: []
-gaps:
-  - BL-02 expired or confirmed extraction drafts remain loadable by id
-  - BL-03 first-turn streaming submit creates a conversation before service guards run
-  - BL-04 Customer reference intent reserializes a Jmix entity into draft payload JSON
-  - BL-05 source-faithfulness is represented by fixtures only, not enforced in production
-  - BL-01 committed development credentials remain in application.properties
+verified: 2026-05-08T17:32:04+07:00
+status: human_needed
+score: "9/9 must-haves verified"
+overrides_applied: 1
+overrides:
+  - must_have: "BL-01 - jmix-app/src/main/resources/application.properties contains no committed database passwords, admin default password, or host-specific database IP; local values move to environment variables or ignored .env."
+    reason: "User explicitly narrowed BL-01: datasource and UI-login defaults are not Phase 14 verification failures; only OpenRouter API key must remain env-backed and .env.example must only document OPENROUTER_API_KEY."
+    accepted_by: "user"
+    accepted_at: "2026-05-08T17:32:04+07:00"
+re_verification:
+  previous_status: gaps_found
+  previous_score: "10/14 requirements verified; 4 phase-goal gaps and 1 inherited release blocker remain"
+  gaps_closed:
+    - "BL-02 expired or confirmed extraction drafts remain loadable by id"
+    - "BL-03 first-turn streaming submit creates a conversation before service guards run"
+    - "BL-04 Customer reference intent reserializes a Jmix entity into draft payload JSON"
+    - "BL-05 source-faithfulness is represented by fixtures only, not enforced in production"
+    - "BL-01 narrowed to API-key env handling only"
+  gaps_remaining: []
+  regressions: []
+human_verification:
+  - test: "Run the manual chat-to-form UAT from 14-UAT-CHECKLIST.md in a browser"
+    expected: "Customer intent is visible, selecting it and sending supported source text or a task file produces an inline Open form to confirm button, clicking opens Customer detail prefilled, Save succeeds through normal Jmix validation, and the draft row is deleted."
+    why_human: "Vaadin/Jmix rendering, real navigation, and real provider-backed extraction require a running app and browser session."
 ---
 
-# Phase 14: Intent-Driven Extraction -> Form Prefill - Verification Report
+# Phase 14: Intent-Driven Extraction -> Form Prefill Verification Report
 
-**Phase Goal:** The LLM produces a structured draft for a host entity, the user confirms through a chat-rendered button, and a Jmix detail view opens prefilled without giving the LLM any UI-mutation primitive. Jmix security and normal detail-view validation must remain the authority for the eventual save.
+**Phase Goal:** The LLM produces a structured draft for a host entity, the user confirms through a chat-rendered button, and a Jmix detail view opens prefilled without giving the LLM any UI-mutation primitive. Jmix security and normal detail-view validation remain the authority for the eventual save.
+**Verified:** 2026-05-08T17:32:04+07:00
+**Status:** human_needed
+**Re-verification:** Yes - after 14-09 gap closure
 
-**Status:** gaps_found  
-**Verdict:** Do not mark Phase 14 complete yet.
+## Goal Achievement
 
-The implementation delivers the planned foundation, SPI, structured tool payload, intent-aware chat routing, controller-side confirm/open flow, reference Customer intent, scanner tests, eval fixtures, and UAT checklist. The targeted Phase 14 test matrix passes. However, verification found critical gaps that affect the phase's safety contract: stale drafts can still be applied, the Customer reference payload can expand beyond the synthesized schema, production source-faithfulness is not enforced, and the UI can create a first-turn conversation before service guards run.
+### Observable Truths
 
-## Requirement Coverage
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | Named intent turns expose only `prepare_form_draft`; Auto turns keep the normal tool surface; tool output is `{action,draftId,entityName,instanceName}` and tool classes do not navigate. | VERIFIED | `AgentToolCallbacks.callbacksFor(..., intentId)` filters to `prepare_form_draft`; `ExtractionToolBridge` returns the locked map; `ToolNavigationLeakScannerTest` passed. |
+| 2 | `StreamingEvent.ToolResult` carries structured payload data, `ChatPanelFragment` renders an inline confirm button, and only controller-side code navigates after `AccessManager` view checks. | VERIFIED | `StreamingEvent.ToolResult.toolName/payloadJson`, `StreamEventRenderer.parseOpenFormWithDraftPayload`, `ChatPanelFragment.appendIntentConfirmRow`, and `OpenFormWithDraftHandler` are wired. |
+| 3 | Draft prefill applies only to permitted attributes on the `StandardDetailView` edited entity, uses a gated `setValueIfPermitted` boundary, audits counts, and Save deletes the draft while close leaves it for TTL. | VERIFIED | `DraftLoader.canModify()` gates before `EntityValues.setValue`; scanner confines raw setValue to the helper; `OpenFormWithDraftHandler.AfterSaveEvent` confirms/removes the draft and `AfterCloseEvent` removes listeners only. |
+| 4 | `AiExtractionDraft` is persisted in `agentstore`, row-level-scoped by owner, hidden from LLM schema/tools, has TTL cleanup, and `prepare_form_draft` is audited. | VERIFIED | `AiExtractionDraft`, Liquibase `110-ai-extraction-draft.xml`, `AiAgentUserRole`, `AiAgentUserRowLevelRole`, `AiInternalEntityNames`, `AiExtractionDraftCleanupJob`, and `ExtractionService.writeSuccessAudit` exist and are covered by tests/source checks. |
+| 5 | BL-02: Expired or confirmed drafts cannot be opened or applied through user-facing paths. | VERIFIED | `ExtractionDraftAccess.loadOpenDraft()` uses secured `DataManager` with `e.id = :draftId and e.expiresAt > :now and e.confirmed = false`; both `DraftLoader` and `OpenFormWithDraftHandler` use it. |
+| 6 | BL-03: First-turn streaming submit no longer creates a conversation in the UI before service guards run. | VERIFIED | `ChatPanelFragment.onSubmit()` passes `final UUID targetConversationId = conversationId`; no production `ensureConversationIdForSubmit(userId, text)` remains; `DefaultChatServiceImpl.stream()` checks rate limit before `conversationGateway.loadOrCreate(...)`. |
+| 7 | BL-04: Draft `payloadJson` and success audit summaries are limited to `MetaClassDtoSynthesizer`-approved attribute names. | VERIFIED | `ExtractionService` calls `schemaSynthesizer.buildSchema(metaClass)` then `filterPayloadToSchema(...)` before JSON persistence and audit summary creation; tests cover unsupported keys such as `recommendedProducts`, `version`, and `class`. |
+| 8 | BL-05: Reference Customer extraction rejects unsupported string values when textual evidence exists. | VERIFIED | `ExtractionInput` carries `sourceTexts`; `RunContext`, `DefaultChatServiceImpl`, and `ExtractionToolBridge` propagate them; `CustomerDraftIntentExtractor.assertSourceFaithful(...)` rejects fabricated strings against user/document text. Image-only input remains prompt-based by explicit 14-09 scope. |
+| 9 | BL-01 narrowed: OpenRouter API key remains env-backed and `.env.example` only documents that key. | PASSED (override) | `spring.ai.openai.api-key=${OPENROUTER_API_KEY:}` remains in `jmix-app/src/main/resources/application.properties`; `jmix-app/.env.example` contains only `OPENROUTER_API_KEY=`. Datasource/UI defaults remain by user correction. |
 
-| Requirement | Status | Evidence |
-| --- | --- | --- |
-| EXTRACT-01 | VERIFIED | `chat-panel-fragment.xml` and `ChatPanelFragment` implement the intent picker; Plan 14-06 tests cover Auto/default selection and named-intent rendering. |
-| EXTRACT-02 | PARTIAL | `IntentExtractor<T>` and `CustomerDraftIntentExtractor` exist, but the reference extractor returns a `Customer` entity after validating a narrowed map, which contributes to BL-04. |
-| EXTRACT-03 | VERIFIED | `CustomerDraftIntentExtractor` uses the active Spring AI `ChatClient`; no separate Phase 14 model pin was added. |
-| EXTRACT-04 | PARTIAL | `AiExtractionDraft` exists with TTL fields and row-level security, but live load paths do not reject expired or already-confirmed rows (BL-02). |
-| EXTRACT-05 | PARTIAL | `ExtractionService.prepare(...)` dispatches to the extractor and persists drafts, but it serializes the extractor return value without filtering against the synthesized schema (BL-04). |
-| EXTRACT-06 | VERIFIED | `ExtractionToolBridge` exposes only `prepare_form_draft`; `ToolNavigationLeakScannerTest` guards tool-side navigation leaks. |
-| EXTRACT-07 | VERIFIED | `StreamEventRenderer` recognizes the structured `open_form_with_draft` payload and `OpenFormWithDraftHandler` owns navigation through Jmix UI APIs. |
-| EXTRACT-08 | VERIFIED | `DraftLoader` applies payload fields through `canModify(...)` checks and a single guarded `setValueIfPermitted(...)`; scanner coverage pins the raw `EntityValues.setValue` boundary. |
-| EXTRACT-09 | PARTIAL | Save-time deletion exists, and the cleanup job deletes expired rows hourly, but expired rows remain usable before cleanup runs (BL-02). |
-| EXTRACT-10 | VERIFIED | Scanner tests assert LLM-facing tool surfaces do not import `ViewNavigators` or call `.navigate()`. |
-| ENT-08 | VERIFIED | `AiExtractionDraft` entity and Liquibase changelog were added in Plan 14-01. |
-| SPI-12 | VERIFIED | `IntentExtractor<T>`, `IntentRegistry`, `ExtractionInput`, and schema synthesis exist and are tested. |
-| TEST-15 | VERIFIED | `ToolNavigationLeakScannerTest`, `DraftSetValueBypassScannerTest`, and `CoreCustomerImportScannerTest` pass in the targeted matrix. |
-| SEC-06 | VERIFIED | `AiAgentUserRole` / row-level role coverage for own draft rows was added and tested. |
+**Score:** 9/9 truths verified. Status is still `human_needed` because browser/manual UAT is required.
 
-## Critical Gaps
+### Required Artifacts
 
-### BL-02: Expired or Confirmed Drafts Remain Usable
+| Artifact | Expected | Status | Details |
+|---|---|---|---|
+| `AiExtractionDraft.java` + `110-ai-extraction-draft.xml` | Agentstore draft entity and table | VERIFIED | Entity has UUID, version, instance name, owner, payload JSON, source ids, timestamps, expiry, confirmed flag; changelog uses UUID/timestamp properties and indexes owner/expiry/conversation. |
+| `AiAgentUserRole.java` / `AiAgentUserRowLevelRole.java` | Owner-scoped user access | VERIFIED | Resource policy covers draft CRUD; row-level JPQL scopes `userUsername = :current_user_username`. |
+| `IntentExtractor`, `IntentRegistry`, `MetaClassDtoSynthesizer` | Host SPI, eligible intent registry, schema synthesis | VERIFIED | Registry filters with `LlmExposurePolicy` read/create and sorts deterministically; schema excludes non-writable/internal/collection fields and renders to-one refs as UUID strings. |
+| `ExtractionService` / `ExtractionToolBridge` | Draft orchestration and single LLM-facing tool | VERIFIED | Service handles exposure denial, extraction, schema filtering, persistence, and audit; bridge returns payload only and has no navigation imports. |
+| `ExtractionDraftAccess`, `DraftLoader`, `OpenFormWithDraftHandler` | Live draft loading, gated apply, controller navigation | VERIFIED | Load paths reject missing/expired/confirmed rows; view permission uses `UiShowViewContext`; create permission checked before new detail view. |
+| `ChatService`, `DefaultChatServiceImpl`, `RunContext`, `AgentToolCallbacks` | Intent-aware chat routing | VERIFIED | Intent overloads, named prompt suffix, callback filter, source-text context, and prepare-form invocation cap are present. |
+| `chat-panel-fragment.xml`, `ChatPanelFragment`, `StreamEventRenderer`, CSS/messages | Intent picker and confirm row UI | VERIFIED | XML radio group, `@Supply` renderer, named-send reset, structured payload marker, confirm row, and bilingual keys are present. |
+| `CustomerDraftIntentExtractor` | Host reference Customer intent | VERIFIED | Lives in `jmix-app`, enabled by property, uses Spring AI Map output, narrows fields, validates, and enforces textual source faithfulness. |
+| Scanner/eval/UAT files | TEST-15 and final verification support | VERIFIED | Navigation, raw setValue, core Customer import, eval contract, locale parity, and UAT checklist artifacts exist and targeted tests pass. |
 
-`DraftLoader.loadDraft(...)` loads by id only:
+### Key Link Verification
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/extraction/DraftLoader.java:114-118`
+| From | To | Via | Status | Details |
+|---|---|---|---|---|
+| `ChatPanelFragment.onSubmit` | `ChatService.stream` | Selected `intentId` argument | VERIFIED | Named intent id is read from `intentCardRow`; Auto passes null; named selection resets to Auto after dispatch. |
+| `DefaultChatServiceImpl` | `AgentToolCallbacks` | `callbacksFor(userId, convId, intentId)` | VERIFIED | Named intent gets exactly `prepare_form_draft`; stale intent and callback misconfiguration fail closed before model invocation. |
+| `ExtractionToolBridge` | `ExtractionService` | `prepareFormDraft(...)` delegates | VERIFIED | Tool returns only `open_form_with_draft` payload. |
+| `ExtractionService` | `AiExtractionDraft` | Secured `DataManager.save` | VERIFIED | Draft JSON is schema-filtered before save; audit summaries use filtered attributes and counts only. |
+| `ToolCallbackAuditDecorator` | `StreamingEvent.ToolResult` | `toolName` and `payloadJson` | VERIFIED | Structured payload is carried for `prepare_form_draft`; other tools keep `payloadJson=null`. |
+| `StreamEventRenderer` | `ChatPanelFragment` | `RenderedStreamEvent.DraftPayload` | VERIFIED | Renderer parses payload JSON only, not human summary; fragment appends confirm row. |
+| `ChatPanelFragment` | `OpenFormWithDraftHandler` | Confirm button click | VERIFIED | Handler receives origin view and draft identifiers; renderer never imports `ViewNavigators`. |
+| `OpenFormWithDraftHandler` | `DraftLoader` | `withAfterNavigationHandler` | VERIFIED | Handler opens primary detail view, then applies the draft to `detailView.getEditedEntity()`. |
+| `AiTaskFileMediaResolver` / user text | `CustomerDraftIntentExtractor` | `ExtractionSourceText` through `RunContext` / `ExtractionInput` | VERIFIED | Textual source evidence reaches the reference extractor and gates string values. |
 
-`OpenFormWithDraftHandler.loadDraft(...)` also loads by id only:
+### Data-Flow Trace (Level 4)
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/intent/OpenFormWithDraftHandler.java:113-119`
+| Artifact | Data Variable | Source | Produces Real Data | Status |
+|---|---|---|---|---|
+| Intent card row | `IntentOption` list | `IntentRegistry.eligibleForCurrentUser()` over registered `IntentExtractor` beans | Yes | VERIFIED |
+| Named chat turn | `intentId`, task file ids/media/source text | `ChatPanelFragment` + `DefaultChatServiceImpl` + `AiTaskFileMediaResolver` | Yes | VERIFIED |
+| Draft payload | `payloadJson` | `IntentExtractor.extract(...)` -> Jackson map -> schema filter | Yes | VERIFIED |
+| Confirm row | `DraftPayload` | `StreamingEvent.ToolResult.payloadJson` from decorated tool output | Yes | VERIFIED |
+| Prefilled entity | `editingEntity` values | `AiExtractionDraft.payloadJson` loaded by `ExtractionDraftAccess` | Yes, if draft is open/unexpired/unconfirmed | VERIFIED |
+| Customer source-faithfulness | `sourceTexts` | Tika/document text and user message | Yes for textual evidence; image-only bypass is scoped | VERIFIED |
 
-The cleanup job deletes rows where `expiresAt < now`, but it runs separately and hourly:
+### Behavioral Spot-Checks
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/extraction/AiExtractionDraftCleanupJob.java:34-41`
+| Behavior | Command | Result | Status |
+|---|---|---|---|
+| Phase 14 add-on gap/scanner/schema matrix | `./gradlew --no-daemon --max-workers=1 :ai-agent:ai-agent:test --tests "*ExtractionDraftAccessTest" --tests "*DraftLoaderTest" --tests "*OpenFormWithDraftHandlerTest" --tests "*ExtractionServiceTest" --tests "*ExtractionToolBridgeTest" --tests "*ChatPanelFragmentConversationIdTest" --tests "*IntentCardRowTest" --tests "*DefaultChatServiceIntentRoutingTest" --tests "*ExtractionEvaluationContractTest" --tests "*ToolNavigationLeakScannerTest" --tests "*DraftSetValueBypassScannerTest" --tests "*CoreCustomerImportScannerTest" --tests "*LocaleParityTest" --tests "*IntentRegistryTest" --tests "*MetaClassDtoSynthesizerTest"` | BUILD SUCCESSFUL | PASS |
+| Host Customer reference tests | `./gradlew --no-daemon --max-workers=1 :jmix-app:test --tests "*CustomerDraftIntentExtractorTest" --tests "*CustomerDraftWorkflowTest"` | BUILD SUCCESSFUL | PASS |
+| BL source checks | PowerShell assertions for BL-02, BL-03, BL-04, BL-05, and narrowed BL-01 | All PASS | PASS |
+| PLAN artifact verifier | `gsd-sdk query verify.artifacts 14-09-PLAN.md` | 3/4 passed; stale BL-01 expected `MAIN_DATASOURCE_URL` | PASS WITH OVERRIDE |
+| Key-link verifier | `gsd-sdk query verify.key-links 14-09-PLAN.md` | No `must_haves.key_links` in frontmatter | SKIP |
 
-This leaves a window where an expired row still opens and applies a prefilled form. The load paths must require `expiresAt > now` and `confirmed = false`, and tests must cover an expired row that still exists.
+### Requirements Coverage
 
-### BL-03: First-Turn Streaming Submit Creates a Conversation Before Guards
+| Requirement | Source Plan | Description | Status | Evidence |
+|---|---|---|---|---|
+| EXTRACT-01 | 14-04/14-06 | User selects an intent before sending; Auto remains default path | VERIFIED | `intentCardRow`, `IntentRegistry`, selected intent submit/reset tests. |
+| EXTRACT-02 | 14-02/14-07 | `IntentExtractor<T>` SPI plus reference extractor | VERIFIED | SPI exists; `CustomerDraftIntentExtractor` implements host reference. |
+| EXTRACT-03 | 14-02/14-04/14-07 | Extraction follows active chat model/profile | VERIFIED | No separate model pin; extractor uses injected `ChatClient`; chat service resolves active parameters. |
+| EXTRACT-04 | 14-01/14-09 | Persisted `AiExtractionDraft` with TTL and owner | VERIFIED | Entity/changelog/roles plus open-draft live predicate. |
+| EXTRACT-05 | 14-03/14-09 | `ExtractionService` orchestrates and persists draft | VERIFIED | Service resolves intent, exposure-checks, extracts, filters payload, saves, audits. |
+| EXTRACT-06 | 14-03/14-04/14-08 | Single `prepare_form_draft` tool, no UI primitive | VERIFIED | Tool bridge payload only; callback gating; navigation scanner passed. |
+| EXTRACT-07 | 14-05/14-06 | Chat renders confirm button and controller opens form | VERIFIED | Renderer/fragment/handler wiring and tests passed. |
+| EXTRACT-08 | 14-05/14-08 | Permission-gated prefill, no raw bypass | VERIFIED | `EntityAttributeContext.canModify` gate and setValue scanner passed. |
+| EXTRACT-09 | 14-01/14-05/14-09 | Draft lifecycle delete-on-save and TTL cleanup | VERIFIED | Cleanup job; save deletion; close retention; expired/confirmed rows rejected. |
+| EXTRACT-10 | 14-03/14-08 | LLM cannot bypass confirm flow | VERIFIED | TEST-15 scanner passed; `OpenFormWithDraftHandler` is UI-side only. |
+| ENT-08 | 14-01 | `AiExtractionDraft` entity | VERIFIED | Entity exists with Jmix/agentstore annotations and Liquibase table. |
+| SPI-12 | 14-02 | `IntentExtractor<T>` SPI | VERIFIED | SPI and registry tests passed. |
+| TEST-15 | 14-08 | Navigation scanner | VERIFIED | `ToolNavigationLeakScannerTest` included in passing matrix. |
+| SEC-06 | 14-01/14-09 | User role row-level access for draft rows | VERIFIED | Role and row-level policy exist; `ExtractionDraftAccess` uses secured `DataManager`. |
 
-`ChatPanelFragment.onSubmit()` calls `ensureConversationIdForSubmit(...)` before invoking `chatService.stream(...)`:
+### Anti-Patterns Found
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java:688-693`
+| File | Line | Pattern | Severity | Impact |
+|---|---:|---|---|---|
+| `14-09-PLAN.md` artifact contract | n/a | Stale BL-01 broad env migration expectation | INFO | Superseded by explicit user correction; formal override applied. |
+| Main Phase 14 source files | n/a | `return null` grep hits | INFO | All reviewed hits are control-flow sentinels, not stubs or user-visible placeholders. |
 
-That helper calls `conversationGateway.loadOrCreate(...)` when `conversationId` is null:
+### Human Verification Required
 
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java:829-846`
+#### 1. Manual Chat-to-Form UAT
 
-This undermines the service-level guard ordering where rate-limit and token-budget checks are intended to run before first-turn conversation creation. Let `DefaultChatServiceImpl.stream(...)` create the first conversation after guards and update the UI conversation id from `StreamingEvent.Final`.
+**Test:** Start the app, log in, open the chat surface, verify the Customer intent card appears, submit supported source text or a supported task file with the Customer intent selected, click the inline confirm button, verify Customer detail opens prefilled, edit if needed, and Save.
 
-### BL-04: Customer Reference Payload Can Expand Beyond the Synthesized Schema
+**Expected:** The detail view opens through normal Jmix navigation, prefilled values match the source, normal validation applies, Save succeeds, and the draft row is gone afterward.
 
-`CustomerDraftIntentExtractor` validates a narrowed map, converts it to `Customer`, and returns the entity:
+**Why human:** This validates Vaadin rendering, browser interaction, real detail-view navigation, and provider-backed extraction. Automated tests cover code paths and source contracts but do not run the browser flow here.
 
-- `jmix-app/src/main/java/com/vn/jmixapp/ai/CustomerDraftIntentExtractor.java:81-98`
+### Gaps Summary
 
-`ExtractionService` then serializes the returned object through `ExtractionJsonSupport.toPayloadMap(...)`:
-
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/extraction/ExtractionService.java:106-110`
-- `ai-agent/ai-agent/src/main/java/com/vn/agent/extraction/ExtractionJsonSupport.java:21-30`
-
-Because the returned object is a Jmix entity, Jackson can reintroduce getter-backed fields that were never part of the synthesized schema. The draft payload should contain only schema-approved attributes. Fix either the service by filtering serialized payloads against the schema or the reference extractor by returning a schema-shaped DTO/map through a compatible SPI contract.
-
-### BL-05: Source-Faithfulness Is Not Enforced in Production
-
-`extraction-fixtures.yaml` encodes `source_faithfulness_failure`, and `ExtractionEvaluationContractTest` asserts that the fixture represents no draft promotion. Production validation in `CustomerDraftIntentExtractor.validatePayload(...)` checks allowed keys, String values, email validation, and phone shape:
-
-- `jmix-app/src/main/java/com/vn/jmixapp/ai/CustomerDraftIntentExtractor.java:121-149`
-
-It does not verify that each extracted value is supported by the source text or attached media. A fabricated but syntactically valid email can pass and create a draft. The extractor needs a provenance/evidence contract and executable tests that drive the real implementation path.
-
-### BL-01: Committed Credentials Remain a Release Blocker
-
-The code review found committed DB/admin defaults in `jmix-app/src/main/resources/application.properties`. This was previously accepted as a dev-only artifact in Phase 13, but Phase 14 touched the same sample app configuration and the release blocker remains. Before shipping, move these values to environment-backed or non-committed development configuration.
-
-## Verified Deliverables
-
-| Deliverable | Status | Evidence |
-| --- | --- | --- |
-| Draft persistence/security/TTL foundation | VERIFIED with stale-load gap | `AiExtractionDraft`, Liquibase 110, cleanup job, roles, row-level policy. |
-| SPI and schema synthesis | VERIFIED | `IntentExtractor`, `IntentRegistry`, `MetaClassDtoSynthesizer`, and unit coverage. |
-| `prepare_form_draft` tool bridge | VERIFIED | `ExtractionToolBridge` exposes one payload-only tool; audit ownership stays in `ExtractionService`. |
-| Named-intent chat routing | VERIFIED | `ChatService` selected-intent overloads and `DefaultChatServiceImpl` callback gating are present. |
-| Controller-side open/apply/save lifecycle | PARTIAL | Navigation and save deletion exist; stale draft load must be fixed. |
-| Chat UI intent picker and confirm row | VERIFIED | UI descriptor/controller/renderer/CSS/i18n shipped and tested by source/XML contracts. |
-| Host Customer reference intent | PARTIAL | End-to-end host example exists and focused tests pass; schema-faithful payload and source-faithfulness need fixes. |
-| Final scanners/eval/UAT artifacts | VERIFIED with eval limitation | Scanners and deterministic eval fixtures exist; eval fixtures are not production enforcement. |
-
-## Automated Checks
-
-Passed checks recorded during execution:
-
-- `./gradlew --no-daemon :ai-agent:ai-agent:test --tests "*ExtractionEvaluationContractTest"` with constrained `GRADLE_OPTS`
-- Targeted Phase 14 add-on matrix covering draft, registry, schema, extraction, tool bridge, intent gating, loader/open-form/UI/scanner/eval/locale tests
-- `./gradlew --no-daemon :jmix-app:test --tests "*CustomerDraft*"`
-- `./gradlew --no-daemon :ai-agent:ai-agent:test`
-- `gsd-sdk query verify.schema-drift 14` -> `drift_detected=false`
-
-Residual failures:
-
-- `./gradlew --no-daemon :jmix-app:test` fails in broad pre-existing host context tests because `UserRepository` cannot initialize: `MetaClass not found for class com.vn.jmixapp.entity.User`.
-- `./gradlew --no-daemon :ai-agent:ai-agent:check :jmix-app:check --continue` fails because `:ai-agent:ai-agent:integrationTest` workers hit native memory/paging-file errors and `:jmix-app:test` repeats the host `User` metaclass failure.
-- `gsd-sdk query verify.codebase-drift` skipped with `reason=no-structure-md`.
-
-No `hs_err_pid*.log` files were present at verification time, and the worktree was clean before this report was written.
-
-## Manual UAT
-
-Manual UI verification is prepared in `14-UAT-CHECKLIST.md`, but this report does not route Phase 14 to `human_needed` because critical automated/code-review gaps must be fixed first. After gap closure, rerun verification and then execute the UAT checklist against a running app.
-
-## Next Step
-
-Create gap-closure plans for Phase 14 and execute them before marking the phase complete:
-
-`$gsd-plan-phase 14 --gaps`
+No automated blocker gaps remain. Phase 14 should not be marked fully complete until the manual UAT above is executed and accepted.
 
 ---
 
-_Verified: 2026-05-08T15:34:36+07:00_  
-_Verifier: Codex inline verifier (gsd-execute-phase fallback)_  
-_Branch: gsd/phase-14-intent-driven-extraction-form-prefill_
+_Verified: 2026-05-08T17:32:04+07:00_
+_Verifier: the agent (gsd-verifier)_
