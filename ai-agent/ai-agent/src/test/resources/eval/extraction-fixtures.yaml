@@ -1,0 +1,173 @@
+# Deterministic Phase 14 extraction-eval fixtures.
+# These are not live model prompts; they encode the critical failure modes the
+# engine must represent in tests and future offline eval runners.
+cases:
+  - id: happy-customer-extraction
+    scenario: happy_customer
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    sourceText: "Business card: Ada Lovelace, ada.lovelace@example.test, +15550101010."
+    payload:
+      name: Ada Lovelace
+      email: ada.lovelace@example.test
+      phone: "+15550101010"
+    expectedFields: [name, email, phone]
+    expectedOutcome: SUCCESS
+    draftCreated: true
+    confirmButtonVisible: true
+    auditRows:
+      - eventName: prepare_form_draft
+        outcome: SUCCESS
+        resultSummary:
+          draftId: "11111111-1111-4111-8111-111111111111"
+          entityName: jmixapp_Customer
+          extractedFieldCount: 3
+          extractedAttributes: [name, email, phone]
+          truncated: false
+      - eventName: extraction.draft_applied
+        outcome: SUCCESS
+        resultSummary:
+          draftId: "11111111-1111-4111-8111-111111111111"
+          entityName: jmixapp_Customer
+          appliedFieldCount: 3
+          deniedAttributeCount: 0
+          deniedAttributes: []
+          truncated: false
+
+  - id: schema-discipline-fenced-json
+    scenario: schema_discipline_failure
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    rawModelOutput: "```json\n{\"name\":\"Ada Lovelace\",\"email\":\"ada.lovelace@example.test\",\"phone\":\"+15550101010\",\"notes\":\"extra\"}\n```"
+    schemaViolations: [markdown_fence, extra_key]
+    expectedOutcome: FAILED
+    failureCode: schema_parse_failure
+    draftCreated: false
+    confirmButtonVisible: false
+    auditRows:
+      - eventName: prepare_form_draft
+        outcome: FAILED
+        resultSummary:
+          failureCode: schema_parse_failure
+          entityName: jmixapp_Customer
+          extractedFieldCount: 0
+
+  - id: source-faithfulness-fabricated-email
+    scenario: source_faithfulness_failure
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    sourceText: "Source contains customer name Ada Lovelace and phone +15550101010. No email is present."
+    fabricatedValue: ada.lovelace@example.test
+    payload:
+      name: Ada Lovelace
+      email: ada.lovelace@example.test
+      phone: "+15550101010"
+    expectedOutcome: FABRICATION_FLAG
+    draftCreated: false
+    confirmButtonVisible: false
+    auditRows:
+      - eventName: prepare_form_draft
+        outcome: FAILED
+        resultSummary:
+          failureCode: source_fabrication
+          entityName: jmixapp_Customer
+          extractedFieldCount: 3
+
+  - id: denied-attribute-payload
+    scenario: denied_attribute_payload
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    payload:
+      name: Ada Lovelace
+      accountStatus: vip
+    permittedAttributes: [name]
+    deniedAttributes: [accountStatus]
+    expectedOutcome: SUCCESS
+    draftCreated: true
+    confirmButtonVisible: true
+    auditRows:
+      - eventName: prepare_form_draft
+        outcome: SUCCESS
+        resultSummary:
+          draftId: "22222222-2222-4222-8222-222222222222"
+          entityName: jmixapp_Customer
+          extractedFieldCount: 2
+          extractedAttributes: [name, accountStatus]
+          truncated: false
+      - eventName: extraction.draft_applied
+        outcome: SUCCESS
+        resultSummary:
+          draftId: "22222222-2222-4222-8222-222222222222"
+          entityName: jmixapp_Customer
+          appliedFieldCount: 1
+          deniedAttributeCount: 1
+          deniedAttributes: [accountStatus]
+          truncated: false
+
+  - id: expired-draft-click
+    scenario: expired_draft_click
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    draftId: "33333333-3333-4333-8333-333333333333"
+    draftExistsAtClick: false
+    expectedButtonState: disabled
+    expectedMessageKey: chatView.intent.draftExpired
+    loadsDifferentDraft: false
+    expectedOutcome: EXPIRED
+
+  - id: exposure-denied-entity
+    scenario: exposure_denied_entity
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    expectedOutcome: DENIED
+    draftCreated: false
+    confirmButtonVisible: false
+    auditRows:
+      - eventName: prepare_form_draft
+        outcome: DENIED
+        denialReason: exposure_rule
+        resultSummary:
+          failureCode: exposure_denied
+          entityName: jmixapp_Customer
+          extractedFieldCount: 0
+
+  - id: concurrent-same-entity-drafts
+    scenario: concurrent_same_entity_draft_creation
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    drafts:
+      - turn: 1
+        draftId: "44444444-4444-4444-8444-444444444441"
+        entityName: jmixapp_Customer
+        instanceName: Customer draft
+        confirmTargetDraftId: "44444444-4444-4444-8444-444444444441"
+      - turn: 2
+        draftId: "44444444-4444-4444-8444-444444444442"
+        entityName: jmixapp_Customer
+        instanceName: Customer draft
+        confirmTargetDraftId: "44444444-4444-4444-8444-444444444442"
+    addressBy: draftId
+    expectedOutcome: SUCCESS
+
+  - id: schema-change-unknown-attribute
+    scenario: schema_change_unknown_attribute
+    intentId: customer-from-pdf
+    entityName: jmixapp_Customer
+    payload:
+      name: Ada Lovelace
+      legacyFax: "555-0102"
+    permittedAttributes: [name]
+    deniedAttributes: [legacyFax]
+    unknownAttributes: [legacyFax]
+    expectedOutcome: SUCCESS
+    draftCreated: true
+    auditRows:
+      - eventName: extraction.draft_applied
+        outcome: SUCCESS
+        resultSummary:
+          draftId: "55555555-5555-4555-8555-555555555555"
+          entityName: jmixapp_Customer
+          appliedFieldCount: 1
+          deniedAttributeCount: 1
+          deniedAttributes: [legacyFax]
+          truncated: false
