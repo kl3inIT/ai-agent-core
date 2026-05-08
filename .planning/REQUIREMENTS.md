@@ -151,7 +151,7 @@ All SPIs default to no-op beans where applicable, follow MEMORY rule "SPIs only 
 - [x] **TEST-12**: Mutation audit-vs-transaction test — known host save rollback writes a durable audit row with `outcome=ERROR`; post-host-save idempotency finalization failure writes `outcome=COMMIT_FAILED` and leaves the intent non-reclaimable (`COMMIT_UNKNOWN` or retained `PENDING`); post-COMMITTED audit/result failures leave the intent `COMMITTED` and exact retry replays.
 - [x] **TEST-13**: Default-config boot test — assert zero mutation tool callbacks under default settings (P-2 silent default-on gate).
 - [x] **TEST-14**: Cross-surface conversation continuity test — switch surface mid-session, verify same `conversation_id` and JDBC memory rows.
-- [ ] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
+- [x] **TEST-15**: Intent-extraction navigation test — assert no `@Tool`-bearing class imports `ViewNavigators` (grep / source-scanner test); assert `prepare_form_draft` returns structured payload, NOT triggering navigation server-side.
 - [x] **TEST-16**: Task file isolation test — `AiTaskFile` upload does NOT trigger `IngesterManager` invocation; `VectorStore` count unchanged after task-file attach.
 - [ ] **TEST-17**: STT audit privacy test — by default, `STT_TRANSCRIPTION` audit row contains transcript hash, NOT raw text. Setting `ai-agent.stt.audit.storeTranscript=true` flips it.
 

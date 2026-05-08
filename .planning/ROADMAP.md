@@ -30,7 +30,7 @@
 - [x] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable).
  (completed 2026-05-06)
 - [ ] **Phase 13.1: Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context (FOLLOW-UP)** — Replace Phase 13 chip-strip with verbatim port of jmix-crm Attachments right-pane (card grid + drop-zone + empty state); change `AiTaskFileMediaResolver` from single-turn to per-turn-all (with token-budget cap); extend `AiTaskFile` lifetime to conversation-scoped (or 24h TTL, configurable); add inline "[user] added attachment" ledger row in message stream. Driver: post-Phase-13 UX review confirmed CRM right-pane is more discoverable + per-turn-all `Media` is required for "AI agent thực thụ" multi-turn follow-up.
-- [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only.
+- [x] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only. (completed 2026-05-08)
 - [ ] **Phase 15: Chat Voice Input — Soniox STT** — Browser `MediaRecorder` capture (webm/opus or mp4, no transcoding) + custom Spring `RestClient` Soniox provider (`/v1/files` + `/v1/transcriptions`, `Authorization: Bearer`); `TranscriptionService` strategy interface (`SonioxTranscriptionService` default + optional `SpringAiTranscriptionService` OpenAI fallback); `TranscriptionPostProcessor` SPI; STT_TRANSCRIPTION audit via `writeToolCall`.
 
 ## Phase Details
@@ -250,7 +250,7 @@ Plans:
   2. `StreamingEvent.ToolResult` carries the structured `prepare_form_draft` payload separately from human-readable summaries; `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) checks `UiShowViewContext` via `AccessManager`, resolves the primary detail view via `ViewRegistry`, and navigates with `ViewNavigators.detailView(...).newEntity().withViewClass(...).withAfterNavigationHandler(...)`.
   3. The prefill applies to the opened `StandardDetailView`'s `DataContext`-tracked edited entity and uses per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); normal view validation runs before Save; on Save the draft is deleted and close-without-save leaves it for TTL cleanup.
   4. `AiExtractionDraft` rows expire after TTL (default 1h, hourly cleanup job); each row is row-level-scoped to its owner `userUsername` (`AiAgentUserRole` row policy), persisted (not `VaadinSession`-cached), and survives navigation; `prepare_form_draft` invocations are audited via `AuditWriter.writeToolCall` with `eventName=prepare_form_draft`.
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 **Wave 1**
@@ -271,7 +271,7 @@ Plans:
 - [x] 14-07-PLAN.md — Host `CustomerDraftIntentExtractor` reference implementation and host workflow tests
 
 **Wave 6 *(blocked on Wave 5 completion)***
-- [ ] 14-08-PLAN.md — TEST-15 navigation scanner, setValue/core-boundary scanners, eval fixtures, and final verification gates
+- [x] 14-08-PLAN.md — TEST-15 navigation scanner, setValue/core-boundary scanners, eval fixtures, and final verification gates
 **UI hint**: yes
 
 ## Phase Dependency Graph
@@ -303,7 +303,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1**
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | 6/6 | Complete    | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | 7/7 | Complete | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | 7/8 | In Progress|  |
+| 14. Intent-Driven Extraction → Form Prefill | 8/8 | Complete   | 2026-05-08 |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
 ## Coverage Validation
