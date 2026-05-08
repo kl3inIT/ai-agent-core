@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 14-05-PLAN.md
-last_updated: "2026-05-08T04:18:32.467Z"
+stopped_at: Completed 14-06-PLAN.md
+last_updated: "2026-05-08T04:41:03.253Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 60
-  completed_plans: 58
-  percent: 97
+  completed_plans: 59
+  percent: 98
 ---
 
 # Project State
@@ -28,13 +28,13 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 14 (intent-driven-extraction-form-prefill) — EXECUTING
-Plan: 5 of 8
+Plan: 7 of 8
 | Field | Value |
 |-------|-------|
 | Phase | Phase 14 |
-| Plan | 4 of 8 |
-| Status | Completed 14-04; ready for Plan 14-05 |
-| Last activity | 2026-05-08 — Plan 14-04 completed; selected intent now flows through chat prompt composition, tool gating, RunContext extraction input, and streaming fallback |
+| Plan | 7 of 8 |
+| Status | Completed 14-06; ready for Plan 14-07 |
+| Last activity | 2026-05-08 — Plan 14-06 completed; chat UI now supports intent card selection, structured draft confirmation rows, scoped CSS, bilingual copy, and renderer/source regression tests |
 
 ## Phase Status
 
@@ -46,7 +46,7 @@ Plan: 5 of 8
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 5/5 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | In Progress | 4/8 | 2026-05-07 | - |
+| 14. Intent-Driven Extraction → Form Prefill | In Progress | 6/8 | 2026-05-07 | - |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
@@ -196,6 +196,10 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 14]: OpenFormWithDraftHandler reloads the draft by draftId on every open call and is the only chat-intent class that imports ViewNavigators.
 - [Phase 14]: Draft rows are marked confirmed and removed only from the StandardDetailView.AfterSaveEvent path; close events only remove listener registrations.
 - [Phase 14]: The handler checks create permission in addition to UiShowViewContext before opening a new detail view.
+- [Phase 14]: Plan 14-06: Intent row uses Jmix radioButtonGroup plus @Supply ComponentRenderer, with Auto as the first/default option and hidden row when no named intents are eligible.
+- [Phase 14]: Plan 14-06: StreamEventRenderer parses only prepare_form_draft ToolResult.payloadJson and returns a structured DraftPayload marker; human-readable summaries are never parsed for extraction UI.
+- [Phase 14]: Plan 14-06: Confirm rows are appended by ChatPanelFragment and delegate clicks to OpenFormWithDraftHandler; StreamEventRenderer remains navigation-free.
+- [Phase 14]: Plan 14-06: UI tests use source/XML contract checks because full Jmix UI boot remains affected by the pre-existing agentstore Spring context blocker documented in prior phase summaries.
 
 ### Performance Metrics
 
@@ -255,6 +259,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 14 P03 | 34min | 4 tasks | 19 files |
 | Phase 14 P04 | 29min | 5 tasks | 16 files |
 | Phase 14 P05 | 23min | 3 tasks | 10 files |
+| Phase 14 P06 | 17min | 6 tasks | 10 files |
 
 ### Quick Tasks Completed
 
@@ -264,8 +269,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-08T04:16:52.039Z
-**Stopped at:** Completed 14-05-PLAN.md
+**Last session:** 2026-05-08T04:41:03.224Z
+**Stopped at:** Completed 14-06-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Execute Phase 14 Plan 06 — Jmix intent card-row UI, open_form_with_draft rendering, confirm row, CSS, and i18n.
+**Next action:** Execute Phase 14 Plan 07 — Host `CustomerDraftIntentExtractor` reference implementation and host workflow tests.
