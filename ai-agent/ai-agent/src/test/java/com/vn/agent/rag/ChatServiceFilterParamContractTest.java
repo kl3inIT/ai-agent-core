@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.DefaultChatServiceImpl;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
@@ -164,6 +165,7 @@ class ChatServiceFilterParamContractTest {
                 cancellationRegistry,
                 streamingSinkHolder,
                 rulesComposer,
+                mock(IntentRegistry.class),
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
                 mock(com.vn.agent.taskfile.AiTaskFileRepository.class));

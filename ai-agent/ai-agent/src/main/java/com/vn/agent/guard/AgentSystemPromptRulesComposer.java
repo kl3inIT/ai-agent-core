@@ -2,6 +2,7 @@ package com.vn.agent.guard;
 
 import com.vn.agent.tools.mutation.AiAgentMutationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Phase 11 MUT-10 sibling top-level composer that selects between
@@ -46,5 +47,41 @@ public class AgentSystemPromptRulesComposer {
             return AgentSystemPromptRules.PROMPT_RULES + AgentSystemPromptRules.MUTATION_PROMPT_RULES;
         }
         return AgentSystemPromptRules.PROMPT_RULES;
+    }
+
+    /**
+     * Adds the extraction-specific rule suffix for a single named-intent turn.
+     */
+    public String effectiveRules(String intentId, String label) {
+        String baseRules = effectiveRules();
+        if (!StringUtils.hasText(intentId)) {
+            return baseRules;
+        }
+        String safeIntentId = escapePromptLiteral(intentId.trim());
+        String safeLabel = sanitizePromptLabel(StringUtils.hasText(label) ? label.trim() : intentId.trim());
+        return baseRules + String.join("\n",
+                "",
+                "Named extraction intent rules:",
+                "- The user selected the named extraction intent '" + safeLabel + "'.",
+                "- To fulfill this named-intent turn, you MUST call prepare_form_draft(\""
+                        + safeIntentId + "\", contextRefs).",
+                "- Call prepare_form_draft at most once for this turn.",
+                "- If extracted or generated values are incomplete or ambiguous, ask the user"
+                        + " for the missing information instead of inventing values.",
+                "- Draft promotion happens only after the user opens the Jmix detail view and"
+                        + " clicks Save.",
+                ""
+        );
+    }
+
+    private static String escapePromptLiteral(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"");
+    }
+
+    private static String sanitizePromptLabel(String value) {
+        return value.replace('\r', ' ')
+                .replace('\n', ' ')
+                .replace("'", "\\'");
     }
 }
