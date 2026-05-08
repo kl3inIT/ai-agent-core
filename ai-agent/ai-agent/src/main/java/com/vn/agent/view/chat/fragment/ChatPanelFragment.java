@@ -7,6 +7,7 @@ import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H5;
 import com.vaadin.flow.component.html.Span;
@@ -33,6 +34,7 @@ import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
+import com.vn.agent.view.chat.intent.OpenFormWithDraftHandler;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
@@ -140,6 +142,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
     @Autowired private IntentRegistry intentRegistry;
+    @Autowired private OpenFormWithDraftHandler openFormWithDraftHandler;
     @Autowired private UiComponents uiComponents;
     // Phase 13 Plan 04 — task-file persistence collaborators.
     @Autowired private Metadata metadataApi;
@@ -712,7 +715,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                             showBudgetExceededToast();
                         }
                     }
-                    String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
+                    StreamEventRenderer.RenderedStreamEvent rendered =
+                            StreamEventRenderer.renderStreamEventDetails(evt, labels, citationState);
+                    if (rendered.draftPayloadInvalid()) {
+                        accessUi(this::showDraftPayloadInvalidNotification);
+                    }
+                    if (rendered.draftPayload() != null) {
+                        StreamEventRenderer.DraftPayload draftPayload = rendered.draftPayload();
+                        accessUi(() -> appendIntentConfirmRow(
+                                draftPayload.draftId(),
+                                draftPayload.entityName(),
+                                draftPayload.instanceName()));
+                    }
+                    String md = rendered.markdown();
                     if (md.isEmpty()) return;
                     accessUi(() -> {
                         if (botMsg != null) {
@@ -777,6 +792,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         messages.getMessage("chatView.attachments.budgetExceeded"))
                 .withThemeVariant(NotificationVariant.LUMO_WARNING)
                 .show());
+    }
+
+    private void showDraftPayloadInvalidNotification() {
+        notifications.create(messages.getMessage("chatView.intent.draftPayloadInvalid"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show();
     }
 
     private void finishStreamInternal() {
@@ -916,6 +937,40 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         notice.setText(text);
         messageListSlot.getElement().appendChild(notice);
         messageCount++;
+    }
+
+    void appendIntentConfirmRow(UUID draftId, String entityName, String instanceName) {
+        Div row = new Div();
+        row.addClassName("ai-agent-intent-confirm");
+        row.getElement().setAttribute("role", "status");
+        row.getElement().setAttribute("aria-live", "polite");
+
+        Span summary = new Span(MessageFormat.format(
+                messages.getMessage("chatView.intent.confirmButton.summary"),
+                safeText(instanceName)));
+        summary.addClassName("ai-agent-intent-confirm__summary");
+
+        Button confirmButton = new Button(
+                messages.getMessage("chatView.intent.confirmButton"),
+                VaadinIcon.EXTERNAL_LINK.create());
+        confirmButton.addThemeNames("primary", "small");
+        confirmButton.setAriaLabel(messages.getMessage("chatView.intent.confirmButton"));
+        confirmButton.addClickListener(event -> {
+            OpenFormWithDraftHandler.OpenResult result =
+                    openFormWithDraftHandler.open(this, draftId, entityName, instanceName);
+            if (result.status() == OpenFormWithDraftHandler.OpenStatus.EXPIRED) {
+                markIntentConfirmRowExpired(summary, confirmButton);
+            }
+        });
+
+        row.add(summary, confirmButton);
+        messageListSlot.add(row);
+        messageCount++;
+    }
+
+    private void markIntentConfirmRowExpired(Span summary, Button confirmButton) {
+        summary.setText(messages.getMessage("chatView.intent.draftExpired"));
+        confirmButton.setEnabled(false);
     }
 
     private void clearMessageList() {

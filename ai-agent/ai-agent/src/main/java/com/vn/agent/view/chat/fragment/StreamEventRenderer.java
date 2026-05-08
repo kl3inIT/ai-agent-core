@@ -1,8 +1,11 @@
 package com.vn.agent.view.chat.fragment;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.orchestration.StreamingEvent;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Pure-function renderer mapping {@link StreamingEvent} variants to markdown
@@ -31,8 +34,31 @@ import java.util.Map;
  */
 public final class StreamEventRenderer {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String PREPARE_FORM_DRAFT_TOOL = "prepare_form_draft";
+    private static final String OPEN_FORM_WITH_DRAFT_ACTION = "open_form_with_draft";
+
     private StreamEventRenderer() {
         // pure-static utility
+    }
+
+    public record DraftPayload(UUID draftId, String entityName, String instanceName) {
+    }
+
+    public record RenderedStreamEvent(String markdown,
+                                      DraftPayload draftPayload,
+                                      boolean draftPayloadInvalid) {
+        static RenderedStreamEvent markdown(String markdown) {
+            return new RenderedStreamEvent(markdown == null ? "" : markdown, null, false);
+        }
+
+        static RenderedStreamEvent draftPayload(DraftPayload draftPayload) {
+            return new RenderedStreamEvent("", draftPayload, false);
+        }
+
+        static RenderedStreamEvent invalidDraftPayload() {
+            return new RenderedStreamEvent("", null, true);
+        }
     }
 
     /**
@@ -71,13 +97,19 @@ public final class StreamEventRenderer {
     public static String renderStreamEvent(StreamingEvent event,
                                            Map<String, String> labels,
                                            CitationState citationState) {
+        return renderStreamEventDetails(event, labels, citationState).markdown();
+    }
+
+    public static RenderedStreamEvent renderStreamEventDetails(StreamingEvent event,
+                                                               Map<String, String> labels,
+                                                               CitationState citationState) {
         return switch (event) {
             case StreamingEvent.Content c ->
-                    c.markdownChunk() == null ? "" : c.markdownChunk();
+                    RenderedStreamEvent.markdown(c.markdownChunk());
             case StreamingEvent.ToolCall ignoredToolCall ->
-                    "";
-            case StreamingEvent.ToolResult ignoredToolResult ->
-                    "";
+                    RenderedStreamEvent.markdown("");
+            case StreamingEvent.ToolResult toolResult ->
+                    renderToolResult(toolResult);
             case StreamingEvent.Citation c -> {
                 String prefix = citationState.consumeFirst()
                         ? "\n\n---\n**%s**".formatted(
@@ -85,20 +117,55 @@ public final class StreamEventRenderer {
                         : "";
                 if (c.documentId() == null) {
                     // A5 null-guard: emit an unlinked bullet, no NPE.
-                    yield prefix + "\n- source";
+                    yield RenderedStreamEvent.markdown(prefix + "\n- source");
                 }
-                yield prefix + "\n- [%s](/ai-agent/knowledge?documentId=%s)"
-                        .formatted(c.documentId().toString(), c.documentId());
+                yield RenderedStreamEvent.markdown(prefix + "\n- [%s](/ai-agent/knowledge?documentId=%s)"
+                        .formatted(c.documentId().toString(), c.documentId()));
             }
             case StreamingEvent.Error err -> {
                 String errorLabel = labels.getOrDefault("chatView.stream.error", "error");
                 String errorText = labels.getOrDefault(err.messageKey(), err.messageKey());
-                yield "\n\n---\n**%s:** %s".formatted(errorLabel, errorText);
+                yield RenderedStreamEvent.markdown("\n\n---\n**%s:** %s".formatted(errorLabel, errorText));
             }
             case StreamingEvent.Final ignoredFinal ->
                     // v1 — skip closing summary per RESEARCH Open Question 2.
-                    "";
+                    RenderedStreamEvent.markdown("");
         };
+    }
+
+    private static RenderedStreamEvent renderToolResult(StreamingEvent.ToolResult toolResult) {
+        if (!PREPARE_FORM_DRAFT_TOOL.equals(toolResult.toolName())) {
+            return RenderedStreamEvent.markdown("");
+        }
+        DraftPayload draftPayload = parseOpenFormWithDraftPayload(toolResult.payloadJson());
+        return draftPayload == null
+                ? RenderedStreamEvent.invalidDraftPayload()
+                : RenderedStreamEvent.draftPayload(draftPayload);
+    }
+
+    private static DraftPayload parseOpenFormWithDraftPayload(String payloadJson) {
+        if (isBlank(payloadJson)) {
+            return null;
+        }
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(payloadJson);
+            if (!OPEN_FORM_WITH_DRAFT_ACTION.equals(root.path("action").asText(null))) {
+                return null;
+            }
+            String draftIdText = root.path("draftId").asText(null);
+            String entityName = root.path("entityName").asText(null);
+            String instanceName = root.path("instanceName").asText(null);
+            if (isBlank(draftIdText) || isBlank(entityName) || isBlank(instanceName)) {
+                return null;
+            }
+            return new DraftPayload(UUID.fromString(draftIdText), entityName, instanceName);
+        } catch (Exception failure) {
+            return null;
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
 }
