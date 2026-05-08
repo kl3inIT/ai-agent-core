@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 14-04-PLAN.md
-last_updated: "2026-05-08T03:48:18.217Z"
+stopped_at: Completed 14-05-PLAN.md
+last_updated: "2026-05-08T04:18:32.467Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 60
-  completed_plans: 57
-  percent: 95
+  completed_plans: 58
+  percent: 97
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 ## Current Position
 
 Phase: 14 (intent-driven-extraction-form-prefill) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 | Field | Value |
 |-------|-------|
 | Phase | Phase 14 |
@@ -192,6 +192,10 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - [Phase 14]: Chat intent ids are per-turn only; blank/Auto maps to the default chat path while named ids are resolved through IntentRegistry before prompt/tool setup. — Preserves existing callers and ensures stale or unauthorized named intents fail closed before the LLM receives prompt rules or callbacks.
 - [Phase 14]: Named-intent callback gating filters Spring AI callbacks by ToolDefinition name and requires exactly one prepare_form_draft callback. — This makes tool-surface isolation structural instead of relying on prompt wording, while preserving Auto turns' full tool surface.
 - [Phase 14]: ExtractionToolBridge uses chat-scoped ExtractionInput only when DefaultChatServiceImpl populated extraction-turn state, not merely because audit context has a conversation id. — AuditAdvisor also writes RunContext conversation ids; checking extraction-specific fields prevents direct tool calls from losing explicit contextRefs.
+- [Phase 14]: DraftLoader is UI-free and applies payload fields only after EntityAttributeContext.canModify passes.
+- [Phase 14]: OpenFormWithDraftHandler reloads the draft by draftId on every open call and is the only chat-intent class that imports ViewNavigators.
+- [Phase 14]: Draft rows are marked confirmed and removed only from the StandardDetailView.AfterSaveEvent path; close events only remove listener registrations.
+- [Phase 14]: The handler checks create permission in addition to UiShowViewContext before opening a new detail view.
 
 ### Performance Metrics
 
@@ -250,6 +254,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 | Phase 14 P02 | ~15min | 4 tasks | 9 files |
 | Phase 14 P03 | 34min | 4 tasks | 19 files |
 | Phase 14 P04 | 29min | 5 tasks | 16 files |
+| Phase 14 P05 | 23min | 3 tasks | 10 files |
 
 ### Quick Tasks Completed
 
@@ -259,8 +264,8 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-08T03:48:18.196Z
-**Stopped at:** Completed 14-04-PLAN.md
+**Last session:** 2026-05-08T04:16:52.039Z
+**Stopped at:** Completed 14-05-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Execute Phase 14 Plan 05 — draft apply/navigation lifecycle.
+**Next action:** Execute Phase 14 Plan 06 — Jmix intent card-row UI, open_form_with_draft rendering, confirm row, CSS, and i18n.
