@@ -1,11 +1,16 @@
 package com.vn.agent.view.chat.fragment;
 
+import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.H5;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.messages.MessageInput;
 import com.vaadin.flow.component.messages.MessageList;
 import com.vaadin.flow.component.messages.MessageListItem;
@@ -13,6 +18,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.upload.FileRejectedEvent;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
@@ -20,6 +26,8 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.extraction.IntentOption;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
@@ -34,11 +42,14 @@ import io.jmix.core.Metadata;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
+import io.jmix.flowui.component.card.JmixCard;
 import io.jmix.flowui.component.gridlayout.GridLayout;
+import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.upload.JmixUpload;
 import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
@@ -49,6 +60,7 @@ import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Supply;
 import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
@@ -98,12 +110,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             OffsetDateTime.of(9999, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC);
     private static final int USER_COLOR = 0;
     private static final int AI_COLOR = 2;
+    private static final String AUTO_INTENT_ID = "__auto__";
 
     @ViewComponent private JmixButton stopButton;
     @ViewComponent private JmixButton newChatButton;
     @ViewComponent private H3 conversationTitle;
     @ViewComponent private JmixButton editConversationTitleButton;
     @ViewComponent private VerticalLayout messageListSlot;
+    @ViewComponent private JmixRadioButtonGroup<IntentOption> intentCardRow;
     @ViewComponent private VerticalLayout messageInputSlot;
 
     // Phase 13.1 REQ-7 / Pitfall 6 — slot id contract preserved; field type stays
@@ -125,6 +139,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
+    @Autowired private IntentRegistry intentRegistry;
+    @Autowired private UiComponents uiComponents;
     // Phase 13 Plan 04 — task-file persistence collaborators.
     @Autowired private Metadata metadataApi;
     @Autowired private FileStorageLocator fileStorageLocator;
@@ -135,6 +151,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private ProgressBar streamProgressBar;
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
+    private final Map<String, List<JmixCard>> intentCardsByKey = new HashMap<>();
 
     private Path uploadTempDir;
 
@@ -215,6 +232,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageInputSlot.add(streamProgressBar, messageInput);
 
         resolveLabels();
+        refreshIntentCardRow();
         updateTitleEditState();
 
         // Phase 13.1 UI-01 — right-pane upload handler + loader binding.
@@ -292,6 +310,113 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         boolean empty = taskFilesDc.getItems().isEmpty();
         attachmentsEmptyState.setVisible(empty);
         attachmentsGridLayout.setVisible(!empty);
+    }
+
+    void refreshIntentCardRow() {
+        if (intentCardRow == null) {
+            return;
+        }
+        IntentOption autoOption = buildAutoIntentOption();
+        List<IntentOption> namedIntents = intentRegistry == null
+                ? List.of()
+                : intentRegistry.eligibleForCurrentUser();
+        List<IntentOption> options = new ArrayList<>(namedIntents.size() + 1);
+        options.add(autoOption);
+        options.addAll(namedIntents);
+
+        List<IntentOption> currentIntentOptions = List.copyOf(options);
+        intentCardsByKey.clear();
+        intentCardRow.setItems(currentIntentOptions);
+        intentCardRow.setVisible(!namedIntents.isEmpty());
+        intentCardRow.setValue(autoOption);
+    }
+
+    @Supply(to = "intentCardRow", subject = "renderer")
+    private ComponentRenderer<JmixCard, IntentOption> intentCardRowRenderer() {
+        return new ComponentRenderer<>(this::createIntentCard);
+    }
+
+    @Subscribe("intentCardRow")
+    public void onIntentCardRowValueChange(
+            final AbstractField.ComponentValueChangeEvent<JmixRadioButtonGroup<IntentOption>, IntentOption> event) {
+        refreshIntentCardSelection();
+    }
+
+    private IntentOption buildAutoIntentOption() {
+        return new IntentOption(
+                AUTO_INTENT_ID,
+                resolveLabel("chatView.intent.auto.label", "Auto"),
+                resolveLabel("chatView.intent.auto.description", "Default chat"),
+                null,
+                true);
+    }
+
+    private JmixCard createIntentCard(IntentOption option) {
+        IntentOption safeOption = option == null ? buildAutoIntentOption() : option;
+
+        JmixCard card = uiComponents.create(JmixCard.class);
+        card.addThemeVariants(CardVariant.LUMO_OUTLINED);
+        card.addClassName("ai-agent-intent-card");
+        card.setWidthFull();
+
+        H5 title = new H5(safeText(safeOption.label()));
+        title.addClassNames("m-0", "ai-agent-intent-card__label");
+
+        Span description = new Span(intentDescription(safeOption));
+        description.addClassNames("text-secondary", "text-s", "ai-agent-intent-card__description");
+
+        card.setHeaderPrefix(safeOption.auto()
+                ? VaadinIcon.MAGIC.create()
+                : VaadinIcon.FILE_TEXT_O.create());
+        card.setTitle(title);
+        card.add(description);
+
+        intentCardsByKey.computeIfAbsent(intentCardKey(safeOption), ignored -> new ArrayList<>())
+                .add(card);
+        applyIntentCardSelection(card, safeOption);
+        return card;
+    }
+
+    private String intentDescription(IntentOption option) {
+        if (option.auto()) {
+            return safeText(option.description());
+        }
+        String key = "chatView.intent." + option.intentId() + ".description";
+        return resolveLabel(key, safeText(option.description()));
+    }
+
+    private void refreshIntentCardSelection() {
+        if (intentCardRow == null) {
+            return;
+        }
+        String selectedKey = intentCardKey(intentCardRow.getValue());
+        for (Map.Entry<String, List<JmixCard>> entry : intentCardsByKey.entrySet()) {
+            boolean selected = Objects.equals(selectedKey, entry.getKey());
+            for (JmixCard card : entry.getValue()) {
+                if (selected) {
+                    card.addClassName("ai-agent-intent-card--selected");
+                } else {
+                    card.removeClassName("ai-agent-intent-card--selected");
+                }
+            }
+        }
+    }
+
+    private void applyIntentCardSelection(JmixCard card, IntentOption option) {
+        if (Objects.equals(intentCardKey(option), intentCardKey(intentCardRow.getValue()))) {
+            card.addClassName("ai-agent-intent-card--selected");
+        }
+    }
+
+    private String intentCardKey(IntentOption option) {
+        if (option == null || option.auto()) {
+            return AUTO_INTENT_ID;
+        }
+        return option.intentId();
+    }
+
+    private static String safeText(String value) {
+        return value == null ? "" : value;
     }
 
     /**
