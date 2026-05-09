@@ -14,8 +14,12 @@ class AgentSystemPromptRulesComposerTest {
 
         String rules = composer.effectiveRules();
 
-        assertThat(rules).isEqualTo(AgentSystemPromptRules.PROMPT_RULES);
-        assertThat(rules).contains("Vocabulary rules:");
+        assertThat(rules)
+                .startsWith(AgentSystemPromptRules.PROMPT_RULES)
+                .contains("Vocabulary rules:")
+                .contains("Action intent rules:")
+                .contains("propose_action_choices")
+                .contains("Wait for the user to choose an action intent before performing a side effect.");
         assertThat(rules)
                 .doesNotContain("idempotencyKey")
                 .doesNotContain("parameter_conversion_error")
@@ -34,6 +38,8 @@ class AgentSystemPromptRulesComposerTest {
         assertThat(rules).startsWith(AgentSystemPromptRules.PROMPT_RULES);
         assertThat(rules).contains(AgentSystemPromptRules.MUTATION_PROMPT_RULES);
         assertThat(rules)
+                .contains("Action intent rules:")
+                .contains("propose_action_choices")
                 .contains("idempotencyKey")
                 .contains("fresh random UUID v4")
                 .contains("third group is '4'")
