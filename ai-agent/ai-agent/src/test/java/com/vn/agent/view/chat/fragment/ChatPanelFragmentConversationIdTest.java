@@ -12,6 +12,9 @@ import io.jmix.core.Messages;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.kit.component.button.JmixButton;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -160,8 +163,31 @@ class ChatPanelFragmentConversationIdTest {
         assertThat(source)
                 .doesNotContain("ensureConversationIdForSubmit(userId, text)")
                 .contains("final UUID targetConversationId = conversationId")
-                .contains("chatService.stream(userId, targetConversationId, text, null, selectedIntentId)")
+                .contains("chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId)")
+                .contains("accessUiAuthenticated(submitAuthentication")
                 .contains("taskFilesDl.setParameter(\"conversationId\", conversationId)");
+    }
+
+    @Test
+    void runWithAuthenticationRestoresCapturedAuthenticationForAsyncUiWork() throws Exception {
+        ChatPanelFragment fragment = new ChatPanelFragment();
+        Authentication previousAuthentication = mock(Authentication.class);
+        Authentication capturedAuthentication = mock(Authentication.class);
+        SecurityContext previousContext = SecurityContextHolder.createEmptyContext();
+        previousContext.setAuthentication(previousAuthentication);
+        SecurityContextHolder.setContext(previousContext);
+        List<Authentication> observedAuthentications = new java.util.ArrayList<>();
+
+        try {
+            invokeRunWithAuthentication(fragment, capturedAuthentication, () ->
+                    observedAuthentications.add(SecurityContextHolder.getContext().getAuthentication()));
+
+            assertThat(observedAuthentications).containsExactly(capturedAuthentication);
+            assertThat(SecurityContextHolder.getContext().getAuthentication())
+                    .isSameAs(previousAuthentication);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private static void prepareSetConversationIdDependencies(ChatPanelFragment fragment,
@@ -213,6 +239,15 @@ class ChatPanelFragmentConversationIdTest {
             }
             throw exception;
         }
+    }
+
+    private static void invokeRunWithAuthentication(ChatPanelFragment fragment,
+                                                    Authentication authentication,
+                                                    Runnable action) throws Exception {
+        Method method = ChatPanelFragment.class.getDeclaredMethod(
+                "runWithAuthentication", Authentication.class, Runnable.class);
+        method.setAccessible(true);
+        method.invoke(fragment, authentication, action);
     }
 
     private static Document readDescriptor() throws Exception {

@@ -1,5 +1,6 @@
 package com.vn.agent;
 
+import com.vn.agent.action.ActionIntentId;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
@@ -234,7 +235,7 @@ public class DefaultChatServiceImpl implements ChatService {
             }
 
             IntentOption selectedIntent = resolveSelectedIntent(normalizedIntentId);
-            if (normalizedIntentId != null && selectedIntent == null) {
+            if (isNamedExtractionIntent(normalizedIntentId) && selectedIntent == null) {
                 return ChatResponseDto.denied(convId, runId,
                         "chatView.intent.unknownIntent", Map.of());
             }
@@ -258,7 +259,7 @@ public class DefaultChatServiceImpl implements ChatService {
             String composedSystemPrompt = SystemPromptComposer.compose(
                     baselineText,
                     profileSystemPrompt,
-                    effectiveRules(selectedIntent));
+                    effectiveRules(normalizedIntentId, selectedIntent));
 
             // Phase 5 role-scoped retrieval (RAG-04/RAG-05). Null filter = admin-bypass; skip
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
@@ -299,7 +300,7 @@ public class DefaultChatServiceImpl implements ChatService {
             return executeBlockingTurn(userId, convId, message, effectiveOverrides,
                     resolvedMedia, composedSystemPrompt, model, active,
                     ragFilter, retrievalTopK, retrievalSimilarityThreshold,
-                    normalizedIntentId, runId, startNanos);
+                    extractionIntentId(normalizedIntentId), normalizedIntentId, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
             // Iteration-cap request-level audit row is written by GuardedToolCallingManager (D-11).
@@ -358,7 +359,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                                 Filter.Expression ragFilter,
                                                 int retrievalTopK,
                                                 double retrievalSimilarityThreshold,
-                                                String intentId,
+                                                String extractionIntentId,
+                                                String toolSurfaceIntentId,
                                                 UUID runId,
                                                 long startNanos) {
         // Phase 13.1 UAT-fix-02 — Tika-extracted document text rides the SYSTEM prompt,
@@ -368,7 +370,7 @@ public class DefaultChatServiceImpl implements ChatService {
         // "=== End === / User message:" scaffolding leaked into next-session UI replay.
         final String systemPromptWithDocs = appendDocumentBlocks(
                 composedSystemPrompt, resolvedMedia.documentTexts());
-        RunContext.setExtractionTurn(intentId, convId, message,
+        RunContext.setExtractionTurn(extractionIntentId, convId, message,
                 resolvedMedia.taskFileIds(), resolvedMedia.media(),
                 sourceTexts(resolvedMedia.documentTexts()));
         ChatClientResponse clientResp = chatClient.prompt()
@@ -380,7 +382,7 @@ public class DefaultChatServiceImpl implements ChatService {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
                 })
-                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, intentId))
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId))
                 .toolContext(auditToolContext(runId, convId))
                 .advisors(advisorSpec -> {
                     advisorSpec
@@ -495,7 +497,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     }
 
                     IntentOption selectedIntent = resolveSelectedIntent(normalizedIntentId);
-                    if (normalizedIntentId != null && selectedIntent == null) {
+                    if (isNamedExtractionIntent(normalizedIntentId) && selectedIntent == null) {
                         long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
                         return Flux.<StreamingEvent>just(
                                 new StreamingEvent.Error("chatView.intent.unknownIntent", Map.of()),
@@ -517,7 +519,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     String composedSystemPrompt = SystemPromptComposer.compose(
                             baselineText,
                             profileSystemPrompt,
-                            effectiveRules(selectedIntent));
+                            effectiveRules(normalizedIntentId, selectedIntent));
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
@@ -552,7 +554,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     // (see blocking path comment for rationale).
                     final String systemPromptWithDocs = appendDocumentBlocks(
                             composedSystemPrompt, resolvedMedia.documentTexts());
-                    RunContext.setExtractionTurn(normalizedIntentId, convId, message,
+                    RunContext.setExtractionTurn(extractionIntentId(normalizedIntentId), convId, message,
                             resolvedMedia.taskFileIds(), resolvedMedia.media(),
                             sourceTexts(resolvedMedia.documentTexts()));
 
@@ -609,7 +611,7 @@ public class DefaultChatServiceImpl implements ChatService {
                         ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
                                 resolvedMedia, composedSystemPrompt, model, active,
                                 ragFilter, retrievalTopK, retrievalSimilarityThreshold,
-                                normalizedIntentId, runId, startNanos);
+                                extractionIntentId(normalizedIntentId), normalizedIntentId, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
@@ -661,7 +663,11 @@ public class DefaultChatServiceImpl implements ChatService {
         return AUTO_INTENT_ID.equalsIgnoreCase(trimmedIntentId) ? null : trimmedIntentId;
     }
 
-    private String effectiveRules(IntentOption selectedIntent) {
+    private String effectiveRules(String normalizedIntentId, IntentOption selectedIntent) {
+        String actionIntentId = ActionIntentId.fromSelectionParameter(normalizedIntentId);
+        if (actionIntentId != null) {
+            return agentSystemPromptRulesComposer.effectiveActionRules(actionIntentId);
+        }
         if (selectedIntent == null) {
             return agentSystemPromptRulesComposer.effectiveRules();
         }
@@ -670,7 +676,7 @@ public class DefaultChatServiceImpl implements ChatService {
     }
 
     private IntentOption resolveSelectedIntent(String intentId) {
-        if (intentId == null) {
+        if (!isNamedExtractionIntent(intentId)) {
             return null;
         }
         for (IntentOption option : intentRegistry.eligibleForCurrentUser()) {
@@ -679,6 +685,14 @@ public class DefaultChatServiceImpl implements ChatService {
             }
         }
         return null;
+    }
+
+    private static boolean isNamedExtractionIntent(String intentId) {
+        return intentId != null && !ActionIntentId.isSelectionParameter(intentId);
+    }
+
+    private static String extractionIntentId(String intentId) {
+        return isNamedExtractionIntent(intentId) ? intentId : null;
     }
 
     /**

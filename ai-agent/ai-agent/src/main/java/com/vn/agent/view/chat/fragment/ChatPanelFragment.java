@@ -1,5 +1,7 @@
 package com.vn.agent.view.chat.fragment;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClickEvent;
@@ -23,6 +25,9 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
+import com.vn.agent.action.ActionIntentId;
+import com.vn.agent.action.ActionProposal;
+import com.vn.agent.action.ActionProposalService;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
@@ -71,6 +76,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
@@ -143,6 +151,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private AiChatSessionState chatSessionState;
     @Autowired private IntentRegistry intentRegistry;
     @Autowired private OpenFormWithDraftHandler openFormWithDraftHandler;
+    @Autowired private ActionProposalService actionProposalService;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private UiComponents uiComponents;
     // Phase 13 Plan 04 — task-file persistence collaborators.
     @Autowired private Metadata metadataApi;
@@ -208,6 +218,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private volatile Disposable activeStream;
     private MessageListItem botMsg;
     private volatile UI ownerUi;
+    private volatile Authentication ownerAuthentication;
     private Registration conversationIdStateRegistration;
     // Phase 13.1 UAT-fix — tracks visible turns across the mixed substrate
     // (MessageList items + NOTICE divs) so hasMessages() is O(1).
@@ -235,7 +246,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageInputSlot.add(streamProgressBar, messageInput);
 
         resolveLabels();
-        refreshIntentCardRow();
+        ownerAuthentication = captureCurrentAuthentication();
+        hideInitialIntentCardRow();
         updateTitleEditState();
 
         // Phase 13.1 UI-01 — right-pane upload handler + loader binding.
@@ -332,6 +344,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         intentCardRow.setItems(currentIntentOptions);
         intentCardRow.setVisible(!namedIntents.isEmpty());
         intentCardRow.setValue(autoOption);
+    }
+
+    private void hideInitialIntentCardRow() {
+        if (intentCardRow != null) {
+            intentCardRow.setVisible(false);
+            intentCardRow.setValue(buildAutoIntentOption());
+        }
     }
 
     @Supply(to = "intentCardRow", subject = "renderer")
@@ -667,11 +686,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void onSubmit(MessageInput.SubmitEvent event) {
         String text = event.getValue();
         if (text == null || text.isBlank()) return;
+        submitChatTurn(text, text, selectedIntentIdForSubmit());
+    }
 
+    private void submitChatTurn(String displayText, String modelText, String toolSurfaceIntentId) {
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
 
-        MessageListItem userItem = new MessageListItem(text, Instant.now(), userName);
+        MessageListItem userItem = new MessageListItem(displayText, Instant.now(), userName);
         userItem.setUserColorIndex(USER_COLOR);
         items.add(userItem);
         messageCount++;
@@ -685,12 +707,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
         setStreamingUiState(true);
 
+        final Authentication submitAuthentication = captureCurrentAuthentication();
+        ownerAuthentication = submitAuthentication;
         final String userId = currentAuthentication.getUser().getUsername();
         final UUID targetConversationId = conversationId;
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
-        final String selectedIntentId = selectedIntentIdForSubmit();
+        final String selectedIntentId = toolSurfaceIntentId;
 
-        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, text, null, selectedIntentId);
+        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId);
         resetIntentCardRowToAutoIfNamed(selectedIntentId);
         activeStream = source
                 .doOnSubscribe(sub -> {
@@ -704,12 +728,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                             activeRunId = f.runId();
                         }
                         if (conversationId == null && f.conversationId() != null) {
-                            conversationId = f.conversationId();
-                            updateSessionConversationId(conversationId);
-                            if (taskFilesDl != null) {
-                                taskFilesDl.setParameter("conversationId", conversationId);
-                                taskFilesDl.load();
-                            }
+                            accessUiAuthenticated(submitAuthentication, () ->
+                                    initializeConversationFromFinalEvent(f.conversationId()));
                         }
                         // Phase 13.1 D-D1 — streaming-path budget-exceeded toast (CONTEXT D-D1
                         // demands the toast on BOTH transports; the streaming Final event
@@ -731,6 +751,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                                 draftPayload.entityName(),
                                 draftPayload.instanceName()));
                     }
+                    if (rendered.actionProposalPayload() != null) {
+                        StreamEventRenderer.ActionProposalPayload actionProposalPayload =
+                                rendered.actionProposalPayload();
+                        accessUi(() -> appendActionChoiceRow(actionProposalPayload));
+                    }
                     String md = rendered.markdown();
                     if (md.isEmpty()) return;
                     accessUi(() -> {
@@ -746,6 +771,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnComplete(() -> accessUi(this::finishStreamInternal))
                 .subscribe();
+    }
+
+    private void initializeConversationFromFinalEvent(UUID newConversationId) {
+        if (conversationId != null || newConversationId == null) {
+            return;
+        }
+        conversationId = newConversationId;
+        updateSessionConversationId(conversationId);
+        updateTitleEditState();
+        if (taskFilesDl != null) {
+            taskFilesDl.setParameter("conversationId", conversationId);
+            taskFilesDl.load();
+        }
     }
 
     private String selectedIntentIdForSubmit() {
@@ -948,6 +986,116 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageCount++;
     }
 
+    void appendActionChoiceRow(StreamEventRenderer.ActionProposalPayload proposalPayload) {
+        if (proposalPayload == null || proposalPayload.choices().isEmpty()) {
+            return;
+        }
+        Div row = new Div();
+        row.addClassName("ai-agent-action-choice");
+        row.getElement().setAttribute("role", "status");
+        row.getElement().setAttribute("aria-live", "polite");
+
+        Span summary = new Span(MessageFormat.format(
+                messages.getMessage("chatView.actionChoice.summary"),
+                safeText(proposalPayload.instanceName())));
+        summary.addClassName("ai-agent-action-choice__summary");
+        row.add(summary);
+
+        if (proposalPayload.choices().contains(ActionIntentId.CREATE_NOW)) {
+            Button createNowButton = new Button(
+                    messages.getMessage("chatView.actionChoice.createNow"),
+                    VaadinIcon.CHECK.create());
+            createNowButton.addThemeNames("primary", "small");
+            createNowButton.setAriaLabel(messages.getMessage("chatView.actionChoice.createNow"));
+            createNowButton.addClickListener(event ->
+                    submitActionChoice(row, proposalPayload, ActionIntentId.CREATE_NOW));
+            row.add(createNowButton);
+        }
+        if (proposalPayload.choices().contains(ActionIntentId.PREFILL_FORM)) {
+            Button prefillButton = new Button(
+                    messages.getMessage("chatView.actionChoice.prefillForm"),
+                    VaadinIcon.EXTERNAL_LINK.create());
+            prefillButton.addThemeNames("small");
+            prefillButton.setAriaLabel(messages.getMessage("chatView.actionChoice.prefillForm"));
+            prefillButton.addClickListener(event ->
+                    submitActionChoice(row, proposalPayload, ActionIntentId.PREFILL_FORM));
+            row.add(prefillButton);
+        }
+
+        messageListSlot.add(row);
+        messageCount++;
+    }
+
+    private void submitActionChoice(Div actionChoiceRow,
+                                    StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                    String actionIntentId) {
+        disableActionChoiceRow(actionChoiceRow);
+        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
+            String label = messages.getMessage("chatView.actionChoice.createNow");
+            submitChatTurn(label, actionSelectionPrompt(proposalPayload, actionIntentId),
+                    ActionIntentId.selectionParameter(actionIntentId));
+            return;
+        }
+        if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {
+            try {
+                ActionProposalService.DraftResult draftResult =
+                        actionProposalService.createDraft(
+                                toActionProposal(proposalPayload, actionIntentId), conversationId, null);
+                appendIntentConfirmRow(draftResult.draftId(), draftResult.entityName(), draftResult.instanceName());
+            } catch (RuntimeException failure) {
+                log.warn("Prefill action proposal failed", failure);
+                enableActionChoiceRow(actionChoiceRow);
+                showGenericErrorNotification();
+            }
+        }
+    }
+
+    private ActionProposal toActionProposal(StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                            String actionIntentId) {
+        return new ActionProposal(
+                proposalPayload.proposalId(),
+                "create",
+                proposalPayload.targetEntityName(),
+                proposalPayload.instanceName(),
+                proposalPayload.values(),
+                List.of(),
+                List.of(actionIntentId));
+    }
+
+    private String actionSelectionPrompt(StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                         String actionIntentId) {
+        return "Selected action intent: " + actionIntentId + "\n"
+                + "Proposal id: " + proposalPayload.proposalId() + "\n"
+                + "Target entity: " + proposalPayload.targetEntityName() + "\n"
+                + "Collected values JSON: " + valuesJson(proposalPayload.values());
+    }
+
+    private String valuesJson(Map<String, Object> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? Map.of() : values);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize action proposal values", e);
+        }
+    }
+
+    private void disableActionChoiceRow(Div actionChoiceRow) {
+        setActionChoiceRowEnabled(actionChoiceRow, false);
+    }
+
+    private void enableActionChoiceRow(Div actionChoiceRow) {
+        setActionChoiceRowEnabled(actionChoiceRow, true);
+    }
+
+    private void setActionChoiceRowEnabled(Div actionChoiceRow, boolean enabled) {
+        if (actionChoiceRow == null) {
+            return;
+        }
+        actionChoiceRow.getChildren()
+                .filter(Button.class::isInstance)
+                .map(Button.class::cast)
+                .forEach(button -> button.setEnabled(enabled));
+    }
+
     private void markIntentConfirmRowExpired(Span summary, Button confirmButton) {
         summary.setText(messages.getMessage("chatView.intent.draftExpired"));
         confirmButton.setEnabled(false);
@@ -1035,10 +1183,40 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void accessUi(Runnable action) {
+        accessUiAuthenticated(ownerAuthentication, action);
+    }
+
+    private void accessUiAuthenticated(Authentication authentication, Runnable action) {
         UI ui = this.ownerUi;
         if (ui == null) ui = getUI().orElse(null);
         if (ui == null) return; // detached — drop update
-        ui.access(action::run);
+        ui.access(() -> runWithAuthentication(authentication, action));
+    }
+
+    private void runWithAuthentication(Authentication authentication, Runnable action) {
+        if (authentication == null) {
+            action.run();
+            return;
+        }
+
+        SecurityContext previousContext = SecurityContextHolder.getContext();
+        SecurityContext capturedContext = SecurityContextHolder.createEmptyContext();
+        capturedContext.setAuthentication(authentication);
+        try {
+            SecurityContextHolder.setContext(capturedContext);
+            action.run();
+        } finally {
+            SecurityContextHolder.setContext(previousContext);
+        }
+    }
+
+    private Authentication captureCurrentAuthentication() {
+        try {
+            return currentAuthentication == null ? null : currentAuthentication.getAuthentication();
+        } catch (RuntimeException authenticationMissing) {
+            log.debug("Unable to capture current authentication for async UI callback", authenticationMissing);
+            return null;
+        }
     }
 
     // ---- Phase 13 Plan 04 — D-04 + REVIEWS HIGH-4 + HIGH-5 attachments wiring -------

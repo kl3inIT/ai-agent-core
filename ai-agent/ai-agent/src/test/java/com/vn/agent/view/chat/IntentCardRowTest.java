@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Phase 14 Plan 06 intent-card row contract.
+ * Phase 14 intent-row contract after the gap-closure UX shift.
  *
  * <p>Uses XML/source checks instead of {@code @UiTest}: the shared module still has
  * the pre-existing agentstore Spring context boot blocker documented by prior phase
@@ -36,15 +36,16 @@ class IntentCardRowTest {
     }
 
     @Test
-    void controllerBuildsAutoPlusEligibleNamedIntentsAndHidesWhenEmpty() throws Exception {
+    void controllerStillKnowsNamedIntentsButReadyStateKeepsInitialRowHidden() throws Exception {
         String source = read("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java");
 
         assertThat(source)
                 .contains("intentRegistry.eligibleForCurrentUser()")
                 .contains("options.add(autoOption)")
                 .contains("options.addAll(namedIntents)")
-                .contains("intentCardRow.setVisible(!namedIntents.isEmpty())")
-                .contains("intentCardRow.setValue(autoOption)");
+                .contains("hideInitialIntentCardRow();")
+                .contains("intentCardRow.setVisible(false)")
+                .contains("intentCardRow.setValue(buildAutoIntentOption())");
     }
 
     @Test
@@ -61,13 +62,19 @@ class IntentCardRowTest {
     }
 
     @Test
-    void selectedNamedTurnIsSentAndThenResetToAuto() throws Exception {
+    void firstScreenNoLongerRefreshesStaticIntentChoices() throws Exception {
         String source = read("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java");
+        String onReadyBody = source.substring(source.indexOf("public void onReady("),
+                source.indexOf("@Supply(to = \"intentCardRow\", subject = \"renderer\")"));
+
+        assertThat(onReadyBody)
+                .contains("hideInitialIntentCardRow();")
+                .doesNotContain("refreshIntentCardRow();");
 
         assertThat(source)
-                .contains("selectedIntentIdForSubmit()")
+                .contains("submitChatTurn(text, text, selectedIntentIdForSubmit())")
                 .contains("final UUID targetConversationId = conversationId")
-                .contains("chatService.stream(userId, targetConversationId, text, null, selectedIntentId)")
+                .contains("chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId)")
                 .contains("resetIntentCardRowToAutoIfNamed(selectedIntentId)")
                 .contains("intentCardRow.setValue(buildAutoIntentOption())")
                 .doesNotContain("ensureConversationIdForSubmit(userId, text)");

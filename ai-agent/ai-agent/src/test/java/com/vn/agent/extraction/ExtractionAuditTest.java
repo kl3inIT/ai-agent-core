@@ -62,6 +62,35 @@ class ExtractionAuditTest {
     }
 
     @Test
+    void readyActionProposalToolResultCarriesStructuredPayloadAndUsesGenericAudit() {
+        String payload = """
+                {"action":"show_action_choices","status":"READY",
+                 "proposal":{"proposalId":"proposal-1","targetEntityName":"jmixapp_Product","instanceName":"Desk",
+                             "values":{"name":"Desk"}},
+                 "choices":["create-now","prefill-form"]}
+                """;
+        ToolCallback delegate = callback("propose_action_choices", payload);
+        AuditWriter auditWriter = mock(AuditWriter.class);
+        List<StreamingEvent> events = new ArrayList<>();
+        ToolCallbackAuditDecorator decorator = decorator(delegate, auditWriter, events);
+
+        decorator.call("{}");
+
+        StreamingEvent.ToolResult toolResult = events.stream()
+                .filter(StreamingEvent.ToolResult.class::isInstance)
+                .map(StreamingEvent.ToolResult.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(toolResult.toolName()).isEqualTo("propose_action_choices");
+        assertThat(toolResult.payloadJson()).isEqualTo(payload);
+        verify(auditWriter).writeToolCall(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                eq("alice"), org.mockito.ArgumentMatchers.any(), eq("propose_action_choices"),
+                eq("{}"), eq(payload), anyLong(), eq(AiToolCallOutcome.SUCCESS),
+                isNull(), isNull());
+    }
+
+    @Test
     void nonExtractionToolResultKeepsPayloadJsonNullAndStillUsesGenericAudit() {
         String output = "{\"action\":\"open_form_with_draft\"}";
         ToolCallback delegate = callback("find_records", output);

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Ready for verification
-stopped_at: Executed 14-09 gap closure
-last_updated: "2026-05-08T10:23:42.092Z"
+status: Ready for Phase 15 planning; Phase 14 gap closure awaits manual UAT
+stopped_at: Executed 14-10-PLAN.md gap closure
+last_updated: "2026-05-09T20:30:00.000Z"
 progress:
-  total_phases: 9
+  total_phases: 8
   completed_phases: 7
-  total_plans: 61
-  completed_plans: 61
-  percent: 100
+  total_plans: 62
+  completed_plans: 62
+  percent: 88
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 14 — intent-driven-extraction-form-prefill
+**Current focus:** Phase 15 — chat-voice-input-soniox-stt
 
 ## Current Position
 
-Phase: 14 (intent-driven-extraction-form-prefill) — EXECUTING
-Plan: 14-09 of 9 (gap closure complete)
+Phase: 15 (chat-voice-input-soniox-stt) — READY TO PLAN
+Plan: Not started
 | Field | Value |
 |-------|-------|
-| Phase | Phase 14 |
-| Plan | 14-09 of 9 |
-| Status | Plan 14-09 complete; ready for Phase 14 re-verification |
-| Last activity | 2026-05-08 — Executed Plan 14-09 for BL-02 through BL-05; BL-01 datasource/UI env migration removed per user correction, leaving only OpenRouter API key env handling |
+| Phase | Phase 15 |
+| Plan | Not started |
+| Status | Phase 14 Plan 14-10 gap closure executed; ready for manual UAT and Phase 15 planning |
+| Last activity | 2026-05-10 — Executed Plan 14-10 gap closure for post-clarification action intents, action-choice UI, constrained tool routing, async authentication, and provider/RAG diagnostics |
 
 ## Phase Status
 
@@ -46,7 +46,7 @@ Plan: 14-09 of 9 (gap closure complete)
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Gap closure planned | 8/9 | 2026-05-07 | - |
+| 14. Intent-Driven Extraction → Form Prefill | Complete; manual UAT pending | 10/10 | 2026-05-07 | 2026-05-09 |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order

@@ -50,6 +50,8 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
 
     private static final String PREPARE_FORM_DRAFT_TOOL = "prepare_form_draft";
     private static final String OPEN_FORM_WITH_DRAFT_ACTION = "open_form_with_draft";
+    private static final String PROPOSE_ACTION_CHOICES_TOOL = "propose_action_choices";
+    private static final String SHOW_ACTION_CHOICES_ACTION = "show_action_choices";
     private static final ObjectMapper STRUCTURED_PAYLOAD_OBJECT_MAPPER = new ObjectMapper();
 
     private static String cap(String value, int maxChars) {
@@ -169,12 +171,18 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
     }
 
     private static String structuredPayloadJson(String toolName, String output) {
-        if (!PREPARE_FORM_DRAFT_TOOL.equals(toolName) || output == null || output.isBlank()) {
+        if (output == null || output.isBlank()) {
             return null;
         }
         try {
             JsonNode root = STRUCTURED_PAYLOAD_OBJECT_MAPPER.readTree(output);
-            if (root != null && OPEN_FORM_WITH_DRAFT_ACTION.equals(root.path("action").asText())) {
+            if (root != null && PREPARE_FORM_DRAFT_TOOL.equals(toolName)
+                    && OPEN_FORM_WITH_DRAFT_ACTION.equals(root.path("action").asText())) {
+                return output;
+            }
+            if (root != null && PROPOSE_ACTION_CHOICES_TOOL.equals(toolName)
+                    && SHOW_ACTION_CHOICES_ACTION.equals(root.path("action").asText())
+                    && "READY".equals(root.path("status").asText())) {
                 return output;
             }
         } catch (RuntimeException | java.io.IOException ignored) {

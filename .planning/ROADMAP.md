@@ -30,7 +30,7 @@
 - [x] **Phase 13: Chat Task File — Attach + LLM Read + Bulk Save** — `AiTaskFile` transient entity (separate from KB ingestion); UI attach affordance in `attachmentsPanel`; Spring AI `Media` injection (single-turn, jmix-crm pattern); `bulk_save_records` tool extending Phase 11 `MutationSaveExecutor`; default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache 2.0 self-hostable).
  (completed 2026-05-06)
 - [ ] **Phase 13.1: Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context (FOLLOW-UP)** — Replace Phase 13 chip-strip with verbatim port of jmix-crm Attachments right-pane (card grid + drop-zone + empty state); change `AiTaskFileMediaResolver` from single-turn to per-turn-all (with token-budget cap); extend `AiTaskFile` lifetime to conversation-scoped (or 24h TTL, configurable); add inline "[user] added attachment" ledger row in message stream. Driver: post-Phase-13 UX review confirmed CRM right-pane is more discoverable + per-turn-all `Media` is required for "AI agent thực thụ" multi-turn follow-up.
-- [ ] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only. (gap closure planned from `14-VERIFICATION.md` on 2026-05-08)
+- [x] **Phase 14: Intent-Driven Extraction → Form Prefill** — Persisted `AiExtractionDraft`; `IntentExtractor<T>` SPI; `prepare_form_draft` tool returning structured payload; controller-side navigation only. (gap closure planned from `14-VERIFICATION.md` on 2026-05-08) (completed 2026-05-09)
 - [ ] **Phase 15: Chat Voice Input — Soniox STT** — Browser `MediaRecorder` capture (webm/opus or mp4, no transcoding) + custom Spring `RestClient` Soniox provider (`/v1/files` + `/v1/transcriptions`, `Authorization: Bearer`); `TranscriptionService` strategy interface (`SonioxTranscriptionService` default + optional `SpringAiTranscriptionService` OpenAI fallback); `TranscriptionPostProcessor` SPI; STT_TRANSCRIPTION audit via `writeToolCall`.
 
 ## Phase Details
@@ -246,11 +246,12 @@ Plans:
 **Depends on**: Phase 9 (richer baseline / structured tool outputs); Phase 10 (exposure policy gates which entities the extractor may target)
 **Requirements**: EXTRACT-01, EXTRACT-02, EXTRACT-03, EXTRACT-04, EXTRACT-05, EXTRACT-06, EXTRACT-07, EXTRACT-08, EXTRACT-09, EXTRACT-10, ENT-08, SPI-12, TEST-15, SEC-06 (row-level read on own `AiExtractionDraft` rows completes here)
 **Success Criteria** (what must be TRUE):
-  1. With at least one named intent registered (the add-on ships one reference end-to-end intent plus the SPI for hosts), the user picks an intent, optionally attaches an `AiTaskFile`, and the LLM calls `prepare_form_draft(intentId, contextRefs)` exactly once — the tool returns a structured payload `{ "action": "open_form_with_draft", "draftId": "...", "entityName": "...", "instanceName": "..." }`; the LLM never receives a `ViewNavigators` or any UI-mutation primitive (TEST-15 grep / source-scanner gate).
-  2. `StreamingEvent.ToolResult` carries the structured `prepare_form_draft` payload separately from human-readable summaries; `ChatPanelFragment` recognizes the `open_form_with_draft` shape and renders an "Open form to confirm" button; clicking it (controller side) checks `UiShowViewContext` via `AccessManager`, resolves the primary detail view via `ViewRegistry`, and navigates with `ViewNavigators.detailView(...).newEntity().withViewClass(...).withAfterNavigationHandler(...)`.
-  3. The prefill applies to the opened `StandardDetailView`'s `DataContext`-tracked edited entity and uses per-attribute `EntityAttributeContext.canModify`-gated `setValueIfPermitted` (never raw `setValue`); normal view validation runs before Save; on Save the draft is deleted and close-without-save leaves it for TTL cleanup.
-  4. `AiExtractionDraft` rows expire after TTL (default 1h, hourly cleanup job); each row is row-level-scoped to its owner `userUsername` (`AiAgentUserRole` row policy), persisted (not `VaadinSession`-cached), and survives navigation; `prepare_form_draft` invocations are audited via `AuditWriter.writeToolCall` with `eventName=prepare_form_draft`.
-**Plans:** 8/9 plans complete; 1 gap-closure plan pending
+  1. Opening chat shows no entity/action picker. For side-effecting create/update requests, the assistant first gathers missing required fields, then calls the safe `propose_action_choices` tool; action choices render only for a server-validated READY proposal.
+  2. `Create now` is available only after user selection and routes to the constrained mutation tool surface under the current user's Jmix security. Default planning turns do not expose built-in mutation callbacks.
+  3. `Prefill form` creates an `AiExtractionDraft` from the validated proposal payload and then reuses the existing structured `open_form_with_draft` confirm-row path. The Jmix detail view opens only after the user clicks "Open form to confirm".
+  4. Named `IntentExtractor` flows remain supported as backend extraction capabilities: named intent turns expose exactly `prepare_form_draft`, return structured payloads, and never give the LLM `ViewNavigators` or any UI-mutation primitive.
+  5. Stream UI callbacks that touch secured Jmix data/components run with the captured current-user authentication; RAG/embedding failures remain best-effort diagnostics and do not block a non-RAG chat turn.
+**Plans:** 10/10 plans complete
 
 Plans:
 **Wave 1**
@@ -274,7 +275,10 @@ Plans:
 - [x] 14-08-PLAN.md — TEST-15 navigation scanner, setValue/core-boundary scanners, eval fixtures, and final verification gates
 
 **Wave 7 *(gap closure; blocked on Wave 6 completion)***
-- [ ] 14-09-PLAN.md — Gap closure: stale/confirmed drafts, first-turn streaming guard ordering, schema payload filtering, source faithfulness, and credential hygiene
+- [x] 14-09-PLAN.md — Gap closure: stale/confirmed drafts, first-turn streaming guard ordering, schema payload filtering, source faithfulness, and credential hygiene
+
+**Wave 8 *(gap closure; blocked on Wave 7 completion)***
+- [x] 14-10-PLAN.md — Gap closure: post-clarification action intents, action-choice UI, constrained tool routing, async authentication, and provider/RAG diagnostics
 
 **UI hint**: yes
 
@@ -307,7 +311,7 @@ Sequence in v1.1: 9 ✓ → 10 ✓ → 11 ✓ → 12 ✓ → 13 ✓ → **13.1**
 | 12. Configurable Chat Surfaces | 6/6 | Complete   | 2026-05-02 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | 6/6 | Complete    | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | 7/7 | Complete | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | 8/9 | Gap closure planned | - |
+| 14. Intent-Driven Extraction → Form Prefill | 10/10 | Complete    | 2026-05-09 |
 | 15. Chat Voice Input — Soniox STT | 0/0 | Not started | - |
 
 ## Coverage Validation

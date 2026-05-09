@@ -1,8 +1,8 @@
 ---
 phase: 14-intent-driven-extraction-form-prefill
-verified: 2026-05-08T17:32:04+07:00
+verified: 2026-05-10T03:30:00+07:00
 status: human_needed
-score: "9/9 must-haves verified"
+score: "16/16 must-haves verified; manual UAT pending"
 overrides_applied: 1
 overrides:
   - must_have: "BL-01 - jmix-app/src/main/resources/application.properties contains no committed database passwords, admin default password, or host-specific database IP; local values move to environment variables or ignored .env."
@@ -20,18 +20,26 @@ re_verification:
     - "BL-01 narrowed to API-key env handling only"
   gaps_remaining: []
   regressions: []
+post_14_10_gap_closure:
+  previous_human_gap: "The old static intent-picker design showed registry-driven intent choices on chat open and did not offer post-clarification action choices."
+  gaps_closed:
+    - "Initial chat open no longer presents entity/action choices."
+    - "A safe propose_action_choices planning tool validates readiness before choices are rendered."
+    - "Create now and Prefill form selections route through separate constrained tool surfaces."
+    - "Stream UI callbacks restore the captured current-user authentication before secured Jmix work."
+  manual_retest_required: true
 human_verification:
   - test: "Run the manual chat-to-form UAT from 14-UAT-CHECKLIST.md in a browser"
-    expected: "Customer intent is visible, selecting it and sending supported source text or a task file produces an inline Open form to confirm button, clicking opens Customer detail prefilled, Save succeeds through normal Jmix validation, and the draft row is deleted."
+    expected: "Chat opens with no entity/action intent card. The assistant clarifies missing required fields first. After enough data is available, a server-validated action-choice row appears. Create now is the only path that enables immediate mutation tools. Prefill form creates a draft and still requires clicking Open form to confirm before the Jmix detail view opens and Save applies normal validation."
     why_human: "Vaadin/Jmix rendering, real navigation, and real provider-backed extraction require a running app and browser session."
 ---
 
 # Phase 14: Intent-Driven Extraction -> Form Prefill Verification Report
 
 **Phase Goal:** The LLM produces a structured draft for a host entity, the user confirms through a chat-rendered button, and a Jmix detail view opens prefilled without giving the LLM any UI-mutation primitive. Jmix security and normal detail-view validation remain the authority for the eventual save.
-**Verified:** 2026-05-08T17:32:04+07:00
+**Verified:** 2026-05-10T03:30:00+07:00
 **Status:** human_needed
-**Re-verification:** Yes - after 14-09 gap closure
+**Re-verification:** Yes - after 14-09 automated gap closure, then updated after 14-10 human-UAT gap closure
 
 ## Goal Achievement
 
@@ -48,8 +56,15 @@ human_verification:
 | 7 | BL-04: Draft `payloadJson` and success audit summaries are limited to `MetaClassDtoSynthesizer`-approved attribute names. | VERIFIED | `ExtractionService` calls `schemaSynthesizer.buildSchema(metaClass)` then `filterPayloadToSchema(...)` before JSON persistence and audit summary creation; tests cover unsupported keys such as `recommendedProducts`, `version`, and `class`. |
 | 8 | BL-05: Reference Customer extraction rejects unsupported string values when textual evidence exists. | VERIFIED | `ExtractionInput` carries `sourceTexts`; `RunContext`, `DefaultChatServiceImpl`, and `ExtractionToolBridge` propagate them; `CustomerDraftIntentExtractor.assertSourceFaithful(...)` rejects fabricated strings against user/document text. Image-only input remains prompt-based by explicit 14-09 scope. |
 | 9 | BL-01 narrowed: OpenRouter API key remains env-backed and `.env.example` only documents that key. | PASSED (override) | `spring.ai.openai.api-key=${OPENROUTER_API_KEY:}` remains in `jmix-app/src/main/resources/application.properties`; `jmix-app/.env.example` contains only `OPENROUTER_API_KEY=`. Datasource/UI defaults remain by user correction. |
+| 10 | Initial chat open does not present entity/action intent choices. | VERIFIED | `ChatPanelFragment.onReady()` no longer calls `refreshIntentCardRow()`; `IntentCardRowTest` and the updated UAT checklist pin the no-first-screen-picker contract. |
+| 11 | Side-effecting action choices appear only after a server-validated READY proposal. | VERIFIED | `ActionProposalTool.TOOL_NAME` is `propose_action_choices`; `ActionProposalService` validates metadata, required fields, writable attributes, and create permission before returning `READY`; `RenderStreamEventActionProposalTest` covers rendering input. |
+| 12 | Missing required fields are clarified before choices are shown. | VERIFIED | `ActionProposalService` returns `MISSING_FIELDS` without choices; `ActionProposalToolTest` and prompt rules direct the assistant to ask for those fields. |
+| 13 | Create now is selected explicitly and routes through the mutation-capable action surface only for that turn. | VERIFIED | `DefaultChatServiceImpl` separates named extraction intents from `action:create-now`; `AgentToolCallbacks.callbacksFor(...)` exposes mutation callbacks only for selected create-now action turns. |
+| 14 | Prefill form is selected explicitly and creates a draft before reusing the existing Open form to confirm path. | VERIFIED | `ActionProposalService.createDraft(...)` persists validated draft payload with `SOURCE_CONVERSATION_ID`; `ChatPanelFragment` renders the existing confirm row after prefill-form selection. |
+| 15 | Stream UI callbacks that touch secured Jmix services restore the captured current-user authentication. | VERIFIED | `ChatPanelFragment.accessUiAuthenticated(...)` wraps UI access; `ChatPanelFragmentConversationIdTest` covers authenticated callback behavior. |
+| 16 | RAG/embedding failures remain best-effort diagnostics and do not block non-RAG action-choice chat turns. | VERIFIED | `AuditingDocumentRetrieverTest` covers best-effort retrieval failure handling; `ProviderConfigurationContractTest` separates provider configuration diagnostics from action-choice UI behavior. |
 
-**Score:** 9/9 truths verified. Status is still `human_needed` because browser/manual UAT is required.
+**Score:** 16/16 truths verified. Status is still `human_needed` because browser/manual UAT is required.
 
 ### Required Artifacts
 
@@ -130,7 +145,7 @@ human_verification:
 
 #### 1. Manual Chat-to-Form UAT
 
-**Test:** Start the app, log in, open the chat surface, verify the Customer intent card appears, submit supported source text or a supported task file with the Customer intent selected, click the inline confirm button, verify Customer detail opens prefilled, edit if needed, and Save.
+**Test:** Start the app, log in, and open the chat surface. Verify chat opens without rendering entity/action choices. Submit a create request with missing required fields, verify the assistant asks for those fields, then provide enough data for a server-validated action-choice row. Verify Create now creates only after that click. Verify Prefill form creates a draft, renders the inline Open form to confirm button, opens the Jmix detail view only after that click, prefilled values match the collected data, Save succeeds through normal validation, and the draft row is deleted.
 
 **Expected:** The detail view opens through normal Jmix navigation, prefilled values match the source, normal validation applies, Save succeeds, and the draft row is gone afterward.
 
@@ -142,5 +157,5 @@ No automated blocker gaps remain. Phase 14 should not be marked fully complete u
 
 ---
 
-_Verified: 2026-05-08T17:32:04+07:00_
+_Verified: 2026-05-10T03:30:00+07:00_
 _Verifier: the agent (gsd-verifier)_

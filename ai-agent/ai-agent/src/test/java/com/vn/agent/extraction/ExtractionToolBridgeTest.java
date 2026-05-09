@@ -1,5 +1,7 @@
 package com.vn.agent.extraction;
 
+import com.vn.agent.action.ActionProposalService;
+import com.vn.agent.action.ActionProposalTool;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.audit.MutationArgumentSanitizer;
 import com.vn.agent.audit.ToolCallbackAuditDecorator;
@@ -109,6 +111,7 @@ class ExtractionToolBridgeTest {
                 mock(BuiltInDataTools.class),
                 mock(BuiltInLinkTools.class),
                 bridge,
+                new ActionProposalTool(mock(ActionProposalService.class)),
                 mutationToolsProvider,
                 List.of(),
                 mock(AuditWriter.class),

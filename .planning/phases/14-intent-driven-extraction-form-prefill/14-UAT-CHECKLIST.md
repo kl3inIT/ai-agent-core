@@ -1,89 +1,190 @@
 ---
 phase: 14-intent-driven-extraction-form-prefill
-source: 14-08-PLAN.md
+source: 14-10-PLAN.md
 status: pending
-created: 2026-05-08
+updated: 2026-05-10
 ---
 
-# Phase 14 Manual UAT Checklist
+# Phase 14 Manual UAT
 
-Run after merge against a locally started app.
+## Purpose
+
+Validate the corrected side-effecting chat pattern:
+
+1. Chat opens without a static entity/action picker.
+2. The assistant asks for missing required data before offering actions.
+3. The UI renders action choices only after a server-validated ready proposal.
+4. The user-selected action controls the next tool surface.
+5. Prefill still routes through the existing Jmix detail-view confirmation and save path.
 
 ## Setup
 
-- Start the app:
-  `./gradlew bootRun`
-- Open `http://localhost:8080`.
-- Log in as `admin/admin`.
+- Start the app with `./gradlew bootRun`.
+- Open `http://localhost:8088`.
+- Log in as `admin/admin`, unless a scenario says to use a restricted user.
 - Open the AI chat surface.
+- Use a target entity that the logged-in user can create and whose detail view is registered.
 
-## Intent Picker
+## Scenario 1 - Initial Chat State
 
-- Verify the intent picker is visible when the reference intent is enabled.
-- Verify Auto is selected by default.
-- Expected visible copy keys:
-  - `chatView.intent.cardRow.ariaLabel`
-  - `chatView.intent.auto.label`
-  - `chatView.intent.auto.description`
-  - `chatView.intent.customer-from-pdf.label`
-  - `chatView.intent.customer-from-pdf.description`
+**Steps**
 
-## Customer Draft Creation
+1. Open the chat surface.
+2. Do not send a message.
 
-- Type or paste customer source text with a name, email, and phone.
-- Optional: attach a customer document fixture with the same fields.
-- Select the Customer intent card.
-- Send the message.
-- Verify the picker resets to Auto while the response is produced.
-- Verify a confirm row appears in the message-list area, not in the attachment pane.
-- Expected visible copy keys:
-  - `chatView.intent.confirmButton.summary`
-  - `chatView.intent.confirmButton`
+**Expected**
 
-## Confirm And Save
+- No entity/action intent card should appear just because the chat opened.
+- The message input is ready for typing.
+- No record is created.
+- No draft is created.
 
-- Click the confirm button.
-- Verify the Customer detail view opens.
-- Verify the new Customer form is prefilled with the extracted name, email, and phone.
-- Edit one field.
-- Save the form.
-- Verify the save succeeds through the normal Jmix detail-view validation path.
-- Verify the draft row is deleted after Save.
+**Result:** pending
 
-## Expired Draft
+## Scenario 2 - Missing Fields Are Clarified
 
-- Create a draft.
-- Let the draft expire or delete the draft row before clicking confirm.
-- Click the confirm button.
-- Verify the button becomes disabled and no other draft is opened.
-- Expected visible copy key:
-  - `chatView.intent.draftExpired`
+**Steps**
 
-## Permission Denied
+1. Send a create request with incomplete data, for example `Create a product`.
+2. Wait for the assistant response.
 
-- Log in as a user without access to the target Customer detail view.
-- Trigger or reuse a Customer draft confirm row.
-- Click the confirm button.
-- Verify no form opens.
-- Verify an error notification appears.
-- Expected visible copy key:
-  - `chatView.intent.permissionDenied`
+**Expected**
 
-## Misconfiguration And Payload Errors
+- The assistant asks for missing required fields.
+- No `Create now` action is shown yet.
+- No `Prefill form` action is shown yet.
+- No mutation tool creates a record.
+- No form opens.
 
-- Disable or misconfigure the draft tool path if testing operator-failure handling.
-- Verify the user-facing error uses:
-  - `chatView.intent.configurationError`
-- Trigger or simulate an invalid structured draft payload.
-- Verify the user-facing error uses:
-  - `chatView.intent.draftPayloadInvalid`
+**Result:** pending
+
+## Scenario 3 - Action Choices After Clarification
+
+**Steps**
+
+1. Continue the same conversation from Scenario 2.
+2. Provide the required fields requested by the assistant.
+3. Wait for the assistant response and streamed tool results.
+
+**Expected**
+
+- The app validates a ready action proposal server-side.
+- The message list renders an action-choice row after the assistant response.
+- The available choices match the user's permissions.
+- For a create-capable user, the row includes `Create now` and `Prefill form`.
+- The row does not appear while the proposal has missing fields or validation errors.
+
+**Result:** pending
+
+## Scenario 4 - Create Now Path
+
+**Steps**
+
+1. From a ready action-choice row, click `Create now`.
+2. Let the selected action turn finish.
+3. Open the target entity list or detail screen and inspect the result.
+
+**Expected**
+
+- Mutation-capable tools are available only after the `Create now` click.
+- The record is created only during the selected action turn.
+- Normal Jmix entity, attribute, and row-level security still apply.
+- The audit trail records the selected mutation path.
+
+**Result:** pending
+
+## Scenario 5 - Prefill Form Path
+
+**Steps**
+
+1. Repeat the clarified create request or start a fresh one.
+2. From a ready action-choice row, click `Prefill form`.
+3. Wait for the inline confirm row.
+4. Click `Open form to confirm`.
+5. Inspect the opened Jmix detail view.
+6. Edit one field and click Save.
+
+**Expected**
+
+- `Prefill form` creates an extraction draft instead of saving the final entity.
+- The inline `Open form to confirm` row appears in the message-list area.
+- The Jmix detail view opens only after the confirm click.
+- The form is prefilled with the collected values.
+- Normal Jmix validation runs on Save.
+- Save succeeds for valid data.
+- The draft is deleted after successful Save.
+
+**Result:** pending
+
+## Scenario 6 - Expired Or Removed Draft
+
+**Steps**
+
+1. Create a prefill-form draft.
+2. Let the draft expire or delete the draft row before clicking `Open form to confirm`.
+3. Click the confirm button.
+
+**Expected**
+
+- No form opens.
+- No alternate draft is opened.
+- The confirm button becomes disabled or the user sees the draft-expired notification.
+- The chat remains usable for a new request.
+
+**Result:** pending
+
+## Scenario 7 - Permission Denied
+
+**Steps**
+
+1. Log in as a user without create permission or without access to the target detail view.
+2. Trigger a create request through the chat.
+3. If a prefill confirm row is available, click `Open form to confirm`.
+
+**Expected**
+
+- Choices that require missing permissions are not offered.
+- If access is lost between proposal and confirm, no form opens.
+- The user receives a permission-denied notification.
+- No record is created outside Jmix security.
+
+**Result:** pending
+
+## Scenario 8 - Streaming Authentication
+
+**Steps**
+
+1. Run Scenarios 2 through 5 while watching the app logs.
+2. Pay attention to streamed tool results and UI row insertion.
+
+**Expected**
+
+- No `Authentication is not set` stack trace appears.
+- Action-choice rows and confirm rows render during streaming callbacks.
+- Secured Jmix loaders/actions still run as the logged-in user.
+
+**Result:** pending
+
+## Scenario 9 - Provider And RAG Diagnostics
+
+**Steps**
+
+1. Run a non-RAG create/prefill request with normal chat-model configuration.
+2. If embedding or retrieval configuration is unavailable, observe the chat behavior.
+
+**Expected**
+
+- Retrieval or embedding warnings are best-effort diagnostics.
+- A non-RAG action-choice turn can proceed when the chat model call succeeds.
+- Provider model errors are treated as configuration issues, not as action-choice UI failures.
+
+**Result:** pending
 
 ## Pass Criteria
 
-- Intent picker appears only when at least one named intent is eligible.
-- Named-intent turns expose only the draft-preparation path.
-- Confirm row is rendered from structured tool payload, not a parsed prose summary.
-- Navigation happens only after the user clicks the confirm button.
-- Prefill writes only permitted attributes.
-- Save deletes the draft.
-- Expired and permission-denied paths do not open a different draft or form.
+- Scenarios 1 through 8 pass.
+- Scenario 9 does not block the action-choice flow when the chat model itself works.
+- No static first-screen entity/action picker is required or accepted as proof of success.
+- No record is created before explicit user action selection.
+- No form opens before the existing confirm click.
+- Manual failures are recorded in `14-HUMAN-UAT.md` before planning another gap closure.

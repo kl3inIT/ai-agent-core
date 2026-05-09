@@ -78,6 +78,17 @@ class OpenFormWithDraftRenderingTest {
                 .contains("messageListSlot.getElement().removeAllChildren()");
     }
 
+    @Test
+    void actionChoicePrefillReusesExistingConfirmRow() throws Exception {
+        String source = read("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java");
+
+        assertThat(source)
+                .contains("appendActionChoiceRow")
+                .contains("actionProposalService.createDraft(")
+                .contains("appendIntentConfirmRow(draftResult.draftId(), draftResult.entityName(), draftResult.instanceName())")
+                .contains("conversationId, null");
+    }
+
     private static String read(String repositoryPath) throws Exception {
         String moduleRelativePath = repositoryPath.startsWith("ai-agent/ai-agent/")
                 ? repositoryPath.substring("ai-agent/ai-agent/".length())

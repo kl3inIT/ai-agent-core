@@ -1,5 +1,8 @@
 package com.vn.agent.extraction;
 
+import com.vn.agent.action.ActionIntentId;
+import com.vn.agent.action.ActionProposalService;
+import com.vn.agent.action.ActionProposalTool;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.audit.MutationArgumentSanitizer;
 import com.vn.agent.orchestration.StreamingSinkHolder;
@@ -35,7 +38,8 @@ class AgentToolCallbacksIntentGatingTest {
         List<String> names = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null));
 
         assertThat(names)
-                .contains("prepare_form_draft", "find_records", "bulk_save_records");
+                .contains("propose_action_choices", "find_records")
+                .doesNotContain("prepare_form_draft");
     }
 
     @Test
@@ -47,6 +51,28 @@ class AgentToolCallbacksIntentGatingTest {
 
         assertThat(names(namedIntentCallbacks))
                 .containsExactly("prepare_form_draft");
+    }
+
+    @Test
+    void createNowActionAddsMutationCallbacksOnlyAfterSelection() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> planningNames = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null));
+        List<String> createNowNames = names(callbacks.callbacksFor("alice", UUID.randomUUID(),
+                ActionIntentId.selectionParameter(ActionIntentId.CREATE_NOW)));
+
+        assertThat(planningNames).doesNotContain("bulk_save_records");
+        assertThat(createNowNames).contains("bulk_save_records");
+    }
+
+    @Test
+    void prefillActionReturnsOnlyPrepareFormDraft() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        ToolCallback[] prefillCallbacks = callbacks.callbacksFor("alice", UUID.randomUUID(),
+                ActionIntentId.selectionParameter(ActionIntentId.PREFILL_FORM));
+
+        assertThat(names(prefillCallbacks)).containsExactly("prepare_form_draft");
     }
 
     @Test
@@ -90,6 +116,7 @@ class AgentToolCallbacksIntentGatingTest {
                 mock(BuiltInDataTools.class),
                 mock(BuiltInLinkTools.class),
                 extractionToolBridge,
+                new ActionProposalTool(mock(ActionProposalService.class)),
                 mutationToolsProvider,
                 contributors,
                 mock(AuditWriter.class),

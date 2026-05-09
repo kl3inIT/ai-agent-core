@@ -236,7 +236,12 @@ class LocaleParityTest {
                 "chatView.intent.draftExpired",
                 "chatView.intent.permissionDenied",
                 "chatView.intent.draftPayloadInvalid",
-                "chatView.intent.cardRow.empty.fallback");
+                "chatView.intent.cardRow.empty.fallback",
+                "chatView.actionChoice.summary",
+                "chatView.actionChoice.createNow",
+                "chatView.actionChoice.prefillForm",
+                "chatView.actionChoice.missingFields",
+                "chatView.actionChoice.invalidProposal");
 
         for (String key : requiredKeys) {
             assertThat(en.containsKey(key))
