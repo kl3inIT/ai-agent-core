@@ -126,7 +126,7 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
         // to the originating ToolCall by this id. Emission is a no-op when no streaming
         // run is active (blocking ask() path or non-chat invocation).
         final UUID toolCallId = UUID.randomUUID();
-        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
+        emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
 
         boolean success = false;
         String output = null;
@@ -159,7 +159,7 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             // Plan 07-02: emit post-exit ToolResult to the streaming sink (both success + error paths).
             final String emittedSummary = resultSummary;
             final String emittedPayloadJson = structuredPayloadJson(toolName, output);
-            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(
+            emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(
                     toolCallId, toolName, emittedSummary, outcome, emittedPayloadJson)));
         }
     }
@@ -225,12 +225,13 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
      * Non-streaming callers (and callers outside {@code ChatService.stream(...)}) see a no-op
      * — zero behavior change for the Phase-4 blocking path.
      */
-    private void emitToolEvent(java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
+    private void emitToolEvent(UUID runId,
+                               java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
         if (streamingSinkHolder == null) {
             return;
         }
         try {
-            streamingSinkHolder.current().ifPresent(emitter);
+            streamingSinkHolder.currentOrForRun(runId).ifPresent(emitter);
         } catch (RuntimeException ex) {
             log.debug("Streaming tool-event emission failed; continuing with audit-only path", ex);
         }
