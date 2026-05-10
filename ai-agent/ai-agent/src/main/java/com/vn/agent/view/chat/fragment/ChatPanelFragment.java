@@ -1032,8 +1032,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         disableActionChoiceRow(actionChoiceRow);
         if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
             String label = messages.getMessage("chatView.actionChoice.createNow");
-            submitChatTurn(label, actionSelectionPrompt(proposalPayload, actionIntentId),
-                    ActionIntentId.selectionParameter(actionIntentId));
+            try {
+                submitChatTurn(label, actionSelectionPrompt(proposalPayload, actionIntentId),
+                        ActionIntentId.selectionParameter(actionIntentId));
+                removeActionChoiceRow(actionChoiceRow);
+            } catch (RuntimeException failure) {
+                enableActionChoiceRow(actionChoiceRow);
+                throw failure;
+            }
             return;
         }
         if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {
@@ -1041,6 +1047,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 ActionProposalService.DraftResult draftResult =
                         actionProposalService.createDraft(
                                 toActionProposal(proposalPayload, actionIntentId), conversationId, null);
+                removeActionChoiceRow(actionChoiceRow);
                 appendIntentConfirmRow(draftResult.draftId(), draftResult.entityName(), draftResult.instanceName());
             } catch (RuntimeException failure) {
                 log.warn("Prefill action proposal failed", failure);
@@ -1094,6 +1101,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 .filter(Button.class::isInstance)
                 .map(Button.class::cast)
                 .forEach(button -> button.setEnabled(enabled));
+    }
+
+    private void removeActionChoiceRow(Div actionChoiceRow) {
+        if (actionChoiceRow == null) {
+            return;
+        }
+        actionChoiceRow.removeFromParent();
+        if (messageCount > 0) {
+            messageCount--;
+        }
     }
 
     private void markIntentConfirmRowExpired(Span summary, Button confirmButton) {

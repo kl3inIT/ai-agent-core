@@ -21,7 +21,18 @@ class ActionChoiceRowTest {
                 .contains("chatView.actionChoice.createNow")
                 .contains("chatView.actionChoice.prefillForm")
                 .contains("ActionIntentId.selectionParameter(actionIntentId)")
+                .contains("removeActionChoiceRow(actionChoiceRow)")
                 .contains("actionProposalService.createDraft(");
+    }
+
+    @Test
+    void selectedActionChoiceRowIsRemovedAfterSelection() throws Exception {
+        String source = read("ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java");
+
+        assertThat(source)
+                .contains("private void removeActionChoiceRow(Div actionChoiceRow)")
+                .contains("actionChoiceRow.removeFromParent()")
+                .contains("messageCount--");
     }
 
     @Test

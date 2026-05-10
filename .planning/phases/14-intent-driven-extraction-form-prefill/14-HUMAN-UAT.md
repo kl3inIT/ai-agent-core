@@ -3,17 +3,17 @@ status: testing
 phase: 14-intent-driven-extraction-form-prefill
 source: [14-VERIFICATION.md, 14-10-PLAN.md, 14-10-SUMMARY.md]
 started: 2026-05-08T17:32:04+07:00
-updated: 2026-05-10T17:59:00+07:00
+updated: 2026-05-10T18:19:18+07:00
 ---
 
 # Phase 14 Human UAT
 
 ## Current Test
 
-number: 4
-name: Create Now Path
+number: 6
+name: Expired Or Removed Draft
 expected: |
-  Clicking Create now enables the mutation path only for the selected action turn, creates the record under Jmix security, and records audit evidence. No record should be created before the explicit Create now click.
+  An expired or removed draft cannot open a form or substitute another draft; the user sees the expired-draft behavior and chat remains usable.
 awaiting: user response
 
 ## Tests
@@ -39,7 +39,9 @@ verified: "After the user replied to skip missing optional fields, the message l
 ### 4. Create Now Path
 
 expected: Clicking Create now enables the mutation path only for the selected action turn, creates the record under Jmix security, and records audit evidence.
-result: pending
+result: pass
+verified: "User confirmed the Create now path passed. The selected action created the target record only after the explicit Create now click."
+ux_observation: "User noticed the disabled action-choice card remained anchored near the bottom after selection. This was treated as a minor UX cleanup and resolved by removing the action-choice row once an action is selected."
 
 ### 5. Prefill Form Path
 
@@ -73,9 +75,9 @@ verified: "The app log contained a best-effort embedding/retrieval warning, but 
 ## Summary
 
 total: 9
-passed: 6
+passed: 7
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
@@ -96,6 +98,22 @@ blocked: 0
   debug_session: "inline"
   fixed_by: "Use the AiExtractionDraft instance returned by DataManager.save for DataManager.remove."
   verified: "Targeted tests passed and Playwright retest on localhost:8090 confirmed Prefill form OK no longer shows the draft optimistic-lock error."
+
+- truth: "After the user selects an action choice, the stale disabled action-choice card should not remain anchored at the bottom of the chat surface."
+  status: resolved
+  reason: "User reported that the disabled action-choice card appeared fixed at the bottom after Create now had already completed."
+  severity: minor
+  test: 4
+  root_cause: "ChatPanelFragment disabled action-choice buttons after selection but left the selected action row mounted below the scrolling MessageList."
+  artifacts:
+    - path: "ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java"
+      issue: "submitActionChoice disabled the selected action row but did not remove it after the action was selected."
+  missing:
+    - "Resolved: remove the action-choice row after Create now submits successfully."
+    - "Resolved: remove the action-choice row after Prefill form creates the draft and before rendering the Open form confirmation row."
+  debug_session: "inline"
+  fixed_by: "Remove the selected action-choice row after a successful action selection."
+  verified: "Regression test asserts selected action-choice rows are removed after selection."
 
 ## Gap Closure
 
