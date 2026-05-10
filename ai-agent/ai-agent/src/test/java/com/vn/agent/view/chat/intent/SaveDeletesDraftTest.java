@@ -37,9 +37,11 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +60,7 @@ class SaveDeletesDraftTest {
     private View<?> originView;
     private DetailViewClassNavigator<Object, View<?>> classNavigator;
     private AiExtractionDraft draft;
+    private AiExtractionDraft savedDraft;
     private UUID draftId;
 
     @SuppressWarnings("unchecked")
@@ -75,9 +78,13 @@ class SaveDeletesDraftTest {
         originView = mock(View.class);
         MetaClass metaClass = mock(MetaClass.class);
         draftId = UUID.randomUUID();
-        draft = new AiExtractionDraft();
+        draft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
         draft.setId(draftId);
         draft.setTargetEntityName(ENTITY_NAME);
+        savedDraft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
+        savedDraft.setId(draftId);
+        savedDraft.setTargetEntityName(ENTITY_NAME);
+        savedDraft.setConfirmed(true);
 
         when(messages.getMessage(any(String.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(metadata.getSession().findClass(ENTITY_NAME)).thenReturn(metaClass);
@@ -91,6 +98,7 @@ class SaveDeletesDraftTest {
         when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.of(draft));
         when(dataManager.load(AiExtractionDraft.class).id(draftId).optional())
                 .thenReturn(Optional.of(draft));
+        when(dataManager.save(same(draft))).thenReturn(savedDraft);
         when(draftLoader.apply(any(UUID.class), any())).thenReturn(
                 new DraftApplyResult(1, 0, List.of(), false));
 
@@ -113,7 +121,8 @@ class SaveDeletesDraftTest {
 
         assertThat(draft.getConfirmed()).isTrue();
         verify(dataManager).save(draft);
-        verify(dataManager).remove(draft);
+        verify(dataManager).remove(savedDraft);
+        verify(dataManager, never()).remove(same(draft));
     }
 
     @Test
@@ -154,6 +163,6 @@ class SaveDeletesDraftTest {
     @SuppressWarnings("unchecked")
     private ComponentEventListener<View.AfterCloseEvent> closeListener(TestMutationDetailView detailView) {
         List<?> listeners = List.copyOf(ComponentUtil.getListeners(detailView, View.AfterCloseEvent.class));
-        return (ComponentEventListener<View.AfterCloseEvent>) listeners.get(listeners.size() - 1);
+        return (ComponentEventListener<View.AfterCloseEvent>) listeners.getLast();
     }
 }

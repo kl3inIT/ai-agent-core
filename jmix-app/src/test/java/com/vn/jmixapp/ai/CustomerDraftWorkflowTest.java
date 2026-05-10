@@ -45,6 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +63,7 @@ class CustomerDraftWorkflowTest {
     private View<?> originView;
     private DetailViewClassNavigator<Object, View<?>> classNavigator;
     private AiExtractionDraft draft;
+    private AiExtractionDraft savedDraft;
     private UUID draftId;
     private OpenFormWithDraftHandler handler;
 
@@ -83,6 +85,10 @@ class CustomerDraftWorkflowTest {
         draft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
         draft.setId(draftId);
         draft.setTargetEntityName(ENTITY_NAME);
+        savedDraft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
+        savedDraft.setId(draftId);
+        savedDraft.setTargetEntityName(ENTITY_NAME);
+        savedDraft.setConfirmed(true);
 
         when(messages.getMessage(any(String.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(metadata.getSession().findClass(ENTITY_NAME)).thenReturn(customerMetaClass);
@@ -96,6 +102,7 @@ class CustomerDraftWorkflowTest {
         when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.of(draft));
         when(dataManager.load(AiExtractionDraft.class).id(draftId).optional())
                 .thenReturn(Optional.of(draft));
+        when(dataManager.save(same(draft))).thenReturn(savedDraft);
         when(draftLoader.apply(eq(draftId), any())).thenAnswer(invocation -> {
             Customer customer = invocation.getArgument(1, Customer.class);
             customer.setName("Workflow Customer");
@@ -144,7 +151,7 @@ class CustomerDraftWorkflowTest {
 
         assertThat(draft.getConfirmed()).isTrue();
         verify(dataManager).save(draft);
-        verify(dataManager).remove(draft);
+        verify(dataManager).remove(savedDraft);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

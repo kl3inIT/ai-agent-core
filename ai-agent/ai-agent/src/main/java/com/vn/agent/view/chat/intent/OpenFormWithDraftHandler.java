@@ -181,8 +181,8 @@ public class OpenFormWithDraftHandler {
                 .optional()
                 .ifPresent(draft -> {
                     draft.setConfirmed(true);
-                    dataManager.save(draft);
-                    dataManager.remove(draft);
+                    AiExtractionDraft savedDraft = dataManager.save(draft);
+                    dataManager.remove(savedDraft);
                 });
     }
 
