@@ -52,6 +52,20 @@ public interface ChatService {
     ChatResponseDto ask(String userId, UUID conversationId, String message, Overrides overrides);
 
     /**
+     * Intent-aware blocking variant used by the Phase 14 picker. A blank intent id, or the
+     * UI's Auto option, is equivalent to the default chat path.
+     */
+    ChatResponseDto ask(String userId, UUID conversationId, String message,
+                        Overrides overrides, String intentId);
+
+    /**
+     * Intent-aware blocking variant with private per-turn system context. The extra context is
+     * sent to the model but must not be rendered or persisted as a user-visible message.
+     */
+    ChatResponseDto ask(String userId, UUID conversationId, String message,
+                        Overrides overrides, String intentId, String privateSystemAppendix);
+
+    /**
      * Structured-output variant. Requests the LLM produce JSON matching the shape of
      * {@code targetType} (GUARD-06). The response is parsed via Spring AI's
      * {@code BeanOutputConverter} and validated via Jakarta Bean Validation.
@@ -97,4 +111,18 @@ public interface ChatService {
      * @throws ConversationNotFoundException same ownership semantics as {@link #ask}
      */
     Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides);
+
+    /**
+     * Intent-aware streaming variant. Existing callers can keep using the four-arg overload.
+     */
+    Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                Overrides overrides, String intentId);
+
+    /**
+     * Intent-aware streaming variant with private per-turn system context. Existing callers can
+     * use the five-arg overload; UI-selected action proposals use this path so internal proposal
+     * payloads do not leak into chat history.
+     */
+    Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                Overrides overrides, String intentId, String privateSystemAppendix);
 }

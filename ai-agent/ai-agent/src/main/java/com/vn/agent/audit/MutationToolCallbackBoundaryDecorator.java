@@ -121,7 +121,7 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
 
         // Streaming pair-id correlation (mirrors ToolCallbackAuditDecorator).
         final UUID toolCallId = UUID.randomUUID();
-        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, safeInput)));
+        emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, safeInput)));
 
         long startNanos = System.nanoTime();
         String output = null;
@@ -160,7 +160,8 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
             // outer Flux.
             AiToolCallOutcome outcome = output != null ? AiToolCallOutcome.SUCCESS : AiToolCallOutcome.ERROR;
             String emittedSummary = output != null ? cap(output, RESULT_SUMMARY_MAX_CHARS) : null;
-            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
+            emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(
+                    toolCallId, toolName, emittedSummary, outcome, null)));
             previousContext.restore();
         }
     }
@@ -208,12 +209,13 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
         return null;
     }
 
-    private void emitToolEvent(java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
+    private void emitToolEvent(UUID runId,
+                               java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
         if (streamingSinkHolder == null) {
             return;
         }
         try {
-            streamingSinkHolder.current().ifPresent(emitter);
+            streamingSinkHolder.currentOrForRun(runId).ifPresent(emitter);
         } catch (RuntimeException ex) {
             log.debug("Streaming tool-event emission failed in mutation boundary; continuing", ex);
         }

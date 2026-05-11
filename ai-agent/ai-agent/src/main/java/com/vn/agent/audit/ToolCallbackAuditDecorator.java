@@ -1,5 +1,7 @@
 package com.vn.agent.audit;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.orchestration.StreamingEvent;
@@ -45,6 +47,12 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
 
     /** Suffix appended when a captured value is truncated, so the truncation is observable. */
     static final String TRUNCATION_SUFFIX = "…[truncated]";
+
+    private static final String PREPARE_FORM_DRAFT_TOOL = "prepare_form_draft";
+    private static final String OPEN_FORM_WITH_DRAFT_ACTION = "open_form_with_draft";
+    private static final String PROPOSE_ACTION_CHOICES_TOOL = "propose_action_choices";
+    private static final String SHOW_ACTION_CHOICES_ACTION = "show_action_choices";
+    private static final ObjectMapper STRUCTURED_PAYLOAD_OBJECT_MAPPER = new ObjectMapper();
 
     private static String cap(String value, int maxChars) {
         if (value == null || value.length() <= maxChars) {
@@ -118,7 +126,7 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
         // to the originating ToolCall by this id. Emission is a no-op when no streaming
         // run is active (blocking ask() path or non-chat invocation).
         final UUID toolCallId = UUID.randomUUID();
-        emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
+        emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
 
         boolean success = false;
         String output = null;
@@ -139,17 +147,48 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
                     ? cap(errorMessage, RESULT_SUMMARY_MAX_CHARS)
                     : cap(output, RESULT_SUMMARY_MAX_CHARS);
             UUID parentId = RunContext.getRootAuditId();   // may be null defensively (out-of-chain calls — D-10)
-            try {
-                auditWriter.writeToolCall(parentId, runId, userUsername, conversationId, toolName,
-                        cappedInput, resultSummary, latencyMs, outcome,
-                        /*denialReason*/ null, errorClass);
-            } catch (Throwable t2) {
-                log.warn("Tool audit write failed runId={} tool={}", runId, toolName, t2);
+            if (shouldWriteGenericAudit(toolName)) {
+                try {
+                    auditWriter.writeToolCall(parentId, runId, userUsername, conversationId, toolName,
+                            cappedInput, resultSummary, latencyMs, outcome,
+                            /*denialReason*/ null, errorClass);
+                } catch (Throwable t2) {
+                    log.warn("Tool audit write failed runId={} tool={}", runId, toolName, t2);
+                }
             }
             // Plan 07-02: emit post-exit ToolResult to the streaming sink (both success + error paths).
             final String emittedSummary = resultSummary;
-            emitToolEvent(sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(toolCallId, emittedSummary, outcome)));
+            final String emittedPayloadJson = structuredPayloadJson(toolName, output);
+            emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolResult(
+                    toolCallId, toolName, emittedSummary, outcome, emittedPayloadJson)));
         }
+    }
+
+    private static boolean shouldWriteGenericAudit(String toolName) {
+        // ExtractionService owns prepare_form_draft audit rows so denial/failure paths produce
+        // exactly one plan-defined row and no duplicate generic decorator row.
+        return !PREPARE_FORM_DRAFT_TOOL.equals(toolName);
+    }
+
+    private static String structuredPayloadJson(String toolName, String output) {
+        if (output == null || output.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = STRUCTURED_PAYLOAD_OBJECT_MAPPER.readTree(output);
+            if (root != null && PREPARE_FORM_DRAFT_TOOL.equals(toolName)
+                    && OPEN_FORM_WITH_DRAFT_ACTION.equals(root.path("action").asText())) {
+                return output;
+            }
+            if (root != null && PROPOSE_ACTION_CHOICES_TOOL.equals(toolName)
+                    && SHOW_ACTION_CHOICES_ACTION.equals(root.path("action").asText())
+                    && "READY".equals(root.path("status").asText())) {
+                return output;
+            }
+        } catch (RuntimeException | java.io.IOException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private static UUID resolveRunId(ToolContext toolContext) {
@@ -186,12 +225,13 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
      * Non-streaming callers (and callers outside {@code ChatService.stream(...)}) see a no-op
      * — zero behavior change for the Phase-4 blocking path.
      */
-    private void emitToolEvent(java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
+    private void emitToolEvent(UUID runId,
+                               java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
         if (streamingSinkHolder == null) {
             return;
         }
         try {
-            streamingSinkHolder.current().ifPresent(emitter);
+            streamingSinkHolder.currentOrForRun(runId).ifPresent(emitter);
         } catch (RuntimeException ex) {
             log.debug("Streaming tool-event emission failed; continuing with audit-only path", ex);
         }

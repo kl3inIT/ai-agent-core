@@ -221,4 +221,42 @@ class LocaleParityTest {
                 .as("Phase 13.1 attachments namespace must be non-empty")
                 .isNotEmpty();
     }
+
+    @Test
+    void allPhase14IntentKeysPresentInBothBundles() throws IOException {
+        Properties en = load("/com/vn/agent/messages_en.properties");
+        Properties vi = load("/com/vn/agent/messages_vi.properties");
+
+        List<String> requiredKeys = List.of(
+                "chatView.intent.cardRow.ariaLabel",
+                "chatView.intent.auto.label",
+                "chatView.intent.auto.description",
+                "chatView.intent.confirmButton",
+                "chatView.intent.confirmButton.summary",
+                "chatView.intent.draftExpired",
+                "chatView.intent.permissionDenied",
+                "chatView.intent.draftPayloadInvalid",
+                "chatView.intent.cardRow.empty.fallback",
+                "chatView.actionChoice.summary",
+                "chatView.actionChoice.createNow",
+                "chatView.actionChoice.prefillForm",
+                "chatView.actionChoice.missingFields",
+                "chatView.actionChoice.invalidProposal");
+
+        for (String key : requiredKeys) {
+            assertThat(en.containsKey(key))
+                    .as("Phase 14 key %s must exist in messages_en.properties", key)
+                    .isTrue();
+            assertThat(vi.containsKey(key))
+                    .as("Phase 14 key %s must exist in messages_vi.properties", key)
+                    .isTrue();
+
+            assertThat(en.getProperty(key))
+                    .as("Phase 14 key %s must have a non-blank EN value", key)
+                    .isNotBlank();
+            assertThat(vi.getProperty(key))
+                    .as("Phase 14 key %s must have a non-blank VI value", key)
+                    .isNotBlank();
+        }
+    }
 }

@@ -28,3 +28,8 @@ out/
 nexus-credentials*
 gradle-local.properties
 **/nexus.properties
+
+# Playwright MCP scratch output and ad-hoc UAT artifacts.
+.playwright-mcp/
+/output/
+phase14-dom.json

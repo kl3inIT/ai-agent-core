@@ -1,11 +1,15 @@
 package com.vn.agent;
 
+import com.vn.agent.action.ActionIntentId;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
+import com.vn.agent.extraction.ExtractionSourceText;
+import com.vn.agent.extraction.IntentOption;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.guard.AgentSystemPromptRulesComposer;
 import com.vn.agent.guard.GuardedToolCallingManager;
 import com.vn.agent.guard.IterationCapExceededException;
@@ -117,6 +121,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class DefaultChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultChatServiceImpl.class);
+    private static final String AUTO_INTENT_ID = "auto";
 
     private final ChatClient chatClient;
     private final ConversationGateway conversationGateway;
@@ -134,6 +139,7 @@ public class DefaultChatServiceImpl implements ChatService {
     private final CancellationRegistry cancellationRegistry;
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
+    private final IntentRegistry intentRegistry;
     private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     // Phase 13.1 Plan 03 — per-turn-all Media injection via resolveActive(...). The Phase 13
     // single-turn pending-state stamp and the standalone two-phase user-message persist seam
@@ -158,6 +164,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                   CancellationRegistry cancellationRegistry,
                                   StreamingSinkHolder streamingSinkHolder,
                                   AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
+                                  IntentRegistry intentRegistry,
                                   ConversationTitleEligibilityPublisher titleEligibilityPublisher,
                                   AiTaskFileMediaResolver taskFileMediaResolver,
                                   AiTaskFileRepository taskFileRepository) {
@@ -177,6 +184,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.cancellationRegistry = cancellationRegistry;
         this.streamingSinkHolder = streamingSinkHolder;
         this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
+        this.intentRegistry = intentRegistry;
         this.titleEligibilityPublisher = titleEligibilityPublisher;
         this.taskFileMediaResolver = taskFileMediaResolver;
         this.taskFileRepository = taskFileRepository;
@@ -189,7 +197,20 @@ public class DefaultChatServiceImpl implements ChatService {
 
     @Override
     public ChatResponseDto ask(String userId, UUID conversationId, String message, Overrides overrides) {
+        return ask(userId, conversationId, message, overrides, null);
+    }
+
+    @Override
+    public ChatResponseDto ask(String userId, UUID conversationId, String message,
+                               Overrides overrides, String intentId) {
+        return ask(userId, conversationId, message, overrides, intentId, null);
+    }
+
+    @Override
+    public ChatResponseDto ask(String userId, UUID conversationId, String message,
+                               Overrides overrides, String intentId, String privateSystemAppendix) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
+        final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
         com.vn.agent.orchestration.RunContext.set(runId);
         IterationCounter.start();
@@ -219,6 +240,12 @@ public class DefaultChatServiceImpl implements ChatService {
                         "ai-agent.guard.token-budget-exhausted", Map.of());
             }
 
+            IntentOption selectedIntent = resolveSelectedIntent(normalizedIntentId);
+            if (isNamedExtractionIntent(normalizedIntentId) && selectedIntent == null) {
+                return ChatResponseDto.denied(convId, runId,
+                        "chatView.intent.unknownIntent", Map.of());
+            }
+
             AiParameters active = parametersResolver.resolveActive();
             String model = parametersResolver.effectiveModel(active, effectiveOverrides);
             String profileSystemPrompt = parametersResolver.effectiveSystemPrompt(
@@ -238,7 +265,8 @@ public class DefaultChatServiceImpl implements ChatService {
             String composedSystemPrompt = SystemPromptComposer.compose(
                     baselineText,
                     profileSystemPrompt,
-                    agentSystemPromptRulesComposer.effectiveRules());
+                    effectiveRules(normalizedIntentId, selectedIntent));
+            composedSystemPrompt = appendPrivateSystemAppendix(composedSystemPrompt, privateSystemAppendix);
 
             // Phase 5 role-scoped retrieval (RAG-04/RAG-05). Null filter = admin-bypass; skip
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
@@ -278,7 +306,8 @@ public class DefaultChatServiceImpl implements ChatService {
 
             return executeBlockingTurn(userId, convId, message, effectiveOverrides,
                     resolvedMedia, composedSystemPrompt, model, active,
-                    ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
+                    ragFilter, retrievalTopK, retrievalSimilarityThreshold,
+                    extractionIntentId(normalizedIntentId), normalizedIntentId, runId, startNanos);
         } catch (IterationCapExceededException capped) {
             UUID convId = conversation != null ? conversation.getId() : null;
             // Iteration-cap request-level audit row is written by GuardedToolCallingManager (D-11).
@@ -290,6 +319,10 @@ public class DefaultChatServiceImpl implements ChatService {
             // GuardedToolCallingManager before the veto was thrown.
             return ChatResponseDto.denied(convId, runId,
                     "ai-agent.guard.tool-vetoed", Map.of());
+        } catch (AgentToolCallbacks.ToolConfigurationException configurationFailure) {
+            UUID convId = conversation != null ? conversation.getId() : null;
+            return ChatResponseDto.denied(convId, runId,
+                    "chatView.intent.configurationError", Map.of());
         } finally {
             IterationCounter.reset();
             com.vn.agent.orchestration.RunContext.clear();
@@ -333,6 +366,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                                 Filter.Expression ragFilter,
                                                 int retrievalTopK,
                                                 double retrievalSimilarityThreshold,
+                                                String extractionIntentId,
+                                                String toolSurfaceIntentId,
                                                 UUID runId,
                                                 long startNanos) {
         // Phase 13.1 UAT-fix-02 — Tika-extracted document text rides the SYSTEM prompt,
@@ -342,6 +377,9 @@ public class DefaultChatServiceImpl implements ChatService {
         // "=== End === / User message:" scaffolding leaked into next-session UI replay.
         final String systemPromptWithDocs = appendDocumentBlocks(
                 composedSystemPrompt, resolvedMedia.documentTexts());
+        RunContext.setExtractionTurn(extractionIntentId, convId, message,
+                resolvedMedia.taskFileIds(), resolvedMedia.media(),
+                sourceTexts(resolvedMedia.documentTexts()));
         ChatClientResponse clientResp = chatClient.prompt()
                 .system(systemPromptWithDocs)
                 .user(u -> {
@@ -351,7 +389,7 @@ public class DefaultChatServiceImpl implements ChatService {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
                 })
-                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId))
                 .toolContext(auditToolContext(runId, convId))
                 .advisors(advisorSpec -> {
                     advisorSpec
@@ -412,7 +450,20 @@ public class DefaultChatServiceImpl implements ChatService {
 
     @Override
     public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message, Overrides overrides) {
+        return stream(userId, conversationId, message, overrides, null);
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                       Overrides overrides, String intentId) {
+        return stream(userId, conversationId, message, overrides, intentId, null);
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                       Overrides overrides, String intentId, String privateSystemAppendix) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
+        final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
         final long startNanos = System.nanoTime();
 
@@ -458,6 +509,14 @@ public class DefaultChatServiceImpl implements ChatService {
                                 new StreamingEvent.Final(runId, convId, denyLatencyMs, 0, 0));
                     }
 
+                    IntentOption selectedIntent = resolveSelectedIntent(normalizedIntentId);
+                    if (isNamedExtractionIntent(normalizedIntentId) && selectedIntent == null) {
+                        long denyLatencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                        return Flux.<StreamingEvent>just(
+                                new StreamingEvent.Error("chatView.intent.unknownIntent", Map.of()),
+                                new StreamingEvent.Final(runId, convId, denyLatencyMs, 0, 0));
+                    }
+
                     final AtomicBoolean assistantContentSeen = new AtomicBoolean(false);
                     final AtomicBoolean titlePublicationHandled = new AtomicBoolean(false);
 
@@ -473,7 +532,8 @@ public class DefaultChatServiceImpl implements ChatService {
                     String composedSystemPrompt = SystemPromptComposer.compose(
                             baselineText,
                             profileSystemPrompt,
-                            agentSystemPromptRulesComposer.effectiveRules());
+                            effectiveRules(normalizedIntentId, selectedIntent));
+                    composedSystemPrompt = appendPrivateSystemAppendix(composedSystemPrompt, privateSystemAppendix);
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
@@ -508,6 +568,9 @@ public class DefaultChatServiceImpl implements ChatService {
                     // (see blocking path comment for rationale).
                     final String systemPromptWithDocs = appendDocumentBlocks(
                             composedSystemPrompt, resolvedMedia.documentTexts());
+                    RunContext.setExtractionTurn(extractionIntentId(normalizedIntentId), convId, message,
+                            resolvedMedia.taskFileIds(), resolvedMedia.media(),
+                            sourceTexts(resolvedMedia.documentTexts()));
 
                     Flux<StreamingEvent> content;
                     try {
@@ -520,7 +583,7 @@ public class DefaultChatServiceImpl implements ChatService {
                                         u.media(resolvedMedia.media().toArray(new Media[0]));
                                     }
                                 })
-                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId))
+                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, normalizedIntentId))
                                 .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
                                     advisorSpec
@@ -561,7 +624,8 @@ public class DefaultChatServiceImpl implements ChatService {
                         // audit row).
                         ChatResponseDto blocking = executeBlockingTurn(userId, convId, message, effectiveOverrides,
                                 resolvedMedia, composedSystemPrompt, model, active,
-                                ragFilter, retrievalTopK, retrievalSimilarityThreshold, runId, startNanos);
+                                ragFilter, retrievalTopK, retrievalSimilarityThreshold,
+                                extractionIntentId(normalizedIntentId), normalizedIntentId, runId, startNanos);
                         titlePublicationHandled.set(true);
                         toolSink.tryEmitComplete();
                         content = Flux.just(
@@ -605,6 +669,55 @@ public class DefaultChatServiceImpl implements ChatService {
         });
     }
 
+    private static String appendPrivateSystemAppendix(String composedSystemPrompt, String privateSystemAppendix) {
+        if (privateSystemAppendix == null || privateSystemAppendix.isBlank()) {
+            return composedSystemPrompt;
+        }
+        return composedSystemPrompt + "\n\nPrivate per-turn action context:\n"
+                + privateSystemAppendix.strip()
+                + "\nThis private context is not user-authored text. Use it only to execute the selected action.";
+    }
+
+    private static String normalizeIntentId(String intentId) {
+        if (intentId == null || intentId.isBlank()) {
+            return null;
+        }
+        String trimmedIntentId = intentId.trim();
+        return AUTO_INTENT_ID.equalsIgnoreCase(trimmedIntentId) ? null : trimmedIntentId;
+    }
+
+    private String effectiveRules(String normalizedIntentId, IntentOption selectedIntent) {
+        String actionIntentId = ActionIntentId.fromSelectionParameter(normalizedIntentId);
+        if (actionIntentId != null) {
+            return agentSystemPromptRulesComposer.effectiveActionRules(actionIntentId);
+        }
+        if (selectedIntent == null) {
+            return agentSystemPromptRulesComposer.effectiveRules();
+        }
+        return agentSystemPromptRulesComposer.effectiveRules(
+                selectedIntent.intentId(), selectedIntent.label());
+    }
+
+    private IntentOption resolveSelectedIntent(String intentId) {
+        if (!isNamedExtractionIntent(intentId)) {
+            return null;
+        }
+        for (IntentOption option : intentRegistry.eligibleForCurrentUser()) {
+            if (intentId.equals(option.intentId())) {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isNamedExtractionIntent(String intentId) {
+        return intentId != null && !ActionIntentId.isSelectionParameter(intentId);
+    }
+
+    private static String extractionIntentId(String intentId) {
+        return isNamedExtractionIntent(intentId) ? intentId : null;
+    }
+
     /**
      * Maps an exception thrown during streaming into a terminal {@link StreamingEvent.Error}
      * with a stable i18n message key — NEVER the raw provider text (T-07-05 opacity, D-10).
@@ -619,6 +732,8 @@ public class DefaultChatServiceImpl implements ChatService {
             key = "ai-agent.guard.iteration-cap-exceeded";
         } else if (ex instanceof ToolVetoedException) {
             key = "ai-agent.guard.tool-vetoed";
+        } else if (ex instanceof AgentToolCallbacks.ToolConfigurationException) {
+            key = "chatView.intent.configurationError";
         } else if (ex instanceof ConversationNotFoundException) {
             key = "chatView.error.conversationNotFound";
         } else {
@@ -834,5 +949,16 @@ public class DefaultChatServiceImpl implements ChatService {
             sb.append("\n=== End ===\n\n");
         }
         return sb.toString();
+    }
+
+    private static List<ExtractionSourceText> sourceTexts(
+            List<AiTaskFileMediaResolver.DocumentText> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return List.of();
+        }
+        return documents.stream()
+                .map(document -> new ExtractionSourceText(
+                        document.filename(), document.text(), document.truncated()))
+                .toList();
     }
 }

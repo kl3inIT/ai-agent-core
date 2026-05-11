@@ -67,4 +67,15 @@ public class StreamingSinkHolder {
         }
         return Optional.ofNullable(sinksByRunId.get(runId));
     }
+
+    /**
+     * Prefer the explicit run id supplied by Spring AI {@code ToolContext}, then fall back to
+     * the current thread's {@link RunContext}. Tool callbacks may execute with ThreadLocal state
+     * restored differently from the outer stream subscriber, but the stream sink is still keyed
+     * by the stable run id.
+     */
+    public Optional<Sinks.Many<StreamingEvent>> currentOrForRun(UUID runId) {
+        Optional<Sinks.Many<StreamingEvent>> sink = forRun(runId);
+        return sink.isPresent() ? sink : current();
+    }
 }

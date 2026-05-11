@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="1" author="ai-agent">
+        <createTable tableName="AI_EXTRACTION_DRAFT">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="USER_USERNAME" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="TARGET_ENTITY_NAME" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="INTENT_ID" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="PAYLOAD_JSON" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="SOURCE_CONVERSATION_ID" type="${uuid.type}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="SOURCE_TASK_FILE_ID" type="${uuid.type}"/>
+            <column name="INSTANCE_NAME" type="varchar(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CREATED_AT" type="${offsetDateTime.type}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="EXPIRES_AT" type="${offsetDateTime.type}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CONFIRMED" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <createIndex indexName="IDX_AI_EXTRACTION_DRAFT__USER_USERNAME"
+                     tableName="AI_EXTRACTION_DRAFT">
+            <column name="USER_USERNAME"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_EXTRACTION_DRAFT__EXPIRES_AT"
+                     tableName="AI_EXTRACTION_DRAFT">
+            <column name="EXPIRES_AT"/>
+        </createIndex>
+        <createIndex indexName="IDX_AI_EXTRACTION_DRAFT__SOURCE_CONVERSATION"
+                     tableName="AI_EXTRACTION_DRAFT">
+            <column name="SOURCE_CONVERSATION_ID"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

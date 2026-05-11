@@ -54,6 +54,12 @@
                     <vbox id="messageListSlot" width="100%" height="100%"
                           padding="false" spacing="false"
                           classNames="ai-agent-chat-panel__messages"/>
+                    <radioButtonGroup id="intentCardRow"
+                                      classNames="ai-agent-intent-card-row"
+                                      themeNames="horizontal"
+                                      visible="false"
+                                      width="100%"
+                                      ariaLabel="msg:///chatView.intent.cardRow.ariaLabel"/>
                     <vbox id="messageInputSlot" width="100%"
                           padding="false" spacing="false"
                           classNames="ai-agent-chat-panel__input"/>

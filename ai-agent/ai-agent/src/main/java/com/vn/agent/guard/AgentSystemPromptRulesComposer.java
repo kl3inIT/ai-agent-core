@@ -1,7 +1,9 @@
 package com.vn.agent.guard;
 
+import com.vn.agent.action.ActionIntentId;
 import com.vn.agent.tools.mutation.AiAgentMutationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 /**
  * Phase 11 MUT-10 sibling top-level composer that selects between
@@ -28,6 +30,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class AgentSystemPromptRulesComposer {
 
+    private static final String ACTION_PROPOSAL_RULES = String.join("\n",
+            "",
+            "Action intent rules:",
+            "- For create or update requests, gather missing required fields first.",
+            "- If the user asks for an ambiguous record count (for example, '2 or 3 records'), ask a clarification question before proposing actions.",
+            "- propose_action_choices supports one record per proposal. For multi-record create requests, either ask the user to handle them one at a time or propose separate single-record choices; never pass an array as values.",
+            "- When enough structured data is available, call propose_action_choices with the target entity and collected writable values.",
+            "- Do not call create_record, update_record, or bulk_save_records during the planning turn.",
+            "- Wait for the user to choose an action intent before performing a side effect.",
+            "");
+
     private final AiAgentMutationProperties mutationProperties;
 
     public AgentSystemPromptRulesComposer(AiAgentMutationProperties mutationProperties) {
@@ -42,9 +55,77 @@ public class AgentSystemPromptRulesComposer {
      *         needing to know the joining convention.
      */
     public String effectiveRules() {
+        String baseRules;
         if (mutationProperties.resolvedEnabled()) {
-            return AgentSystemPromptRules.PROMPT_RULES + AgentSystemPromptRules.MUTATION_PROMPT_RULES;
+            baseRules = AgentSystemPromptRules.PROMPT_RULES + AgentSystemPromptRules.MUTATION_PROMPT_RULES;
+        } else {
+            baseRules = AgentSystemPromptRules.PROMPT_RULES;
         }
-        return AgentSystemPromptRules.PROMPT_RULES;
+        return baseRules + ACTION_PROPOSAL_RULES;
+    }
+
+    /**
+     * Adds the extraction-specific rule suffix for a single named-intent turn.
+     */
+    public String effectiveRules(String intentId, String label) {
+        String baseRules = mutationProperties.resolvedEnabled()
+                ? AgentSystemPromptRules.PROMPT_RULES + AgentSystemPromptRules.MUTATION_PROMPT_RULES
+                : AgentSystemPromptRules.PROMPT_RULES;
+        if (!StringUtils.hasText(intentId)) {
+            return effectiveRules();
+        }
+        String safeIntentId = escapePromptLiteral(intentId.trim());
+        String safeLabel = sanitizePromptLabel(StringUtils.hasText(label) ? label.trim() : intentId.trim());
+        return baseRules + String.join("\n",
+                "",
+                "Named extraction intent rules:",
+                "- The user selected the named extraction intent '" + safeLabel + "'.",
+                "- To fulfill this named-intent turn, you MUST call prepare_form_draft(\""
+                        + safeIntentId + "\", contextRefs).",
+                "- Call prepare_form_draft at most once for this turn.",
+                "- If extracted or generated values are incomplete or ambiguous, ask the user"
+                        + " for the missing information instead of inventing values.",
+                "- Draft promotion happens only after the user opens the Jmix detail view and"
+                        + " clicks Save.",
+                ""
+        );
+    }
+
+    /**
+     * Adds the selected post-proposal action rule suffix.
+     */
+    public String effectiveActionRules(String actionIntentId) {
+        String baseRules = effectiveRules();
+        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
+            return baseRules + String.join("\n",
+                    "",
+                    "Selected action intent rules:",
+                    "- The user selected create-now.",
+                    "- Use the collected proposal values from the private per-turn action context.",
+                    "- Call create_record only for the selected target entity and only with those collected values.",
+                    "- Do not call prepare_form_draft in this turn.",
+                    "");
+        }
+        if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {
+            return baseRules + String.join("\n",
+                    "",
+                    "Selected action intent rules:",
+                    "- The user selected prefill-form.",
+                    "- Prepare a draft/form path only.",
+                    "- Do not call create_record, update_record, or bulk_save_records in this turn.",
+                    "");
+        }
+        return baseRules;
+    }
+
+    private static String escapePromptLiteral(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"");
+    }
+
+    private static String sanitizePromptLabel(String value) {
+        return value.replace('\r', ' ')
+                .replace('\n', ' ')
+                .replace("'", "\\'");
     }
 }

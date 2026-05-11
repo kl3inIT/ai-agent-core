@@ -7,6 +7,8 @@ import org.springframework.lang.Nullable;
 public enum AiToolCallOutcome implements EnumClass<String> {
 
     SUCCESS("SUCCESS"),
+    DENIED("DENIED"),
+    FAILED("FAILED"),
     BLOCKED("BLOCKED"),
     ERROR("ERROR"),
     FLAGGED("FLAGGED"),

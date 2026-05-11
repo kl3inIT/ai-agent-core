@@ -154,3 +154,99 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
 .attachment-card-source-text {
     font-size: 0.7rem;
 }
+
+/* --- Phase 14: intent card-row picker -------------------------------------- */
+
+.ai-agent-intent-card-row {
+    width: 100%;
+    margin: var(--lumo-space-s) 0;
+    gap: var(--lumo-space-xs);
+}
+
+.ai-agent-intent-card-row vaadin-radio-button {
+    cursor: pointer;
+}
+
+.ai-agent-intent-card-row vaadin-radio-button::part(radio) {
+    display: none;
+}
+
+.ai-agent-intent-card-row vaadin-radio-button::part(label) {
+    width: 100%;
+    margin: 0;
+}
+
+.ai-agent-intent-card {
+    width: 100%;
+    min-width: 12rem;
+    max-width: 16rem;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ai-agent-intent-card:hover {
+    background-color: var(--lumo-contrast-5pct);
+}
+
+.ai-agent-intent-card--selected {
+    border: 0.125rem solid var(--lumo-primary-color);
+    background-color: var(--lumo-primary-color-10pct);
+}
+
+.ai-agent-intent-card__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-agent-intent-card__description {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* --- Phase 14: inline "Open form to confirm" row --------------------------- */
+
+.ai-agent-intent-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lumo-space-s);
+    padding: var(--lumo-space-s) var(--lumo-space-m);
+    margin: var(--lumo-space-s) auto;
+    min-height: 4rem;
+    max-width: fit-content;
+    background: var(--lumo-base-color);
+    border: 0.0625rem solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-l);
+    box-shadow: var(--lumo-box-shadow-xs);
+}
+
+.ai-agent-intent-confirm__summary {
+    color: var(--lumo-secondary-text-color);
+    font-size: var(--lumo-font-size-s);
+}
+
+/* --- Phase 14 gap closure: post-proposal action choices -------------------- */
+
+.ai-agent-action-choice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--lumo-space-s);
+    padding: var(--lumo-space-s) var(--lumo-space-m);
+    margin: var(--lumo-space-s) auto;
+    min-height: 4rem;
+    max-width: min(100%, 32rem);
+    background: var(--lumo-base-color);
+    border: 0.0625rem solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-l);
+    box-shadow: var(--lumo-box-shadow-xs);
+}
+
+.ai-agent-action-choice__summary {
+    color: var(--lumo-secondary-text-color);
+    font-size: var(--lumo-font-size-s);
+}

@@ -3,6 +3,7 @@ package com.vn.agent.rag;
 import com.vn.agent.DefaultChatServiceImpl;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
@@ -120,7 +121,7 @@ class ChatServiceFilterParamContractTest {
         when(parametersResolver.effectiveRagTopK(any(), anyInt())).thenReturn(10);
         when(parametersResolver.effectiveRagSimilarityThreshold(any(), anyDouble())).thenReturn(0.1);
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.*");
-        when(toolCallbacks.callbacksFor(anyString(), any())).thenReturn(new org.springframework.ai.tool.ToolCallback[]{});
+        when(toolCallbacks.callbacksFor(anyString(), any(), any())).thenReturn(new org.springframework.ai.tool.ToolCallback[]{});
 
         // Fluent chain — every builder call returns requestSpec; .call().chatResponse() returns null.
         when(chatClient.prompt()).thenReturn(requestSpec);
@@ -164,6 +165,7 @@ class ChatServiceFilterParamContractTest {
                 cancellationRegistry,
                 streamingSinkHolder,
                 rulesComposer,
+                mock(IntentRegistry.class),
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
                 mock(com.vn.agent.taskfile.AiTaskFileRepository.class));

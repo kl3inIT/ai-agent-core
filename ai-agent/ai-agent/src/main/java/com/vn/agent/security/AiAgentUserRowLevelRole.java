@@ -1,6 +1,7 @@
 package com.vn.agent.security;
 
 import com.vn.agent.entity.AiConversation;
+import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiTaskFile;
 import io.jmix.security.role.annotation.JpqlRowLevelPolicy;
@@ -37,4 +38,9 @@ public interface AiAgentUserRowLevelRole {
             entityClass = AiTaskFile.class,
             where = "{E}.userUsername = :current_user_username")
     void taskFile();
+
+    @JpqlRowLevelPolicy(
+            entityClass = AiExtractionDraft.class,
+            where = "{E}.userUsername = :current_user_username")
+    void extractionDraft();
 }

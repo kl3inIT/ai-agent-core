@@ -4,6 +4,7 @@ import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.guard.AgentSystemPromptRulesComposer;
 import com.vn.agent.guard.RateLimitGuard;
 import com.vn.agent.guard.TokenBudgetGuard;
@@ -92,6 +93,7 @@ class DefaultChatServiceImplStreamFallbackTest {
     private CancellationRegistry cancellationRegistry;
     private StreamingSinkHolder streamingSinkHolder;
     private AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
+    private IntentRegistry intentRegistry;
     private ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     private AiTaskFileMediaResolver taskFileMediaResolver;
     private AiTaskFileRepository taskFileRepository;
@@ -119,6 +121,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         cancellationRegistry = mock(CancellationRegistry.class);
         streamingSinkHolder = mock(StreamingSinkHolder.class);
         agentSystemPromptRulesComposer = mock(AgentSystemPromptRulesComposer.class);
+        intentRegistry = mock(IntentRegistry.class);
         titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
         taskFileMediaResolver = mock(AiTaskFileMediaResolver.class);
         taskFileRepository = mock(AiTaskFileRepository.class);
@@ -157,7 +160,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         // override this to exercise the budget-exceeded propagation contract.
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), List.of(), false));
+                .thenReturn(new Resolved(List.of(media), List.of(), false, List.of(UUID.randomUUID())));
 
         sut = new DefaultChatServiceImpl(
                 chatClient,
@@ -176,6 +179,7 @@ class DefaultChatServiceImplStreamFallbackTest {
                 cancellationRegistry,
                 streamingSinkHolder,
                 agentSystemPromptRulesComposer,
+                intentRegistry,
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
                 taskFileRepository);
@@ -301,7 +305,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         // Override the default Resolved stub: budgetExceeded=true.
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), List.of(), true));
+                .thenReturn(new Resolved(List.of(media), List.of(), true, List.of(UUID.randomUUID())));
         stubChatClientForStreamingSuccess();
 
         StreamingEvent terminal = sut.stream(USER_ID, convId, MESSAGE, Overrides.NONE).blockLast();
@@ -320,7 +324,7 @@ class DefaultChatServiceImplStreamFallbackTest {
     void blockingPathPropagatesBudgetExceeded() {
         Media media = mock(Media.class);
         when(taskFileMediaResolver.resolveActive(convId))
-                .thenReturn(new Resolved(List.of(media), List.of(), true));
+                .thenReturn(new Resolved(List.of(media), List.of(), true, List.of(UUID.randomUUID())));
         stubChatClientForBlocking();
 
         ChatResponseDto resp = sut.ask(USER_ID, convId, MESSAGE, Overrides.NONE);

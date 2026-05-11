@@ -14,8 +14,12 @@ class AgentSystemPromptRulesComposerTest {
 
         String rules = composer.effectiveRules();
 
-        assertThat(rules).isEqualTo(AgentSystemPromptRules.PROMPT_RULES);
-        assertThat(rules).contains("Vocabulary rules:");
+        assertThat(rules)
+                .startsWith(AgentSystemPromptRules.PROMPT_RULES)
+                .contains("Vocabulary rules:")
+                .contains("Action intent rules:")
+                .contains("propose_action_choices")
+                .contains("Wait for the user to choose an action intent before performing a side effect.");
         assertThat(rules)
                 .doesNotContain("idempotencyKey")
                 .doesNotContain("parameter_conversion_error")
@@ -34,6 +38,8 @@ class AgentSystemPromptRulesComposerTest {
         assertThat(rules).startsWith(AgentSystemPromptRules.PROMPT_RULES);
         assertThat(rules).contains(AgentSystemPromptRules.MUTATION_PROMPT_RULES);
         assertThat(rules)
+                .contains("Action intent rules:")
+                .contains("propose_action_choices")
                 .contains("idempotencyKey")
                 .contains("fresh random UUID v4")
                 .contains("third group is '4'")
@@ -45,5 +51,25 @@ class AgentSystemPromptRulesComposerTest {
                 .contains("generate_entity_detail_link")
                 .contains("immediately call generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
+    }
+
+    @Test
+    void namedIntentAppendsExtractionRulesOnlyForNamedIntent() {
+        AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
+                new AiAgentMutationProperties(null, null, null, null, null));
+
+        assertThat(composer.effectiveRules(null, "Customer"))
+                .isEqualTo(composer.effectiveRules());
+
+        String rules = composer.effectiveRules("customer-from-source", "Customer");
+
+        assertThat(rules)
+                .startsWith(AgentSystemPromptRules.PROMPT_RULES)
+                .contains("Named extraction intent rules:")
+                .contains("prepare_form_draft(\"customer-from-source\", contextRefs)")
+                .contains("Call prepare_form_draft at most once")
+                .contains("ask the user for the missing information instead of inventing values")
+                .contains("Jmix detail view")
+                .doesNotContain("payloadJson");
     }
 }

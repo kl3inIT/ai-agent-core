@@ -1,11 +1,19 @@
 package com.vn.agent.view.chat.fragment;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.H5;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.messages.MessageInput;
 import com.vaadin.flow.component.messages.MessageList;
 import com.vaadin.flow.component.messages.MessageListItem;
@@ -13,18 +21,25 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.upload.FileRejectedEvent;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.shared.Registration;
 import com.vn.agent.ChatService;
+import com.vn.agent.action.ActionIntentId;
+import com.vn.agent.action.ActionProposal;
+import com.vn.agent.action.ActionProposalService;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.extraction.IntentOption;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
+import com.vn.agent.view.chat.intent.OpenFormWithDraftHandler;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
@@ -34,11 +49,14 @@ import io.jmix.core.Metadata;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
+import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
+import io.jmix.flowui.component.card.JmixCard;
 import io.jmix.flowui.component.gridlayout.GridLayout;
+import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.upload.JmixUpload;
 import io.jmix.flowui.component.validation.ValidationErrors;
 import io.jmix.flowui.fragment.Fragment;
@@ -49,6 +67,7 @@ import io.jmix.flowui.kit.component.button.JmixButton;
 import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.Subscribe;
+import io.jmix.flowui.view.Supply;
 import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
@@ -57,6 +76,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 
@@ -98,12 +120,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             OffsetDateTime.of(9999, 12, 31, 23, 59, 59, 0, ZoneOffset.UTC);
     private static final int USER_COLOR = 0;
     private static final int AI_COLOR = 2;
+    private static final String AUTO_INTENT_ID = "__auto__";
 
     @ViewComponent private JmixButton stopButton;
     @ViewComponent private JmixButton newChatButton;
     @ViewComponent private H3 conversationTitle;
     @ViewComponent private JmixButton editConversationTitleButton;
     @ViewComponent private VerticalLayout messageListSlot;
+    @ViewComponent private JmixRadioButtonGroup<IntentOption> intentCardRow;
     @ViewComponent private VerticalLayout messageInputSlot;
 
     // Phase 13.1 REQ-7 / Pitfall 6 — slot id contract preserved; field type stays
@@ -125,6 +149,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private DataManager dataManager;
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
+    @Autowired private IntentRegistry intentRegistry;
+    @Autowired private OpenFormWithDraftHandler openFormWithDraftHandler;
+    @Autowired private ActionProposalService actionProposalService;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private UiComponents uiComponents;
     // Phase 13 Plan 04 — task-file persistence collaborators.
     @Autowired private Metadata metadataApi;
     @Autowired private FileStorageLocator fileStorageLocator;
@@ -135,6 +164,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private ProgressBar streamProgressBar;
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
+    private final Map<String, List<JmixCard>> intentCardsByKey = new HashMap<>();
+    private final Map<String, Div> actionChoiceRowsByProposalId = new HashMap<>();
 
     private Path uploadTempDir;
 
@@ -188,6 +219,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private volatile Disposable activeStream;
     private MessageListItem botMsg;
     private volatile UI ownerUi;
+    private volatile Authentication ownerAuthentication;
     private Registration conversationIdStateRegistration;
     // Phase 13.1 UAT-fix — tracks visible turns across the mixed substrate
     // (MessageList items + NOTICE divs) so hasMessages() is O(1).
@@ -215,6 +247,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageInputSlot.add(streamProgressBar, messageInput);
 
         resolveLabels();
+        ownerAuthentication = captureCurrentAuthentication();
+        hideInitialIntentCardRow();
         updateTitleEditState();
 
         // Phase 13.1 UI-01 — right-pane upload handler + loader binding.
@@ -292,6 +326,120 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         boolean empty = taskFilesDc.getItems().isEmpty();
         attachmentsEmptyState.setVisible(empty);
         attachmentsGridLayout.setVisible(!empty);
+    }
+
+    void refreshIntentCardRow() {
+        if (intentCardRow == null) {
+            return;
+        }
+        IntentOption autoOption = buildAutoIntentOption();
+        List<IntentOption> namedIntents = intentRegistry == null
+                ? List.of()
+                : intentRegistry.eligibleForCurrentUser();
+        List<IntentOption> options = new ArrayList<>(namedIntents.size() + 1);
+        options.add(autoOption);
+        options.addAll(namedIntents);
+
+        List<IntentOption> currentIntentOptions = List.copyOf(options);
+        intentCardsByKey.clear();
+        intentCardRow.setItems(currentIntentOptions);
+        intentCardRow.setVisible(!namedIntents.isEmpty());
+        intentCardRow.setValue(autoOption);
+    }
+
+    private void hideInitialIntentCardRow() {
+        if (intentCardRow != null) {
+            intentCardRow.setVisible(false);
+            intentCardRow.setValue(buildAutoIntentOption());
+        }
+    }
+
+    @Supply(to = "intentCardRow", subject = "renderer")
+    private ComponentRenderer<JmixCard, IntentOption> intentCardRowRenderer() {
+        return new ComponentRenderer<>(this::createIntentCard);
+    }
+
+    @Subscribe("intentCardRow")
+    public void onIntentCardRowValueChange(
+            final AbstractField.ComponentValueChangeEvent<JmixRadioButtonGroup<IntentOption>, IntentOption> event) {
+        refreshIntentCardSelection();
+    }
+
+    private IntentOption buildAutoIntentOption() {
+        return new IntentOption(
+                AUTO_INTENT_ID,
+                resolveLabel("chatView.intent.auto.label", "Auto"),
+                resolveLabel("chatView.intent.auto.description", "Default chat"),
+                null,
+                true);
+    }
+
+    private JmixCard createIntentCard(IntentOption option) {
+        IntentOption safeOption = option == null ? buildAutoIntentOption() : option;
+
+        JmixCard card = uiComponents.create(JmixCard.class);
+        card.addThemeVariants(CardVariant.LUMO_OUTLINED);
+        card.addClassName("ai-agent-intent-card");
+        card.setWidthFull();
+
+        H5 title = new H5(safeText(safeOption.label()));
+        title.addClassNames("m-0", "ai-agent-intent-card__label");
+
+        Span description = new Span(intentDescription(safeOption));
+        description.addClassNames("text-secondary", "text-s", "ai-agent-intent-card__description");
+
+        card.setHeaderPrefix(safeOption.auto()
+                ? VaadinIcon.MAGIC.create()
+                : VaadinIcon.FILE_TEXT_O.create());
+        card.setTitle(title);
+        card.add(description);
+
+        intentCardsByKey.computeIfAbsent(intentCardKey(safeOption), ignored -> new ArrayList<>())
+                .add(card);
+        applyIntentCardSelection(card, safeOption);
+        return card;
+    }
+
+    private String intentDescription(IntentOption option) {
+        if (option.auto()) {
+            return safeText(option.description());
+        }
+        String key = "chatView.intent." + option.intentId() + ".description";
+        return resolveLabel(key, safeText(option.description()));
+    }
+
+    private void refreshIntentCardSelection() {
+        if (intentCardRow == null) {
+            return;
+        }
+        String selectedKey = intentCardKey(intentCardRow.getValue());
+        for (Map.Entry<String, List<JmixCard>> entry : intentCardsByKey.entrySet()) {
+            boolean selected = Objects.equals(selectedKey, entry.getKey());
+            for (JmixCard card : entry.getValue()) {
+                if (selected) {
+                    card.addClassName("ai-agent-intent-card--selected");
+                } else {
+                    card.removeClassName("ai-agent-intent-card--selected");
+                }
+            }
+        }
+    }
+
+    private void applyIntentCardSelection(JmixCard card, IntentOption option) {
+        if (Objects.equals(intentCardKey(option), intentCardKey(intentCardRow.getValue()))) {
+            card.addClassName("ai-agent-intent-card--selected");
+        }
+    }
+
+    private String intentCardKey(IntentOption option) {
+        if (option == null || option.auto()) {
+            return AUTO_INTENT_ID;
+        }
+        return option.intentId();
+    }
+
+    private static String safeText(String value) {
+        return value == null ? "" : value;
     }
 
     /**
@@ -539,11 +687,23 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void onSubmit(MessageInput.SubmitEvent event) {
         String text = event.getValue();
         if (text == null || text.isBlank()) return;
+        if (looksLikeActionCancellation(text)) {
+            removeAllActionChoiceRows();
+        }
+        submitChatTurn(text, text, selectedIntentIdForSubmit());
+    }
 
+    private void submitChatTurn(String displayText, String modelText, String toolSurfaceIntentId) {
+        submitChatTurn(displayText, modelText, toolSurfaceIntentId, null);
+    }
+
+    private void submitChatTurn(String displayText, String modelText,
+                                String toolSurfaceIntentId,
+                                String privateSystemAppendix) {
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
 
-        MessageListItem userItem = new MessageListItem(text, Instant.now(), userName);
+        MessageListItem userItem = new MessageListItem(displayText, Instant.now(), userName);
         userItem.setUserColorIndex(USER_COLOR);
         items.add(userItem);
         messageCount++;
@@ -557,11 +717,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
         setStreamingUiState(true);
 
+        final Authentication submitAuthentication = captureCurrentAuthentication();
+        ownerAuthentication = submitAuthentication;
         final String userId = currentAuthentication.getUser().getUsername();
-        final UUID targetConversationId = ensureConversationIdForSubmit(userId, text);
+        final UUID targetConversationId = conversationId;
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
-
-        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, text, null);
+        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, modelText,
+                null, toolSurfaceIntentId, privateSystemAppendix);
+        resetIntentCardRowToAutoIfNamed(toolSurfaceIntentId);
         activeStream = source
                 .doOnSubscribe(sub -> {
                     if (sub instanceof Disposable disposable && activeRunId != null) {
@@ -574,8 +737,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                             activeRunId = f.runId();
                         }
                         if (conversationId == null && f.conversationId() != null) {
-                            conversationId = f.conversationId();
-                            updateSessionConversationId(conversationId);
+                            accessUiAuthenticated(submitAuthentication, () ->
+                                    initializeConversationFromFinalEvent(f.conversationId()));
                         }
                         // Phase 13.1 D-D1 — streaming-path budget-exceeded toast (CONTEXT D-D1
                         // demands the toast on BOTH transports; the streaming Final event
@@ -585,7 +748,24 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                             showBudgetExceededToast();
                         }
                     }
-                    String md = StreamEventRenderer.renderStreamEvent(evt, labels, citationState);
+                    StreamEventRenderer.RenderedStreamEvent rendered =
+                            StreamEventRenderer.renderStreamEventDetails(evt, labels, citationState);
+                    if (rendered.draftPayloadInvalid()) {
+                        accessUi(this::showDraftPayloadInvalidNotification);
+                    }
+                    if (rendered.draftPayload() != null) {
+                        StreamEventRenderer.DraftPayload draftPayload = rendered.draftPayload();
+                        accessUi(() -> appendIntentConfirmRow(
+                                draftPayload.draftId(),
+                                draftPayload.entityName(),
+                                draftPayload.instanceName()));
+                    }
+                    if (rendered.actionProposalPayload() != null) {
+                        StreamEventRenderer.ActionProposalPayload actionProposalPayload =
+                                rendered.actionProposalPayload();
+                        accessUi(() -> appendActionChoiceRow(actionProposalPayload));
+                    }
+                    String md = rendered.markdown();
                     if (md.isEmpty()) return;
                     accessUi(() -> {
                         if (botMsg != null) {
@@ -600,6 +780,38 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnComplete(() -> accessUi(this::finishStreamInternal))
                 .subscribe();
+    }
+
+    private void initializeConversationFromFinalEvent(UUID newConversationId) {
+        if (conversationId != null || newConversationId == null) {
+            return;
+        }
+        conversationId = newConversationId;
+        updateSessionConversationId(conversationId);
+        updateTitleEditState();
+        if (taskFilesDl != null) {
+            taskFilesDl.setParameter("conversationId", conversationId);
+            taskFilesDl.load();
+        }
+    }
+
+    private String selectedIntentIdForSubmit() {
+        if (intentCardRow == null) {
+            return null;
+        }
+        IntentOption selectedOption = intentCardRow.getValue();
+        if (selectedOption == null || selectedOption.auto()) {
+            return null;
+        }
+        return selectedOption.intentId();
+    }
+
+    private void resetIntentCardRowToAutoIfNamed(String selectedIntentId) {
+        if (selectedIntentId == null || intentCardRow == null) {
+            return;
+        }
+        intentCardRow.setValue(buildAutoIntentOption());
+        refreshIntentCardSelection();
     }
 
     /**
@@ -633,6 +845,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 .show());
     }
 
+    private void showDraftPayloadInvalidNotification() {
+        notifications.create(messages.getMessage("chatView.intent.draftPayloadInvalid"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .show();
+    }
+
     private void finishStreamInternal() {
         setStreamingUiState(false);
         if (activeRunId != null) cancellationRegistry.clearDisposable(activeRunId);
@@ -654,30 +872,6 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     // ---- Helpers -----------------------------------------------------------
-
-    /**
-     * Reserve a stable conversation id before streaming starts so follow-up turns always
-     * continue the same thread, even if the stream terminates before a Final event arrives.
-     */
-    UUID ensureConversationIdForSubmit(String userId, String firstMessage) {
-        if (conversationId != null) {
-            return conversationId;
-        }
-        AiConversation conversation = conversationGateway.loadOrCreate(userId, null, firstMessage);
-        UUID resolved = conversation.getId();
-        if (resolved == null) {
-            throw new IllegalStateException("Conversation id must not be null");
-        }
-        conversationId = resolved;
-        updateConversationTitle(conversation.getTitle());
-        updateTitleEditState();
-        updateSessionConversationId(resolved);
-        if (taskFilesDl != null) {
-            taskFilesDl.setParameter("conversationId", resolved);
-            taskFilesDl.load();
-        }
-        return resolved;
-    }
 
     void registerConversationIdStateListener(UI ui) {
         unregisterConversationIdStateListener();
@@ -772,8 +966,236 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageCount++;
     }
 
+    void appendIntentConfirmRow(UUID draftId, String entityName, String instanceName) {
+        Div row = new Div();
+        row.addClassName("ai-agent-intent-confirm");
+        row.getElement().setAttribute("role", "status");
+        row.getElement().setAttribute("aria-live", "polite");
+
+        Span summary = new Span(MessageFormat.format(
+                messages.getMessage("chatView.intent.confirmButton.summary"),
+                safeText(instanceName)));
+        summary.addClassName("ai-agent-intent-confirm__summary");
+
+        Button confirmButton = new Button(
+                messages.getMessage("chatView.intent.confirmButton"),
+                VaadinIcon.EXTERNAL_LINK.create());
+        confirmButton.addThemeNames("primary", "small");
+        confirmButton.setAriaLabel(messages.getMessage("chatView.intent.confirmButton"));
+        confirmButton.addClickListener(event -> {
+            OpenFormWithDraftHandler.OpenResult result =
+                    openFormWithDraftHandler.open(this, draftId, entityName, instanceName);
+            if (result.status() == OpenFormWithDraftHandler.OpenStatus.EXPIRED) {
+                markIntentConfirmRowExpired(summary, confirmButton);
+            }
+        });
+
+        row.add(summary, confirmButton);
+        messageListSlot.add(row);
+        messageCount++;
+    }
+
+    void appendActionChoiceRow(StreamEventRenderer.ActionProposalPayload proposalPayload) {
+        if (proposalPayload == null || proposalPayload.choices().isEmpty()) {
+            return;
+        }
+        Div row = new Div();
+        row.addClassName("ai-agent-action-choice");
+        row.getElement().setAttribute("role", "status");
+        row.getElement().setAttribute("aria-live", "polite");
+        row.getElement().setAttribute("data-proposal-id", proposalPayload.proposalId());
+
+        Span summary = new Span(MessageFormat.format(
+                messages.getMessage("chatView.actionChoice.summary"),
+                safeText(proposalPayload.instanceName())));
+        summary.addClassName("ai-agent-action-choice__summary");
+        row.add(summary);
+
+        if (proposalPayload.choices().contains(ActionIntentId.CREATE_NOW)) {
+            Button createNowButton = new Button(
+                    messages.getMessage("chatView.actionChoice.createNow"),
+                    VaadinIcon.CHECK.create());
+            createNowButton.addThemeNames("primary", "small");
+            createNowButton.setAriaLabel(messages.getMessage("chatView.actionChoice.createNow"));
+            createNowButton.addClickListener(event ->
+                    submitActionChoice(row, proposalPayload, ActionIntentId.CREATE_NOW));
+            row.add(createNowButton);
+        }
+        if (proposalPayload.choices().contains(ActionIntentId.PREFILL_FORM)) {
+            Button prefillButton = new Button(
+                    messages.getMessage("chatView.actionChoice.prefillForm"),
+                    VaadinIcon.EXTERNAL_LINK.create());
+            prefillButton.addThemeNames("small");
+            prefillButton.setAriaLabel(messages.getMessage("chatView.actionChoice.prefillForm"));
+            prefillButton.addClickListener(event ->
+                    submitActionChoice(row, proposalPayload, ActionIntentId.PREFILL_FORM));
+            row.add(prefillButton);
+        }
+        Button discardButton = new Button(
+                messages.getMessage("chatView.actionChoice.discard"),
+                VaadinIcon.CLOSE_SMALL.create());
+        discardButton.addThemeNames("small", "tertiary");
+        discardButton.setAriaLabel(messages.getMessage("chatView.actionChoice.discard"));
+        discardButton.addClickListener(event -> removeActionChoiceRow(row));
+        row.add(discardButton);
+
+        // The model can re-emit a proposal with the same proposalId; drop any stale row first
+        // so it does not leak in messageListSlot and double-count messageCount.
+        Div existingRow = actionChoiceRowsByProposalId.get(proposalPayload.proposalId());
+        if (existingRow != null) {
+            removeActionChoiceRow(existingRow);
+        }
+        messageListSlot.add(row);
+        actionChoiceRowsByProposalId.put(proposalPayload.proposalId(), row);
+        messageCount++;
+    }
+
+    private void submitActionChoice(Div actionChoiceRow,
+                                    StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                    String actionIntentId) {
+        disableActionChoiceRow(actionChoiceRow);
+        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
+            String label = messages.getMessage("chatView.actionChoice.createNow");
+            try {
+                submitChatTurn(label, label,
+                        ActionIntentId.selectionParameter(actionIntentId),
+                        actionSelectionPrompt(proposalPayload, actionIntentId));
+                removeActionChoiceRow(actionChoiceRow);
+            } catch (RuntimeException failure) {
+                enableActionChoiceRow(actionChoiceRow);
+                throw failure;
+            }
+            return;
+        }
+        if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {
+            try {
+                ActionProposalService.DraftResult draftResult =
+                        actionProposalService.createDraft(
+                                toActionProposal(proposalPayload, actionIntentId), conversationId, null);
+                removeActionChoiceRow(actionChoiceRow);
+                appendIntentConfirmRow(draftResult.draftId(), draftResult.entityName(), draftResult.instanceName());
+            } catch (RuntimeException failure) {
+                log.warn("Prefill action proposal failed", failure);
+                enableActionChoiceRow(actionChoiceRow);
+                showGenericErrorNotification();
+            }
+        }
+    }
+
+    private ActionProposal toActionProposal(StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                            String actionIntentId) {
+        return new ActionProposal(
+                proposalPayload.proposalId(),
+                "create",
+                proposalPayload.targetEntityName(),
+                proposalPayload.instanceName(),
+                proposalPayload.values(),
+                List.of(),
+                List.of(actionIntentId));
+    }
+
+    private String actionSelectionPrompt(StreamEventRenderer.ActionProposalPayload proposalPayload,
+                                         String actionIntentId) {
+        return "Selected action intent: " + actionIntentId + "\n"
+                + "Proposal id: " + proposalPayload.proposalId() + "\n"
+                + "Target entity: " + proposalPayload.targetEntityName() + "\n"
+                + "Collected values JSON: " + valuesJson(proposalPayload.values());
+    }
+
+    private String valuesJson(Map<String, Object> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? Map.of() : values);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize action proposal values", e);
+        }
+    }
+
+    private void disableActionChoiceRow(Div actionChoiceRow) {
+        setActionChoiceRowEnabled(actionChoiceRow, false);
+    }
+
+    private void enableActionChoiceRow(Div actionChoiceRow) {
+        setActionChoiceRowEnabled(actionChoiceRow, true);
+    }
+
+    private void setActionChoiceRowEnabled(Div actionChoiceRow, boolean enabled) {
+        if (actionChoiceRow == null) {
+            return;
+        }
+        actionChoiceRow.getChildren()
+                .filter(Button.class::isInstance)
+                .map(Button.class::cast)
+                .forEach(button -> button.setEnabled(enabled));
+    }
+
+    private void removeActionChoiceRow(Div actionChoiceRow) {
+        if (actionChoiceRow == null) {
+            return;
+        }
+        actionChoiceRow.removeFromParent();
+        actionChoiceRowsByProposalId.values().removeIf(row -> row == actionChoiceRow);
+        if (messageCount > 0) {
+            messageCount--;
+        }
+    }
+
+    private void removeAllActionChoiceRows() {
+        List<Div> rows = new ArrayList<>(actionChoiceRowsByProposalId.values());
+        for (Div row : rows) {
+            removeActionChoiceRow(row);
+        }
+        actionChoiceRowsByProposalId.clear();
+    }
+
+    /**
+     * Maximum normalized length of a message still treated as a bare cancellation instruction.
+     * A longer message is assumed to carry substantive content (e.g. "don't create a duplicate,
+     * update the existing one") rather than being a standalone "cancel"/"huy".
+     */
+    private static final int CANCELLATION_MAX_LENGTH = 40;
+    /** A negated cancel verb ("don't cancel", "khong huy") is not itself a cancellation. */
+    private static final java.util.regex.Pattern CANCELLATION_NEGATED = java.util.regex.Pattern.compile(
+            ".*\\b(khong|chua|do not|dont|don't|never|dung)\\b\\s+(huy|cancel|discard)\\b.*");
+    private static final java.util.regex.Pattern CANCELLATION_LEADING_POLITENESS = java.util.regex.Pattern.compile(
+            "^(please|pls|kindly|vui long|lam on|xin|hay)\\b\\s*");
+
+    private boolean looksLikeActionCancellation(String text) {
+        String normalized = normalizeCancellationText(text).trim();
+        if (normalized.isEmpty() || normalized.length() > CANCELLATION_MAX_LENGTH) {
+            return false;
+        }
+        if (CANCELLATION_NEGATED.matcher(normalized).matches()) {
+            // "khong huy nua" / "I don't want to cancel" — a negated cancellation is not a cancellation.
+            return false;
+        }
+        String imperative = CANCELLATION_LEADING_POLITENESS.matcher(normalized).replaceFirst("").trim();
+        return imperative.matches("^(huy|cancel|discard)\\b.*")
+                || imperative.startsWith("khong tao")
+                || imperative.startsWith("dung tao")
+                || imperative.startsWith("bo qua yeu cau")
+                || imperative.startsWith("do not create")
+                || imperative.startsWith("dont create")
+                || imperative.startsWith("don't create");
+    }
+
+    private String normalizeCancellationText(String text) {
+        if (text == null) {
+            return "";
+        }
+        String stripped = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
+        return stripped.replace('đ', 'd');
+    }
+
+    private void markIntentConfirmRowExpired(Span summary, Button confirmButton) {
+        summary.setText(messages.getMessage("chatView.intent.draftExpired"));
+        confirmButton.setEnabled(false);
+    }
+
     private void clearMessageList() {
         items.clear();
+        actionChoiceRowsByProposalId.clear();
         if (messageListSlot != null) {
             // Wipe the underlying element children so both the MessageList component AND any
             // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.
@@ -854,10 +1276,40 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void accessUi(Runnable action) {
+        accessUiAuthenticated(ownerAuthentication, action);
+    }
+
+    private void accessUiAuthenticated(Authentication authentication, Runnable action) {
         UI ui = this.ownerUi;
         if (ui == null) ui = getUI().orElse(null);
         if (ui == null) return; // detached — drop update
-        ui.access(action::run);
+        ui.access(() -> runWithAuthentication(authentication, action));
+    }
+
+    private void runWithAuthentication(Authentication authentication, Runnable action) {
+        if (authentication == null) {
+            action.run();
+            return;
+        }
+
+        SecurityContext previousContext = SecurityContextHolder.getContext();
+        SecurityContext capturedContext = SecurityContextHolder.createEmptyContext();
+        capturedContext.setAuthentication(authentication);
+        try {
+            SecurityContextHolder.setContext(capturedContext);
+            action.run();
+        } finally {
+            SecurityContextHolder.setContext(previousContext);
+        }
+    }
+
+    private Authentication captureCurrentAuthentication() {
+        try {
+            return currentAuthentication == null ? null : currentAuthentication.getAuthentication();
+        } catch (RuntimeException authenticationMissing) {
+            log.debug("Unable to capture current authentication for async UI callback", authenticationMissing);
+            return null;
+        }
     }
 
     // ---- Phase 13 Plan 04 — D-04 + REVIEWS HIGH-4 + HIGH-5 attachments wiring -------

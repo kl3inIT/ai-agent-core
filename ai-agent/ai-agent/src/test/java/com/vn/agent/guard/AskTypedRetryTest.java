@@ -5,6 +5,7 @@ import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
@@ -107,7 +108,7 @@ class AskTypedRetryTest {
         when(parametersResolver.effectiveTopP(any())).thenReturn(0.9);
         when(parametersResolver.effectiveMaxTokens(any())).thenReturn(2048);
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.*");
-        when(toolCallbacks.callbacksFor(anyString(), any())).thenReturn(new ToolCallback[0]);
+        when(toolCallbacks.callbacksFor(anyString(), any(), any())).thenReturn(new ToolCallback[0]);
         when(retrievalFilterBuilder.buildFor(any())).thenReturn(null);
 
         when(chatClient.prompt()).thenReturn(requestSpec);
@@ -138,6 +139,7 @@ class AskTypedRetryTest {
                 /* cancellationRegistry */ null,
                 /* streamingSinkHolder */ null,
                 rulesComposer,
+                mock(IntentRegistry.class),
                 mock(ConversationTitleEligibilityPublisher.class),
                 // Phase 13.1 Plan 03: task-file media + repository dependencies. AskTypedRetryTest
                 // exercises only the typed-retry path with no attached files, so the resolver is
