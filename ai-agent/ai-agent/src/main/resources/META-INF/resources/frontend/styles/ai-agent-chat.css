@@ -250,3 +250,83 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     color: var(--lumo-secondary-text-color);
     font-size: var(--lumo-font-size-s);
 }
+
+/* --- Phase 15 Plan 03: SIDEBAR chat surface (D-01..D-04) -------------------
+ *
+ * The SIDEBAR surface is a non-modal, position:fixed docked Div on the UI element
+ * (ChatSurfaceMounter mounts it there so it survives route navigation — the
+ * AppLayout content slot is setContent()-replaced on every navigation). It hosts
+ * the existing ChatPanelFragment through a lean Jmix-owned host view
+ * (AiAgentSidebarView). Loaded on every chat/sidebar render via
+ * @CssImport("./styles/ai-agent-chat.css") on ChatPanelFragment (REVIEWS point #5).
+ * Justified raw-CSS exception per D-01 (no new Vaadin theme / theme.json).
+ *
+ * Width: clamp(640px, 32vw, 760px) — replaces the malformed `clamp(420px, 32vw, 32vw)`
+ * flagged in 15-REVIEWS point #4. The fragment's chat-panel-fragment.xml has a
+ * <split orientation="HORIZONTAL" splitterPosition="68"> (68% chat / 32% attachments),
+ * so 640px min ⇒ ~205px for the attachments pane — matching the project's ~200px
+ * attachment-card note (cf. ChatSurfaceMounter.configureDialogWindow comment). 32vw
+ * preferred; 760px cap on wide screens.
+ *
+ * top: var(--lumo-size-xl, 3.5rem) — a Lumo size token used as the navbar-height
+ * proxy with a 3.5rem fallback (this app's StandardMainView navbar is position:relative,
+ * so an exact value is not load-bearing; the fallback keeps the panel below the navbar
+ * on shells without the token).
+ */
+.ai-agent-sidebar {
+    position: fixed;
+    right: 0;
+    top: var(--lumo-size-xl, 3.5rem);
+    bottom: 0;
+    width: clamp(640px, 32vw, 760px);
+    display: none;
+    z-index: 5;
+    background: var(--lumo-base-color);
+    box-shadow: var(--lumo-box-shadow-l);
+}
+
+.ai-agent-sidebar--open {
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-agent-sidebar__header {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--lumo-space-xs);
+    flex: 0 0 auto;
+}
+
+/* The host view's element (below the header row) fills the remaining height. */
+.ai-agent-sidebar > :not(.ai-agent-sidebar__header) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Push the main content left when the panel is open. padding-right suffices because
+ * the navbar is position:relative; add padding-top only on a host with a fixed navbar. */
+.ai-agent-content--pushed {
+    padding-right: clamp(640px, 32vw, 760px);
+}
+
+/* Small devices (≤768px): the panel becomes a full-screen overlay and the push is
+ * dropped. The fragment's internal 68/32 split stacks per its own responsive rules. */
+@media (max-width: 768px) {
+    .ai-agent-sidebar {
+        width: 100vw;
+        left: 0;
+        right: 0;
+    }
+
+    .ai-agent-content--pushed {
+        padding-right: 0;
+    }
+}
+
+/* Lumo has no built-in "pressed" toggle variant — mark the navbar toggle's active
+ * (panel-open) state explicitly. Pairs with aria-pressed="true" set server-side. */
+.ai-agent-sidebar-toggle--active {
+    background: var(--lumo-primary-color-10pct);
+    color: var(--lumo-primary-text-color);
+}
