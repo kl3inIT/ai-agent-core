@@ -19,10 +19,10 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 ### Chat Observability & UX
 
-- [ ] **SURF-11**: A `SIDEBAR` / right-sidebar chat surface is implemented as a third chat surface beside `FULL_ROUTE` and `HEADER_BUTTON`, mounts the shared `ChatPanelFragment`, participates in the existing `AiUiSettings` enabled-surface controls, and preserves `AiChatSessionState` conversation continuity across surface switches. It must not introduce a separate chat backend, chat memory, or duplicate fragment implementation.
+- [x] **SURF-11**: A `SIDEBAR` / right-sidebar chat surface is implemented as a third chat surface beside `FULL_ROUTE` and `HEADER_BUTTON`, mounts the shared `ChatPanelFragment`, participates in the existing `AiUiSettings` enabled-surface controls, and preserves `AiChatSessionState` conversation continuity across surface switches. It must not introduce a separate chat backend, chat memory, or duplicate fragment implementation.
 - [ ] **OBS-01**: An ephemeral streaming-status line renders in a sibling slot (not inside the message bubble), keyed by audit `KIND` ("thinking…", "searching data…", "retrieving documents…"), and clears completely when the turn finalizes — the status text is never concatenated into the final answer and never shows internal `@Tool` / entity names.
 - [ ] **OBS-02**: Each completed turn shows a collapsed-by-default "what the agent did — N steps, total ms" disclosure listing humanized, label-only steps (KIND-keyed, never internal tool/entity names) with per-step timing and error/rollback indication; the disclosure is hidden entirely for turns with zero tool calls. A turn deep-links to its filtered audit list (`AiAuditEventListView?runId=...`).
-- [ ] **OBS-04**: The observability panels are driven by the existing `StreamingEvent` flux and `AiAuditEvent` tree — no new persisted "turn" entity, no parallel state store; per-turn detail held in the panels does not accumulate unbounded in `AiChatSessionState`. New labels use `msg://` keys in all locale bundles. (Resolves the pending `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo.)
+- [x] **OBS-04**: The observability panels are driven by the existing `StreamingEvent` flux and `AiAuditEvent` tree — no new persisted "turn" entity, no parallel state store; per-turn detail held in the panels does not accumulate unbounded in `AiChatSessionState`. New labels use `msg://` keys in all locale bundles. (Resolves the pending `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo.)
 
 ### Admin Model Management
 
@@ -106,10 +106,10 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SURF-11 | Phase 15 | Pending |
+| SURF-11 | Phase 15 | Complete |
 | OBS-01 | Phase 15 | Pending |
 | OBS-02 | Phase 15 | Pending |
-| OBS-04 | Phase 15 | Pending |
+| OBS-04 | Phase 15 | Complete |
 | TEST-19 | Phase 15 | Pending |
 | MODEL-01 | Phase 16 | Pending |
 | MODEL-02 | Phase 16 | Pending |
