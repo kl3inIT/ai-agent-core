@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
-status: planning
+status: executing
 stopped_at: Phase 15 context gathered
-last_updated: "2026-05-11T13:17:59.638Z"
-last_activity: 2026-05-11 — v1.2 roadmap created then revised (Soniox STT moved to Phase 20, last in milestone; phases 15–20 re-ordered/re-numbered; SIDEBAR/right-sidebar chat surface restored to Phase 15; chat-state side panel deferred; 29/29 v1.2 requirements covered)
+last_updated: "2026-05-11T14:09:41.398Z"
+last_activity: 2026-05-11 -- Phase 15 planning complete
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -29,8 +30,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 Phase: 15 (Chat Observability & UX) — not started
 Plan: —
-Status: Roadmap created; awaiting phase planning
-Last activity: 2026-05-11 — v1.2 roadmap created then revised (Soniox STT moved to Phase 20, last in milestone; phases 15–20 re-ordered/re-numbered; SIDEBAR/right-sidebar chat surface restored to Phase 15; chat-state side panel deferred; 29/29 v1.2 requirements covered)
+Status: Ready to execute
+Last activity: 2026-05-11 -- Phase 15 planning complete
 
 ## Phase Status
 
