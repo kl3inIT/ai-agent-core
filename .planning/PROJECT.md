@@ -27,7 +27,7 @@ v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi
 
 **Target features:**
 - **Chat voice input — Soniox STT (trimmed):** Soniox default transcription path + OpenAI-direct fallback, browser `MediaRecorder` capture, privacy-safe `STT_TRANSCRIPTION` audit (SHA-256 hash by default / raw transcript opt-in), non-blocking error + retry UI, transcript lands in `MessageInput` for user review before send. `TranscriptionPostProcessor` SPI and custom-provider SPI deferred until a real host need appears.
-- **Chat UX & observability:** right-sidebar chat-state panel, collapsible per-turn tool-detail panel, ephemeral streaming-status indicator (resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo).
+- **Right-sidebar chat surface & observability UX:** `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus collapsible per-turn tool-detail panel and ephemeral streaming-status indicator (resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo). The chat-state side panel is deferred.
 - **Admin model management:** curated common-model dropdown + custom model-name free-entry in the admin Parameters/Settings UI; admin-only (no per-conversation end-user model switching). Curated defaults stay self-hostable open-weights per project policy; the custom-entry field allows anything the host routes to.
 - **Admin config-knob migration:** audit prior-phase properties-only knobs (RAG top-k / similarity threshold, mutation toggle, task-file token budget, chat surface mode, STT toggle, etc.) and migrate the operator-relevant ones into editable `AiParameters` / admin UI.
 - **Phase 11 mutation-internals hardening:** refactor duplicated mutation-gate sequencing, batch-load to-one FK references during mutation binding, cache related-write metadata resolution where safe (ROADMAP Backlog → Phase 999.1).
@@ -61,7 +61,7 @@ v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi
 v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigned in `REQUIREMENTS.md`, phases in `ROADMAP.md`):
 
 - [ ] Chat voice input — Soniox STT (trimmed): Soniox default + OpenAI-direct fallback, `MediaRecorder` capture, privacy-safe `STT_TRANSCRIPTION` audit (hash default / raw opt-in), non-blocking error + retry UI, transcript → `MessageInput` for review before send. (Promotes ROADMAP Backlog Phase 999.2; `TranscriptionPostProcessor`/custom-provider SPIs deferred.)
-- [ ] Chat UX & observability: right-sidebar chat-state panel, collapsible per-turn tool-detail panel, ephemeral streaming-status indicator. (Resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo.)
+- [ ] Right-sidebar chat surface & observability UX: `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, collapsible per-turn tool-detail panel, and ephemeral streaming-status indicator. (Resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo; chat-state side panel deferred.)
 - [ ] Admin model management: curated common-model dropdown + custom model-name free-entry in admin Parameters/Settings UI; admin-only.
 - [ ] Admin config-knob migration: surface operator-relevant prior-phase properties knobs as editable `AiParameters` / admin UI settings.
 - [ ] Phase 11 mutation-internals hardening: dedup gate sequencing, batch-load to-one FK refs during binding, cache related-write metadata. (Promotes ROADMAP Backlog Phase 999.1.)
@@ -73,6 +73,7 @@ v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigne
 - [ ] **Clean-consumer smoke (PKG-05 / TEST-07)** — Plan 08-05 carryover from v1.0.0. Postgres/pgvector Testcontainers smoke OR a starter stub `VectorStore` boot mode. Deferred from v1.2 per user decision 2026-05-11.
 - [ ] **`TranscriptionPostProcessor` SPI + custom STT-provider SPI** — trimmed out of v1.2 STT scope; revisit when a real host need appears.
 - [ ] **Per-conversation end-user model switching** — v1.2 model picker is admin-only; per-conversation switching deferred.
+- [ ] **Chat-state side panel** — model/conversation/governance/attachment-budget summary in chat is deferred per user decision 2026-05-11; Phase 15 implements the `SIDEBAR` / right-sidebar chat surface but must not add this separate state panel.
 - [ ] **Admin-screen performance work** — out of the v1.2 perf pass (which is AI-runtime only); separate effort if needed.
 - [ ] **Attribute-path-level exposure rules** (vs. entity-level only) — `attributePath` field on `AiExposureRule`; deferred per user decision 2026-04-27.
 

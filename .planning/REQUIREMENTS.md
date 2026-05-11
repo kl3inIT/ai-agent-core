@@ -19,16 +19,16 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 ### Chat Observability & UX
 
+- [ ] **SURF-11**: A `SIDEBAR` / right-sidebar chat surface is implemented as a third chat surface beside `FULL_ROUTE` and `HEADER_BUTTON`, mounts the shared `ChatPanelFragment`, participates in the existing `AiUiSettings` enabled-surface controls, and preserves `AiChatSessionState` conversation continuity across surface switches. It must not introduce a separate chat backend, chat memory, or duplicate fragment implementation.
 - [ ] **OBS-01**: An ephemeral streaming-status line renders in a sibling slot (not inside the message bubble), keyed by audit `KIND` ("thinking…", "searching data…", "retrieving documents…"), and clears completely when the turn finalizes — the status text is never concatenated into the final answer and never shows internal `@Tool` / entity names.
 - [ ] **OBS-02**: Each completed turn shows a collapsed-by-default "what the agent did — N steps, total ms" disclosure listing humanized, label-only steps (KIND-keyed, never internal tool/entity names) with per-step timing and error/rollback indication; the disclosure is hidden entirely for turns with zero tool calls. A turn deep-links to its filtered audit list (`AiAuditEventListView?runId=...`).
-- [ ] **OBS-03**: A right-sidebar chat-state panel shows the active model code, the current conversation id + title, the LLM-exposure-policy-active flag, the mutation-tools-enabled flag, the attached-file count, the attachment token-budget usage, and a one-line last-turn summary; it renders in both chat surfaces and updates as state changes.
 - [ ] **OBS-04**: The observability panels are driven by the existing `StreamingEvent` flux and `AiAuditEvent` tree — no new persisted "turn" entity, no parallel state store; per-turn detail held in the panels does not accumulate unbounded in `AiChatSessionState`. New labels use `msg://` keys in all locale bundles. (Resolves the pending `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo.)
 
 ### Admin Model Management
 
 - [ ] **MODEL-01**: In the admin Parameters/Settings view the chat-model field becomes a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
 - [ ] **MODEL-02**: The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); the curated list contains only open-weights models per the self-hostable policy and custom entry is the escape hatch. Model validity is checked at first use with a clear error surfaced, not at save time.
-- [ ] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions` and is reflected in the chat-state panel (OBS-03). All new labels use `msg://` keys in all locale bundles.
+- [ ] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`. All new labels use `msg://` keys in all locale bundles.
 
 ### Admin Config-Knob Migration
 
@@ -70,6 +70,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 - **MODEL-FUT-01**: Per-conversation / per-user end-user model switching.
 - **CFG-FUT-01**: Admin-screen performance work (the v1.2 perf pass is AI-runtime only).
+- **OBS-FUT-01**: Chat-state side panel showing model, conversation, governance flags, attached-file count, attachment token-budget usage, and last-turn summary. Deferred from v1.2 per user decision on 2026-05-11; do not implement in Phase 15.
 
 ### Carried debt (later hardening pass)
 
@@ -105,9 +106,9 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SURF-11 | Phase 15 | Pending |
 | OBS-01 | Phase 15 | Pending |
 | OBS-02 | Phase 15 | Pending |
-| OBS-03 | Phase 15 | Pending |
 | OBS-04 | Phase 15 | Pending |
 | TEST-19 | Phase 15 | Pending |
 | MODEL-01 | Phase 16 | Pending |
