@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Ready for Phase 15 planning; Phase 14 gap closure awaits manual UAT
-stopped_at: Executed 14-10-PLAN.md gap closure
-last_updated: "2026-05-09T20:30:00.000Z"
+status: Phase 14 shipped — PR #28; ready for Phase 15 planning
+stopped_at: "Phase 14 shipped — PR #28 (github.com/kl3inIT/ai-agent-core/pull/28)"
+last_updated: "2026-05-11T00:00:00.000Z"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 7
   total_plans: 62
-  completed_plans: 62
-  percent: 88
+  completed_plans: 63
+  percent: 100
 ---
 
 # Project State
@@ -33,8 +33,8 @@ Plan: Not started
 |-------|-------|
 | Phase | Phase 15 |
 | Plan | Not started |
-| Status | Phase 14 Plan 14-10 gap closure executed; ready for manual UAT and Phase 15 planning |
-| Last activity | 2026-05-10 — Executed Plan 14-10 gap closure for post-clarification action intents, action-choice UI, constrained tool routing, async authentication, and provider/RAG diagnostics |
+| Status | Phase 14 shipped — PR #28 (github.com/kl3inIT/ai-agent-core/pull/28); ready for Phase 15 planning |
+| Last activity | 2026-05-11 — Shipped Phase 14: pushed branch, opened PR #28 against main (manual chat-to-form UAT accepted) |
 
 ## Phase Status
 
@@ -46,7 +46,7 @@ Plan: Not started
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Complete; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
+| 14. Intent-Driven Extraction → Form Prefill | Shipped — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
