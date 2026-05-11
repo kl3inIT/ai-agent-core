@@ -34,4 +34,24 @@ class ActionProposalToolTest {
         assertThat(proposalCaptor.getValue().targetEntityName()).isEqualTo("jmixapp_Product");
         assertThat(proposalCaptor.getValue().values()).containsEntry("name", "Desk");
     }
+
+    @Test
+    void toolHandlesNullValuesAsEmptyMap() {
+        ActionProposalService service = mock(ActionProposalService.class);
+        ActionProposalResult missing = ActionProposalResult.missingFields(new ActionProposal(
+                "proposal-2", "create", "jmixapp_Product", "Desk",
+                Map.of(), List.of("name"), List.of()), List.of("name"));
+        when(service.validate(any(ActionProposal.class))).thenReturn(missing);
+        ActionProposalTool tool = new ActionProposalTool(service);
+
+        ActionProposalResult result = tool.proposeActionChoices(
+                "create", "jmixapp_Product", "Desk",
+                null, List.of(), List.of(ActionIntentId.PREFILL_FORM));
+
+        assertThat(result).isSameAs(missing);
+        org.mockito.ArgumentCaptor<ActionProposal> proposalCaptor =
+                org.mockito.ArgumentCaptor.forClass(ActionProposal.class);
+        verify(service).validate(proposalCaptor.capture());
+        assertThat(proposalCaptor.getValue().values()).isEmpty();
+    }
 }

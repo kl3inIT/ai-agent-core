@@ -20,6 +20,7 @@ class ActionChoiceRowTest {
                 .contains("chatView.actionChoice.summary")
                 .contains("chatView.actionChoice.createNow")
                 .contains("chatView.actionChoice.prefillForm")
+                .contains("chatView.actionChoice.discard")
                 .contains("ActionIntentId.selectionParameter(actionIntentId)")
                 .contains("removeActionChoiceRow(actionChoiceRow)")
                 .contains("actionProposalService.createDraft(");
@@ -31,6 +32,8 @@ class ActionChoiceRowTest {
 
         assertThat(source)
                 .contains("private void removeActionChoiceRow(Div actionChoiceRow)")
+                .contains("private void removeAllActionChoiceRows()")
+                .contains("looksLikeActionCancellation(text)")
                 .contains("actionChoiceRow.removeFromParent()")
                 .contains("messageCount--");
     }

@@ -59,6 +59,13 @@ public interface ChatService {
                         Overrides overrides, String intentId);
 
     /**
+     * Intent-aware blocking variant with private per-turn system context. The extra context is
+     * sent to the model but must not be rendered or persisted as a user-visible message.
+     */
+    ChatResponseDto ask(String userId, UUID conversationId, String message,
+                        Overrides overrides, String intentId, String privateSystemAppendix);
+
+    /**
      * Structured-output variant. Requests the LLM produce JSON matching the shape of
      * {@code targetType} (GUARD-06). The response is parsed via Spring AI's
      * {@code BeanOutputConverter} and validated via Jakarta Bean Validation.
@@ -110,4 +117,12 @@ public interface ChatService {
      */
     Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
                                 Overrides overrides, String intentId);
+
+    /**
+     * Intent-aware streaming variant with private per-turn system context. Existing callers can
+     * use the five-arg overload; UI-selected action proposals use this path so internal proposal
+     * payloads do not leak into chat history.
+     */
+    Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                Overrides overrides, String intentId, String privateSystemAppendix);
 }

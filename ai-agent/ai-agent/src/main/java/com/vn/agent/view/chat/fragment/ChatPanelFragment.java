@@ -165,6 +165,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
     private final Map<String, List<JmixCard>> intentCardsByKey = new HashMap<>();
+    private final Map<String, Div> actionChoiceRowsByProposalId = new HashMap<>();
 
     private Path uploadTempDir;
 
@@ -686,10 +687,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void onSubmit(MessageInput.SubmitEvent event) {
         String text = event.getValue();
         if (text == null || text.isBlank()) return;
+        if (looksLikeActionCancellation(text)) {
+            removeAllActionChoiceRows();
+        }
         submitChatTurn(text, text, selectedIntentIdForSubmit());
     }
 
     private void submitChatTurn(String displayText, String modelText, String toolSurfaceIntentId) {
+        submitChatTurn(displayText, modelText, toolSurfaceIntentId, null);
+    }
+
+    private void submitChatTurn(String displayText, String modelText,
+                                String toolSurfaceIntentId,
+                                String privateSystemAppendix) {
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
 
@@ -712,10 +722,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         final String userId = currentAuthentication.getUser().getUsername();
         final UUID targetConversationId = conversationId;
         final StreamEventRenderer.CitationState citationState = new StreamEventRenderer.CitationState();
-        final String selectedIntentId = toolSurfaceIntentId;
-
-        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId);
-        resetIntentCardRowToAutoIfNamed(selectedIntentId);
+        Flux<StreamingEvent> source = chatService.stream(userId, targetConversationId, modelText,
+                null, toolSurfaceIntentId, privateSystemAppendix);
+        resetIntentCardRowToAutoIfNamed(toolSurfaceIntentId);
         activeStream = source
                 .doOnSubscribe(sub -> {
                     if (sub instanceof Disposable disposable && activeRunId != null) {
@@ -994,6 +1003,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         row.addClassName("ai-agent-action-choice");
         row.getElement().setAttribute("role", "status");
         row.getElement().setAttribute("aria-live", "polite");
+        row.getElement().setAttribute("data-proposal-id", proposalPayload.proposalId());
 
         Span summary = new Span(MessageFormat.format(
                 messages.getMessage("chatView.actionChoice.summary"),
@@ -1021,8 +1031,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     submitActionChoice(row, proposalPayload, ActionIntentId.PREFILL_FORM));
             row.add(prefillButton);
         }
+        Button discardButton = new Button(
+                messages.getMessage("chatView.actionChoice.discard"),
+                VaadinIcon.CLOSE_SMALL.create());
+        discardButton.addThemeNames("small", "tertiary");
+        discardButton.setAriaLabel(messages.getMessage("chatView.actionChoice.discard"));
+        discardButton.addClickListener(event -> removeActionChoiceRow(row));
+        row.add(discardButton);
 
         messageListSlot.add(row);
+        actionChoiceRowsByProposalId.put(proposalPayload.proposalId(), row);
         messageCount++;
     }
 
@@ -1033,8 +1051,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
             String label = messages.getMessage("chatView.actionChoice.createNow");
             try {
-                submitChatTurn(label, actionSelectionPrompt(proposalPayload, actionIntentId),
-                        ActionIntentId.selectionParameter(actionIntentId));
+                submitChatTurn(label, label,
+                        ActionIntentId.selectionParameter(actionIntentId),
+                        actionSelectionPrompt(proposalPayload, actionIntentId));
                 removeActionChoiceRow(actionChoiceRow);
             } catch (RuntimeException failure) {
                 enableActionChoiceRow(actionChoiceRow);
@@ -1108,9 +1127,39 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             return;
         }
         actionChoiceRow.removeFromParent();
+        actionChoiceRowsByProposalId.values().removeIf(row -> row == actionChoiceRow);
         if (messageCount > 0) {
             messageCount--;
         }
+    }
+
+    private void removeAllActionChoiceRows() {
+        List<Div> rows = new ArrayList<>(actionChoiceRowsByProposalId.values());
+        for (Div row : rows) {
+            removeActionChoiceRow(row);
+        }
+        actionChoiceRowsByProposalId.clear();
+    }
+
+    private boolean looksLikeActionCancellation(String text) {
+        String normalized = normalizeCancellationText(text);
+        return normalized.matches(".*\\b(huy|cancel|discard)\\b.*")
+                || normalized.contains("khong tao")
+                || normalized.contains("dung tao")
+                || normalized.contains("bo qua yeu cau")
+                || normalized.contains("do not create")
+                || normalized.contains("dont create")
+                || normalized.contains("don't create");
+    }
+
+    private String normalizeCancellationText(String text) {
+        if (text == null) {
+            return "";
+        }
+        String stripped = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
+        return stripped.replace('đ', 'd');
     }
 
     private void markIntentConfirmRowExpired(Span summary, Button confirmButton) {
@@ -1120,6 +1169,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private void clearMessageList() {
         items.clear();
+        actionChoiceRowsByProposalId.clear();
         if (messageListSlot != null) {
             // Wipe the underlying element children so both the MessageList component AND any
             // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.

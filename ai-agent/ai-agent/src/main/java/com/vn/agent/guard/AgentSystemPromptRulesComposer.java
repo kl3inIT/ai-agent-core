@@ -34,6 +34,8 @@ public class AgentSystemPromptRulesComposer {
             "",
             "Action intent rules:",
             "- For create or update requests, gather missing required fields first.",
+            "- If the user asks for an ambiguous record count (for example, '2 or 3 records'), ask a clarification question before proposing actions.",
+            "- propose_action_choices supports one record per proposal. For multi-record create requests, either ask the user to handle them one at a time or propose separate single-record choices; never pass an array as values.",
             "- When enough structured data is available, call propose_action_choices with the target entity and collected writable values.",
             "- Do not call create_record, update_record, or bulk_save_records during the planning turn.",
             "- Wait for the user to choose an action intent before performing a side effect.",
@@ -99,7 +101,7 @@ public class AgentSystemPromptRulesComposer {
                     "",
                     "Selected action intent rules:",
                     "- The user selected create-now.",
-                    "- Use the collected proposal values from the user message.",
+                    "- Use the collected proposal values from the private per-turn action context.",
                     "- Call create_record only for the selected target entity and only with those collected values.",
                     "- Do not call prepare_form_draft in this turn.",
                     "");

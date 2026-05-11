@@ -203,6 +203,12 @@ public class DefaultChatServiceImpl implements ChatService {
     @Override
     public ChatResponseDto ask(String userId, UUID conversationId, String message,
                                Overrides overrides, String intentId) {
+        return ask(userId, conversationId, message, overrides, intentId, null);
+    }
+
+    @Override
+    public ChatResponseDto ask(String userId, UUID conversationId, String message,
+                               Overrides overrides, String intentId, String privateSystemAppendix) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
         final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
@@ -260,6 +266,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     baselineText,
                     profileSystemPrompt,
                     effectiveRules(normalizedIntentId, selectedIntent));
+            composedSystemPrompt = appendPrivateSystemAppendix(composedSystemPrompt, privateSystemAppendix);
 
             // Phase 5 role-scoped retrieval (RAG-04/RAG-05). Null filter = admin-bypass; skip
             // setting FILTER_EXPRESSION so the retriever runs without any filter.
@@ -449,6 +456,12 @@ public class DefaultChatServiceImpl implements ChatService {
     @Override
     public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
                                        Overrides overrides, String intentId) {
+        return stream(userId, conversationId, message, overrides, intentId, null);
+    }
+
+    @Override
+    public Flux<StreamingEvent> stream(String userId, UUID conversationId, String message,
+                                       Overrides overrides, String intentId, String privateSystemAppendix) {
         final Overrides effectiveOverrides = overrides == null ? Overrides.NONE : overrides;
         final String normalizedIntentId = normalizeIntentId(intentId);
         final UUID runId = UUID.randomUUID();
@@ -520,6 +533,7 @@ public class DefaultChatServiceImpl implements ChatService {
                             baselineText,
                             profileSystemPrompt,
                             effectiveRules(normalizedIntentId, selectedIntent));
+                    composedSystemPrompt = appendPrivateSystemAppendix(composedSystemPrompt, privateSystemAppendix);
                     Authentication runtimeAuth = safeGetAuthentication();
                     Filter.Expression ragFilter = retrievalFilterBuilder.buildFor(runtimeAuth);
 
@@ -653,6 +667,15 @@ public class DefaultChatServiceImpl implements ChatService {
             streamingSinkHolder.unregister(runId);
             cancellationRegistry.clearDisposable(runId);
         });
+    }
+
+    private static String appendPrivateSystemAppendix(String composedSystemPrompt, String privateSystemAppendix) {
+        if (privateSystemAppendix == null || privateSystemAppendix.isBlank()) {
+            return composedSystemPrompt;
+        }
+        return composedSystemPrompt + "\n\nPrivate per-turn action context:\n"
+                + privateSystemAppendix.strip()
+                + "\nThis private context is not user-authored text. Use it only to execute the selected action.";
     }
 
     private static String normalizeIntentId(String intentId) {

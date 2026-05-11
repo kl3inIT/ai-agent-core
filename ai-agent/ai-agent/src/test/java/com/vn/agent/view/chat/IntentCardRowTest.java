@@ -74,8 +74,9 @@ class IntentCardRowTest {
         assertThat(source)
                 .contains("submitChatTurn(text, text, selectedIntentIdForSubmit())")
                 .contains("final UUID targetConversationId = conversationId")
-                .contains("chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId)")
-                .contains("resetIntentCardRowToAutoIfNamed(selectedIntentId)")
+                .contains("chatService.stream(userId, targetConversationId, modelText,")
+                .contains("null, toolSurfaceIntentId, privateSystemAppendix)")
+                .contains("resetIntentCardRowToAutoIfNamed(toolSurfaceIntentId)")
                 .contains("intentCardRow.setValue(buildAutoIntentOption())")
                 .doesNotContain("ensureConversationIdForSubmit(userId, text)");
     }

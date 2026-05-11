@@ -29,6 +29,7 @@ public class ChatView extends StandardView {
     @Autowired private Messages messages;
     @Autowired private Notifications notifications;
     @Autowired private AiUiSettingsService uiSettingsService;
+    @Autowired private AiChatSessionState chatSessionState;
 
     @Override
     public void beforeEnter(@NonNull BeforeEnterEvent event) {
@@ -47,7 +48,7 @@ public class ChatView extends StandardView {
                 .getSingleParameter("conversationId")
                 .orElse(null);
         if (raw == null) {
-            chatPanelFragment.setConversationId(null);
+            chatPanelFragment.setConversationId(chatSessionState.getCurrentConversationId());
             return;
         }
         UUID id;

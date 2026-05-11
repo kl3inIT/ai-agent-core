@@ -163,7 +163,8 @@ class ChatPanelFragmentConversationIdTest {
         assertThat(source)
                 .doesNotContain("ensureConversationIdForSubmit(userId, text)")
                 .contains("final UUID targetConversationId = conversationId")
-                .contains("chatService.stream(userId, targetConversationId, modelText, null, selectedIntentId)")
+                .contains("chatService.stream(userId, targetConversationId, modelText,")
+                .contains("null, toolSurfaceIntentId, privateSystemAppendix)")
                 .contains("accessUiAuthenticated(submitAuthentication")
                 .contains("taskFilesDl.setParameter(\"conversationId\", conversationId)");
     }

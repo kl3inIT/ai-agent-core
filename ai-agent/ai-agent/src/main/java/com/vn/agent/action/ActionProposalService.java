@@ -86,7 +86,7 @@ public class ActionProposalService {
 
         MetaClass metaClass;
         try {
-            metaClass = toolEntityResolver.resolveCreatableEntityOrThrow(proposal.targetEntityName());
+            metaClass = resolveCreatableEntity(proposal.targetEntityName());
         } catch (ToolUserError deniedOrUnknown) {
             return ActionProposalResult.accessDenied(proposal);
         }
@@ -106,6 +106,65 @@ public class ActionProposalService {
             return ActionProposalResult.accessDenied(proposal);
         }
         return ActionProposalResult.ready(withChoices(proposal, allowedChoices, metaClass), allowedChoices);
+    }
+
+    private MetaClass resolveCreatableEntity(String targetEntityName) {
+        try {
+            MetaClass exactMetaClass = toolEntityResolver.resolveCreatableEntityOrThrow(targetEntityName);
+            if (exactMetaClass != null) {
+                return exactMetaClass;
+            }
+        } catch (ToolUserError exactFailure) {
+            String canonicalEntityName = findUniqueEntityAlias(targetEntityName);
+            if (canonicalEntityName == null || canonicalEntityName.equals(targetEntityName)) {
+                throw exactFailure;
+            }
+            return toolEntityResolver.resolveCreatableEntityOrThrow(canonicalEntityName);
+        }
+        throw new ToolUserError("unknown_entity", "no entity named " + targetEntityName);
+    }
+
+    private String findUniqueEntityAlias(String targetEntityName) {
+        if (!StringUtils.hasText(targetEntityName)) {
+            return null;
+        }
+        String normalizedTarget = targetEntityName.strip();
+        String matchedEntityName = null;
+        for (MetaClass candidateMetaClass : metadata.getSession().getClasses()) {
+            if (!matchesEntityAlias(candidateMetaClass, normalizedTarget)) {
+                continue;
+            }
+            if (matchedEntityName != null) {
+                return null;
+            }
+            matchedEntityName = candidateMetaClass.getName();
+        }
+        return matchedEntityName;
+    }
+
+    private boolean matchesEntityAlias(MetaClass metaClass, String targetEntityName) {
+        if (metaClass == null || !StringUtils.hasText(targetEntityName)) {
+            return false;
+        }
+        if (targetEntityName.equalsIgnoreCase(metaClass.getName())) {
+            return true;
+        }
+        Class<?> javaClass = metaClass.getJavaClass();
+        if (javaClass != null && targetEntityName.equalsIgnoreCase(javaClass.getSimpleName())) {
+            return true;
+        }
+        String name = metaClass.getName();
+        int separatorIndex = name == null ? -1 : name.lastIndexOf('_');
+        if (separatorIndex >= 0 && separatorIndex + 1 < name.length()
+                && targetEntityName.equalsIgnoreCase(name.substring(separatorIndex + 1))) {
+            return true;
+        }
+        try {
+            String caption = messageTools.getEntityCaption(metaClass);
+            return StringUtils.hasText(caption) && targetEntityName.equalsIgnoreCase(caption.strip());
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     public DraftResult createDraft(ActionProposal proposal) {

@@ -1,6 +1,7 @@
 package com.vn.agent;
 
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.action.ActionIntentId;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
@@ -144,6 +145,8 @@ class DefaultChatServiceIntentRoutingTest {
         when(rulesComposer.effectiveRules()).thenReturn("base-rules");
         when(rulesComposer.effectiveRules(INTENT_ID, "Customer draft"))
                 .thenReturn("base-rules\nnamed-intent-rules");
+        when(rulesComposer.effectiveActionRules(ActionIntentId.CREATE_NOW))
+                .thenReturn("base-rules\naction-rules");
         when(intentRegistry.eligibleForCurrentUser()).thenReturn(List.of(CUSTOMER_INTENT));
         when(taskFileMediaResolver.resolveActive(conversationId))
                 .thenReturn(AiTaskFileMediaResolver.Resolved.empty());
@@ -262,6 +265,32 @@ class DefaultChatServiceIntentRoutingTest {
 
         verify(toolCallbacks, times(2)).callbacksFor(USER_ID, conversationId, INTENT_ID);
         verify(taskFileMediaResolver, times(1)).resolveActive(conversationId);
+    }
+
+    @Test
+    void streamingActionTurnAddsProposalContextToSystemPrompt() {
+        stubStreamingChatClient("created");
+        String actionIntent = ActionIntentId.selectionParameter(ActionIntentId.CREATE_NOW);
+        String actionMessage = "Create now";
+        AiConversation conversation = mock(AiConversation.class);
+        when(conversation.getId()).thenReturn(conversationId);
+        when(conversationGateway.loadOrCreate(USER_ID, conversationId, actionMessage))
+                .thenReturn(conversation);
+        String privateContext = "Proposal id: secret\nCollected values JSON: {\"name\":\"Acme\"}";
+        when(toolCallbacks.callbacksFor(USER_ID, conversationId, actionIntent))
+                .thenReturn(new ToolCallback[0]);
+
+        service.stream(USER_ID, conversationId, actionMessage, Overrides.NONE, actionIntent, privateContext)
+                .collectList()
+                .block();
+
+        org.mockito.ArgumentCaptor<String> systemPromptCaptor =
+                org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(requestSpec).system(systemPromptCaptor.capture());
+        assertThat(systemPromptCaptor.getValue())
+                .contains("Private per-turn action context:")
+                .contains(privateContext)
+                .contains("This private context is not user-authored text");
     }
 
     @Test

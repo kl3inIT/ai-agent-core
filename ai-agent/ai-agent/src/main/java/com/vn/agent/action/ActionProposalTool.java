@@ -27,6 +27,7 @@ public class ActionProposalTool {
             2. This tool is safe: it does not create records, update records, open views, or create drafts.
             3. If status=MISSING_FIELDS, ask the user for those fields. Do not show action choices.
             4. If status=READY, the UI will render the returned action choices. Wait for the user to choose one.
+            5. This tool validates ONE record per call. Do not pass an array as values.
 
             INPUT CONTRACT:
             - operation: currently "create".
@@ -39,11 +40,13 @@ public class ActionProposalTool {
             @ToolParam(description = "Operation, currently create") String operation,
             @ToolParam(description = "Exact target entity name from list_entities") String targetEntityName,
             @ToolParam(description = "Short human-readable instance summary", required = false) String instanceName,
-            @ToolParam(description = "Writable attribute-name to value object", required = false) Map<String, Object> values,
+            @ToolParam(description = "Writable attribute-name to value object. Must be an object, not an array.", required = false) Map<String, Object> values,
             @ToolParam(description = "Known missing required fields", required = false) List<String> missingFields,
             @ToolParam(description = "Requested choice ids: create-now, prefill-form", required = false) List<String> choices) {
 
         return actionProposalService.validate(new ActionProposal(
-                null, operation, targetEntityName, instanceName, values, missingFields, choices));
+                null, operation, targetEntityName, instanceName,
+                values == null ? Map.of() : values,
+                missingFields, choices));
     }
 }
