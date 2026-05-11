@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: milestone
-status: Phase 14 shipped — PR #28; ready for Phase 15 planning
-stopped_at: "Phase 14 shipped — PR #28 (github.com/kl3inIT/ai-agent-core/pull/28)"
+status: Phase 14 merged (PR #28). Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 → ROADMAP Backlog 999.2. Ready to run /gsd-complete-milestone 1.1
+stopped_at: "v1.1.0 closing — Phases 9-14 + 13.1 done; Phase 15 deferred to v1.2 (Backlog 999.2); awaiting /gsd-audit-milestone 1.1 then /gsd-complete-milestone 1.1"
 last_updated: "2026-05-11T00:00:00.000Z"
 progress:
-  total_phases: 9
+  total_phases: 7
   completed_phases: 7
-  total_plans: 62
+  total_plans: 63
   completed_plans: 63
   percent: 100
 ---
@@ -23,18 +23,18 @@ See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 15 — chat-voice-input-soniox-stt
+**Current focus:** Closing v1.1.0 — run `/gsd-audit-milestone 1.1` then `/gsd-complete-milestone 1.1`. Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 (ROADMAP Backlog → Phase 999.2).
 
 ## Current Position
 
-Phase: 15 (chat-voice-input-soniox-stt) — READY TO PLAN
-Plan: Not started
+Milestone: v1.1.0 — ALL DELIVERED PHASES COMPLETE (9, 10, 11, 12, 13, 13.1, 14); merged via PR #28. Phase 15 deferred to v1.2.
+Next: `/gsd-audit-milestone 1.1` → `/gsd-complete-milestone 1.1` → (v1.2) `/gsd-new-milestone`
 | Field | Value |
 |-------|-------|
-| Phase | Phase 15 |
-| Plan | Not started |
-| Status | Phase 14 shipped — PR #28 (github.com/kl3inIT/ai-agent-core/pull/28); ready for Phase 15 planning |
-| Last activity | 2026-05-11 — Shipped Phase 14: pushed branch, opened PR #28 against main (manual chat-to-form UAT accepted) |
+| Phase | v1.1.0 closing (no active phase) |
+| Plan | n/a |
+| Status | Phase 14 merged (PR #28); Phase 15 deferred to v1.2 (Backlog 999.2); ready for /gsd-complete-milestone 1.1 |
+| Last activity | 2026-05-11 — Merged PR #28 (Phase 14); fixed CI (ActionProposalServiceTest) + applied 6 code-review WARNING fixes; deferred Phase 15 → v1.2 Backlog; synced local main |
 
 ## Phase Status
 
@@ -46,8 +46,8 @@ Plan: Not started
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Shipped — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
-| 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
+| 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
+| ~~15. Chat Voice Input — Soniox STT~~ | **Deferred to v1.2** (ROADMAP Backlog → Phase 999.2) on 2026-05-11 | 0/0 | - | - |
 
 ## Hard Build-Order
 
