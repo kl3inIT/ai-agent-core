@@ -14,6 +14,7 @@ import io.jmix.core.DataManager;
 import io.jmix.core.MessageTools;
 import io.jmix.core.Metadata;
 import io.jmix.core.metamodel.model.MetaClass;
+import io.jmix.core.metamodel.model.Session;
 import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.view.ViewInfo;
 import io.jmix.flowui.view.ViewRegistry;
@@ -73,6 +74,9 @@ class ActionProposalServiceTest {
         when(toolEntityResolver.resolveCreatableEntityOrThrow(ENTITY_NAME)).thenReturn(metaClass);
         when(metaClass.getName()).thenReturn(ENTITY_NAME);
         when(metadata.getClass(ENTITY_NAME)).thenReturn(metaClass);
+        Session metadataSession = mock(Session.class);
+        when(metadata.getSession()).thenReturn(metadataSession);
+        when(metadataSession.getClasses()).thenReturn(List.of(metaClass));
         when(schemaSynthesizer.buildSchema(metaClass)).thenReturn(new MetaClassDtoSynthesizer.SynthesizedSchema(
                 "{}", List.of("name", "externalCode"), List.of("name")));
         when(viewRegistry.getDetailViewInfo(metaClass)).thenReturn(new ViewInfo(
