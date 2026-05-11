@@ -27,6 +27,7 @@ import io.jmix.flowui.view.ViewRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.MessageFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -165,8 +166,9 @@ public class OpenFormWithDraftHandler {
         }
 
         Object editedEntity = detailView.getEditedEntity();
+        DraftApplyResult applyResult;
         try {
-            draftLoader.apply(draftId, editedEntity);
+            applyResult = draftLoader.apply(draftId, editedEntity);
         } catch (DraftNotFoundException expired) {
             showWarning("chatView.intent.draftExpired");
             return;
@@ -174,6 +176,12 @@ public class OpenFormWithDraftHandler {
             log.warn("Draft apply failed for draftId={}", draftId, failure);
             showConfigurationError();
             return;
+        }
+        if (applyResult.deniedAttributeCount() > 0) {
+            notifications.create(MessageFormat.format(
+                            messages.getMessage("chatView.intent.partialPrefill"),
+                            applyResult.deniedAttributeCount()))
+                    .show();
         }
         DraftLifecycleRegistration lifecycleRegistration = new DraftLifecycleRegistration();
         lifecycleRegistration.afterSaveRegistration = ComponentUtil.addListener(
