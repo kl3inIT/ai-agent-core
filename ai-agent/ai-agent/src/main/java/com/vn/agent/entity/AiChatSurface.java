@@ -7,7 +7,8 @@ import org.springframework.lang.Nullable;
 public enum AiChatSurface implements EnumClass<String> {
 
     FULL_ROUTE("FULL_ROUTE"),
-    HEADER_BUTTON("HEADER_BUTTON");
+    HEADER_BUTTON("HEADER_BUTTON"),
+    SIDEBAR("SIDEBAR");
 
     private final String id;
 

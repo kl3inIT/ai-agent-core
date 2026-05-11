@@ -21,14 +21,17 @@ class AiUiSettingsModelTest {
     Metadata metadata;
 
     @Test
-    void chatSurfaceEnumContainsOnlyTheTwoSupportedSurfaceIds() {
+    void chatSurfaceEnumContainsTheThreeSupportedSurfaceIds() {
+        assertThat(AiChatSurface.values()).hasSize(3);
         assertThat(AiChatSurface.values())
-                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON, AiChatSurface.SIDEBAR);
         assertThat(AiChatSurface.FULL_ROUTE.getId()).isEqualTo("FULL_ROUTE");
         assertThat(AiChatSurface.HEADER_BUTTON.getId()).isEqualTo("HEADER_BUTTON");
+        assertThat(AiChatSurface.SIDEBAR.getId()).isEqualTo("SIDEBAR");
         assertThat(AiChatSurface.fromId("FULL_ROUTE")).isEqualTo(AiChatSurface.FULL_ROUTE);
         assertThat(AiChatSurface.fromId("HEADER_BUTTON")).isEqualTo(AiChatSurface.HEADER_BUTTON);
-        assertThat(AiChatSurface.fromId("SIDEBAR")).isNull();
+        assertThat(AiChatSurface.fromId("SIDEBAR")).isEqualTo(AiChatSurface.SIDEBAR);
+        assertThat(AiChatSurface.fromId("UNKNOWN_SURFACE")).isNull();
     }
 
     @Test
@@ -37,13 +40,28 @@ class AiUiSettingsModelTest {
 
         assertThat(settings.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
         assertThat(settings.getEnabledSurfaceSet())
-                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
-        assertThat(settings.getEnabledSurfaceIds()).isEqualTo("FULL_ROUTE,HEADER_BUTTON");
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON, AiChatSurface.SIDEBAR);
+        assertThat(settings.getEnabledSurfaceIds()).isEqualTo("FULL_ROUTE,HEADER_BUTTON,SIDEBAR");
 
         settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.HEADER_BUTTON));
 
         assertThat(settings.getEnabledSurfaceIds()).isEqualTo("HEADER_BUTTON");
         assertThat(settings.getEnabledSurfaceSet()).containsExactly(AiChatSurface.HEADER_BUTTON);
+    }
+
+    @Test
+    void enabledSurfaceIdsContainingSidebarParsesBackToSidebar() {
+        AiUiSettings settings = metadata.create(AiUiSettings.class);
+
+        settings.setEnabledSurfaceIds("FULL_ROUTE,SIDEBAR");
+
+        assertThat(settings.getEnabledSurfaceSet())
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.SIDEBAR);
+
+        settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.SIDEBAR));
+
+        assertThat(settings.getEnabledSurfaceIds()).isEqualTo("SIDEBAR");
+        assertThat(settings.getEnabledSurfaceSet()).containsExactly(AiChatSurface.SIDEBAR);
     }
 
     @Test
