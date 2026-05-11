@@ -1,11 +1,14 @@
 ---
 id: SEED-005
-status: dormant
+status: implemented
 planted: 2026-04-21
 planted_during: v1.0 / Phase 7 Flow UI planning
+implemented_during: v1.1.0 / Phase 12 — Configurable Chat Surfaces
 trigger_when: after the standard ChatView ships and teams want lower-friction chat access from any screen, or operators need to control whether end users see a full route or a lightweight launcher
 scope: Medium
 ---
+
+> **Implemented in v1.1.0 — Phase 12 (Configurable Chat Surfaces).** Shipped the admin chat-surface toggle (`AiUiSettings` + `AiUiSettingsView`) and two surfaces — `FULL_ROUTE` (`ChatView`) and `HEADER_BUTTON` (`ChatDialogView` via Jmix `DialogWindow`) — over one `ChatPanelFragment`, with cross-surface conversation continuity (`AiChatSessionState`). The literal floating bottom-right corner launcher is the only piece not shipped — tracked as future requirement `SURF-11`.
 
 # SEED-005: Add a floating user chat launcher and admin chat-surface toggle
 

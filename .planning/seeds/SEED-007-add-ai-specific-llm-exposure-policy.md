@@ -1,11 +1,14 @@
 ---
 id: SEED-007
-status: dormant
+status: implemented
 planted: 2026-04-24
 planted_during: v1.0 / Phase 07.1 awaiting human UAT
+implemented_during: v1.1.0 / Phase 10 — AI-Specific LLM Exposure Policy
 trigger_when: When a host application needs the AI to see less than the current user's Jmix permissions, or when admin governance over the LLM-visible entity surface becomes planned product scope.
 scope: Medium
 ---
+
+> **Implemented in v1.1.0 — Phase 10 (AI-Specific LLM Exposure Policy).** Shipped `AiExposureRule` (entity-level, `EXCLUDE`-only) + `LlmExposurePolicy` boundary (composition `userVisible AND NOT excluded`), enforced uniformly across schema discovery, tool calls, baseline prompt, and RAG; admin Flow UI (`AiExposureRuleListView`/`DetailView`) gated to `AiAgentAdminRole`; `LlmExposureChangedEvent`. `attributePath`-level rules deferred (entity-level denylist only in v1.1).
 
 # SEED-007: Add AI-specific LLM exposure policy
 
