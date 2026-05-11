@@ -15,6 +15,8 @@ import io.jmix.core.Metadata;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.security.CurrentAuthentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -38,6 +40,7 @@ public class ExtractionService {
 
     static final String TOOL_NAME = "prepare_form_draft";
     private static final int AUDIT_ATTRIBUTE_NAME_LIMIT = 16;
+    private static final Logger log = LoggerFactory.getLogger(ExtractionService.class);
 
     private final IntentRegistry intentRegistry;
     private final DataManager dataManager;
@@ -132,8 +135,14 @@ public class ExtractionService {
 
             dataManager.save(draft);
             ExtractionResult result = new ExtractionResult(draftId, metaClass.getName(), instanceName);
-            writeSuccessAudit(runId, userUsername, effectiveInput.conversationId(), argumentsJson,
-                    result, filteredPayloadMap, elapsedMillis(startNanos));
+            try {
+                writeSuccessAudit(runId, userUsername, effectiveInput.conversationId(), argumentsJson,
+                        result, filteredPayloadMap, elapsedMillis(startNanos));
+            } catch (RuntimeException auditFailure) {
+                // Best-effort audit, mirroring auditDenial / task_file_budget_exceeded: a transient
+                // audit-write failure must not reclassify a persisted draft as a validation failure.
+                log.warn("Failed to write success audit for prepare_form_draft draftId={}", draftId, auditFailure);
+            }
             return result;
         } catch (ExtractionDeniedException denied) {
             writeDeniedAudit(runId, userUsername, effectiveInput.conversationId(), argumentsJson,
