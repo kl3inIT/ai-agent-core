@@ -46,7 +46,7 @@ Plan: Not started
 | 12. Configurable Chat Surfaces | Shipped | 6/6 | 2026-05-02 | 2026-05-05 |
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
-| 14. Intent-Driven Extraction → Form Prefill | Complete; manual UAT pending | 10/10 | 2026-05-07 | 2026-05-09 |
+| 14. Intent-Driven Extraction → Form Prefill | Complete; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
 | 15. Chat Voice Input — Soniox STT | Not started | 0/0 | - | - |
 
 ## Hard Build-Order
@@ -272,8 +272,9 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 
 ## Session Continuity
 
-**Last session:** 2026-05-08T07:54:56.705Z
-**Stopped at:** Executed 14-09-PLAN.md gap closure
+**Last session:** 2026-05-11T13:00:00.000Z
+**Stopped at:** Phase 14 manual UAT — all 14 checks pass (driven live on localhost:8088 against a local docker Postgres)
 **Resume file:** None
-**Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory IndexOutOfBoundsException) still blocks runtime of all module-level @SpringBootTest classes including Plan 13.1-06's 4 new ones; not introduced by 13.1; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. Plan 13.1-07 sidesteps via XML/source-scan tests per the plan's project_context preamble.
-**Next action:** Rerun Phase 14 verification; then manual UI UAT from `14-UAT-CHECKLIST.md`.
+**Blockers:** None for Phase 14 UAT. Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md.
+**Working-tree changes (uncommitted) from this session:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432; application.properties itself is UNCHANGED from origin and stays shippable with the 10.123.123.174:5555 URLs); ActionProposalTool `@ToolParam values` Object→Map<String,Object> fix + test cleanup. Plus pre-existing 14-11 WIP (cancel control, transcript-leak fix, ambiguous-count rules, full-page prefill source-conversation). See 14-HUMAN-UAT.md "Session Handoff - 2026-05-11 (UAT COMPLETE)".
+**Next action:** Decide commit strategy for the working-tree changes (the ActionProposalTool fix is small/isolated; the docker-compose/localhost datasource may be a local-only change). Add a regression test for full-page prefill Cancel→Don't save (Test 12). Then proceed to v1.1.0 milestone close.

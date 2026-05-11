@@ -180,6 +180,92 @@ Validate the corrected side-effecting chat pattern:
 
 **Result:** pending
 
+## Scenario 10 - Cancelled Pending Action Cannot Still Mutate
+
+**Steps**
+
+1. Ask the assistant to create a Customer with enough data to render action choices.
+2. Do not click an action button yet.
+3. Send a cancellation message such as `Do not create that customer anymore`.
+4. Try to click the old `Create now` button if it is still visible.
+5. Inspect the Customer list.
+
+**Expected**
+
+- The assistant may acknowledge the cancellation.
+- The cancelled action-choice row is removed or disabled.
+- The cancelled proposal cannot create a record after cancellation.
+- No Customer record is created for the cancelled proposal.
+
+**Result:** pending
+
+## Scenario 11 - Ambiguous Multi-Record Quantity
+
+**Steps**
+
+1. Send a request with an ambiguous count, for example `Create 2 or 3 customers named A, B, C`.
+2. Wait for the assistant response.
+
+**Expected**
+
+- The assistant asks the user to choose the exact count, or rejects the batch gracefully if multi-row proposals are unsupported.
+- The assistant does not silently choose a count.
+- No generic tool argument or deserialization error is shown to the user.
+- No record is created before an explicit valid action choice.
+
+**Result:** pending
+
+## Scenario 12 - Full-Page Prefill Cancel Preserves Conversation State
+
+**Steps**
+
+1. Open the full chat page.
+2. Create a ready prefill proposal.
+3. Click `Prefill form`, then `Open form to confirm`.
+4. Click Cancel in the detail view.
+5. Choose `Don't save`.
+6. Return to the chat page.
+
+**Expected**
+
+- The user returns to the same chat conversation.
+- Previous messages and pending confirm/action rows remain available as appropriate.
+- The chat does not reset to a fresh conversation unless the user explicitly starts one.
+
+**Result:** pending
+
+## Scenario 13 - User-Facing Transcript Hides Internal Action Payloads
+
+**Steps**
+
+1. Create a ready action proposal.
+2. Select an action such as `Create now`.
+3. Close and reopen the floating chat dialog, or reload the chat history.
+
+**Expected**
+
+- User-visible chat history does not contain selected-action routing text.
+- Proposal ids, internal entity names, and collected JSON payloads are not rendered as normal chat messages.
+- The user only sees business-level responses.
+
+**Result:** pending
+
+## Scenario 14 - Create Now Double Click Idempotency
+
+**Steps**
+
+1. Create a ready action proposal.
+2. Double-click `Create now`.
+3. Inspect the target list.
+
+**Expected**
+
+- At most one selected-action turn is submitted.
+- At most one target record is created.
+- The selected action row is removed or disabled quickly enough to prevent duplicate side effects.
+
+**Result:** pending
+
 ## Pass Criteria
 
 - Scenarios 1 through 8 pass.
