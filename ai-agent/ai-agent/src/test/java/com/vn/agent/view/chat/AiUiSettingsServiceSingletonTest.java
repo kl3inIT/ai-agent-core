@@ -52,7 +52,7 @@ class AiUiSettingsServiceSingletonTest {
         assertThat(settings.getId()).isEqualTo(AiUiSettings.SINGLETON_ID);
         assertThat(settings.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
         assertThat(settings.getEnabledSurfaceSet())
-                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON, AiChatSurface.SIDEBAR);
         assertThat(settings.getCreatedBy()).isEqualTo("admin");
         assertThat(settings.getCreatedDate()).isNotNull();
         assertThat(countRows()).isEqualTo(1);
