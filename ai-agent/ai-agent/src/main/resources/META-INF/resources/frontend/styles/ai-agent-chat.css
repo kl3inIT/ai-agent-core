@@ -330,3 +330,76 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     background: var(--lumo-primary-color-10pct);
     color: var(--lumo-primary-text-color);
 }
+
+/* --- Phase 15 Plan 04: ephemeral streaming-status line (OBS-01) -------------
+ *
+ * A <span class="ai-agent-status" role="status" aria-live="polite"> rendered as a
+ * sibling AFTER <vaadin-message-list> inside the message-list slot — never inside a
+ * MessageListItem. Removed entirely on every terminal/teardown site (review #7), so
+ * it never lingers below a completed turn. A subtle animated ellipsis communicates
+ * "working" without grabbing attention; the prefers-reduced-motion guard stills it.
+ */
+.ai-agent-status {
+    display: block;
+    text-align: center;
+    font-size: var(--lumo-font-size-s);
+    color: var(--lumo-secondary-text-color);
+    padding: var(--lumo-space-xs) 0;
+}
+
+.ai-agent-status::after {
+    content: "";
+    display: inline-block;
+    width: 1.2em;
+    text-align: left;
+    animation: ai-agent-status-pulse 1.2s steps(4, end) infinite;
+}
+
+@keyframes ai-agent-status-pulse {
+    0% { content: ""; }
+    25% { content: "."; }
+    50% { content: ".."; }
+    75% { content: "..."; }
+    100% { content: ""; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-agent-status::after {
+        animation: none;
+        content: "…";
+    }
+}
+
+/* --- Phase 15 Plan 04: per-turn tool-detail activity block (OBS-02) ---------
+ *
+ * One ordered container Div appended after <vaadin-message-list>, holding the
+ * collapsed-by-default <vaadin-details> disclosures in turn order (newest last) —
+ * the only achievable rendering on the MessageList substrate (review #2). Label-only
+ * KIND-keyed step rows; per-step duration ("— " when unknown, never "0 ms").
+ */
+.ai-agent-turn-activity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lumo-space-xs);
+    padding: 0 var(--lumo-space-m);
+}
+
+.ai-agent-turn-activity__steps {
+    width: 100%;
+}
+
+.ai-agent-turn-activity__step {
+    display: flex;
+    align-items: baseline;
+    gap: var(--lumo-space-s);
+    font-size: var(--lumo-font-size-s);
+}
+
+.ai-agent-turn-activity__step-duration {
+    color: var(--lumo-secondary-text-color);
+}
+
+.ai-agent-turn-activity__step-error {
+    color: var(--lumo-error-text-color);
+    font-weight: 500;
+}

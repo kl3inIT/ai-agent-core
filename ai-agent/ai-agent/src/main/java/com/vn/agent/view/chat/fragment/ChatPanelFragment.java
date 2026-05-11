@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.dependency.CssImport;
+import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H5;
@@ -29,10 +31,12 @@ import com.vn.agent.ChatService;
 import com.vn.agent.action.ActionIntentId;
 import com.vn.agent.action.ActionProposal;
 import com.vn.agent.action.ActionProposalService;
+import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiTaskFile;
+import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.extraction.IntentOption;
 import com.vn.agent.extraction.IntentRegistry;
 import com.vn.agent.orchestration.ConversationGateway;
@@ -42,6 +46,7 @@ import com.vn.agent.taskfile.AiTaskFileProperties;
 import com.vn.agent.view.chat.AiChatSessionState;
 import com.vn.agent.view.chat.intent.OpenFormWithDraftHandler;
 import io.jmix.core.DataManager;
+import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.FileRef;
 import io.jmix.core.FileStorage;
 import io.jmix.core.FileStorageLocator;
@@ -157,6 +162,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private Messages messages;
     @Autowired private Dialogs dialogs;
     @Autowired private DataManager dataManager;
+    // Phase 15 Plan 04 (RESEARCH Open Q1) — AiAgentUserRole has NO AiAuditEvent EntityPolicy
+    // (AiAuditEventListView is an admin-only view); the chat user cannot read AiAuditEvent via
+    // the constrained DataManager. The per-turn-detail audit reads therefore use
+    // UnconstrainedDataManager with a MANDATORY `where e.userUsername = :me and e.conversation.id
+    // = :cid` clause on every read — never `runId`-only unconstrained. The conversation was
+    // already ownership-checked at setConversationIdInternal (~line 563).
+    @Autowired private UnconstrainedDataManager unconstrainedDataManager;
     @Autowired private Notifications notifications;
     @Autowired private AiChatSessionState chatSessionState;
     @Autowired private IntentRegistry intentRegistry;
@@ -234,6 +246,36 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     // Phase 13.1 UAT-fix — tracks visible turns across the mixed substrate
     // (MessageList items + NOTICE divs) so hasMessages() is O(1).
     private int messageCount;
+
+    // ---- Phase 15 Plan 04 — observability surfaces -------------------------
+    /** OBS-04 / review point #12 — cap protects against a single pathological turn. */
+    private static final int LIVE_TURN_STEP_CAP = 50;
+    /** Memoization flag set on a history {@link Details} once its steps have been lazily loaded. */
+    private static final String TURN_DETAILS_LOADED_KEY = "ai-agent.turnDetails.loaded";
+
+    /** Ephemeral KIND-keyed streaming-status {@code <span>} (a sibling AFTER {@code <vaadin-message-list>});
+     *  {@code null} when no turn is streaming. Removed entirely on every terminal/teardown site. */
+    private com.vaadin.flow.dom.Element statusRow;
+    /** {@code true} once the first {@link StreamingEvent.Content} of the current turn has arrived
+     *  (the first-Content-implies-CHAT flip, review point #6). Reset to {@code false} at turn start. */
+    private boolean turnContentSeen;
+
+    /** Per-fragment-instance bounded live-turn step accumulator (NOT {@code AiChatSessionState}),
+     *  capped at {@link #LIVE_TURN_STEP_CAP}, cleared on every terminal/teardown site. */
+    private final List<LiveTurnStep> liveTurnSteps = new ArrayList<>();
+    /** The single ordered activity block ({@code <div class="ai-agent-turn-activity">}) appended
+     *  after {@code <vaadin-message-list>} in {@code messageListSlot}; holds the per-turn {@link Details}. */
+    private Div turnActivityBlock;
+    /** Per-turn {@link Details} anchored by {@code runId} (so a re-rendered turn replaces, not duplicates). */
+    private final Map<UUID, Details> turnDetailsByRunId = new HashMap<>();
+
+    /** A live-turn step (transient ToolCall→ToolResult arrival delta is a FALLBACK only — the real
+     *  {@code latencyMs} comes from the {@code AiAuditEvent} children read on {@code Final}). Holds
+     *  ONLY a label key, a nullable latency, an errored flag, and the transient {@code toolCallId}
+     *  for dedupe — never a tool/entity name (T-15-D1). */
+    private record LiveTurnStep(String labelKey, Long latencyMs, boolean errored,
+                                UUID toolCallId, long startedAtNanos) {
+    }
 
     @Subscribe
     public void onReady(final ReadyEvent event) {
@@ -491,6 +533,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         }
         this.activeStream = null;
         this.ownerUi = null;
+        // Phase 15 Plan 04 (review point #7) — explicit observability-state teardown on detach
+        // (the cancelled stream's .doOnComplete does NOT fire on dispose). Element children go
+        // away with the fragment; the field cleanup keeps the contract uniform.
+        liveTurnSteps.clear();
+        removeStatusRow();
+        turnContentSeen = false;
         super.onDetach(detachEvent);
     }
 
@@ -587,6 +635,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only).
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+        int assistantTurnCount = 0;
         for (AiMessage m : history) {
             AiMessageRole role = m.getRole();
             if (role == AiMessageRole.USER) {
@@ -595,6 +644,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             } else if (role == AiMessageRole.ASSISTANT) {
                 items.add(buildItem(m, aiName, AI_COLOR));
                 messageCount++;
+                assistantTurnCount++;
             } else if (role == AiMessageRole.NOTICE) {
                 appendNoticeRow(m.getContent());
             }
@@ -602,6 +652,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (messageList != null) {
             messageList.setItems(new ArrayList<>(items));
         }
+        // Phase 15 Plan 04 (SPEC req 5 / CONTEXT D-07) — additive post-navigation correlation:
+        // anchor a collapsed per-turn Details (in the .ai-agent-turn-activity block) by runId for
+        // each prior ASSISTANT turn whose AiAuditEvent CHAT root has >=1 tool/retrieval child,
+        // ONLY when the assistant-turn count matches the audit-root count (else none — no guess).
+        correlateHistoryTurnDetails(cid, assistantTurnCount);
     }
 
     public UUID getConversationId() { return conversationId; }
@@ -726,6 +781,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageList.setItems(new ArrayList<>(items));
 
         setStreamingUiState(true);
+        // Phase 15 Plan 04 — fresh per-turn observability state; neutral typing indicator
+        // until the first Activity/Content arrives.
+        turnContentSeen = false;
+        liveTurnSteps.clear();
+        accessUi(() -> showStatus(TurnDetailRenderer.neutralStatusKey()));
 
         final Authentication submitAuthentication = captureCurrentAuthentication();
         ownerAuthentication = submitAuthentication;
@@ -758,6 +818,27 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                             showBudgetExceededToast();
                         }
                     }
+                    // Phase 15 Plan 04 — ephemeral status line + per-turn step accumulation.
+                    // The Activity variant is NOT routed through StreamEventRenderer (it contributes
+                    // no markdown); record the status flip and (for RETRIEVAL) a live step, then skip
+                    // the markdown path entirely.
+                    if (evt instanceof StreamingEvent.Activity a) {
+                        if (a.kind() == StreamingEvent.ActivityKind.RETRIEVAL) {
+                            recordLiveStep(new LiveTurnStep(
+                                    TurnDetailRenderer.STEP_RETRIEVAL_KEY, null, false, null, System.nanoTime()));
+                        }
+                        accessUi(() -> showStatus(TurnDetailRenderer.statusKeyFor(a.kind())));
+                        return;
+                    }
+                    if (evt instanceof StreamingEvent.ToolCall tc) {
+                        // Live "started" step keyed by toolCallId — store the start nanos for the
+                        // FALLBACK arrival delta only; never store toolName()/argsJson().
+                        recordLiveStep(new LiveTurnStep(
+                                TurnDetailRenderer.STEP_TOOL_KEY, null, false, tc.toolCallId(), System.nanoTime()));
+                    }
+                    if (evt instanceof StreamingEvent.ToolResult tr) {
+                        finishLiveStep(tr.toolCallId(), tr.outcome());
+                    }
                     StreamEventRenderer.RenderedStreamEvent rendered =
                             StreamEventRenderer.renderStreamEventDetails(evt, labels, citationState);
                     if (rendered.draftPayloadInvalid()) {
@@ -777,6 +858,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     }
                     String md = rendered.markdown();
                     if (md.isEmpty()) return;
+                    // Review point #6 — the first Content event of the turn implies CHAT/"thinking…"
+                    // (regardless of any prior Activity(RETRIEVAL)); a later Activity(...) still wins.
+                    if (!turnContentSeen) {
+                        turnContentSeen = true;
+                        accessUi(() -> showStatus(
+                                TurnDetailRenderer.statusKeyFor(StreamingEvent.ActivityKind.CHAT)));
+                    }
                     accessUi(() -> {
                         if (botMsg != null) {
                             botMsg.appendText(md);
@@ -786,10 +874,67 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnError(err -> {
                     log.warn("Chat stream failed", err);
+                    liveTurnSteps.clear();
                     accessUi(() -> { showGenericErrorNotification(); finishStreamInternal(); });
                 })
-                .doOnComplete(() -> accessUi(this::finishStreamInternal))
+                .doOnComplete(() -> accessUi(() -> {
+                    // Review point #8 — on the terminal Final of the just-completed turn, read the
+                    // runId's AiAuditEvent TOOL/RETRIEVAL children for REAL latencyMs (unified
+                    // loadTurnSteps path); fall back to the transient arrival-delta steps only if
+                    // the audit read returns nothing. A zero-step turn produces NO Details.
+                    UUID runId = activeRunId;
+                    UUID cid = conversationId;
+                    if (runId != null && cid != null) {
+                        List<TurnDetailRenderer.StepRow> steps = loadTurnSteps(runId, cid);
+                        if (steps.isEmpty()) {
+                            steps = liveTurnStepsAsStepRows();
+                        }
+                        if (!steps.isEmpty()) {
+                            appendTurnDetails(runId, steps);
+                        }
+                    }
+                    liveTurnSteps.clear();
+                    finishStreamInternal();
+                }))
                 .subscribe();
+    }
+
+    /** Adds a live-turn step iff under {@link #LIVE_TURN_STEP_CAP} (review point #12). */
+    private void recordLiveStep(LiveTurnStep step) {
+        if (liveTurnSteps.size() < LIVE_TURN_STEP_CAP) {
+            liveTurnSteps.add(step);
+        }
+    }
+
+    /** Marks the live "started" TOOL step with the matching {@code toolCallId} as finished,
+     *  recording the {@link AiToolCallOutcome} and the transient ToolCall→ToolResult arrival
+     *  delta in ms as a FALLBACK only (the real {@code latencyMs} is read from the audit children
+     *  on {@code Final}). */
+    private void finishLiveStep(UUID toolCallId, AiToolCallOutcome outcome) {
+        if (toolCallId == null) {
+            return;
+        }
+        for (int i = 0; i < liveTurnSteps.size(); i++) {
+            LiveTurnStep step = liveTurnSteps.get(i);
+            if (toolCallId.equals(step.toolCallId())) {
+                long deltaMs = Math.max(0L, (System.nanoTime() - step.startedAtNanos()) / 1_000_000L);
+                boolean errored = TurnDetailRenderer.stepRow(
+                        StreamingEvent.ActivityKind.TOOL, deltaMs, outcome).errored();
+                liveTurnSteps.set(i, new LiveTurnStep(step.labelKey(), deltaMs, errored,
+                        step.toolCallId(), step.startedAtNanos()));
+                return;
+            }
+        }
+    }
+
+    /** Converts the bounded live-turn step list into renderer {@link TurnDetailRenderer.StepRow}s
+     *  (fallback path — used only when the audit read returns nothing on {@code Final}). */
+    private List<TurnDetailRenderer.StepRow> liveTurnStepsAsStepRows() {
+        List<TurnDetailRenderer.StepRow> rows = new ArrayList<>(liveTurnSteps.size());
+        for (LiveTurnStep step : liveTurnSteps) {
+            rows.add(new TurnDetailRenderer.StepRow(step.labelKey(), step.latencyMs(), step.errored()));
+        }
+        return rows;
     }
 
     private void initializeConversationFromFinalEvent(UUID newConversationId) {
@@ -867,6 +1012,263 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         activeRunId = null;
         activeStream = null;
         botMsg = null;
+        // Phase 15 Plan 04 (review point #7) — the ephemeral status line is GONE in every
+        // teardown path (not blanked). finishStreamInternal is reached by .doOnComplete /
+        // .doOnError / the stop-button handler (stopActiveStream) and via clearMessageList on a
+        // conversation switch; the onDetach hook routes through stopActiveStream/cancel as well.
+        removeStatusRow();
+        turnContentSeen = false;
+    }
+
+    // ---- Phase 15 Plan 04 — ephemeral streaming-status line (OBS-01) -------
+
+    /**
+     * Shows/updates the ephemeral KIND-keyed streaming-status {@code <span>} — a sibling of
+     * {@code <vaadin-message-list>} inside {@code messageListSlot}, never inside any
+     * {@link MessageListItem}. Text is set via {@link com.vaadin.flow.dom.Element#setText(String)}
+     * (HTML-escaped); no markdown rendering on this element (T-15-D2). The status text is NEVER
+     * concatenated into the assistant bubble.
+     */
+    private void showStatus(String messageKey) {
+        if (messageListSlot == null) {
+            return;
+        }
+        if (statusRow == null) {
+            statusRow = new com.vaadin.flow.dom.Element("span");
+            statusRow.getClassList().add("ai-agent-status");
+            statusRow.setAttribute("role", "status");
+            statusRow.setAttribute("aria-live", "polite");
+            messageListSlot.getElement().appendChild(statusRow);
+        }
+        statusRow.setText(messages.getMessage(messageKey));
+    }
+
+    /** Removes the status {@code <span>} from its parent and nulls the field — used in every
+     *  terminal/teardown site (review point #7). Idempotent. */
+    private void removeStatusRow() {
+        if (statusRow != null) {
+            statusRow.removeFromParent();
+            statusRow = null;
+        }
+    }
+
+    // ---- Phase 15 Plan 04 — per-turn tool-detail Details (OBS-02) ----------
+
+    /** Lazily creates the single {@code <div class="ai-agent-turn-activity">} block (appended
+     *  after {@code <vaadin-message-list>} inside {@code messageListSlot}); the per-turn
+     *  {@link Details} are added INTO it in turn order. Review point #2: a {@link Details} cannot
+     *  be inserted between two {@link MessageListItem}s on the {@code MessageList} substrate, so
+     *  the disclosures are grouped here. */
+    private Div turnActivityBlock() {
+        if (turnActivityBlock == null) {
+            turnActivityBlock = new Div();
+            turnActivityBlock.addClassName("ai-agent-turn-activity");
+            if (messageListSlot != null) {
+                messageListSlot.add(turnActivityBlock);
+            }
+        }
+        return turnActivityBlock;
+    }
+
+    /** Builds + appends a collapsed-by-default {@link Details} for a just-completed live turn
+     *  from already-resolved step rows (real {@code latencyMs} from the audit children, or the
+     *  arrival-delta fallback). Caller has already ensured {@code steps} is non-empty. */
+    private void appendTurnDetails(UUID runId, List<TurnDetailRenderer.StepRow> steps) {
+        Details details = buildTurnDetails(steps);
+        ComponentUtil.setData(details, TURN_DETAILS_LOADED_KEY, Boolean.TRUE);
+        replaceTurnDetails(runId, details);
+    }
+
+    /** Builds + appends a collapsed {@link Details} for a prior (history-replayed) turn whose
+     *  CHAT root we already know has &ge;1 child. The step rows are read lazily on first expand
+     *  via {@link #loadTurnSteps(UUID, UUID)} and memoized ({@link #TURN_DETAILS_LOADED_KEY}) so a
+     *  re-expand does not re-query. If (defensively) zero children come back the {@link Details}
+     *  is removed. */
+    private void appendHistoryTurnDetails(UUID runId, UUID conversationId) {
+        Details details = new Details();
+        details.setOpened(false);
+        details.setSummaryText(messages.getMessage("chatView.turnDetail.summaryPending"));
+        details.addOpenedChangeListener(event -> {
+            if (!event.isOpened()
+                    || Boolean.TRUE.equals(ComponentUtil.getData(details, TURN_DETAILS_LOADED_KEY))) {
+                return;
+            }
+            List<TurnDetailRenderer.StepRow> steps = loadTurnSteps(runId, conversationId);
+            if (steps.isEmpty()) {
+                details.removeFromParent();
+                turnDetailsByRunId.remove(runId, details);
+                return;
+            }
+            populateTurnDetails(details, steps);
+            ComponentUtil.setData(details, TURN_DETAILS_LOADED_KEY, Boolean.TRUE);
+        });
+        replaceTurnDetails(runId, details);
+    }
+
+    private void replaceTurnDetails(UUID runId, Details details) {
+        Details existing = turnDetailsByRunId.remove(runId);
+        if (existing != null) {
+            existing.removeFromParent();
+        }
+        turnActivityBlock().add(details);
+        turnDetailsByRunId.put(runId, details);
+    }
+
+    private Details buildTurnDetails(List<TurnDetailRenderer.StepRow> steps) {
+        Details details = new Details();
+        details.setOpened(false);
+        populateTurnDetails(details, steps);
+        return details;
+    }
+
+    private void populateTurnDetails(Details details, List<TurnDetailRenderer.StepRow> steps) {
+        long totalMs = 0L;
+        for (TurnDetailRenderer.StepRow step : steps) {
+            if (step.latencyMs() != null) {
+                totalMs += step.latencyMs();
+            }
+        }
+        details.setSummaryText(MessageFormat.format(
+                messages.getMessage(TurnDetailRenderer.summaryKey()),
+                TurnDetailRenderer.summaryArgs(steps.size(), totalMs)));
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.addClassName("ai-agent-turn-activity__steps");
+        content.removeAll();
+        for (TurnDetailRenderer.StepRow step : steps) {
+            content.add(buildStepRow(step));
+        }
+        details.removeAll();
+        details.add(content);
+    }
+
+    private Div buildStepRow(TurnDetailRenderer.StepRow step) {
+        Div row = new Div();
+        row.addClassName("ai-agent-turn-activity__step");
+        // Label-only KIND-keyed text — never a tool/entity name (T-15-D1).
+        Span label = new Span(messages.getMessage(step.labelKey()));
+        label.addClassName("ai-agent-turn-activity__step-label");
+        Span duration = new Span(step.latencyMs() == null
+                ? TurnDetailRenderer.UNKNOWN_DURATION_TEXT
+                : step.latencyMs() + " ms");
+        duration.addClassName("ai-agent-turn-activity__step-duration");
+        row.add(label, duration);
+        if (step.errored()) {
+            Span error = new Span(messages.getMessage(TurnDetailRenderer.errorIndicatorKey()));
+            error.addClassName("ai-agent-turn-activity__step-error");
+            row.add(error);
+        }
+        return row;
+    }
+
+    /**
+     * The unified live + history audit read (review point #8). Reads the {@code AiAuditEvent}
+     * TOOL/RETRIEVAL children for one {@code runId} via {@link UnconstrainedDataManager} with the
+     * MANDATORY {@code where e.userUsername = :me and e.conversation.id = :cid} clause — never
+     * {@code runId}-only unconstrained (T-15-D3). The narrow fetch plan deliberately omits the
+     * name columns and LOBs ({@code eventName}/{@code argumentsJson}/{@code resultSummary}/
+     * {@code queryText}) — only {@code kind}/{@code startedAt}/{@code finishedAt}/{@code latencyMs}/
+     * {@code outcome}/{@code errorClass} cross. Typed {@code load(AiAuditEvent.class)} infers the
+     * {@code agentstore} store.
+     */
+    private List<TurnDetailRenderer.StepRow> loadTurnSteps(UUID runId, UUID conversationId) {
+        if (runId == null || conversationId == null) {
+            return List.of();
+        }
+        try {
+            List<AiAuditEvent> children = unconstrainedDataManager.load(AiAuditEvent.class)
+                    .query("select e from ai_AiAuditEvent e " +
+                           "where e.userUsername = :me and e.conversation.id = :cid " +
+                           "and e.runId = :rid and e.parent is not null " +
+                           "order by e.startedAt asc")
+                    .parameter("me", currentAuthentication.getUser().getUsername())
+                    .parameter("cid", conversationId)
+                    .parameter("rid", runId)
+                    .fetchPlan(fp -> {
+                        fp.add("kind");
+                        fp.add("startedAt");
+                        fp.add("finishedAt");
+                        fp.add("latencyMs");
+                        fp.add("outcome");
+                        fp.add("errorClass");
+                    })
+                    .list();
+            List<TurnDetailRenderer.StepRow> rows = new ArrayList<>(children.size());
+            for (AiAuditEvent child : children) {
+                rows.add(TurnDetailRenderer.stepRow(child.getKind(), child.getLatencyMs(), child.getOutcome()));
+            }
+            return rows;
+        } catch (RuntimeException failure) {
+            log.debug("Turn-detail audit read failed runId={} conversationId={}", runId, conversationId, failure);
+            return List.of();
+        }
+    }
+
+    /**
+     * Additive post-navigation correlation pass (SPEC req 5 / CONTEXT D-07, review point #3).
+     * Called AFTER the history-replay loop calls {@code messageList.setItems(...)}. Loads, in
+     * {@code startedAt} order, the conversation's CHAT-root {@code runId}s + each root's
+     * TOOL/RETRIEVAL child count via two narrow raw-JPQL {@code loadValues} reads against the
+     * {@code agentstore} (raw {@code loadValues} does NOT infer the store — project memory
+     * {@code feedback_jmix_loadvalue_store} — so {@code .store("agentstore")} is explicit). The
+     * two-query form is used (one ordered list of roots, one grouped child-count map) — a single
+     * {@code left join} on a {@code @Composition} self-relation is awkward in JPQL. Zips the
+     * ordered {@code runId} list 1:1 against the replayed ASSISTANT turns ONLY when the counts
+     * match; on a mismatch renders NO disclosures (debug-log, never throws, never guesses) — a
+     * wrong association is worse than none. Appends a collapsed history {@link Details} only for
+     * roots with {@code childCount > 0}.
+     */
+    private void correlateHistoryTurnDetails(UUID conversationId, int assistantTurnCount) {
+        if (conversationId == null || assistantTurnCount <= 0) {
+            return;
+        }
+        try {
+            String me = currentAuthentication.getUser().getUsername();
+            List<UUID> rootRunIds = new ArrayList<>();
+            for (io.jmix.core.entity.KeyValueEntity row : unconstrainedDataManager.loadValues(
+                            "select e.runId from ai_AiAuditEvent e " +
+                            "where e.userUsername = :me and e.conversation.id = :cid and e.parent is null " +
+                            "order by e.startedAt asc")
+                    .store("agentstore")
+                    .properties("runId")
+                    .parameter("me", me)
+                    .parameter("cid", conversationId)
+                    .list()) {
+                Object rid = row.getValue("runId");
+                if (rid instanceof UUID uuid) {
+                    rootRunIds.add(uuid);
+                }
+            }
+            Map<UUID, Long> childCounts = new HashMap<>();
+            for (io.jmix.core.entity.KeyValueEntity row : unconstrainedDataManager.loadValues(
+                            "select c.runId, count(c) from ai_AiAuditEvent c " +
+                            "where c.userUsername = :me and c.conversation.id = :cid and c.parent is not null " +
+                            "group by c.runId")
+                    .store("agentstore")
+                    .properties("runId", "cnt")
+                    .parameter("me", me)
+                    .parameter("cid", conversationId)
+                    .list()) {
+                Object rid = row.getValue("runId");
+                Object cnt = row.getValue("cnt");
+                if (rid instanceof UUID uuid && cnt instanceof Number number) {
+                    childCounts.put(uuid, number.longValue());
+                }
+            }
+            if (rootRunIds.size() != assistantTurnCount) {
+                log.debug("turn-detail correlation skipped: {} assistant turns vs {} audit roots",
+                        assistantTurnCount, rootRunIds.size());
+                return;
+            }
+            for (UUID runId : rootRunIds) {
+                if (childCounts.getOrDefault(runId, 0L) > 0L) {
+                    appendHistoryTurnDetails(runId, conversationId);
+                }
+            }
+        } catch (RuntimeException failure) {
+            log.debug("turn-detail correlation failed conversationId={}", conversationId, failure);
+        }
     }
 
     void setStreamingUiState(boolean streaming) {
@@ -1206,6 +1608,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void clearMessageList() {
         items.clear();
         actionChoiceRowsByProposalId.clear();
+        // Phase 15 Plan 04 (review point #7) — drop the observability state for the outgoing
+        // conversation; removeAllChildren() below detaches the status <span> + activity-block Div,
+        // but the fields must be nulled so the next turn re-creates them in the fresh substrate.
+        turnDetailsByRunId.clear();
+        liveTurnSteps.clear();
+        turnActivityBlock = null;
+        statusRow = null;
+        turnContentSeen = false;
         if (messageListSlot != null) {
             // Wipe the underlying element children so both the MessageList component AND any
             // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.
