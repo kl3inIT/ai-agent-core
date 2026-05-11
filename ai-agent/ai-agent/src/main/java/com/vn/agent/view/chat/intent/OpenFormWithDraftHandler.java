@@ -7,6 +7,7 @@ import com.vaadin.flow.spring.annotation.VaadinSessionScope;
 import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.extraction.DraftApplyResult;
 import com.vn.agent.extraction.DraftLoader;
+import com.vn.agent.extraction.DraftNotFoundException;
 import com.vn.agent.extraction.ExtractionDraftAccess;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
@@ -23,6 +24,8 @@ import io.jmix.flowui.view.StandardDetailView;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewInfo;
 import io.jmix.flowui.view.ViewRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +40,8 @@ import java.util.UUID;
 @org.springframework.stereotype.Component
 @VaadinSessionScope
 public class OpenFormWithDraftHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenFormWithDraftHandler.class);
 
     private final ViewNavigators viewNavigators;
     private final AccessManager accessManager;
@@ -160,7 +165,16 @@ public class OpenFormWithDraftHandler {
         }
 
         Object editedEntity = detailView.getEditedEntity();
-        DraftApplyResult ignored = draftLoader.apply(draftId, editedEntity);
+        try {
+            draftLoader.apply(draftId, editedEntity);
+        } catch (DraftNotFoundException expired) {
+            showWarning("chatView.intent.draftExpired");
+            return;
+        } catch (RuntimeException failure) {
+            log.warn("Draft apply failed for draftId={}", draftId, failure);
+            showConfigurationError();
+            return;
+        }
         DraftLifecycleRegistration lifecycleRegistration = new DraftLifecycleRegistration();
         lifecycleRegistration.afterSaveRegistration = ComponentUtil.addListener(
                 detailView,
