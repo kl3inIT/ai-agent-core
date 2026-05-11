@@ -1,145 +1,218 @@
-# Stack Research — v1.1.0 Additions
+# Stack Research — v1.2 Additions
 
-**Domain:** Jmix AI Copilot add-on (`ai-agent-core`) — incremental v1.1 stack delta
-**Researched:** 2026-04-26
-**Confidence:** HIGH for Spring AI 1.1.4 audio + tool-error contracts (Context7 verified); HIGH for Vaadin Flow 24 dialog/drawer/JS-bridge patterns (Context7 verified); HIGH for Jmix `ViewNavigators.detailView(...).withInitializer(...)` form-prefill (Context7 verified); MEDIUM for browser-side audio capture choice (`MediaRecorder` is the standard; there is no Vaadin first-party microphone component, so client-side JS is required).
+**Domain:** Jmix 2.8 + Spring Boot 3 + Spring AI 1.1.x AI agent add-on (`ai-agent-core`) — incremental v1.2 stack delta (Operator Experience, Voice Input & Runtime Performance)
+**Researched:** 2026-05-11
+**Confidence:** HIGH — Spring AI 1.1.x transcription API + config keys verified against current spring.io/spring-ai/reference; Soniox HTTP contract verified against current soniox.com/docs; build coords read from the repo's own gradle files. MEDIUM only on the browser-mic component choice (no Jmix/Vaadin first-party microphone primitive — a small first-party `@JsModule` wrapping `MediaRecorder` is the standard option).
 
-## Scope of This Document
+> Supersedes the v1.1.0 delta that previously lived in this file (archived context: STT was scoped but not built in v1.1).
 
-v1.0 stack is pinned and validated (Java 21, Jmix 2.8.1, Spring Boot 3, Vaadin Flow 24, Spring AI 1.1.4 BOM, pgvector, OpenRouter via `spring-ai-starter-model-openai`, Liquibase, Tika, `jmix-security-data`, JDBC chat memory). **No version bumps to v1.0 dependencies are required for v1.1**, and none are recommended — the BOM is a milestone release whose churn would force re-validation across the entire chat/RAG/guard/audit chain. v1.1 work fits inside the existing BOM.
+## TL;DR — Net new runtime dependency for v1.2: effectively ZERO
 
-This file enumerates ONLY the new additions or activations needed for the five v1.1 features:
+- **OpenAI transcription fallback** — `OpenAiAudioApi` / `OpenAiAudioTranscriptionModel` / `OpenAiAudioTranscriptionOptions` / `AudioTranscriptionPrompt` / `AudioTranscriptionResponse` / the `AudioTranscriptionModel` interface all ship inside `org.springframework.ai:spring-ai-openai:1.1.4`, which `ai-agent` already declares (`ai-agent.gradle:29`). Wire it manually (mirroring the existing manual OpenRouter `ChatModel` wiring). Do **not** add `spring-ai-starter-model-openai` just for property auto-config.
+- **Soniox STT (default path)** — NO Soniox Java SDK exists (Python/Node/Web/React/React Native only). Use Spring's built-in `RestClient` (already on classpath via Spring Web / `spring-boot-starter-web`). No new dep.
+- **Browser audio capture** — a ~50-line first-party `@JsModule` JS file wrapping `MediaRecorder` + `getUserMedia`, posting the blob to a Spring `@RestController` upload endpoint. No add-on, no npm dep.
+- **Model-name dropdown + config-knob migration** — pure Jmix entity/view work + a Vaadin `ComboBox` with `setAllowCustomValue(true)` (or `ComboBox` + `TypedTextField` pair). Nothing new.
+- **Chat UX panels (state panel / tool-detail panel / streaming status)** — existing Jmix Flow UI components inside `ChatPanelFragment`. Nothing new.
+- **Perf pass** — Spring Cache abstraction (`spring-boot-starter-cache`) is already a dependency (`ai-agent.gradle:70`); `ConcurrentMapCacheManager` is already auto-registered (`AiAgentGuardAutoConfiguration`). Do **not** add Caffeine. No benchmark harness.
 
-1. Mutation-capable built-in tools
-2. AI-specific LLM exposure policy (admin-governed denylist/allowlist)
-3. Speech-to-text input in chat
-4. Intent-driven extraction → prefilled Jmix forms
-5. Configurable chat surfaces (full / right-sidebar / floating launcher)
+## Recommended Stack
 
-## Recommended Additions
+### Core Technologies (all already present — confirm pinning, add nothing)
 
-### Core Technologies (no new core; activations only)
+| Technology | Version | Purpose | Why / Status |
+|------------|---------|---------|--------------|
+| `org.springframework.ai:spring-ai-openai` | 1.1.4 (BOM-pinned via `spring-ai-bom`) | `OpenAiAudioApi`, `OpenAiAudioTranscriptionModel`, `OpenAiAudioTranscriptionOptions`, `AudioTranscriptionPrompt`, `AudioTranscriptionResponse`, `AudioTranscriptionModel`/`TranscriptionModel` interface, `OpenAiAudioApi.TranscriptResponseFormat` | **Already declared** at `ai-agent/ai-agent/ai-agent.gradle:29`. OpenAI audio-transcription classes live in this module (no separate audio artifact). OpenAI fallback builds with **zero new deps** via `new OpenAiAudioApi(...)` + `new OpenAiAudioTranscriptionModel(...)`. |
+| Spring `RestClient` (`org.springframework.web.client.RestClient`) | Spring Framework 6.1+ (Boot 3.x, BOM-pinned) | HTTP client for the Soniox async API (`POST /v1/files`, `POST /v1/transcriptions`, `GET .../transcript`, `DELETE`) | **Already on classpath** transitively (Spring Web). `RestClient` is the modern, fluent, synchronous client — exactly right for the short sequential Soniox call chain. **No `WebClient`/reactor needed** — STT is request/response, not streaming. |
+| `org.springframework.boot:spring-boot-starter-cache` + `ConcurrentMapCacheManager` | Boot 3.x (BOM-pinned) | Per-resolution caches for the perf pass (metadata/security/exposure-policy resolution, related-write metadata, `MetaClass` lookups) | **Already declared** (`ai-agent.gradle:70` — powers `RateLimitGuard`/`TokenBudgetGuard`); `AiAgentGuardAutoConfiguration` already registers a default `ConcurrentMapCacheManager` when the host hasn't supplied one. Reuse it. |
+| Jmix Flow UI (`io.jmix.flowui:*`), Vaadin Flow `ComboBox`/`Select`, `@JsModule` | Jmix 2.8.1 BOM | Model-name dropdown, chat-state side panel, collapsible tool-detail panel, ephemeral streaming-status indicator, mic-button component | **Already present.** `ComboBox.setAllowCustomValue(true)` gives "curated list + free entry"; `@JsModule` + a tiny first-party JS file is the standard Flow pattern for browser-API access (here `MediaRecorder`). Per project memory `feedback_jmix_first_ui`: Jmix XML descriptors + Jmix components by default. |
+| `java.security.MessageDigest` (`SHA-256`) + `java.util.HexFormat` | JDK 21 built-in | Privacy-safe `STT_TRANSCRIPTION` audit: SHA-256 transcript hash by default; raw transcript only when `ai-agent.stt.audit.storeTranscript=true` | No dependency. |
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `org.springframework.ai:spring-ai-openai` (audio transcription API surface) | 1.1.4 (already on classpath via `spring-ai-starter-model-openai`) | Speech-to-text via `OpenAiAudioTranscriptionModel` | Already auto-configured by the starter. Activating it requires NO new dependency — only `spring.ai.openai.audio.transcription.*` properties. Ships first-class `AudioTranscriptionPrompt` / `AudioTranscriptionResponse` types and a `language` option (covers vi/en). |
-| `org.springframework.ai:spring-ai-client-chat` (`@Tool` + `ToolExecutionException` + `ToolExecutionExceptionProcessor`) | 1.1.4 (already on classpath) | Mutation tools + structured-error contract on policy denial | The 1.1 contract for tool failures is `ToolExecutionException` thrown from the `@Tool` method body; `DefaultToolExecutionExceptionProcessor` (auto-bean) converts to a model-readable string. We layer `AccessManager.CrudEntityContext` / attribute-policy denials onto this same exception so the LLM observes a single structured failure shape. |
-| `org.springframework.ai:spring-ai-client-chat` (`BeanOutputConverter` + `ChatClient.prompt().call().entity(Class)`) | 1.1.4 (already on classpath) | Intent-driven extraction → typed Java record → form prefill | First-class structured-output binding in 1.1: `chatClient.prompt().user(...).call().entity(InvoiceDraft.class)`. JSON Schema is generated from the record (use `@JsonProperty(required = true, ...)` to mark required fields). Pairs cleanly with Jmix `ViewNavigators.detailView(...).withInitializer(e -> {...})` for prefill. |
-| `io.jmix.flowui` `ViewNavigators` / `DialogWindows` (`.detailView(...).newEntity().withInitializer(...).navigate()`) | 2.8.1 (already on classpath) | Open the prefilled host detail view from chat | Verified pattern in Jmix 2.8 docs (Context7 `/jmix-framework/jmix-context7`). `withInitializer` runs server-side after `Metadata.create(...)` and accepts arbitrary lambdas — the natural seam for an extracted DTO → entity field-set step. |
-
-### Supporting Libraries
+### Supporting Libraries (all already transitive — no declarations needed)
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| Browser `MediaRecorder` API (no JAR — client-side) | Browser-native (HTML5) | Capture mic audio in the browser, encode to `audio/webm; codecs=opus` (Chrome/Edge/Firefox) or `audio/mp4` (Safari) | Wire via `Element.executeJs(...)` from a Jmix Flow chat-input button. Stream the resulting `Blob` to the server with `fetch()` against a `UploadHandler.inMemory(...)`-registered endpoint (or a small `@RestController` under `/ai-agent/api/stt`). The `webm/opus` and `mp4` containers are both accepted by OpenAI Whisper transcriptions — no transcoding needed. |
-| `com.vaadin.flow.component.upload.Upload` (`UploadHandler.inMemory` / `UploadHandler.toFile`) | bundled with `jmix-flowui` 2.8.1 | Server-side receiver for the audio blob and for the v1.1 task-scoped file attachment | Already used elsewhere in the add-on. Per memory `feedback_jmix_upload_receiverType_deprecated`, keep `UploadHandler.toFile` (NOT `setReceiver`). For STT: in-memory handler is preferred — clip is short-lived and we hand the bytes directly to `AudioTranscriptionPrompt`. |
-| `com.vaadin.flow.component.dialog.Dialog` with `setModality(MODELESS)` + `setDraggable(true)` | bundled with `jmix-flowui` 2.8.1 | Floating-launcher chat surface (#3 of three configurable surfaces) | Verified in Vaadin docs. Modeless+draggable is the documented pattern; pair with a fixed-position `Button` in the host's main `AppLayout` to act as the launcher. **Do not** introduce a custom web component or Hilla overlay — the `hilla` / `copilot` modules are already excluded in `ai-agent.gradle:121-124` and that exclusion must hold. |
-| `com.vaadin.flow.component.applayout.AppLayout` `slot="drawer"` / `slot="drawer-end"` (the right-side drawer slot) | bundled with `jmix-flowui` 2.8.1 | Right-sidebar chat surface (#2 of three configurable surfaces) | Verified Vaadin pattern: `element.setAttribute("slot", "drawer")` for left, `slot="drawer-end"` for right (Vaadin 24.4+). Hosts mount the same `ChatPanelFragment` into this slot via a Jmix layout-extension SPI. **Reuse** of `ChatPanelFragment` is non-negotiable — do NOT fork the chat panel for sidebar mode. |
-| `com.vaadin.flow.component.notification.Notification` / `com.vaadin.flow.component.html.Anchor` | bundled with `jmix-flowui` 2.8.1 | Confirm-and-navigate UX from chat to prefilled form | Already in use; no addition. The flow is: chat receives extracted JSON, renders a confirm card, on confirm calls `viewNavigators.detailView(...).newEntity().withInitializer(...).navigate()` from the active Vaadin `UI`. |
-| Jakarta Validation (`jakarta.validation-api` + Hibernate Validator) | already on classpath via Spring Boot BOM | Validate extracted DTOs **before** prefilling the form | Already used for `AiParametersBody`. v1.1 extraction DTOs (`InvoiceDraft`, etc.) get `@NotBlank` / `@DecimalMin` / `@Pattern` annotations so we can reject obviously-broken extractions in the chat UI rather than carry a malformed initializer into the host's detail view. |
+| Jackson (`jackson-databind`) | Boot-BOM-pinned | (De)serialize Soniox JSON: request `{file_id, model, language_hints, ...}`, response `{id, status, error_type, error_message, ...}`, transcript `{tokens:[{text, speaker, language, ...}]}` | **Already transitive** (Spring Boot; `ai-agent.gradle:62` already adds `jackson-dataformat-yaml`). Define small Java records for the Soniox payloads. |
+| `jakarta.validation:jakarta.validation-api` + Hibernate Validator | Boot-BOM-pinned | Bean Validation on new `AiParameters` fields migrated in (top-k range, similarity threshold 0..1, task-file token budget > 0, STT enum) | **Already declared** (`ai-agent.gradle:63`); reuse the `@DecimalMin`/`@NotBlank` pattern from `AiParametersBody`. |
+| `net.ttddyy:datasource-proxy` (test scope) | 1.11.0 | Count JDBC SELECTs in tests to assert N+1 → 1 after the mutation-binding / RAG-filter / metadata-resolution refactors | **Already declared** test-scoped (`ai-agent.gradle:111`). No benchmark harness needed beyond this. |
+| `org.springframework:spring-test` (`MockRestServiceServer`) | Boot-BOM-pinned | Unit-test the `SonioxTranscriptionService` HTTP call chain without hitting Soniox | **Already present** via `spring-boot-starter-test`; `MockRestServiceServer` binds to `RestClient.Builder` (Spring Framework 6.1+). |
+| `org.springframework.ai:spring-ai-test` | 1.1.4 | Optional live STT smoke helpers | **Already on `ai-agent` test classpath** (`ai-agent.gradle:118`). Keep any Soniox/OpenAI live STT test behind a `@Tag("live")`-style opt-in tag (matches the existing live-LLM test policy — see project constraint). |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Existing `@Tag("live")` excluded test tier | Hosts the new STT live test | Add a `@Tag("live")` test that hits Whisper with a 2-second sample WAV — same opt-in posture as existing live LLM tests. No CI cost change. |
-| Existing `@Tag("rag-it")` Testcontainers Postgres tier | Hosts the new exposure-policy DB integration test (`AiExposureRule` table, query-time filter assertions) | Already present; the `agentstore` schema picks up the new Liquibase changelog automatically. |
-| Existing `@SpringBootTest` + `@UiTest` tiers | Host: mutation-tool happy-path + policy-denial tests; intent-extraction structured-output tests; surface-toggle UI tests | No new harness needed. The existing `BuiltInDataToolsReadOnlyTest` class becomes the template for `BuiltInMutationToolsTest`. |
+| Browser dev | Manual mic-capture smoke | `MediaRecorder`/`getUserMedia` need a secure context (https or `localhost`); local dev is `http://localhost:8088` (per project memory `project_local_dev_port`) — qualifies. |
+| `MediaRecorder.isTypeSupported` | Feature-detect codec | Prefer `audio/webm;codecs=opus` (Chrome/Edge/Firefox); fall back to `audio/mp4` (Safari). No transcoding either way. |
 
-## Activation Recipe (no new dependency lines)
+## (a) Spring AI 1.1.x audio transcription — first-class abstraction? YES.
 
-For STT, the v1.0 starter coordinate is sufficient. Add only configuration properties to the host (`jmix-app/src/main/resources/application.properties`) and an opt-in flag:
+Verified against `https://docs.spring.io/spring-ai/reference/api/audio/transcriptions/openai-transcriptions.html` and Context7 `/websites/spring_io_spring-ai_reference`:
 
-```properties
-# v1.1 — STT activation (host-supplied OpenAI/Whisper key; OpenRouter does NOT proxy /audio/transcriptions)
-spring.ai.openai.audio.transcription.api-key=${OPENAI_STT_API_KEY:}
-spring.ai.openai.audio.transcription.base-url=https://api.openai.com
-spring.ai.openai.audio.transcription.options.model=whisper-1
-spring.ai.openai.audio.transcription.options.response-format=text
+- **Interface:** `org.springframework.ai.audio.transcription.AudioTranscriptionModel` — the generic `TranscriptionModel`-style abstraction (`Model<AudioTranscriptionPrompt, AudioTranscriptionResponse>`).
+- **Prompt / response:** `AudioTranscriptionPrompt(Resource audio, AudioTranscriptionOptions options)` → `AudioTranscriptionResponse` (`response.getResult().getOutput()` is the transcript `String`).
+- **OpenAI impl:** `OpenAiAudioTranscriptionModel`, built from `OpenAiAudioApi` (`new OpenAiAudioApi(apiKey)` or the builder with a custom `base-url`), configured via `OpenAiAudioTranscriptionOptions.builder().model(...).language(...).prompt(...).responseFormat(TranscriptResponseFormat.TEXT).temperature(0f).build()`.
+- **Models supported:** `whisper-1` (default), `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`.
+- **Coordinates:** classes ship in `org.springframework.ai:spring-ai-openai` — **already a dependency** of `ai-agent` at `1.1.4`. The auto-config starter `org.springframework.ai:spring-ai-starter-model-openai` exists and binds `spring.ai.openai.audio.transcription.*` + auto-registers an `OpenAiAudioTranscriptionModel` bean — but this project does **not** use Spring AI's chat auto-config either (it wires `ChatModel` manually for the OpenRouter `base-url` pattern), so the OpenAI fallback should likewise be wired **manually** inside the add-on's auto-configuration.
 
-# Add-on opt-in flags (defined under jmix.ai-agent.* — implementation detail of v1.1):
-jmix.ai-agent.stt.enabled=true
-jmix.ai-agent.tools.mutations.enabled=false   # off by default; PROJECT.md mandates opt-in
-jmix.ai-agent.surfaces.full=true
-jmix.ai-agent.surfaces.sidebar=false
-jmix.ai-agent.surfaces.launcher=false
+**Config keys (for reference / documenting host overrides — only relevant if the starter route is ever chosen):**
+
+| Property | Meaning | Default |
+|----------|---------|---------|
+| `spring.ai.model.audio.transcription` | `openai` to enable, `none` to disable | `openai` |
+| `spring.ai.openai.audio.transcription.api-key` | OpenAI key (independent of the chat key — OpenRouter does **not** proxy `/v1/audio/transcriptions`) | — |
+| `spring.ai.openai.audio.transcription.base-url` | endpoint host | `api.openai.com` |
+| `spring.ai.openai.audio.transcription.options.model` | `whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe` | `whisper-1` |
+| `spring.ai.openai.audio.transcription.options.language` | ISO-639-1 hint | — |
+| `spring.ai.openai.audio.transcription.options.prompt` | style/context hint | — |
+| `spring.ai.openai.audio.transcription.options.response-format` | `json` / `text` / `srt` / `verbose_json` / `vtt` | `json` |
+| `spring.ai.openai.audio.transcription.options.temperature` | 0..1 | `0` |
+
+**Recommendation for v1.2:** expose the add-on's own `ai-agent.stt.openai.api-key` (+ optional `ai-agent.stt.openai.model`, default `gpt-4o-mini-transcribe` — cheap/fast — or `whisper-1`) and construct `OpenAiAudioTranscriptionModel` manually in `SpringAiTranscriptionService`. Keep this OpenAI key strictly separate from the chat-provider key. `AudioTranscriptionPrompt` accepts a Spring `Resource` — the uploaded blob can be wrapped in a `ByteArrayResource` (no temp file required, but a `FileSystemResource` is fine too).
+
+## (b) Soniox async transcription HTTP contract — confirmed against current docs
+
+Verified 2026-05 against `https://soniox.com/docs/stt/async/async-transcription`, `https://soniox.com/docs/api-reference`, `https://soniox.com/docs/api-reference/stt/transcriptions/create_transcription`, `https://soniox.com/docs/stt/models`.
+
+- **Base URL:** `https://api.soniox.com/v1`
+- **Auth:** `Authorization: Bearer <SONIOX_API_KEY>` — an **independent** key from the chat/OpenRouter key. Surface as `ai-agent.stt.soniox.api-key`.
+- **Step 1 — upload file:** `POST /v1/files`, `Content-Type: multipart/form-data`, single part **field name `file`** carrying the raw `webm/opus` or `mp4` bytes (Soniox auto-detects format — no transcoding). Response: `{ "id": "<uuid>" }`. Supported input formats explicitly include `webm`, `mp4`, `m4a`, `mp3`, `ogg`, `wav`, `flac`, `aac`, `aiff`, `amr`, `asf`. Max audio length: **5 hours** per request (far above the ~60s chat-dictation cap).
+- **Step 2 — create transcription:** `POST /v1/transcriptions`, JSON body. Fields:
+  - `model` — **required**, max 32 chars. **Use `"stt-async-v4"`** (current generation, released 2026-01-29). The alias `"stt-async-v3"` also points to v4; the literal `stt-async-v3` model was removed 2026-02-28 (auto-routes to v4). Make it a knob (`ai-agent.stt.soniox.model`, default `stt-async-v4`).
+  - `file_id` — the id from Step 1 (mutually exclusive with `audio_url`; use `file_id`).
+  - `language_hints` — array of language codes, e.g. `["vi","en"]` (auto-detected if omitted). Optional `language_hints_strict` (boolean) to lean harder on the hints.
+  - `client_reference_id` — optional tracking id (≤256 chars) — handy to correlate with the `AiAuditEvent` row.
+  - `webhook_url` (HTTPS-only, ≤256 chars) + `webhook_auth_header_name` / `webhook_auth_header_value` — **optional**. For server-side Jmix chat, **short polling** is simpler (no public callback endpoint needed). Use webhooks only if a host explicitly wants push.
+  - Response (201): `{ id, status, created_at, model, filename, audio_duration_ms, error_type, error_message, webhook_status_code, ... }`. `status` ∈ `"queued" | "processing" | "completed" | "error"`.
+- **Step 3 — poll:** `GET /v1/transcriptions/{id}` until `status == "completed"` (or `"error"` → read `error_type` / `error_message`). Bound the loop with a fixed short interval + hard timeout aligned to the recording cap; on timeout surface a non-blocking retry.
+- **Step 4 — fetch transcript:** `GET /v1/transcriptions/{id}/transcript` → `{ "tokens": [ { "text", "speaker", "language", "translation_status", ... }, ... ] }`. Concatenate `tokens[].text` (the `text` values already carry the needed leading spaces) to get the plain transcript that lands in `MessageInput`.
+- **Step 5 — cleanup (always, including on error):** `DELETE /v1/files/{id}` **and** `DELETE /v1/transcriptions/{id}`, in a `finally`-style block, so transient/PII audio + transcript don't linger on Soniox.
+- **Errors:** `400` (validation_errors), `401` (auth), `402` (balance/quota), `429` (rate/capacity), `500`. Map all to the non-blocking "transcription failed — retry" UI; never bubble raw provider text into the chat.
+
+> **Correction to the ROADMAP Backlog notes:** they were right on shape (`POST /v1/files` → `POST /v1/transcriptions` with `model=stt-async-v4` + `language_hints`, then `DELETE` cleanup), but: (1) there is **no status field on the `/transcript` resource** — status lives on `GET /v1/transcriptions/{id}`; (2) the transcript text comes from a **separate** `GET /v1/transcriptions/{id}/transcript` call returning a `tokens` array (not a flat `text` string). Plan the client around both.
+
+## (c) Anything beyond `RestClient` for the Soniox client? NO.
+
+- **No Soniox Java SDK exists.** Soniox publishes Python, Node, Web, React, and React Native SDKs only (verified — `soniox.com/docs/sdk/*`, `github.com/soniox`, `soniox.com/blog/new-soniox-sdks`). Confirm "do not add a Soniox SDK dependency" downstream.
+- **`RestClient` is sufficient and preferred:** multipart upload (`MultipartBodyBuilder` → `RestClient.post().contentType(MULTIPART_FORM_DATA).body(...)`), JSON post/get with Jackson, and `DELETE` are all first-class. Build one `RestClient` from a configured `RestClient.Builder` (base-url `https://api.soniox.com/v1`, default `Authorization` header from `ai-agent.stt.soniox.api-key`, sane connect/read timeouts).
+- **Do not** pull in OkHttp / Apache HttpClient / Retrofit / Feign — `RestClient` already wraps the JDK `HttpClient`.
+- **Do not** add reactor/`WebClient` — the flow is strictly sequential request/response; a blocking `RestClient` keeps it simple and avoids dragging reactive types into the add-on.
+
+## (d) Browser-side `MediaRecorder` capture → server — minimal setup, what to reuse
+
+**Decision: a small first-party `@JsModule` JS file + a Spring `@RestController` upload endpoint.** Rationale:
+
+- Jmix/Vaadin's built-in `Upload` component handles **file-picker** uploads, not microphone capture — `MediaRecorder` + `getUserMedia` are browser APIs with no Java/Flow wrapper in the Jmix or core Vaadin component set. There is a community "Audio Recorder for Vaadin" add-on in the Vaadin Directory, but adopting a third-party add-on conflicts with the no-new-deps / Jmix-first posture and pins us to its maintenance — **skip it**; the JS wrapper is ~50 lines.
+- Minimal client module (e.g. `src/main/resources/META-INF/frontend/ai-mic-recorder.js`, referenced via `@JsModule` on a tiny Flow `Component` mounted in `ChatPanelFragment`):
+  1. `await navigator.mediaDevices.getUserMedia({ audio: true })` (secure context — https or `localhost`; `localhost:8088` in dev qualifies).
+  2. `new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/mp4' })` — **no transcoding**; send whatever the browser produces; Soniox/OpenAI auto-detect.
+  3. Collect `dataavailable` chunks → `Blob`; on `stop`, `POST` via `fetch` + `FormData` to a Jmix REST endpoint, including the active conversation id; same-origin so it rides the existing Vaadin session cookie. Protect the endpoint with the normal Jmix security filter chain.
+  4. Enforce the ~60s cap client-side (`setTimeout` → `rec.stop()`); also re-check duration server-side from `audio_duration_ms` (Soniox) or before the OpenAI call.
+  5. On the response (`{ transcript }` or `{ error }`), return into the Flow component (e.g. `getElement().executeJs(...)` return-promise or a `@ClientCallable`) so the controller drops the text into `ChatPanelFragment.messageInputSlot`'s `MessageInput` for review before send. `TranscriptionService` does **not** call `ChatService.ask` directly.
+- **Server endpoint:** a thin `@RestController` (e.g. `POST /ai-agent/stt`) accepting `multipart/form-data`, behind Jmix security, delegating to `TranscriptionService` and writing the `STT_TRANSCRIPTION` audit. Keeping it a REST endpoint (rather than streaming the blob through a Vaadin `Upload` receiver) avoids the deprecated `Upload.getReceiver`/`setReceiver` path (project memory `feedback_jmix_upload_receiver_deprecated` — Vaadin 24.8 marks it forRemoval) and keeps the audio bytes out of the Vaadin server-push channel. `spring-boot-starter-web` is already on the host classpath (`jmix-app/build.gradle:60`).
+- Integration point: keep the mic UI inside `ChatPanelFragment` per the existing surface contract; `ChatPanelFragment.messageInputSlot` is stable from v1.0 + Phase 12 (the STT phase depends only on that).
+
+## (e) Perf pass — any new dep? NO. (No Caffeine.)
+
+- **Caching:** `spring-boot-starter-cache` is already declared (`ai-agent.gradle:70`) and a `ConcurrentMapCacheManager` is already auto-registered. Add new named caches (`@Cacheable("ai-agent.metadata")`, `"ai-agent.exposurePolicy"`, `"ai-agent.relatedWriteMeta"`, etc.) or hand-rolled `ConcurrentHashMap` memoization where `@Cacheable` proxying is awkward (e.g. inside a `@Tool` bean). **Do not add `com.github.ben-manes.caffeine:caffeine`** — the v1.2 hotspots (metamodel/security/exposure-policy resolution, related-write metadata, prompt scaffolding) are bounded, low-churn, and JVM-lifetime-stable; `ConcurrentMapCacheManager` (no eviction) is the right fit. Invalidate the exposure cache on `LlmExposureChangedEvent`; the rest are effectively immutable for the JVM lifetime. Caffeine would only matter if a cache needed TTL/size eviction — none of these do.
+- **Batching to-one FK loads during mutation binding:** pure `DataManager` fluent-API work (collect distinct FK ids per `MetaClass`, one `.load(...).ids(...)` round-trip, build a lookup map). No dep. (See project memory `feedback_jmix_unconstrained_for_system_writes` — system-internal pre-resolution may use `UnconstrainedDataManager`, but user-attributable mutation binding stays on the regular `DataManager`.)
+- **Hotspot identification:** the existing test-scoped `net.ttddyy:datasource-proxy` (`ai-agent.gradle:111`) counts JDBC SELECTs in tests to confirm N+1 → 1. **No benchmark harness** (JMH/gatling/custom rig) — explicitly out of scope.
+
+## (f) Model dropdown + config-knob migration — does the project already pin everything? YES.
+
+- The chat **model code** is currently a free-typed `AiParameters` field. The v1.2 admin "curated dropdown + free entry" is implemented purely with existing Jmix/Vaadin pieces: a `ComboBox<String>` with `setItems(curatedModelIds)` + `setAllowCustomValue(true)` (or a `ComboBox` for curated + a `TypedTextField` for custom) bound to the same `AiParameters` attribute via a data container. Curated list = self-hostable open-weights (project memory `project_self_hostable_models_only`); free entry = anything the host routes to. **No dep, no Spring AI change** — model selection is already per-request via `ChatOptions` in the existing OpenRouter wiring.
+- **Config-knob migration** (RAG top-k / similarity threshold, mutation toggle, task-file token budget, chat surface mode, STT enable/provider): add columns to the `AiParameters` entity (already UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`), a Liquibase changelog included in the main `changelog.xml`, messages in **all** locale bundles, and fields on the Parameters/Settings Jmix view. **Note:** these AI entities live in the `agentstore` data store (project memory `feedback_jmix_loadvalue_store`) — the changelog and any `loadValue`/`loadValues` must target `agentstore`. Keep `application.properties` as the bootstrap/override fallback (read-at-startup) and make the entity values the runtime source of truth where they currently aren't. **No new dependency.**
+- **BOM / starter coords are all already pinned:** Jmix BOM `2.8.1`, `spring-ai-bom:1.1.4` imported via `io.spring.dependency-management` (root `build.gradle:37-44`), and `ai-agent` already declares `spring-ai-client-chat`, `spring-ai-openai`, `spring-ai-model-chat-memory-repository-jdbc`, `spring-ai-starter-vector-store-pgvector`, `spring-ai-tika-document-reader`, `spring-ai-rag` (all `1.1.4`). Nothing new is required for v1.2 on the Spring AI side.
+
+## Installation
+
+**Recommended approach adds 0 lines to any `*.gradle` file.** New code only:
+- `TranscriptionService` strategy interface + `SonioxTranscriptionService` (RestClient) + `SpringAiTranscriptionService` (manual `OpenAiAudioTranscriptionModel`); provider selected via `ai-agent.stt.provider=soniox|openai|<custom-bean-name>` (default `soniox`).
+- A Spring `@RestController` STT upload endpoint (behind Jmix security) + the `STT_TRANSCRIPTION` audit write (`AuditWriter.writeToolCall(eventName="stt_transcription", ...)` — no new `AuditKind`; `AUD-06` already reserved the string).
+- A `@JsModule` mic-recorder JS file + a small Flow `Component` mounted in `ChatPanelFragment`.
+- `AiParameters` entity fields + a Liquibase changelog (`agentstore`) + Jmix view fields + locale messages (all bundles).
+- New named Spring caches on the existing `ConcurrentMapCacheManager`; batched FK loads via `DataManager`.
+
+```gradle
+// OPTIONAL — ONLY if the team ever decides to use Spring Boot auto-config for the
+// OpenAI transcription fallback instead of manually instantiating
+// OpenAiAudioTranscriptionModel. NOT recommended — the project wires ChatModel
+// manually for OpenRouter; stay consistent and wire transcription manually too.
+// implementation 'org.springframework.ai:spring-ai-starter-model-openai:1.1.4'
 ```
 
-For mutation tools, exposure policy, intent extraction, and the chat surfaces — **zero new dependencies**. Everything builds on the v1.0 dependency set.
+## Alternatives Considered
 
-## Integration Points to Existing v1.0 Components
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Manual `OpenAiAudioTranscriptionModel` wiring | `spring-ai-starter-model-openai` auto-config | Only if the project later switches to Spring AI auto-config across the board; today it wires `ChatModel` manually for OpenRouter — stay consistent. |
+| Spring `RestClient` for Soniox | `WebClient` (reactive) | Only if the chat goes reactive end-to-end (it isn't). Sequential STT calls don't benefit. |
+| Short polling `GET /v1/transcriptions/{id}` | Soniox `webhook_url` push | Only if a host already exposes a public HTTPS callback endpoint and wants push; otherwise polling needs no inbound route. |
+| First-party `@JsModule` mic recorder | "Audio Recorder for Vaadin" community add-on | Never for this add-on — third-party add-on dep + maintenance risk; the JS wrapper is ~50 lines. |
+| `ConcurrentMapCacheManager` (existing) | Caffeine | Only if a hotspot cache needs size/TTL eviction — none of the v1.2 targets do. |
+| `ComboBox` + `allowCustomValue` for model picker | Two separate fields (curated `ComboBox` + free `TextField`) | Either works; pick whichever reads cleaner in the Jmix view — both zero-dep. |
+| `stt-async-v4` literal model | `stt-async-v3` alias (points to v4) | Use the alias only if the host wants Soniox to manage version transitions transparently; default to the explicit `stt-async-v4` to pin behavior. |
+| `gpt-4o-mini-transcribe` (OpenAI fallback default) | `whisper-1` | `whisper-1` if the host prefers the older general-purpose model or has a budget/contract reason; `gpt-4o-mini-transcribe` is cheaper/faster for short dictation. |
 
-This is the load-bearing section for the roadmapper.
-
-| v1.0 Component | v1.1 Integration | Notes |
-|---|---|---|
-| `ChatClientFactory` | UNCHANGED. The same single cached `ChatClient` bean serves: (a) regular chat, (b) intent-extraction calls (`chatClient.prompt().call().entity(...)`), (c) the post-STT chat turn that consumes the transcribed text. | Per `ChatClientFactory` Javadoc, configuration is per-request via `chatClient.prompt().system().user().options()`; intent-extraction simply omits tools/RAG/memory advisors via `.advisors(advisors -> advisors.param(...))`. **Do not** instantiate a parallel `ChatClient` for extraction. |
-| `BuiltInDataTools` | EXTENDED (or paralleled by a sibling `BuiltInMutationTools` class in the same package, behind `jmix.ai-agent.tools.mutations.enabled`). Read-only ASM enforcement test (Plan 04) gates the existing class — keep it intact and put mutations in a new `@Component` so the bytecode rule does not weaken. | Constructor-injects the same `DataManager` + `Metadata` + `CurrentUserSchemaAccess`. New tools throw `ToolExecutionException` on `AccessManager` denial; default `DefaultToolExecutionExceptionProcessor` returns the message to the model. |
-| `CurrentUserSchemaAccess` | EXTENDED. Adds an `AiExposureRulePolicy` collaborator (new bean) that runs AFTER the existing user-permission filter. The result is `effective_visible = user_visible ∩ exposure_allowed`. | This preserves the v1.0 invariant that the LLM never sees more than the user can see. Exposure rules can only NARROW, never widen. New JPA entity `AiExposureRule` lives in `agentstore` schema (Liquibase changelog under `ai-agent/.../liquibase/agentstore-changelog/`). |
-| `AuditWriter` | EXTENDED. Mutation tools record `BEFORE` snapshot + `AFTER` snapshot + `ENTITY_OP` (CREATE/UPDATE/DELETE) on the existing `AiAuditEvent` parent/child tree. Intent-extraction records the extracted DTO and the user's confirm/cancel decision. STT records the transcript (NOT raw audio bytes — privacy). | Reuse existing `UnconstrainedDataManager` write path (memory `feedback_jmix_unconstrained_for_system_writes`). No new audit entity; new `event_type` enum values only. |
-| `ChatPanelFragment` | EXTENDED, NOT CLONED. Adds: (a) mic-record button (calls `Element.executeJs` → `MediaRecorder` → `fetch` to STT endpoint → server pushes transcribed text into `MessageInput`), (b) intent-confirm card rendering hook, (c) optional "open form" button bound to a `Runnable` set by the host. The same fragment is used in all three surfaces. | The fragment's existing public API (`setConversationId` / `hasMessages` / `isStreaming` / `startNewChat`) is the carrier of conversation-continuity guarantees across surface switches: same conversation id ⇒ JDBC chat memory + RAG retrieval are unchanged. |
-| `ConversationGateway` / `ChatService` | UNCHANGED. The streaming `Flux<StreamingEvent>` path is the same regardless of surface. | Surface choice is purely a UI concern. |
-| `ai-agent-starter` `AIAutoConfiguration` | EXTENDED. Adds conditional beans for: STT model wrapper, exposure-rule policy, mutation-tool component, three surface beans. Each gated by its own `@ConditionalOnProperty`. | Keep the existing `@AutoConfiguration` ordering — STT depends on the OpenAI starter being already configured. |
-
-## What NOT to Add (Anti-List)
+## What NOT to Use / NOT to Add
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **A second `ChatClient` for the floating launcher / sidebar** | Would split conversation memory and tool registration, defeats "same backend across surfaces" and makes audit forensics non-comparable. The v1.0 pattern is "one cached `ChatClient` bean; configure per request." | Use the existing `ChatClientFactory`-produced singleton. Each surface instantiates a fresh `ChatPanelFragment` but resolves the same `ChatService` / `ConversationGateway` beans. |
-| **A separate JDBC chat-memory store for the launcher** | Same reason. Conversation continuity across surface changes requires one `ChatMemory` keyed by conversation id. | Reuse the `ProjectingChatMemoryRepository` decorator + `JdbcChatMemoryRepository` already wired in v1.0. |
-| **Browser `webkitSpeechRecognition` / Web Speech API client-side STT** | Chrome-only, not available on enterprise-locked Edge/Safari, and the transcript would bypass the server — defeating audit and Vietnamese-language quality control. | Server-side `OpenAiAudioTranscriptionModel` (Whisper). Auditable, deterministic, supports `language=vi`/`en`. |
-| **A new vector-store collection for STT or extraction** | STT output is a short-lived chat turn; extraction output is a structured DTO. Neither needs embeddings. | Persist transcripts on `AiMessage` (existing entity) and DTOs as JSON on the new draft handoff record (or just hand straight to `withInitializer` and forget). |
-| **A new "draft" entity if the form opens immediately** | Round-tripping the draft through DB on every confirm is overkill when the user is already in the same Vaadin session. | Pass the typed DTO in-memory through a `VaadinSession` attribute or a server-side `Map<UUID, Draft>` keyed by the run id; clean up on form-detach. **Only** introduce a `AiExtractionDraft` entity if PROJECT.md adds a deferred-prefill (multi-session / mobile handoff) requirement, which it does not currently. |
-| **A new surface-portal component built on Hilla / web components** | `hilla`, `hilla-dev`, and `copilot` are explicitly excluded in `ai-agent.gradle:121-124`. Reintroducing them re-opens the bundle-size and frontend-build problems v1.0 solved. | Keep all three surfaces in pure Flow Java: `ChatView` (full route), `Drawer` slot in `AppLayout` (sidebar), `Dialog.setModality(MODELESS).setDraggable(true)` (launcher). |
-| **A new "mutation tool" abstraction layer / SPI** | Per MEMORY `feedback_reuse_jmix_builtins` and `feedback_spi_baseline_builtin`: SPIs are for genuinely host-specific extensions, not for built-ins shipped by the add-on itself. | Mutation tools are concrete `@Tool`-annotated methods on a new `@Component`. They use the EXISTING tool-discovery pipeline (`MethodToolCallbackProvider.builder().toolObjects(...)`). |
-| **An ArchUnit rule for "no `DataManager.save` outside the new mutation-tools class"** | Per MEMORY `feedback_no_archunit`, ArchUnit is deferred until rule drift is observed. The existing read-only ASM bytecode test already demonstrates the discipline; mutation tools are the explicit, narrow exception. | Code review + a positive unit test that exercises the policy-denial path. |
-| **Spring Retry / Resilience4j on mutation tools** | Mutations are not idempotent by construction; auto-retry would silently duplicate writes. | Single attempt. Failures surface as `ToolExecutionException` to the model, which can ask the user to retry explicitly. |
-| **A dedicated transcoder (FFmpeg / JCodec)** | OpenAI Whisper accepts `webm/opus` and `mp4` directly; both are produced natively by `MediaRecorder` in evergreen browsers. Adding FFmpeg would balloon the artifact and inflict a native-binary dependency on every host. | Send the browser-produced blob as-is. Document the supported MIME types and reject anything else server-side. |
-| **A new `RestController` family under `/api/ai-agent/...`** | The MVP avoided new HTTP surface; same logic still applies. STT receiver and any draft endpoints can be modeled as `UploadHandler` registrations or Vaadin `StreamReceiver`s within the Flow session. | Server-side endpoints registered via `Element.setAttribute("endpoint", uploadHandler)` (Vaadin pattern documented in Context7), keeping Vaadin's CSRF/session model intact. |
+| A "Soniox Java SDK" dependency | **None exists** — Soniox ships Python/Node/Web/React SDKs only | Spring `RestClient` against `https://api.soniox.com/v1` |
+| `spring-ai-starter-model-openai` (just for STT) | Project wires `ChatModel` manually for OpenRouter; auto-config inconsistency + pulls more than needed | Manual `new OpenAiAudioApi(...)` + `new OpenAiAudioTranscriptionModel(...)` in the add-on auto-config |
+| OkHttp / Apache HttpClient / Retrofit / Feign / `WebClient` for Soniox | `RestClient` already covers multipart + JSON + DELETE; STT is non-reactive request/response | `RestClient` (wraps JDK `HttpClient`) |
+| Caffeine (`com.github.ben-manes.caffeine:caffeine`) | v1.2 perf-pass caches are bounded & lifetime-stable; no eviction policy needed | Existing `spring-boot-starter-cache` + `ConcurrentMapCacheManager`, or plain `ConcurrentHashMap` memoization |
+| Any benchmark harness (JMH, gatling, custom perf rig, Micrometer-perf wiring) | Explicitly **out of scope** for the v1.2 perf pass | Targeted refactors; reuse test-scoped `datasource-proxy` to assert N+1 → 1 in tests |
+| Routing Soniox/OpenAI transcription through OpenRouter | OpenRouter does **not** proxy `/v1/audio/transcriptions`; Soniox is its own API | Direct calls with **independent** keys (`ai-agent.stt.soniox.api-key`, `ai-agent.stt.openai.api-key`) |
+| Client-side audio transcoding (ffmpeg.wasm, etc.) | Soniox + OpenAI both accept `webm/opus` and `mp4` directly | Send `MediaRecorder` output bytes as-is |
+| "Audio Recorder for Vaadin" / `Vcamera` directory add-ons | Third-party add-on dependency + maintenance burden; conflicts with Jmix-first / no-new-deps posture | First-party `@JsModule` wrapping `MediaRecorder` + a Spring `@RestController` |
+| Vaadin `Upload` receiver streaming for the audio blob | `Upload.getReceiver/setReceiver` is deprecated-for-removal (Vaadin 24.8 — project memory `feedback_jmix_upload_receiver_deprecated`); also routes bytes through the push channel | A dedicated `@RestController` `multipart/form-data` endpoint behind Jmix security |
+| A new `AuditKind` for STT | `AUD-06` (v1.1) already reserved `STT_TRANSCRIPTION` as an `eventName` string | `AuditWriter.writeToolCall(eventName="stt_transcription", ...)` with SHA-256 transcript hash by default |
+| A new vector-store abstraction / changes to RAG `VectorStore` wiring | RAG-retrieval perf comes from caching filter/metadata construction, not from swapping the store; `TEST-16` (KB untouched) must stay green | Optimize `RetrievalAugmentationAdvisor` filter building in place; leave `PgVectorStore` wiring alone |
+| `TranscriptionPostProcessor` / custom-STT-provider SPI scaffolding | Trimmed out of v1.2 scope (PROJECT.md "Deferred"); only `provider` bean-name selection ships | Plain `ai-agent.stt.provider=<bean-name>` resolution; defer the SPI until a real host need appears |
+| Raw Vaadin / programmatic Java UI for the new chat panels | Project memory `feedback_jmix_first_ui` — Jmix XML descriptors + Jmix components by default | Jmix view descriptors + Jmix Flow components inside `ChatPanelFragment` |
 
 ## Stack Patterns by Variant
 
-**If host is OpenRouter-only (i.e., they have no direct OpenAI key) and the operator wants STT:**
-- Hosts MUST set a separate `spring.ai.openai.audio.transcription.api-key` and `base-url` pointing at OpenAI proper (or another Whisper-compatible provider). OpenRouter as of 2026-04 does not proxy `/audio/transcriptions`.
-- The add-on documents this in the operator README under a new "Speech-to-text setup" section.
-- Recommended fallback for hosts without any STT provider: surface the mic button only when `jmix.ai-agent.stt.enabled=true`. Default is `false`.
+**If the host wants Soniox push delivery instead of polling:**
+- Add a small inbound HTTPS `@RestController` webhook + set `webhook_url` / `webhook_auth_header_*` on `POST /v1/transcriptions`.
+- Because: avoids the polling loop; only viable if the host's deployment is internet-reachable.
 
-**If host has a strict "no LLM mutations ever" policy:**
-- Leave `jmix.ai-agent.tools.mutations.enabled=false` (the default). The mutation `@Component` is `@ConditionalOnProperty`-gated and never loads.
-- Read-only v1.0 behavior is preserved bit-for-bit.
+**If the host only has an OpenAI key (no Soniox):**
+- Set `ai-agent.stt.provider=openai`; `SpringAiTranscriptionService` uses `OpenAiAudioTranscriptionModel`.
+- Because: OpenRouter can't proxy transcription — needs the OpenAI key directly. Default `model` `gpt-4o-mini-transcribe`.
 
-**If host wants only one chat surface:**
-- Set the other two surface flags to `false`. The dormant surfaces register no routes / no drawer slot / no launcher button.
-- Chat memory continuity is still preserved if surfaces are toggled at runtime: same conversation id → same JDBC memory rows → same RAG retrieval scope.
+**If the host registers a custom STT bean:**
+- `ai-agent.stt.provider=<bean-name>`; the add-on resolves a host `TranscriptionService` bean by name.
+- Because: keeps the SPI surface minimal (the full `TranscriptionPostProcessor`/custom-provider *SPI* is deferred, but bean-name selection costs nothing).
+
+**If a perf-pass cache turns out to need eviction (unlikely):**
+- Revisit Caffeine then — not now.
+- Because: `ConcurrentMapCacheManager` has no eviction; only adopt Caffeine when a measured need (size/TTL) exists.
 
 ## Version Compatibility
 
 | Package A | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `spring-ai-starter-model-openai:1.1.4` | `spring-ai-client-chat:1.1.4`, `spring-ai-rag:1.1.4`, `spring-ai-tika-document-reader:1.1.4`, `spring-ai-model-chat-memory-repository-jdbc:1.1.4` | All pinned via Spring AI BOM imported in `ai-agent/build.gradle`. **Do not** mix BOM versions. |
-| `spring-ai-starter-model-openai:1.1.4` (audio transcription side) | OpenAI `/audio/transcriptions` (`whisper-1`) | Confirmed via Context7. Browser-produced `audio/webm; codecs=opus` and `audio/mp4` both accepted. Vietnamese supported via `language=vi`. |
-| Vaadin Flow 24 (via Jmix 2.8.1) | `Dialog.setModality(MODELESS)` + `setDraggable(true)`; `AppLayout` `slot="drawer-end"`; `Element.executeJs(...)` + `Element.setAttribute("endpoint", uploadHandler)` | All confirmed in Vaadin 24 docs (Context7 `/vaadin/docs`). |
-| Jmix 2.8.1 `ViewNavigators` | `.detailView(...).newEntity().withInitializer(initializer).navigate()` | Confirmed in Jmix 2.8 docs (Context7 `/jmix-framework/jmix-context7`). Pairs naturally with Spring AI `BeanOutputConverter`-produced records. |
+| `spring-ai-openai:1.1.4` | Spring Boot 3.x / Spring Framework 6.x (Jmix 2.8.1 BOM, Java 21) | Already proven on this classpath; audio-transcription classes included. |
+| Spring `RestClient` | Spring Framework 6.1+ | Present via Boot 3.x; `MockRestServiceServer` supports `RestClient.Builder` for tests. |
+| `MediaRecorder` `audio/webm;codecs=opus` | Chrome/Edge/Firefox | Safari needs `audio/mp4` fallback — feature-detect with `MediaRecorder.isTypeSupported`. Secure context required (`localhost` or https). |
+| Soniox `stt-async-v4` | Soniox API v1 (current, 2026-05) | `stt-async-v3` alias points to v4; literal `stt-async-v3` removed 2026-02-28. Max audio 5h/request. |
+| OpenAI transcription `base-url` override | `spring.ai.openai.audio.transcription.base-url` | Works, but irrelevant here — call OpenAI directly, not via OpenRouter. |
+| `spring-ai-bom:1.1.4` | All `spring-ai-*` modules used | Imported via `io.spring.dependency-management` at root `build.gradle:37-44`; downstream consumers get explicit versions on each `ai-agent` dependency line. |
 
 ## Sources
 
-- Context7 `/spring-projects/spring-ai` (v1.1.x) — verified: `OpenAiAudioTranscriptionModel`, `AudioTranscriptionPrompt`, `OpenAiAudioTranscriptionOptions.builder().language(...)`, `spring.ai.openai.audio.transcription.*` config namespace, single-starter coverage; `BeanOutputConverter` + `chatClient.prompt().call().entity(Class)`; `ToolExecutionException` + `ToolExecutionExceptionProcessor` + `DefaultToolExecutionExceptionProcessor`; `ToolCallAdvisor` semantics for advisor-controlled tool execution. Confidence: HIGH.
-- Context7 `/vaadin/docs` (24.x) — verified: `Dialog.setModality(MODELESS)`, `setDraggable(true)`, `setResizable(true)`; `AppLayout` drawer slots and `slot="drawer"` / `slot="drawer-end"` element-attribute pattern; `Element.executeJs(...)` placeholder substitution; `Element.setAttribute("endpoint", uploadHandler)` Fetch-API pattern for client-side blob upload to a Vaadin `UploadHandler.inMemory(...)`. Confidence: HIGH.
-- Context7 `/jmix-framework/jmix-context7` (Jmix 2.8 docs) — verified: `ViewNavigators.detailView(this, X.class).newEntity().withInitializer(e -> {...}).navigate()`; `dialogWindows.detail(...)` variant; `@EntityPolicy(EntityPolicyAction.{CREATE,UPDATE,DELETE,READ})`, `@EntityAttributePolicy(action = MODIFY)`. Confidence: HIGH.
-- Project memory feedback notes — applied: `feedback_jmix_upload_receiver_deprecated` (keep `UploadHandler.toFile/inMemory`, NOT `setReceiver`); `feedback_jmix_unconstrained_for_system_writes` (use `UnconstrainedDataManager` for audit writes); `feedback_no_archunit` (no new ArchUnit rules); `feedback_spi_baseline_builtin` and `feedback_reuse_jmix_builtins` (no new SPI for mutation tools — use Spring AI's existing tool pipeline); `feedback_jmix_first_ui` (Flow XML/components, not raw Vaadin). Confidence: HIGH (load-bearing project conventions).
-- v1.0 codebase audit — verified: `ai-agent/ai-agent/ai-agent.gradle` already declares `spring-ai-starter-vector-store-pgvector:1.1.4` (api), `spring-ai-rag:1.1.4` (api), `spring-ai-tika-document-reader:1.1.4`, `spring-ai-client-chat:1.1.4`, `spring-ai-model-chat-memory-repository-jdbc:1.1.4`. `ai-agent/ai-agent-starter/ai-agent-starter.gradle` already declares `spring-ai-starter-model-openai:1.1.4` and `spring-ai-starter-model-chat-memory-repository-jdbc:1.1.4`. Vaadin `hilla` / `hilla-dev` / `copilot` are excluded at the configurations level (`ai-agent.gradle:121-124`). Confidence: HIGH.
-
-## Open Questions for Roadmapper / Requirements Step
-
-These do not block stack selection but should be resolved before phase planning:
-
-1. **Mutation tool depth** — does v1.1 ship `create_record` + `update_record` only, or also `delete_record` and `add_to_collection`? PROJECT.md says "create / update / related-write / delete?" with the question mark. Roadmap should pick the exact set (recommendation: ship CREATE and UPDATE; defer DELETE to v1.2 unless host demand surfaces). No stack delta either way.
-2. **Intent-extraction provider routing** — should structured-output extraction default to the same per-request `ChatOptions` model as chat, or pin to a known-strong-at-JSON model (e.g., `gpt-4o-mini` over OpenRouter) regardless of the user's chat-model parameter? Recommendation: default to the chat parameter, allow override via `jmix.ai-agent.intent.model`. No stack delta.
-3. **STT recording UX** — push-to-talk (mousedown/mouseup) or click-to-toggle (start/stop)? Push-to-talk is simpler, click-to-toggle handles long dictation better. Recommendation: click-to-toggle with a 60-second hard cap. No stack delta — both wire through `MediaRecorder.start()` / `stop()`.
-4. **Floating launcher placement** — can the host position it, or is it always bottom-right? Recommendation: configurable corner, default bottom-right. No stack delta.
+- `/websites/spring_io_spring-ai_reference` (Context7) — OpenAI + Azure OpenAI transcription API, config properties, `OpenAiAudioTranscriptionModel` / `AudioTranscriptionPrompt` / `AudioTranscriptionOptions` / `AudioTranscriptionModel` usage — HIGH
+- https://docs.spring.io/spring-ai/reference/api/audio/transcriptions/openai-transcriptions.html — full `spring.ai.openai.audio.transcription.*` property set, supported models (`whisper-1` / `gpt-4o-transcribe` / `gpt-4o-mini-transcribe`), `AudioTranscriptionModel` interface, custom `base-url` — HIGH
+- https://soniox.com/docs/stt/async/async-transcription — async flow: `POST /v1/files` (field `file`), `POST /v1/transcriptions` (`file_id`, `model`, `language_hints`, webhooks), `GET /v1/transcriptions/{id}` status, `GET /v1/transcriptions/{id}/transcript` (tokens), `DELETE` cleanup, supported formats (webm/mp4), 5h max — HIGH
+- https://soniox.com/docs/api-reference and https://soniox.com/docs/api-reference/stt/transcriptions/create_transcription — base URL `https://api.soniox.com/v1`, full create-transcription request/response spec, error codes, no Java SDK — HIGH
+- https://soniox.com/docs/stt/models — `stt-async-v4` is the current async model (2026-01-29); `stt-async-v3` alias → v4; v3 literal removed 2026-02-28; 5h max — HIGH
+- https://github.com/soniox + https://soniox.com/docs/sdk/* + https://soniox.com/blog/new-soniox-sdks — official SDKs: Python, Node, Web, React, React Native (no Java) — HIGH
+- Vaadin Directory ("Audio Recorder for Vaadin", "Vcamera"), MDN `MediaRecorder` / `getUserMedia` — context for the JsModule decision (community add-ons evaluated and rejected) — MEDIUM
+- Repo build files: root `build.gradle` (`springAiVersion=1.1.4`, `spring-ai-bom`, Jmix BOM `2.8.1`, Java 21 toolchain), `ai-agent/ai-agent/ai-agent.gradle` (`spring-ai-openai:1.1.4` @ line 29, `spring-ai-client-chat:1.1.4`, `spring-ai-starter-vector-store-pgvector:1.1.4`, `spring-ai-rag:1.1.4`, `spring-boot-starter-cache` @ line 70, `jackson-dataformat-yaml` @ line 62, `jakarta.validation-api` @ line 63, `datasource-proxy:1.11.0` test scope @ line 111, `spring-ai-test:1.1.4` @ line 118), `jmix-app/build.gradle` (`spring-boot-starter-web` @ line 60) — HIGH
+- Project memory: `feedback_jmix_upload_receiver_deprecated` (Vaadin `Upload.getReceiver/setReceiver` forRemoval), `project_self_hostable_models_only`, `feedback_jmix_loadvalue_store` (`agentstore`), `feedback_jmix_first_ui`, `feedback_jmix_unconstrained_for_system_writes`, `project_local_dev_port` (8088) — HIGH
+- `.planning/PROJECT.md`, `.planning/ROADMAP.md` (Backlog → Phase 999.2 / 999.1), `.planning/MILESTONES.md` — milestone scope, existing capabilities, cross-cutting STT constraints — HIGH
 
 ---
-
-*Stack research for: v1.1.0 of ai-agent-core (Jmix AI Copilot)*
-*Researched: 2026-04-26*
-*Confidence: HIGH (Context7-verified for all four library surfaces; HIGH for project-memory-derived anti-list)*
+*Stack research for: Jmix AI agent add-on — v1.2 (Operator Experience, Voice Input & Runtime Performance)*
+*Researched: 2026-05-11*

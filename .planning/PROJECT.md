@@ -1,8 +1,8 @@
-# Jmix AI Copilot (ai-agent-core)
+# Jmix AI Agent (ai-agent-core)
 
 ## What This Is
 
-A reusable, enterprise-grade AI Copilot add-on for Jmix applications. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via the Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, can (opt-in) perform Jmix-secured create/update/related-write mutations, can read attached files directly (multimodal), can extract structured drafts that open prefilled Jmix detail views after user confirmation, and ships a built-in Flow UI (chat — full route or header-button dialog — conversations, parameters, knowledge base, exposure rules, vector-store debug, audit). Admins can narrow the LLM-visible surface below the current user's Jmix permissions via an entity-level exposure denylist. Hosts extend it through SPIs — custom tools, prompts, context providers, guards, mutation guards, fetch-plan customizers, intent extractors, custom ingesters, audit listeners — without forking.
+A reusable, enterprise-grade **AI agent add-on (agent harness)** for Jmix applications — the engineered runtime that wires an LLM agent into a Jmix app safely, not a packaged "copilot" product. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via the Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, can (opt-in) perform Jmix-secured create/update/related-write mutations, can read attached files directly (multimodal), can extract structured drafts that open prefilled Jmix detail views after user confirmation, and ships a built-in Flow UI (chat — full route or header-button dialog — conversations, parameters, knowledge base, exposure rules, vector-store debug, audit). Admins can narrow the LLM-visible surface below the current user's Jmix permissions via an entity-level exposure denylist. Hosts extend it through SPIs — custom tools, prompts, context providers, guards, mutation guards, fetch-plan customizers, intent extractors, custom ingesters, audit listeners — without forking.
 
 ## Core Value
 
@@ -14,7 +14,7 @@ The non-negotiable floor: read-only Q&A over host entities + documents must work
 
 **Shipped versions:** v1.0.0 MVP (2026-04-26) · v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (2026-05-11, via PR #28).
 
-v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi-surface copilot without new core dependencies: prompt/tool-contract hardening (`agent.entities`/`agent.permissions` baseline, leak guards, `unknown_entity` retry), an admin LLM-exposure denylist (`AiExposureRule` + `LlmExposurePolicy`, uniform `unknown_entity` opacity), opt-in built-in mutation tools (layered fail-closed gating, idempotency, PII-safe errors, full audit), configurable chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` over one `ChatPanelFragment`, cross-surface continuity), chat task files (transient, attach + multimodal `Media` read + `bulk_save_records`, default model swap to Apache-2.0 `qwen/qwen3.6-35b-a3b`, CRM-style right-pane with per-turn-all injection), and intent-driven extraction → prefilled Jmix forms (`IntentExtractor<T>` SPI, `prepare_form_draft` / `propose_action_choices`, controller-side-only navigation, permission-gated prefill). Milestone audit: integration + E2E PASS; status `tech_debt` for bookkeeping (see below).
+v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi-surface AI agent without new core dependencies: prompt/tool-contract hardening (`agent.entities`/`agent.permissions` baseline, leak guards, `unknown_entity` retry), an admin LLM-exposure denylist (`AiExposureRule` + `LlmExposurePolicy`, uniform `unknown_entity` opacity), opt-in built-in mutation tools (layered fail-closed gating, idempotency, PII-safe errors, full audit), configurable chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` over one `ChatPanelFragment`, cross-surface continuity), chat task files (transient, attach + multimodal `Media` read + `bulk_save_records`, default model swap to Apache-2.0 `qwen/qwen3.6-35b-a3b`, CRM-style right-pane with per-turn-all injection), and intent-driven extraction → prefilled Jmix forms (`IntentExtractor<T>` SPI, `prepare_form_draft` / `propose_action_choices`, controller-side-only navigation, permission-gated prefill). Milestone audit: integration + E2E PASS; status `tech_debt` for bookkeeping (see below).
 
 **Carried debt (not blockers):**
 - Phase 10 `10-VERIFICATION.md` is still `human_needed` — goal achieved (4/4 ROADMAP criteria, 12/12 REQ IDs); the substantive REVIEW items (BLOCKER-01/02, WARNING-08) are fixed in code; visual-UI checks + WARNING-01 (RAG partial-failure window) never formally recorded. Optional `/gsd-verify-work 10`.
@@ -23,7 +23,7 @@ v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi
 
 ## Current Milestone: v1.2 Operator Experience, Voice Input & Runtime Performance
 
-**Goal:** Turn the v1.1 copilot into one operators can tune and observe — admin model/config management, in-chat observability, voice input, mutation-internals hardening, and a targeted AI-runtime performance pass.
+**Goal:** Turn the v1.1 AI agent into one operators can tune and observe — admin model/config management, in-chat observability, voice input, mutation-internals hardening, and a targeted AI-runtime performance pass.
 
 **Target features:**
 - **Chat voice input — Soniox STT (trimmed):** Soniox default transcription path + OpenAI-direct fallback, browser `MediaRecorder` capture, privacy-safe `STT_TRANSCRIPTION` audit (SHA-256 hash by default / raw transcript opt-in), non-blocking error + retry UI, transcript lands in `MessageInput` for user review before send. `TranscriptionPostProcessor` SPI and custom-provider SPI deferred until a real host need appears.
@@ -84,7 +84,7 @@ v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigne
 - URL/web crawling ingestion remains deferred.
 - Native non-OpenAI-compatible provider starters remain deferred; hosts can swap `ChatModel` or use OpenRouter-compatible routing.
 - Jmix internal APIs remain forbidden.
-- Universal-agent positioning remains out of scope; this project is specifically a Jmix copilot add-on.
+- Universal-agent positioning remains out of scope; this project is specifically a Jmix AI agent add-on (a metadata-first, Jmix-secured agent — not a generic agent framework).
 - Custom vector-store abstractions remain out of scope; use Spring AI `VectorStore` directly.
 
 ## Context
@@ -102,7 +102,7 @@ v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigne
 - Jmix 2.8 uses Spring Boot 3, Java 17, Vaadin Flow — matches Spring AI's Boot 3 requirement.
 - `DataManager` fluent API is the only supported entry point for secured data access; `EntityManager` bypasses Jmix security and is explicitly forbidden in this codebase (see `CLAUDE.md`).
 
-**Why now:** Jmix lacks a first-party AI copilot. Customer enterprise Jmix apps increasingly want "ask your data" UX, but rolling it safely is expensive. A reusable metadata-first add-on lets every Jmix app get a governed copilot with minimal custom code.
+**Why now:** Jmix lacks a first-party AI agent. Customer enterprise Jmix apps increasingly want "ask your data" UX, but rolling it safely is expensive. A reusable metadata-first add-on lets every Jmix app get a governed AI agent with minimal custom code.
 
 ## Constraints
 

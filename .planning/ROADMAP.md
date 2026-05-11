@@ -1,4 +1,4 @@
-# Roadmap: Jmix AI Copilot (ai-agent-core)
+# Roadmap: Jmix AI Agent (ai-agent-core)
 
 ## Milestones
 
@@ -13,7 +13,7 @@
 
 Full detail: [milestones/v1.0.0-ROADMAP.md](milestones/v1.0.0-ROADMAP.md) · phase history: [milestones/v1.0.0-phases/](milestones/v1.0.0-phases/)
 
-A reusable Jmix AI Copilot add-on with secure metadata-first read-only tools (via `AccessManager`/`DataManager`), Spring AI ChatClient orchestration with JDBC chat memory + conversation projection + durable audit, pgvector RAG ingestion/retrieval with role-scoped filters, prompt-injection-safe result formatting, Flow UI (chat, conversations, parameters, knowledge base, tree-lite audit), SPI extension points, packaged as `ai-agent` + `ai-agent-starter` with Spring Boot auto-config + CI + operator docs.
+A reusable Jmix AI agent add-on with secure metadata-first read-only tools (via `AccessManager`/`DataManager`), Spring AI ChatClient orchestration with JDBC chat memory + conversation projection + durable audit, pgvector RAG ingestion/retrieval with role-scoped filters, prompt-injection-safe result formatting, Flow UI (chat, conversations, parameters, knowledge base, tree-lite audit), SPI extension points, packaged as `ai-agent` + `ai-agent-starter` with Spring Boot auto-config + CI + operator docs.
 
 </details>
 
