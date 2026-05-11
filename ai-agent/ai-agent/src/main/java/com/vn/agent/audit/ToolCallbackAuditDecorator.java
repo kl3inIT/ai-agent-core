@@ -126,6 +126,10 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
         // to the originating ToolCall by this id. Emission is a no-op when no streaming
         // run is active (blocking ask() path or non-chat invocation).
         final UUID toolCallId = UUID.randomUUID();
+        // Phase 15 D-05: ephemeral streaming-status marker — carries only the closed ActivityKind
+        // constant (never the @Tool method name / args), best-effort via the same emitToolEvent
+        // helper (null-guards the sink holder, swallows RuntimeException).
+        emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.Activity(StreamingEvent.ActivityKind.TOOL)));
         emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
 
         boolean success = false;
