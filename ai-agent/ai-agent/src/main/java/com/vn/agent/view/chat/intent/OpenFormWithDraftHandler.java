@@ -198,14 +198,16 @@ public class OpenFormWithDraftHandler {
     }
 
     private void confirmAndDeleteDraft(UUID draftId) {
+        // Remove the draft in a single DataManager operation. The previous
+        // save(confirmed=true) + remove sequence ran as two independent transactions;
+        // if the remove failed the row lingered with confirmed=true (invisible to the UI
+        // because ExtractionDraftAccess.loadOpenDraft filters confirmed=false) until the
+        // TTL job reaped it. There is nothing to preserve once the entity has been saved,
+        // so the intermediate confirmed flip is unnecessary.
         dataManager.load(AiExtractionDraft.class)
                 .id(draftId)
                 .optional()
-                .ifPresent(draft -> {
-                    draft.setConfirmed(true);
-                    AiExtractionDraft savedDraft = dataManager.save(draft);
-                    dataManager.remove(savedDraft);
-                });
+                .ifPresent(dataManager::remove);
     }
 
     private void showConfigurationError() {

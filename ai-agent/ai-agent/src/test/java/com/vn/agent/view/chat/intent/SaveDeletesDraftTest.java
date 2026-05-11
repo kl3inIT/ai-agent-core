@@ -60,7 +60,6 @@ class SaveDeletesDraftTest {
     private View<?> originView;
     private DetailViewClassNavigator<Object, View<?>> classNavigator;
     private AiExtractionDraft draft;
-    private AiExtractionDraft savedDraft;
     private UUID draftId;
 
     @SuppressWarnings("unchecked")
@@ -81,10 +80,6 @@ class SaveDeletesDraftTest {
         draft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
         draft.setId(draftId);
         draft.setTargetEntityName(ENTITY_NAME);
-        savedDraft = mock(AiExtractionDraft.class, CALLS_REAL_METHODS);
-        savedDraft.setId(draftId);
-        savedDraft.setTargetEntityName(ENTITY_NAME);
-        savedDraft.setConfirmed(true);
 
         when(messages.getMessage(any(String.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(metadata.getSession().findClass(ENTITY_NAME)).thenReturn(metaClass);
@@ -98,7 +93,6 @@ class SaveDeletesDraftTest {
         when(extractionDraftAccess.loadOpenDraft(draftId)).thenReturn(Optional.of(draft));
         when(dataManager.load(AiExtractionDraft.class).id(draftId).optional())
                 .thenReturn(Optional.of(draft));
-        when(dataManager.save(same(draft))).thenReturn(savedDraft);
         when(draftLoader.apply(any(UUID.class), any())).thenReturn(
                 new DraftApplyResult(1, 0, List.of(), false));
 
@@ -114,15 +108,13 @@ class SaveDeletesDraftTest {
     }
 
     @Test
-    void successfulSaveMarksConfirmedAndDeletesDraft() {
+    void successfulSaveDeletesDraftInOneOperation() {
         TestMutationDetailView detailView = openAndRunAfterNavigationHandler();
 
         ComponentUtil.fireEvent(detailView, new StandardDetailView.AfterSaveEvent(detailView, false));
 
-        assertThat(draft.getConfirmed()).isTrue();
-        verify(dataManager).save(draft);
-        verify(dataManager).remove(savedDraft);
-        verify(dataManager, never()).remove(same(draft));
+        verify(dataManager).remove(same(draft));
+        verify(dataManager, never()).save(draft);
     }
 
     @Test
