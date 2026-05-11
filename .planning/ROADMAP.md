@@ -61,13 +61,13 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
 Plans:
 **Wave 1**
 - [ ] 15-01-PLAN.md — Add AiChatSurface.SIDEBAR + admin UI-settings participation + locale labels (no DDL)
-- [ ] 15-02-PLAN.md — Additive StreamingEvent.Activity(ActivityKind) variant + best-effort emit sites (retriever/tool decorator/chat impl) + renderer arm
+- [ ] 15-02-PLAN.md — Additive StreamingEvent.Activity(ActivityKind) variant + best-effort Activity(TOOL)/Activity(RETRIEVAL) emit sites (tool decorator/retriever; no Activity(CHAT) — UI derives it) + renderer arm
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 15-03-PLAN.md — ChatSurfaceMounter SIDEBAR side-panel mount + navbar toggle + in-panel closer + CSS push-shell
+- [ ] 15-03-PLAN.md — AiAgentSidebarView host view + ChatSurfaceMounter SIDEBAR fixed-position side-panel mount (same ChatPanelFragment impl/ChatService/AiChatSessionState continuity) + navbar toggle + in-panel closer + CSS push-shell (real clamp width) + @CssImport on ChatPanelFragment
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line + collapsed per-turn tool-detail Details + bounded live state + lazy AiAuditEvent re-read + TurnDetailRenderer mapper
+- [ ] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line (neutral->CHAT-on-first-Content) + collapsed per-turn tool-detail Details in a grouped .ai-agent-turn-activity block + capped live state + child-count-aware AiAuditEvent correlation + lazy/memoized AiAuditEvent re-read (real timings on Final) + TurnDetailRenderer mapper
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/

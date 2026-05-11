@@ -437,19 +437,24 @@ void statusLineAndTurnDetailNeverEmitInternalNames() {
 | A7 | Adding `SIDEBAR` to `AiChatSurface` requires no `agentstore` changelog because `ENABLED_SURFACE_IDS`/`DEFAULT_SURFACE` are `varchar` columns holding comma-joined ids. | OBS-04 / SURF-11 | Very low — confirmed by reading `AiUiSettings.java` (`@Column(name = "ENABLED_SURFACE_IDS")` String, `@Column(name = "DEFAULT_SURFACE", length = 64)` String) and SPEC ("no schema change expected"). |
 | A8 | The default-seed `AiUiSettings` (`AiUiSettingsService.createDefaultSettings()` uses `EnumSet.allOf(AiChatSurface.class)`) will automatically include `SIDEBAR` once the enum value is added — so a fresh install ships with all three surfaces enabled and `FULL_ROUTE` default. | SURF-11 | Low — confirmed by reading `AiUiSettingsService`; planner should decide whether shipping `SIDEBAR` enabled-by-default is desired or whether the seed should be tightened (a product call; current code = all enabled). |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three were resolved during the `--reviews` replan (2026-05-11). Inline `RESOLVED:` markers point to the resolving plan; the prose below is retained for context.
 
 1. **Which `DataManager` for the on-expand `AiAuditEvent` history-turn read?**
+   - **RESOLVED: `UnconstrainedDataManager` with a mandatory `where e.userUsername = :me and e.conversation.id = :cid` clause (never `runId`-only unconstrained), narrow fetch plan, typed `load(AiAuditEvent.class)` (infers the agentstore; `.store("agentstore")` only for the raw-JPQL grouped child-count query) — `AiAgentUserRole` has zero `AiAuditEvent` policy (its Javadoc says so) so the constrained `DataManager` would throw; `AiAuditEventListView` is admin-only and doesn't establish a user-read path. See `15-04-PLAN.md` (REVIEW-RESOLUTION block + Task 3) — the same `loadTurnSteps(runId, cid)` helper is reused for the live-disclosure-on-`Final` read (review point #8).**
    - What we know: `AuditWriter` uses `UnconstrainedDataManager`; `ChatPanelFragment` injects `DataManager`; `AiAuditEvent` is `@Store("agentstore")`; the audit list view exists.
    - What's unclear: whether the chat user's Jmix roles permit a constrained read of their own audit rows.
    - Recommendation: planner reads `AiAuditEventListView` + the `agentstore` security roles; default to `DataManager` (constrained, user-attributable) if the role allows it, else `UnconstrainedDataManager` with an explicit `where e.userUsername = :me` clause. Either way, narrow fetch plan, `where e.runId = :rid and e.parent is not null`, and `.store("agentstore")` only if raw-JPQL projection is used.
 
 2. **Should `SIDEBAR` ship enabled-by-default in the seed?**
+   - **RESOLVED: Yes — keep the all-enabled seed (`createDefaultSettings()` stays `EnumSet.allOf(AiChatSurface.class)`, `defaultSurface` stays `FULL_ROUTE`); the panel starts CLOSED (D-04) so enabled-by-default only means the navbar toggle is present — parity with `HEADER_BUTTON` shipping a navbar button by default. See `15-01-PLAN.md` Task 2.**
    - What we know: `createDefaultSettings()` enables all `AiChatSurface` values; adding `SIDEBAR` to the enum auto-enables it on fresh installs.
    - What's unclear: product preference (a ~32%-viewport surface enabled by default is a visible default).
    - Recommendation: the panel "starts closed" (D-04) so enabled-by-default only means "the toggle button is in the navbar" — consistent with HEADER_BUTTON shipping a navbar button by default. Recommend keeping the all-enabled seed for parity; flag for the design-conscious owner during UI verification.
 
 3. **Is the existing `aiAgentHeaderChatButton` mounted-always-then-hidden, or mounted-only-when-enabled?**
+   - **RESOLVED: Mirror the existing magic-button pattern — mount always, `setVisible(false)` when disabled/not-permitted (Vaadin `setVisible(false)` removes the element from the rendered DOM ⇒ satisfies "absent, not greyed"); tests assert DOM-absence, not just `isVisible()`. See `15-03-PLAN.md` Task 1.**
    - What we know: `mountHeaderButton` mounts unconditionally on UI init / navigation; `refreshMountedSurfaces` then `setVisible(...)` based on `shouldShowHeaderButton`. So it's *mounted-always, visibility-toggled*. But the SURF-11 acceptance says the sidebar toggle is "absent, not greyed" when disabled.
    - What's unclear: whether "absent" is satisfied by `setVisible(false)` (the magic button's approach — it's `visible=false`, which removes it from the DOM in Vaadin) or requires not creating the component at all.
    - Recommendation: mirror the existing magic-button pattern (mount always, `setVisible(false)` when disabled) — Vaadin `setVisible(false)` removes the element from the rendered DOM, which satisfies "absent"; document this in the plan so the verifier checks DOM-absence, not just `isVisible()`.
