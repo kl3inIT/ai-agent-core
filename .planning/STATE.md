@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
-stopped_at: Phase 15 context gathered
-last_updated: "2026-05-11T15:13:56.823Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-05-11T15:38:30.374Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 15 (right-sidebar-chat-surface-observability-ux) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-05-11
 
@@ -252,6 +252,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 14]: Plan 14-06: UI tests use source/XML contract checks because full Jmix UI boot remains affected by the pre-existing agentstore Spring context blocker documented in prior phase summaries.
 - [Phase 14]: Plan 14-09 is a dependent gap-closure pass for `14-VERIFICATION.md` blockers BL-02 through BL-05; BL-01 was narrowed by user correction so datasource/UI defaults stay in application.properties and only OpenRouter API key remains env-backed. It intentionally adds no new AI tool, entity table, audit kind, Jmix view/menu, or AI-specific exposure layer.
 - [Phase 15]: Plan 15-01: `AiChatSurface.SIDEBAR("SIDEBAR")` added as the third enum constant; `com.vn.agent.entity/AiChatSurface.SIDEBAR` label added to messages_en.properties (`Right sidebar`) + messages_vi.properties (`Thanh bên phải`). No DDL — `ENABLED_SURFACE_IDS`/`DEFAULT_SURFACE` are existing varchar columns (OBS-04 by construction). No production code change beyond the constant + labels: `AiUiSettingsDetailView` already calls `setItems(AiChatSurface.class)` for both the enabled-surface checkbox group and the `defaultSurface` radio group, and `AiUiSettings#enabledSurfaceIds` default already delegates to `EnumSet.allOf(AiChatSurface.class)`. RESEARCH Open Q2 resolved: `createDefaultSettings()` stays `EnumSet.allOf` so fresh installs ship all three surfaces enabled; `defaultSurface` stays `FULL_ROUTE` — the side panel starts closed (D-04), so enabled-by-default only means the navbar toggle is present (parity with HEADER_BUTTON). Tests-only changes: extended AiUiSettingsModelTest + AiUiSettingsDetailViewTest, and updated default-seed assertions in AiUiSettingsDetailViewTest + AiUiSettingsServiceSingletonTest to include SIDEBAR. Plan 03 (`ChatSurfaceMounter`) can now gate the side-panel mount on `getEnabledSurfaceSet().contains(AiChatSurface.SIDEBAR)`.
+- [Phase ?]: Phase 15: Activity(CHAT) is NOT emitted from the orchestration edge (review point #11); DefaultChatServiceImpl unchanged, UI derives CHAT from the first Content event
 
 ### Performance Metrics
 
@@ -315,6 +316,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 14 P07 | 46min | 3 tasks | 8 files |
 | Phase 14 P08 | 2h 29m | 5 tasks | 6 files |
 | Phase 15 P01 | ~30min | 2 tasks | 6 files |
+| Phase 15 P02 | 35min | 2 tasks | 8 files |
 
 ### Quick Tasks Completed
 
@@ -324,7 +326,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-11T15:13:56.809Z
+**Last session:** 2026-05-11T15:37:56.366Z
 **Stopped at:** Completed 15-01-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases should prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated.

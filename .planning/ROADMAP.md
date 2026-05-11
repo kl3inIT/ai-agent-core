@@ -61,7 +61,7 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
 Plans:
 **Wave 1**
 - [x] 15-01-PLAN.md — Add AiChatSurface.SIDEBAR + admin UI-settings participation + locale labels (no DDL)
-- [ ] 15-02-PLAN.md — Additive StreamingEvent.Activity(ActivityKind) variant + best-effort Activity(TOOL)/Activity(RETRIEVAL) emit sites (tool decorator/retriever; no Activity(CHAT) — UI derives it) + renderer arm
+- [x] 15-02-PLAN.md — Additive StreamingEvent.Activity(ActivityKind) variant + best-effort Activity(TOOL)/Activity(RETRIEVAL) emit sites (tool decorator/retriever; no Activity(CHAT) — UI derives it) + renderer arm
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 15-03-PLAN.md — AiAgentSidebarView host view + ChatSurfaceMounter SIDEBAR fixed-position side-panel mount (same ChatPanelFragment impl/ChatService/AiChatSessionState continuity) + navbar toggle + in-panel closer + CSS push-shell (real clamp width) + @CssImport on ChatPanelFragment
@@ -145,7 +145,7 @@ Plans:
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 1/5 | In Progress|  |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 2/5 | In Progress|  |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |
