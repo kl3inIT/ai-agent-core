@@ -1039,6 +1039,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         discardButton.addClickListener(event -> removeActionChoiceRow(row));
         row.add(discardButton);
 
+        // The model can re-emit a proposal with the same proposalId; drop any stale row first
+        // so it does not leak in messageListSlot and double-count messageCount.
+        Div existingRow = actionChoiceRowsByProposalId.get(proposalPayload.proposalId());
+        if (existingRow != null) {
+            removeActionChoiceRow(existingRow);
+        }
         messageListSlot.add(row);
         actionChoiceRowsByProposalId.put(proposalPayload.proposalId(), row);
         messageCount++;
