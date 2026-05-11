@@ -1147,15 +1147,35 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         actionChoiceRowsByProposalId.clear();
     }
 
+    /**
+     * Maximum normalized length of a message still treated as a bare cancellation instruction.
+     * A longer message is assumed to carry substantive content (e.g. "don't create a duplicate,
+     * update the existing one") rather than being a standalone "cancel"/"huy".
+     */
+    private static final int CANCELLATION_MAX_LENGTH = 40;
+    /** A negated cancel verb ("don't cancel", "khong huy") is not itself a cancellation. */
+    private static final java.util.regex.Pattern CANCELLATION_NEGATED = java.util.regex.Pattern.compile(
+            ".*\\b(khong|chua|do not|dont|don't|never|dung)\\b\\s+(huy|cancel|discard)\\b.*");
+    private static final java.util.regex.Pattern CANCELLATION_LEADING_POLITENESS = java.util.regex.Pattern.compile(
+            "^(please|pls|kindly|vui long|lam on|xin|hay)\\b\\s*");
+
     private boolean looksLikeActionCancellation(String text) {
-        String normalized = normalizeCancellationText(text);
-        return normalized.matches(".*\\b(huy|cancel|discard)\\b.*")
-                || normalized.contains("khong tao")
-                || normalized.contains("dung tao")
-                || normalized.contains("bo qua yeu cau")
-                || normalized.contains("do not create")
-                || normalized.contains("dont create")
-                || normalized.contains("don't create");
+        String normalized = normalizeCancellationText(text).trim();
+        if (normalized.isEmpty() || normalized.length() > CANCELLATION_MAX_LENGTH) {
+            return false;
+        }
+        if (CANCELLATION_NEGATED.matcher(normalized).matches()) {
+            // "khong huy nua" / "I don't want to cancel" — a negated cancellation is not a cancellation.
+            return false;
+        }
+        String imperative = CANCELLATION_LEADING_POLITENESS.matcher(normalized).replaceFirst("").trim();
+        return imperative.matches("^(huy|cancel|discard)\\b.*")
+                || imperative.startsWith("khong tao")
+                || imperative.startsWith("dung tao")
+                || imperative.startsWith("bo qua yeu cau")
+                || imperative.startsWith("do not create")
+                || imperative.startsWith("dont create")
+                || imperative.startsWith("don't create");
     }
 
     private String normalizeCancellationText(String text) {
