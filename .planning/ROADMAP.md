@@ -34,10 +34,10 @@ Full detail: [milestones/v1.1.0-ROADMAP.md](milestones/v1.1.0-ROADMAP.md) · req
 
 ### 🚧 v1.2 — Operator Experience, Voice Input & Runtime Performance (Phases 15–20)
 
-Six near-independent feature areas layered on the shipped v1.1 agent harness with effectively zero new runtime dependencies. Hard ordering constraint: **Phase 18 (mutation-internals hardening) must precede Phase 19 (perf pass)** — the perf pass refactors the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated sequence. Phases 15/16 both touch `ChatPanelFragment` (one coordinated UI workstream); Phase 17 is best scoped after Phase 16 so its config-knob migration covers the model-picker knobs in the same `AiParameters`/`AiUiSettings` schema design. Voice input (Phase 20) lands last in the milestone: it reuses Phase 15's in-fragment streaming-status-row pattern for its error/retry row. Phases 18/19 (the "invisible" passes) can run in parallel with 15/16/17.
+Six near-independent feature areas layered on the shipped v1.1 agent harness with effectively zero new runtime dependencies. Hard ordering constraint: **Phase 18 (mutation-internals hardening) must precede Phase 19 (perf pass)** — the perf pass refactors the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated sequence. Phase 15 touches the chat surface mounter and `ChatPanelFragment`; Phase 16 is admin configuration UI only. Phase 17 is best scoped after Phase 16 so its config-knob migration covers the model-picker knobs in the same `AiParameters`/`AiUiSettings` schema design. Voice input (Phase 20) lands last in the milestone: it reuses Phase 15's in-fragment streaming-status-row pattern for its error/retry row. Phases 18/19 (the "invisible" passes) can run in parallel with 15/16/17.
 
-- [ ] **Phase 15: Chat Observability & UX** — Ephemeral streaming-status line, collapsed-by-default per-turn tool-detail disclosure, right-sidebar chat-state panel — all driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree, no new entity. Resolves the pending collapsible-tool-detail / ephemeral-status todo.
-- [ ] **Phase 16: Admin Model Management** — Curated open-weights model `ComboBox` + custom free-entry in the admin Parameters view; admin-only; flows to the chat-state panel + per-request `ChatOptions`; validate at use time.
+- [ ] **Phase 15: Right-Sidebar Chat Surface & Observability UX** — `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus ephemeral streaming-status line and collapsed-by-default per-turn tool-detail disclosure driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree. Resolves the pending collapsible-tool-detail / ephemeral-status todo. The chat-state side panel is deferred.
+- [ ] **Phase 16: Admin Model Management** — Curated open-weights model `ComboBox` + custom free-entry in the admin Parameters view; admin-only; flows to per-request `ChatOptions`; validate at use time.
 - [ ] **Phase 17: Admin Config-Knob Migration** — Three-tier knob taxonomy: Tier-1 runtime knobs (RAG top-k / similarity threshold / task-file token budget / TTL / migrated model-picker knobs) become editable `AiParameters`/`AiUiSettings`; Tier-2 boot toggles shown read-only with a "requires restart" note; Tier-3 secrets shown as "configured: yes/no" only. Publishes an `AiParameters` change event for cache eviction.
 - [ ] **Phase 18: Mutation-Internals Hardening (Phase 11 follow-up)** — Extract the canonical `MutationGateChain`; batch-load to-one FK refs via constrained `DataManager` `IN(...)`; memoize related-write metadata. Byte-for-byte behavior-identical; Phase 9/10/11 mutation test suites pass unchanged. Promotes Backlog 999.1.
 - [ ] **Phase 19: AI-Runtime Performance Pass (targeted)** — Per-turn memoization of schema/metadata/`AccessManager`/exposure resolution; app-wide memoized denylist + metadata derivations (evicted on `LlmExposureChangedEvent`); RAG `Filter.Expression` built once per retrieval; task-file `Media` cached per `(convId, taskFileId)`. No benchmark harness, no admin-screen perf; each change ships with a checkable proxy; existing test suites pass unchanged.
@@ -45,27 +45,35 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
 
 ## Phase Details
 
-### Phase 15: Chat Observability & UX
-**Goal**: An operator can see what the agent is doing while it works (an ephemeral streaming-status line) and what it did afterward (a collapsed-by-default per-turn tool-detail disclosure), plus a right-sidebar chat-state panel summarizing the active model, conversation, governance flags, and attachment budget — all without internal tool/entity names ever leaking into the UI, and with no new persisted state.
-**Depends on**: `ChatPanelFragment` + the existing `StreamingEvent` flux + the `AiAuditEvent` tree. Independent — can overlap Phases 16/17/18/19; honors the Phase 12 `ChatSurfaceMounter` slot contract (zero-diff). (Phase 20's STT error/retry row reuses this phase's in-fragment status-row pattern — Phase 15 ships first within the milestone, so the pattern is established.)
-**Requirements**: OBS-01, OBS-02, OBS-03, OBS-04, TEST-19
+### Phase 15: Right-Sidebar Chat Surface & Observability UX
+**Goal**: An operator can open chat from a right-sidebar `SIDEBAR` surface in addition to the shipped `FULL_ROUTE` and `HEADER_BUTTON` surfaces, and can see what the agent is doing while it works (an ephemeral streaming-status line) and what it did afterward (a collapsed-by-default per-turn tool-detail disclosure) — all without internal tool/entity names ever leaking into the UI, and with no new persisted state.
+**Depends on**: `ChatSurfaceMounter`, `AiUiSettings`, `AiChatSessionState`, `ChatPanelFragment`, the existing `StreamingEvent` flux, and the `AiAuditEvent` tree. Independent — can overlap Phases 16/17/18/19. (Phase 20's STT error/retry row reuses this phase's in-fragment status-row pattern — Phase 15 ships first within the milestone, so the pattern is established.)
+**Requirements**: SURF-11, OBS-01, OBS-02, OBS-04, TEST-19
 **Success Criteria** (what must be TRUE):
-  1. While a turn is streaming, an ephemeral status line renders in a sibling slot (not inside the message bubble), keyed by audit `KIND` ("thinking…", "searching data…", "retrieving documents…"), and clears completely when the turn finalizes — the status text is never concatenated into the final answer and never shows internal `@Tool` / entity names.
-  2. Each completed turn shows a collapsed-by-default "what the agent did — N steps, total ms" disclosure listing humanized, label-only steps (KIND-keyed, never internal tool/entity names) with per-step timing and error/rollback indication; the disclosure is hidden entirely for turns with zero tool calls; a turn deep-links to its filtered audit list (`AiAuditEventListView?runId=...`).
-  3. A right-sidebar chat-state panel shows the active model code, the current conversation id + title, the LLM-exposure-policy-active flag, the mutation-tools-enabled flag, the attached-file count, the attachment token-budget usage, and a one-line last-turn summary; it renders in both chat surfaces and updates as state changes.
+  1. A `SIDEBAR` / right-sidebar chat surface can be enabled independently through `AiUiSettings`, mounts the shared `ChatPanelFragment`, preserves cross-surface `AiChatSessionState` continuity, and does not introduce a second chat backend, second chat memory, or duplicate fragment implementation.
+  2. While a turn is streaming, an ephemeral status line renders in a sibling slot (not inside the message bubble), keyed by audit `KIND` ("thinking…", "searching data…", "retrieving documents…"), and clears completely when the turn finalizes — the status text is never concatenated into the final answer and never shows internal `@Tool` / entity names.
+  3. Each completed turn shows a collapsed-by-default "what the agent did — N steps, total ms" disclosure listing humanized, label-only steps (KIND-keyed, never internal tool/entity names) with per-step timing and error/rollback indication; the disclosure is hidden entirely for turns with zero tool calls; a turn deep-links to its filtered audit list (`AiAuditEventListView?runId=...`).
   4. The panels are driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree — no new persisted "turn" entity, no parallel state store; per-turn detail held in the panels does not accumulate unbounded in `AiChatSessionState`; new labels use `msg://` keys in all locale bundles.
   5. TEST-19 — a UI-layer leak test (reusing the Phase 9 leak-guard pattern packs) asserts the streaming-status line and the per-turn tool-detail disclosure never emit internal `@Tool` method names or raw entity names.
-**Plans**: TBD
+**Deferred**: Chat-state side panel for model/conversation/governance/attachment-budget facts (`OBS-FUT-01`). Do not implement it in Phase 15.
+**Note**: ROADMAP success-criterion 3's `AiAuditEventListView?runId=...` deep-link clause is DESCOPED for Phase 15 per `15-SPEC.md` (the disclosure is label-only, no link). Doc-sync follow-up only.
+**Plans**: 5 plans
+Plans:
+- [ ] 15-01-PLAN.md — Add AiChatSurface.SIDEBAR + admin UI-settings participation + locale labels (no DDL)
+- [ ] 15-02-PLAN.md — Additive StreamingEvent.Activity(ActivityKind) variant + best-effort emit sites (retriever/tool decorator/chat impl) + renderer arm
+- [ ] 15-03-PLAN.md — ChatSurfaceMounter SIDEBAR side-panel mount + navbar toggle + in-panel closer + CSS push-shell
+- [ ] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line + collapsed per-turn tool-detail Details + bounded live state + lazy AiAuditEvent re-read + TurnDetailRenderer mapper
+- [ ] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
 **UI hint**: yes
 
 ### Phase 16: Admin Model Management
-**Goal**: An admin can pick the chat model from a curated catalog of self-hostable open-weights models (with the default marked) or type a custom model name as an escape hatch — in the admin Parameters view, admin-only — and the choice flows through to per-request `ChatOptions` and the chat-state panel.
+**Goal**: An admin can pick the chat model from a curated catalog of self-hostable open-weights models (with the default marked) or type a custom model name as an escape hatch — in the admin Parameters view, admin-only — and the choice flows through to per-request `ChatOptions`.
 **Depends on**: Nothing hard. The model field is already a free-text `AiParameters` param, so this is purely a UI affordance change; informs the Phase 17 config-knob audit. Can run first or in parallel with Phase 15.
 **Requirements**: MODEL-01, MODEL-02, MODEL-03, TEST-20
 **Success Criteria** (what must be TRUE):
   1. In the admin Parameters/Settings view the chat-model field is a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
   2. The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); model validity is checked at first use with a clear error surfaced, not at save time, and the chat turn falls back gracefully.
-  3. Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions` and is reflected in the chat-state panel (OBS-03); all new labels use `msg://` keys in all locale bundles.
+  3. Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`; all new labels use `msg://` keys in all locale bundles.
   4. TEST-20 — a curated-model allowlist test asserts every model id in the curated dropdown catalog is on a self-hostable open-weights allowlist (comment references `project_self_hostable_models_only.md`).
 **Plans**: TBD
 **UI hint**: yes
@@ -130,7 +138,7 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Chat Observability & UX | v1.2 | 0/? | Not started | - |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 0/5 | Planned | - |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |
@@ -140,7 +148,7 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
 ## Notes
 
 - Phase numbering is monotonic across milestones: v1.0.0 = Phases 1–8 (+ inserted 7.1, 7.2); v1.1.0 = Phases 9–14 (+ follow-up 13.1); v1.2 = Phases 15–20.
-- v1.2 hard ordering constraint: **Phase 18 before Phase 19**. Soft groupings: 15 + 16 are one coordinated `ChatPanelFragment` UI workstream; 17 is best scoped after 16 (it migrates the model-picker knob); 18/19 (the invisible passes) can run in parallel with 15/16/17. Voice input (Phase 20) lands last — it reuses Phase 15's in-fragment status-row pattern for its error/retry row.
+- v1.2 hard ordering constraint: **Phase 18 before Phase 19**. Soft groupings: Phase 15 owns the chat-surface / `ChatPanelFragment` work; Phase 16 is admin model configuration UI; 17 is best scoped after 16 (it migrates the model-picker knob); 18/19 (the invisible passes) can run in parallel with 15/16/17. Voice input (Phase 20) lands last — it reuses Phase 15's in-fragment status-row pattern for its error/retry row.
 - v1.1.0 milestone audit: PASS on integration (8/8 cross-phase wiring) + E2E (5/5 flows); status `tech_debt` for bookkeeping (Phase 10 verification doc stale at `human_needed`; phases 9/10/11/12/13/13.1 lack `*-VALIDATION.md`). See [milestones/v1.1.0-MILESTONE-AUDIT.md](milestones/v1.1.0-MILESTONE-AUDIT.md).
 - Out of v1.2 scope (carried, NOT in any v1.2 phase): Phase 10 re-verification + Nyquist `*-VALIDATION.md` backfill (phases 9/10/11/12/13/13.1); PKG-05/TEST-07 clean-consumer smoke (v1.0.0 Plan 08-05 carryover); `TranscriptionPostProcessor` SPI + custom STT-provider SPI; per-conversation end-user model switching; admin-screen performance work; attribute-path-level exposure rules; activation of dormant seeds SEED-001/002/003/004/006/008.
 
