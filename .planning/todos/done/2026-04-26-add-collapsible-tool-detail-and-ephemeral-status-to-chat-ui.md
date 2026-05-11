@@ -10,6 +10,9 @@ files:
   - ai-agent/ai-agent/src/main/resources/com/vn/agent/view/chat/fragment/chat-panel-fragment.xml
 ---
 
+> **Resolved by Phase 15 — Right-Sidebar Chat Surface & Observability UX (OBS-01 + OBS-02, decisions D-05..D-08, refined per 15-REVIEWS); shipped 2026-05-12.**
+> The two coordinated surfaces below were implemented inside the shared `ChatPanelFragment` (not a per-bubble slot — a `Details` cannot sit between two `MessageListItem`s, so the per-turn disclosures live in one ordered `.ai-agent-turn-activity` block appended after `<vaadin-message-list>`, and the ephemeral status is a sibling `<span class="ai-agent-status" role="status" aria-live="polite">` removed in every teardown site). Data source: the tree-lite `AiAuditEvent` subtree, read with an `UnconstrainedDataManager` + a mandatory `userUsername`+`conversation.id` filter and a name-column-free fetch plan. The streaming-status KIND comes from the additive `StreamingEvent.Activity(ActivityKind)` variant (Plan 15-02). No new persistence. Leak gate: `ObservabilityLeakTest` (TEST-19) reuses the Phase 9 `TOOL_NAME_LEAK` / `HOST_PREFIX_LEAK` pattern packs against both the `TurnDetailRenderer` mapper output and a real rendered `ChatPanelFragment`. See `15-01-SUMMARY.md` … `15-05-SUMMARY.md` for the full record.
+
 ## Problem
 
 Even after the prompt-side fix (todo
