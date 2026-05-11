@@ -2,6 +2,7 @@
 created: 2026-04-26T02:50:00+07:00
 title: Add collapsible tool-detail and ephemeral status to chat UI
 area: ui
+resolves_phase: 15
 files:
   - ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/ChatView.java
   - ai-agent/ai-agent/src/main/java/com/vn/agent/view/chat/fragment/ChatPanelFragment.java
