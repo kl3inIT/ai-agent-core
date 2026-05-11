@@ -33,3 +33,7 @@ gradle-local.properties
 .playwright-mcp/
 /output/
 phase14-dom.json
+
+# JVM crash / replay logs (occasionally dropped by the Gradle test worker).
+hs_err_pid*.log
+replay_pid*.log

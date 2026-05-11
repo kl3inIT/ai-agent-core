@@ -49,6 +49,8 @@ public interface AiAgentAdminRole {
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
             "AiAgent_ChatDialog",
+            // Phase 15 Plan 03 — SIDEBAR surface host view (parity with AiAgent_ChatDialog).
+            "AiAgent_Sidebar",
             "AiAgent_Configuration",
             "AiAgent_BaselineContext",
             "AiAgent_Conversation.list", "AiAgent_Conversation.detail",

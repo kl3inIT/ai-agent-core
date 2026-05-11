@@ -9,6 +9,7 @@ import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H5;
@@ -113,6 +114,15 @@ import java.util.UUID;
  *  ui.access; D-04 Stop via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach.
  *  Public API for ChatView: setConversationId / hasMessages / isStreaming / startNewChat. */
 @FragmentDescriptor("chat-panel-fragment.xml")
+// Phase 15 Plan 03 (REVIEWS point #5): the @CssImport for ai-agent-chat.css used to
+// live only on the message-bubble component (used solely by ConversationDetailView's
+// read-only transcript replay), which the MessageList-based live chat path never
+// instantiates — so the .ai-agent-sidebar* rules added in this plan (and the Plan-04
+// observability rules) would not load on the sidebar/chat render path. This fragment
+// is present in every chat/sidebar render, so the import belongs here too. The
+// existing import on the bubble component stays (ConversationDetailView still relies
+// on it; a duplicate @CssImport of the same stylesheet path is harmless).
+@CssImport("./styles/ai-agent-chat.css")
 public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private static final Logger log = LoggerFactory.getLogger(ChatPanelFragment.class);
