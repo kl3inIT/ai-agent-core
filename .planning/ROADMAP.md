@@ -67,7 +67,7 @@ Plans:
 - [x] 15-03-PLAN.md — AiAgentSidebarView host view + ChatSurfaceMounter SIDEBAR fixed-position side-panel mount (same ChatPanelFragment impl/ChatService/AiChatSessionState continuity) + navbar toggle + in-panel closer + CSS push-shell (real clamp width) + @CssImport on ChatPanelFragment
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line (neutral->CHAT-on-first-Content) + collapsed per-turn tool-detail Details in a grouped .ai-agent-turn-activity block + capped live state + child-count-aware AiAuditEvent correlation + lazy/memoized AiAuditEvent re-read (real timings on Final) + TurnDetailRenderer mapper
+- [x] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line (neutral->CHAT-on-first-Content) + collapsed per-turn tool-detail Details in a grouped .ai-agent-turn-activity block + capped live state + child-count-aware AiAuditEvent correlation + lazy/memoized AiAuditEvent re-read (real timings on Final) + TurnDetailRenderer mapper
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
@@ -145,7 +145,7 @@ Plans:
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 3/5 | In Progress|  |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 4/5 | In Progress|  |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-05-11T16:28:05.285Z"
-last_activity: 2026-05-11
+stopped_at: Completed 15-04-PLAN.md
+last_updated: "2026-05-12T00:30:00.000Z"
+last_activity: 2026-05-12
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -29,9 +29,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 15 (right-sidebar-chat-surface-observability-ux) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
-Last activity: 2026-05-11
+Plan: 5 of 5
+Status: 15-04 complete; 15-05 (TEST-19 leak-regex test) next
+Last activity: 2026-05-12
 
 ## Phase Status
 
@@ -44,7 +44,7 @@ Last activity: 2026-05-11
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
-| 15. Chat Observability & UX | Not started | 0/? | - | - |
+| 15. Right-Sidebar Chat Surface & Observability UX | Executing | 4/5 | 2026-05-11 | - |
 | 16. Admin Model Management | Not started | 0/? | - | - |
 | 17. Admin Config-Knob Migration | Not started | 0/? | - | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | Not started | 0/? | - | - |
@@ -255,6 +255,8 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase ?]: Phase 15: Activity(CHAT) is NOT emitted from the orchestration edge (review point #11); DefaultChatServiceImpl unchanged, UI derives CHAT from the first Content event
 - [Phase 15]: Plan 15-03: SIDEBAR chat surface mounted by ChatSurfaceMounter through a new lean Jmix host view `AiAgentSidebarView` (`@ViewController("AiAgent_Sidebar")`, `ai-agent-sidebar-view.xml` = a single `<fragment id=chatPanelFragment class=...ChatPanelFragment/>` — NO new fragment subclass; syncs `setConversationId` from `AiChatSessionState` on BeforeShow/Ready, mirroring ChatDialogView). The host view is created via `views.create(AiAgentSidebarView.class)` and SHOWN via `views.create(...)` + `panelDiv.getElement().appendChild(sidebarView.getElement())` + `ViewControllerUtils.fireEvent(new View.BeforeShowEvent(v))` then `ViewControllerUtils.fireEvent(new View.ReadyEvent(v))` (chosen over a DialogWindow wrapper — the `<vaadin-dialog>` overlay doesn't live inside an arbitrary Div and brings modality machinery; the `fireEvent` path drives the non-routed view's lifecycle and ReadyEvent propagates to the fragment's `@Subscribe onReady` via `Fragment.onHostReadyInternal`; no modal curtain). The panel is a `position:fixed` `Div.ai-agent-sidebar` appended to `UI.getCurrent().getElement()` (NOT the AppLayout content slot — survives navigation; re-asserted on `AfterNavigationEvent` along with the push class + toggle visibility), containing a `Div.ai-agent-sidebar__header` close button + the host view. A far-right navbar toggle `aiAgentSidebarToggleButton` (VaadinIcon.PANEL, LUMO_TERTIARY+LUMO_ICON, `aria-pressed` + `.ai-agent-sidebar-toggle--active`) and the in-panel closer both route through one `toggleSidebar(ui)` (flips `--open` + `ai-agent-content--pushed` + `--active` + `aria-pressed` + the toggle's `aria-label` together). Sidebar state (panelDiv / sidebarHostView / toggleButton / sidebarOpen) lives on the per-UI `MountedChatSurfaceState` — `AiChatUIState.java` left untouched. Gating: `shouldShowSidebar(settings, permitted)` = `getEnabledSurfaceSet().contains(SIDEBAR) && isSidebarViewPermitted()` where `isSidebarViewPermitted()` = `UiShowViewContext("AiAgent_Sidebar")` + `accessManager.applyRegisteredConstraints`; disabled/not-permitted = mount-always-then-`setVisible(false)` (mirrors the magic header button — RESEARCH Open Q3). `AiAgent_Sidebar` view id added to AiAgentUserRole.userViews() + AiAgentAdminRole.adminViews(). `@CssImport("./styles/ai-agent-chat.css")` moved onto ChatPanelFragment (REVIEWS #5 — was only on the bubble component, which the MessageList live path never instantiates; the existing bubble-component import stays). CSS (Task 2): `.ai-agent-sidebar` width `clamp(640px, 32vw, 760px)` (REVIEWS #4 — 640px min ⇒ the fragment's 32%-width attachments pane gets ≈205px), `top: var(--lumo-size-xl, 3.5rem)`, `display:none` default; `.ai-agent-sidebar--open`; `.ai-agent-sidebar__header`; `.ai-agent-content--pushed` (`padding-right` matching the clamp); `.ai-agent-sidebar-toggle--active`; `@media (max-width: 768px)` → 100vw overlay + push dropped. No new theme.json / frontend/themes/; no `.ai-agent-status` (deferred → Plan 04); no change to chat-panel-fragment.xml / FULL_ROUTE menu / HEADER_BUTTON dialog logic. New `msg://` keys (en+vi): chatSurfaceMounter.sidebarToggle.ariaLabel.open / .closed, chatSurfaceMounter.sidebarCloser.ariaLabel. SURF-11 "no second ChatService / no second chat memory / no duplicate fragment implementation" holds — same `ChatPanelFragment` CLASS via XML + singleton `ChatService` bean + `AiChatSessionState.currentConversationId` continuity (NOT the same physical fragment object — the sidebar's fragment is a distinct instance, like ChatDialogView's). Proven by ChatSurfaceMounterTest.sidebarUsesTheSameSingletonChatServiceAndExistingFragmentImplementation + ChatPanelFragmentSurfaceSwitchTest.sidebarSurfaceReusesSessionConversationIdForCrossSurfaceContinuity. Two Rule-deviations: reworded a ChatPanelFragment comment to drop the literal token `MessageBubbleComponent` (NoticeRenderTest scans source comments), and added `hs_err_pid*.log`/`replay_pid*.log` to .gitignore (Gradle test-worker crash dumps).
 
+- [Phase 15]: Plan 15-04: in-fragment observability. (1) Status line (OBS-01) — `statusRow` `<span class="ai-agent-status" role="status" aria-live="polite">` appended after `<vaadin-message-list>` in `messageListSlot` (NOT inside a `MessageListItem` — same NOTICE-row sibling trick); neutral typing indicator at turn start, flips to CHAT on the FIRST `Content` event (review #6 — Content implies CHAT regardless of any prior `Activity(RETRIEVAL)`; a later `Activity` still wins), TOOL/RETRIEVAL on `Activity` events; `removeStatusRow()` in `.doOnComplete`/`.doOnError`/`finishStreamInternal()`/`clearMessageList()`/the stop path (via `finishStreamInternal`)/`onDetach` — GONE in every teardown site (review #7), never blanked, never concatenated into the bubble; `Element.setText` (HTML-escaped). (2) Per-turn tool-detail `Details` (OBS-02) — one ordered `Div.ai-agent-turn-activity` appended after `<vaadin-message-list>` holds the collapsed-by-default `<vaadin-details>` per turn with ≥1 tool call (review #2 — a `Details` cannot sit between two `MessageListItem`s); label-only KIND-keyed step rows via `TurnDetailRenderer` (Task 1, committed earlier in `02b2154`) with per-step ms (em-dash `"—"` when unknown, never `"0 ms"`) + an error/rollback indicator. Live turn: `ToolCall`/`ToolResult` (dedup by `toolCallId`)/`Activity(RETRIEVAL)` accumulate into a per-fragment `liveTurnSteps` list capped at 50 (review #12), cleared on every terminal/teardown site (NOT `AiChatSessionState` — OBS-04); on `Final` the disclosure's timings come from a lazy `loadTurnSteps(activeRunId, conversationId)` read of that runId's `AiAuditEvent` TOOL/RETRIEVAL children (review #8 — real `latencyMs`), with the transient arrival-delta steps used only as a fallback. Post-navigation (SPEC req 5 / CONTEXT D-07): after the history-replay `setItems`, `correlateHistoryTurnDetails` loads the conversation's CHAT-root `runId`s (ordered by `startedAt`) + each root's child count via TWO narrow raw-JPQL `loadValues` reads with `.store("agentstore")` (raw `loadValues` does NOT infer the agentstore store — project memory `feedback_jmix_loadvalue_store`; two-query form chosen — a single `left join` on a `@Composition` self-relation is awkward in JPQL), zips them 1:1 against the replayed ASSISTANT turns ONLY when the counts match (else NO disclosures — debug-log, never throw, never guess; review #3), appends a collapsed history `Details` anchored by `runId` only for roots with `childCount > 0` (zero-child roots get NO placeholder); expanding lazily + memoizedly (`TURN_DETAILS_LOADED_KEY` on the `Details`) re-reads that runId's children — collapse+re-expand re-queries nothing (proven by a query-count spy on a delegating `UnconstrainedDataManager` mock — review #13). Constrained-vs-unconstrained decision (RESEARCH Open Q1, confirmed against `AiAuditEventListView`): `AiAgentUserRole` has NO `AiAuditEvent` `EntityPolicy` (Javadoc says so; `AiAuditEventListView` is admin-only) ⇒ all three audit reads use `UnconstrainedDataManager` with a MANDATORY `where e.userUsername = :me and e.conversation.id = :cid` clause (+ `e.runId = :rid` + `e.parent is not null` + a narrow fetch plan: `kind`/`startedAt`/`finishedAt`/`latencyMs`/`outcome`/`errorClass` — no name columns, no LOBs); never `runId`-only unconstrained; the conversation was already ownership-checked at `setConversationIdInternal`. Both paths funnel through `TurnDetailRenderer` (label-only `msg://` keys) — T-15-D1 by construction (TEST-19 in Plan 05 enforces). New `msg://` keys (en+vi): `chatView.status.{neutral,chat,tool,retrieval}`, `chatView.turnDetail.{summary,summaryPending,step.tool,step.retrieval,step.chat,errorIndicator,unknownDuration}`. CSS: `.ai-agent-status` + animated-ellipsis `@keyframes ai-agent-status-pulse` + `@media (prefers-reduced-motion: reduce)` guard; `.ai-agent-turn-activity` + step-row rules — no change to the `.ai-agent-sidebar*` rules Plan 03 added. No new `@Entity`/`@Table`/Liquibase; `AiMessage` / `AiAuditEvent` / `AiChatSessionState` / `chat-panel-fragment.xml` unchanged (`git diff` confirms). Tests (plain JUnit + Mockito, mirroring the existing fragment-test harness — the `accessUi`-wrapped UI mutations need a live UI to run, so the `doOnNext`/history wiring is also asserted via source scan): `ChatPanelFragmentStatusLineTest` (showStatus/removeStatusRow contract, sibling ordering, role/aria-live, removal in `finishStreamInternal`/`clearMessageList`), `ChatPanelFragmentTurnDetailTest` (loadTurnSteps narrow-fetch-plan + mandatory filter, appendTurnDetails one collapsed `Details` with label-only rows + real ms + error indicator + em-dash, same-runId replace, clearMessageList drop, `LIVE_TURN_STEP_CAP == 50`), `ChatPanelFragmentTurnDetailHistoryTest` (matching counts ⇒ Details only for roots with children, no placeholder for zero-child, lazy load once + memoize via query-count spy, count-mismatch ⇒ none + no throw, throwing agentstore swallowed). Full add-on module test green.
+
 ### Performance Metrics
 
 | Phase-Plan | Duration | Tasks | Files | Date |
@@ -319,6 +321,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 15 P01 | ~30min | 2 tasks | 6 files |
 | Phase 15 P02 | 35min | 2 tasks | 8 files |
 | Phase 15 P03 | ~95min | 2 tasks | 12 files |
+| Phase 15 P04 | ~75min | 3 tasks | 8 files |
 
 ### Quick Tasks Completed
 
@@ -328,12 +331,12 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-11T16:28:05.269Z
-**Stopped at:** Completed 15-01-PLAN.md
+**Last session:** 2026-05-12T00:30:00.000Z
+**Stopped at:** Completed 15-04-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases should prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated.
 **Working-tree changes (uncommitted) carried from the v1.1.0 close session:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432; application.properties itself UNCHANGED). Plus pre-existing 14-11 WIP (cancel control, transcript-leak fix, ambiguous-count rules, full-page prefill source-conversation). See 14-HUMAN-UAT.md "Session Handoff - 2026-05-11 (UAT COMPLETE)". (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
-**Next action:** `/gsd-plan-phase 15` (or `/gsd-plan-phase 16` — both independent; 17 is best scoped after 16; **18 must precede 19**; voice input is Phase 20, last). Phase 19 (perf pass) and Phase 20 (Soniox STT) are flagged for `/gsd-research-phase` before planning (safe-caching boundaries for BaselineContextProvider/LlmExposurePolicy/FetchPlanIntersector/RetrievalFilterBuilder; Soniox/OpenAI request shapes).
+**Next action:** `/gsd-execute-phase 15` to run Plan 15-05 (TEST-19 — the Phase-9 leak-regex test over the rendered status text + the per-turn Details rows; plus the NoNewPersistedStateTest / AiChatSessionStateTest invariants), then phase verification. (Phases 16+ independent; 17 best scoped after 16; **18 must precede 19**; voice input is Phase 20, last — its STT error/retry row reuses Phase 15's in-fragment status-row pattern.)
 
 ## Operator Next Steps
 
