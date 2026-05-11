@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
 stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-05-11T15:38:30.374Z"
+last_updated: "2026-05-11T16:28:05.285Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
-  percent: 40
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 15 (right-sidebar-chat-surface-observability-ux) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-05-11
 
@@ -253,6 +253,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 14]: Plan 14-09 is a dependent gap-closure pass for `14-VERIFICATION.md` blockers BL-02 through BL-05; BL-01 was narrowed by user correction so datasource/UI defaults stay in application.properties and only OpenRouter API key remains env-backed. It intentionally adds no new AI tool, entity table, audit kind, Jmix view/menu, or AI-specific exposure layer.
 - [Phase 15]: Plan 15-01: `AiChatSurface.SIDEBAR("SIDEBAR")` added as the third enum constant; `com.vn.agent.entity/AiChatSurface.SIDEBAR` label added to messages_en.properties (`Right sidebar`) + messages_vi.properties (`Thanh bên phải`). No DDL — `ENABLED_SURFACE_IDS`/`DEFAULT_SURFACE` are existing varchar columns (OBS-04 by construction). No production code change beyond the constant + labels: `AiUiSettingsDetailView` already calls `setItems(AiChatSurface.class)` for both the enabled-surface checkbox group and the `defaultSurface` radio group, and `AiUiSettings#enabledSurfaceIds` default already delegates to `EnumSet.allOf(AiChatSurface.class)`. RESEARCH Open Q2 resolved: `createDefaultSettings()` stays `EnumSet.allOf` so fresh installs ship all three surfaces enabled; `defaultSurface` stays `FULL_ROUTE` — the side panel starts closed (D-04), so enabled-by-default only means the navbar toggle is present (parity with HEADER_BUTTON). Tests-only changes: extended AiUiSettingsModelTest + AiUiSettingsDetailViewTest, and updated default-seed assertions in AiUiSettingsDetailViewTest + AiUiSettingsServiceSingletonTest to include SIDEBAR. Plan 03 (`ChatSurfaceMounter`) can now gate the side-panel mount on `getEnabledSurfaceSet().contains(AiChatSurface.SIDEBAR)`.
 - [Phase ?]: Phase 15: Activity(CHAT) is NOT emitted from the orchestration edge (review point #11); DefaultChatServiceImpl unchanged, UI derives CHAT from the first Content event
+- [Phase 15]: Plan 15-03: SIDEBAR chat surface mounted by ChatSurfaceMounter through a new lean Jmix host view `AiAgentSidebarView` (`@ViewController("AiAgent_Sidebar")`, `ai-agent-sidebar-view.xml` = a single `<fragment id=chatPanelFragment class=...ChatPanelFragment/>` — NO new fragment subclass; syncs `setConversationId` from `AiChatSessionState` on BeforeShow/Ready, mirroring ChatDialogView). The host view is created via `views.create(AiAgentSidebarView.class)` and SHOWN via `views.create(...)` + `panelDiv.getElement().appendChild(sidebarView.getElement())` + `ViewControllerUtils.fireEvent(new View.BeforeShowEvent(v))` then `ViewControllerUtils.fireEvent(new View.ReadyEvent(v))` (chosen over a DialogWindow wrapper — the `<vaadin-dialog>` overlay doesn't live inside an arbitrary Div and brings modality machinery; the `fireEvent` path drives the non-routed view's lifecycle and ReadyEvent propagates to the fragment's `@Subscribe onReady` via `Fragment.onHostReadyInternal`; no modal curtain). The panel is a `position:fixed` `Div.ai-agent-sidebar` appended to `UI.getCurrent().getElement()` (NOT the AppLayout content slot — survives navigation; re-asserted on `AfterNavigationEvent` along with the push class + toggle visibility), containing a `Div.ai-agent-sidebar__header` close button + the host view. A far-right navbar toggle `aiAgentSidebarToggleButton` (VaadinIcon.PANEL, LUMO_TERTIARY+LUMO_ICON, `aria-pressed` + `.ai-agent-sidebar-toggle--active`) and the in-panel closer both route through one `toggleSidebar(ui)` (flips `--open` + `ai-agent-content--pushed` + `--active` + `aria-pressed` + the toggle's `aria-label` together). Sidebar state (panelDiv / sidebarHostView / toggleButton / sidebarOpen) lives on the per-UI `MountedChatSurfaceState` — `AiChatUIState.java` left untouched. Gating: `shouldShowSidebar(settings, permitted)` = `getEnabledSurfaceSet().contains(SIDEBAR) && isSidebarViewPermitted()` where `isSidebarViewPermitted()` = `UiShowViewContext("AiAgent_Sidebar")` + `accessManager.applyRegisteredConstraints`; disabled/not-permitted = mount-always-then-`setVisible(false)` (mirrors the magic header button — RESEARCH Open Q3). `AiAgent_Sidebar` view id added to AiAgentUserRole.userViews() + AiAgentAdminRole.adminViews(). `@CssImport("./styles/ai-agent-chat.css")` moved onto ChatPanelFragment (REVIEWS #5 — was only on the bubble component, which the MessageList live path never instantiates; the existing bubble-component import stays). CSS (Task 2): `.ai-agent-sidebar` width `clamp(640px, 32vw, 760px)` (REVIEWS #4 — 640px min ⇒ the fragment's 32%-width attachments pane gets ≈205px), `top: var(--lumo-size-xl, 3.5rem)`, `display:none` default; `.ai-agent-sidebar--open`; `.ai-agent-sidebar__header`; `.ai-agent-content--pushed` (`padding-right` matching the clamp); `.ai-agent-sidebar-toggle--active`; `@media (max-width: 768px)` → 100vw overlay + push dropped. No new theme.json / frontend/themes/; no `.ai-agent-status` (deferred → Plan 04); no change to chat-panel-fragment.xml / FULL_ROUTE menu / HEADER_BUTTON dialog logic. New `msg://` keys (en+vi): chatSurfaceMounter.sidebarToggle.ariaLabel.open / .closed, chatSurfaceMounter.sidebarCloser.ariaLabel. SURF-11 "no second ChatService / no second chat memory / no duplicate fragment implementation" holds — same `ChatPanelFragment` CLASS via XML + singleton `ChatService` bean + `AiChatSessionState.currentConversationId` continuity (NOT the same physical fragment object — the sidebar's fragment is a distinct instance, like ChatDialogView's). Proven by ChatSurfaceMounterTest.sidebarUsesTheSameSingletonChatServiceAndExistingFragmentImplementation + ChatPanelFragmentSurfaceSwitchTest.sidebarSurfaceReusesSessionConversationIdForCrossSurfaceContinuity. Two Rule-deviations: reworded a ChatPanelFragment comment to drop the literal token `MessageBubbleComponent` (NoticeRenderTest scans source comments), and added `hs_err_pid*.log`/`replay_pid*.log` to .gitignore (Gradle test-worker crash dumps).
 
 ### Performance Metrics
 
@@ -317,6 +318,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 14 P08 | 2h 29m | 5 tasks | 6 files |
 | Phase 15 P01 | ~30min | 2 tasks | 6 files |
 | Phase 15 P02 | 35min | 2 tasks | 8 files |
+| Phase 15 P03 | ~95min | 2 tasks | 12 files |
 
 ### Quick Tasks Completed
 
@@ -326,7 +328,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-11T15:37:56.366Z
+**Last session:** 2026-05-11T16:28:05.269Z
 **Stopped at:** Completed 15-01-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases should prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated.
