@@ -36,7 +36,7 @@ Full detail: [milestones/v1.1.0-ROADMAP.md](milestones/v1.1.0-ROADMAP.md) · req
 
 Six near-independent feature areas layered on the shipped v1.1 agent harness with effectively zero new runtime dependencies. Hard ordering constraint: **Phase 18 (mutation-internals hardening) must precede Phase 19 (perf pass)** — the perf pass refactors the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated sequence. Phase 15 touches the chat surface mounter and `ChatPanelFragment`; Phase 16 is admin configuration UI only. Phase 17 is best scoped after Phase 16 so its config-knob migration covers the model-picker knobs in the same `AiParameters`/`AiUiSettings` schema design. Voice input (Phase 20) lands last in the milestone: it reuses Phase 15's in-fragment streaming-status-row pattern for its error/retry row. Phases 18/19 (the "invisible" passes) can run in parallel with 15/16/17.
 
-- [ ] **Phase 15: Right-Sidebar Chat Surface & Observability UX** — `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus ephemeral streaming-status line and collapsed-by-default per-turn tool-detail disclosure driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree. Resolves the pending collapsible-tool-detail / ephemeral-status todo. The chat-state side panel is deferred.
+- [x] **Phase 15: Right-Sidebar Chat Surface & Observability UX** — `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus ephemeral streaming-status line and collapsed-by-default per-turn tool-detail disclosure driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree. Resolves the pending collapsible-tool-detail / ephemeral-status todo. The chat-state side panel is deferred. (All 5 plans complete 2026-05-12; TEST-19 leak gate + locale-completeness + no-DDL structural tests in place — ready for verification.)
 - [ ] **Phase 16: Admin Model Management** — Curated open-weights model `ComboBox` + custom free-entry in the admin Parameters view; admin-only; flows to per-request `ChatOptions`; validate at use time.
 - [ ] **Phase 17: Admin Config-Knob Migration** — Three-tier knob taxonomy: Tier-1 runtime knobs (RAG top-k / similarity threshold / task-file token budget / TTL / migrated model-picker knobs) become editable `AiParameters`/`AiUiSettings`; Tier-2 boot toggles shown read-only with a "requires restart" note; Tier-3 secrets shown as "configured: yes/no" only. Publishes an `AiParameters` change event for cache eviction.
 - [ ] **Phase 18: Mutation-Internals Hardening (Phase 11 follow-up)** — Extract the canonical `MutationGateChain`; batch-load to-one FK refs via constrained `DataManager` `IN(...)`; memoize related-write metadata. Byte-for-byte behavior-identical; Phase 9/10/11 mutation test suites pass unchanged. Promotes Backlog 999.1.
@@ -70,7 +70,7 @@ Plans:
 - [x] 15-04-PLAN.md — Ephemeral KIND-keyed streaming-status line (neutral->CHAT-on-first-Content) + collapsed per-turn tool-detail Details in a grouped .ai-agent-turn-activity block + capped live state + child-count-aware AiAuditEvent correlation + lazy/memoized AiAuditEvent re-read (real timings on Final) + TurnDetailRenderer mapper
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
+- [x] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
 **UI hint**: yes
 
 ### Phase 16: Admin Model Management
@@ -145,7 +145,7 @@ Plans:
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 4/5 | In Progress|  |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 5/5 | Complete — ready for verification | 2026-05-12 |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |

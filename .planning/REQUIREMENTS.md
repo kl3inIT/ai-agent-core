@@ -54,7 +54,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 ### Testing & Safety (cross-cutting)
 
 - [ ] **TEST-18**: STT coverage — the `STT_TRANSCRIPTION` audit row is asserted in both hash-default and `store-transcript=true` modes; a source-scan test asserts the `com.vn.agent.stt` package has zero reference to `ChatService`; a default-config boot test asserts no STT beans and no mic button.
-- [ ] **TEST-19**: Chat-observability leak test — the streaming-status line and the per-turn tool-detail disclosure never emit internal `@Tool` method names or raw entity names (reuses the Phase 9 leak-guard pattern packs at the UI layer).
+- [x] **TEST-19**: Chat-observability leak test — the streaming-status line and the per-turn tool-detail disclosure never emit internal `@Tool` method names or raw entity names (reuses the Phase 9 leak-guard pattern packs at the UI layer). *(`ObservabilityLeakTest` — Plan 15-05; reuses `ToolNamePatternProvider` / `HostPrefixPatternProvider` verbatim against the `TurnDetailRenderer` mapper output AND a real rendered `ChatPanelFragment`'s `<span.ai-agent-status>` + `Details` step-row, with a passing negative control.)*
 - [ ] **TEST-20**: Curated-model allowlist test — every model id in the curated dropdown catalog is on a self-hostable open-weights allowlist (comment references `project_self_hostable_models_only.md`).
 - [ ] **SEC-08**: Config-knob secret denylist — a test asserts no `*.api-key` (or other secret) property is surfaced as an editable or displayed admin setting, and boot-time `@ConditionalOnProperty` toggles are not presented as runtime-editable.
 
@@ -110,7 +110,7 @@ Which phases cover which requirements.
 | OBS-01 | Phase 15 | Complete |
 | OBS-02 | Phase 15 | Complete |
 | OBS-04 | Phase 15 | Complete |
-| TEST-19 | Phase 15 | Pending |
+| TEST-19 | Phase 15 | Complete |
 | MODEL-01 | Phase 16 | Pending |
 | MODEL-02 | Phase 16 | Pending |
 | MODEL-03 | Phase 16 | Pending |
