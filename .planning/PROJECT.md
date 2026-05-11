@@ -2,42 +2,28 @@
 
 ## What This Is
 
-A reusable, enterprise-grade AI Copilot add-on for Jmix applications. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, and ships a built-in Flow UI (chat, conversations, parameters, knowledge base, audit). Hosts extend it through SPIs — custom tools, prompts, context providers, guards, custom ingesters, and audit listeners — without forking. (AI-specific exposure-policy SPI dropped per D-10; Jmix `AccessManager` is authoritative.)
+A reusable, enterprise-grade AI Copilot add-on for Jmix applications. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via the Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, can (opt-in) perform Jmix-secured create/update/related-write mutations, can read attached files directly (multimodal), can extract structured drafts that open prefilled Jmix detail views after user confirmation, and ships a built-in Flow UI (chat — full route or header-button dialog — conversations, parameters, knowledge base, exposure rules, vector-store debug, audit). Admins can narrow the LLM-visible surface below the current user's Jmix permissions via an entity-level exposure denylist. Hosts extend it through SPIs — custom tools, prompts, context providers, guards, mutation guards, fetch-plan customizers, intent extractors, custom ingesters, audit listeners — without forking.
 
 ## Core Value
 
 **Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.**
 
-If everything else fails, the MVP's read-only Q&A-over-host-entities-plus-documents flow must work with Jmix security enforced end-to-end.
+The non-negotiable floor: read-only Q&A over host entities + documents must work with Jmix security enforced end-to-end. Everything beyond that (mutations, file read, intent extraction, multi-surface UI) is opt-in and stays behind the same Jmix `AccessManager` enforcement boundary.
 
 ## Current State
 
-**Shipped version:** v1.0.0 MVP on 2026-04-26
+**Shipped versions:** v1.0.0 MVP (2026-04-26) · v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (2026-05-11, via PR #28).
 
-The MVP is now a working Jmix add-on spanning packaging, secured metadata tools, Spring AI orchestration, RAG, guardrails, Flow UI, audit tree, release documentation, and GitHub Actions CI. The branch shipped through PR #3 and CI passed on `main`.
+v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi-surface copilot without new core dependencies: prompt/tool-contract hardening (`agent.entities`/`agent.permissions` baseline, leak guards, `unknown_entity` retry), an admin LLM-exposure denylist (`AiExposureRule` + `LlmExposurePolicy`, uniform `unknown_entity` opacity), opt-in built-in mutation tools (layered fail-closed gating, idempotency, PII-safe errors, full audit), configurable chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` over one `ChatPanelFragment`, cross-surface continuity), chat task files (transient, attach + multimodal `Media` read + `bulk_save_records`, default model swap to Apache-2.0 `qwen/qwen3.6-35b-a3b`, CRM-style right-pane with per-turn-all injection), and intent-driven extraction → prefilled Jmix forms (`IntentExtractor<T>` SPI, `prepare_form_draft` / `propose_action_choices`, controller-side-only navigation, permission-gated prefill). Milestone audit: integration + E2E PASS; status `tech_debt` for bookkeeping (see below).
 
-**In progress:** v1.1.0 milestone — Phase 9 prompt-contract/tool-layer hardening is complete; Phase 10 AI-specific exposure governance is next, followed by mutation-capable built-in tools and configurable chat surfaces.
+**Carried debt (not blockers):**
+- Phase 10 `10-VERIFICATION.md` is still `human_needed` — goal achieved (4/4 ROADMAP criteria, 12/12 REQ IDs); the substantive REVIEW items (BLOCKER-01/02, WARNING-08) are fixed in code; visual-UI checks + WARNING-01 (RAG partial-failure window) never formally recorded. Optional `/gsd-verify-work 10`.
+- Nyquist `*-VALIDATION.md` exists only for Phase 14; backfill phases 9/10/11/12/13/13.1 with `/gsd-validate-phase` (v1.2 hardening pass).
+- Clean-consumer smoke (PKG-05 / TEST-07) still deferred from v1.0.0 Plan 08-05 — needs PostgreSQL/pgvector Testcontainers OR a starter-provided stub `VectorStore` boot mode.
 
-**Known production caveat:** the clean-consumer smoke requirement remains deferred. Plan 08-05 proved that a minimal consumer needs PostgreSQL/pgvector or a starter-provided stub VectorStore boot mode before the smoke can be made honest. Explicitly OUT of scope for v1.1; revisit in a later milestone.
+## Next Milestone: v1.2 (not started)
 
-## Current Milestone: v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces
-
-**Goal:** Harden prompt/tool contracts, expand built-in tools to safe Jmix-secured mutations, give admins governance over the LLM-visible surface, and ship configurable chat surfaces (full / sidebar / floating).
-
-**Target features:**
-
-- Prompt-contract hardening — readable entity inventory in baseline context, internal tool/entity names hidden from user-facing chat, deterministic `unknown_entity` retry contract.
-- Tool-layer refinements — richer `describe_entity` wrapper with selected Jmix metadata, host-controlled fetch-plan override SPI, LLM permission inventory at entity + attribute level.
-- Mutation-capable built-in tools — create / update / related-write tools layered over `DataManager`, gated by Jmix `AccessManager` CRUD + attribute policies, opt-in by host configuration, audited end-to-end.
-- AI-specific LLM exposure policy (SEED-007 activated) — admin-governed layer that narrows the LLM-visible surface BELOW the user's Jmix permissions; entity + attribute denylist/allowlist with Flow UI.
-- Chat task input — speech-to-text and task-scoped file attachment in chat, separate lifecycle from KB upload.
-- Intent-driven extraction → prefilled Jmix forms — intent-first workflow producing a structured draft that opens a Jmix form with prefilled data after user confirmation.
-- Configurable chat surfaces (SEED-005 activated, refined) — three presentation surfaces over the same backend and reusable `ChatPanelFragment` (full `ChatView`, right-sidebar chat, floating launcher) with admin-controlled toggle for which surfaces are enabled/visible.
-
-**Explicitly OUT of scope for v1.1:**
-
-- Collapsible per-turn tool-detail panel + ephemeral streaming-status component in chat UI (deferred — small UX polish, not blocking).
-- Clean-consumer smoke (PKG-05 / TEST-07) — Plan 08-05 carryover; deferred.
+Run `/gsd-new-milestone` to define it, then `/gsd-review-backlog` to pull in Backlog items. Likely scope: Phase 15 — Chat Voice Input · Soniox STT (deferred from v1.1; ROADMAP Backlog → Phase 999.2); Phase 10 re-verification + Nyquist `*-VALIDATION.md` backfill; Phase 11 mutation-internals hardening (ROADMAP Backlog → Phase 999.1); PKG-05/TEST-07 clean-consumer smoke; possibly the collapsible per-turn tool-detail panel + ephemeral streaming-status indicator.
 
 ## Requirements
 
@@ -51,25 +37,27 @@ The MVP is now a working Jmix add-on spanning packaging, secured metadata tools,
 - ✓ pgvector RAG ingestion/retrieval with role-scoped filters and document lifecycle operations — v1.0.0
 - ✓ Built-in Flow UI for chat, conversations, parameters, knowledge base, and audit — v1.0.0
 - ✓ Release readiness: operator README, CHANGELOG 1.0.0, CI workflows, and Phase 8 regression bars green — v1.0.0
-- ✓ Prompt-contract hardening: baseline `agent.entities` / `agent.permissions`, internal vocabulary guardrails, deterministic `unknown_entity` retry contract, output scanner pattern packs, and cross-locale prompt-contract tests — Phase 9
-- ✓ Tool-layer refinements: richer `describe_entity`, host fetch-plan override SPI, ACL-intersected fetch plans, prompt-safe record envelope, and LLM permission inventory — Phase 9
+- ✓ Prompt-contract hardening: baseline `agent.entities` / `agent.permissions`, internal vocabulary guardrails, deterministic `unknown_entity` retry contract, output scanner pattern packs, and cross-locale prompt-contract tests — v1.1.0 / Phase 9 (PROMPT-01..06, TEST-08)
+- ✓ Tool-layer refinements: richer `describe_entity` via `MetadataTools`, host fetch-plan override SPI (`ToolFetchPlanCustomizer`), ACL-intersected fetch plans (projection, not security), prompt-safe record envelope — v1.1.0 / Phase 9 (TOOL-09..12, SPI-09)
+- ✓ AI-specific LLM exposure policy: admin-governed entity-level `EXCLUDE` denylist (`AiExposureRule` + `LlmExposurePolicy`, composition `userVisible AND NOT excluded`), uniformly enforced across schema discovery / tool calls / baseline prompt / RAG; uniform `unknown_entity` opacity; admin Flow UI; `LlmExposureChangedEvent` — v1.1.0 / Phase 10 (EXP-01..10, ENT-05, SEC-05 partial, TEST-09) (activated SEED-007)
+- ✓ Mutation-capable built-in tools: opt-in `create_record` / `update_record` / `add_related_record` / `remove_related_record` over `DataManager`, layered fail-closed gating (`AiAgentMutationRole` → exposure → `AccessManager` entity+attribute → `AiMutationIntent` idempotency → `MutationGuard` SPI → `@Transactional` save), PII-safe `MutationErrorTranslator`, end-to-end audit incl. rollback; always-on `BuiltInLinkTools` (deep links) — v1.1.0 / Phase 11 (MUT-01..12, ENT-09, AUD-06, AUD-07, SEC-07, SPI-10, TEST-10..13)
+- ✓ Configurable chat surfaces: `FULL_ROUTE` `ChatView` + `HEADER_BUTTON` `ChatDialogView` over one `ChatPanelFragment`, `AiUiSettings` admin toggle, `ChatSurfaceMounter`, `AiChatSessionState` cross-surface conversation continuity, async auto-titled conversations — v1.1.0 / Phase 12 (SURF-01..10, ENT-06, SEC-05 partial, TEST-14) (activated SEED-005; floating-launcher corner placement deferred → SURF-11)
+- ✓ Chat task file: `AiTaskFile` transient entity (structurally disjoint from KB ingestion), attach UI, Spring AI `Media` injection, `bulk_save_records` tool (one transaction, batch idempotency), default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache-2.0, self-hostable) — v1.1.0 / Phase 13 (TASK-01..06, ENT-07, MUT-14, SEC-06 partial, TEST-16)
+- ✓ Chat attachments CRM-style right-pane + persistent multi-turn context: jmix-crm right-pane port (card grid + drop-zone + empty state), per-turn-all `Media` injection with LRU token-budget cap + `task_file_budget_exceeded` audit, conversation-scoped 24h TTL, inline `[user] added attachment` notice rows — v1.1.0 / Phase 13.1 (UI-01, RES-01, AUDIT-01, LIFE-01, UX-01, SCHEMA-01, CONTRACT-01, TEST-16-PORT, I18N-01)
+- ✓ Intent-driven extraction → prefilled Jmix forms: `IntentExtractor<T>` SPI + `IntentRegistry` + prompt-only `MetaClassDtoSynthesizer`, persisted `AiExtractionDraft` (owner-scoped, TTL, hidden from the LLM), `prepare_form_draft` + server-validated `propose_action_choices` tools, chat-rendered confirm/action rows, controller-side-only navigation (`OpenFormWithDraftHandler`), permission-gated `setValueIfPermitted` prefill, host `CustomerDraftIntentExtractor` reference; LLM never receives `ViewNavigators` or any UI-mutation primitive — v1.1.0 / Phase 14 (EXTRACT-01..10, ENT-08, SPI-12, SEC-06 partial, TEST-15)
 
-### Active (v1.1.0 — being defined)
+### Active
 
-Detailed REQ-IDs are produced by the v1.1 requirements gathering step that follows; this list previews the high-level commitments:
+(None — v1.1.0 closed 2026-05-11. Next milestone v1.2 will be defined fresh via `/gsd-new-milestone`; see Backlog in `ROADMAP.md`.)
 
-- [x] Prompt-contract hardening: readable entity inventory in baseline context, hide internal tool/entity names from user-facing chat, enforce `unknown_entity` retry contract. Validated in Phase 9.
-- [x] Tool-layer refinements: richer `describe_entity` wrapper, host-override SPI for tool fetch plans, LLM permission inventory (entity + attribute level). Validated in Phase 9.
-- [ ] Mutation-capable built-in tools: create / update / related-write under `DataManager`, gated by Jmix `AccessManager` policies, opt-in per host, audited.
-- [ ] AI-specific LLM exposure policy: admin-governed denylist/allowlist that narrows the LLM-visible surface beneath the user's Jmix permissions, with Flow UI.
-- [ ] Chat task input: speech-to-text and task-scoped file attachment, separate from KB ingestion.
-- [ ] Intent-driven extraction → prefilled Jmix forms: intent-first workflow with confirmed UI navigation and form prefill.
-- [ ] Configurable chat surfaces: full `ChatView`, right-sidebar chat, floating launcher; admin toggle for which are enabled/visible.
+### Deferred (carried to v1.2+)
 
-### Deferred (not in v1.1)
-
-- [ ] Clean-consumer smoke (PKG-05 / TEST-07): Plan 08-05 carryover from v1.0.0. Either Postgres/pgvector Testcontainers smoke or a starter stub VectorStore boot mode. Revisit in a later milestone.
-- [ ] Collapsible per-turn tool-detail panel + ephemeral streaming-status indicator in chat UI: secondary UX polish; deferred to a later milestone.
+- [ ] **Chat Voice Input · Soniox STT** (`STT-01..06`, `SPI-11`, `TEST-17`) — was Phase 15 of v1.1, sequenced last ("nice to have"), deferred 2026-05-11. Browser `MediaRecorder` capture + custom Spring `RestClient` Soniox provider + `TranscriptionService` strategy (+ optional OpenAI fallback) + `TranscriptionPostProcessor` SPI + privacy-safe `STT_TRANSCRIPTION` audit. See `ROADMAP.md` Backlog → Phase 999.2 and `milestones/v1.1.0-REQUIREMENTS.md` "Deferred to v1.2".
+- [ ] **Phase 11 mutation-internals hardening** — refactor duplicated mutation gate sequencing, batch-load to-one FK refs during binding, cache related-write metadata. See `ROADMAP.md` Backlog → Phase 999.1.
+- [ ] **Phase 10 re-verification + Nyquist backfill** — `/gsd-verify-work 10` to flip the stale `human_needed` status; `/gsd-validate-phase` for phases 9/10/11/12/13/13.1 (no `*-VALIDATION.md`).
+- [ ] **Clean-consumer smoke (PKG-05 / TEST-07)** — Plan 08-05 carryover from v1.0.0. Postgres/pgvector Testcontainers smoke OR a starter stub `VectorStore` boot mode.
+- [ ] **Collapsible per-turn tool-detail panel + ephemeral streaming-status indicator** in chat UI — secondary UX polish.
+- [ ] **Attribute-path-level exposure rules** (vs. entity-level only) — `attributePath` field on `AiExposureRule`; deferred per user decision 2026-04-27.
 
 ### Out of Scope
 
@@ -101,16 +89,16 @@ Detailed REQ-IDs are produced by the v1.1 requirements gathering step that follo
 
 ## Constraints
 
-- **Tech stack**: Jmix 2.8 + Spring Boot 3 + Vaadin Flow + Java 17 — fixed by host ecosystem
-- **Spring AI version**: 1.1.4 — pinned via BOM (upgraded between Phase 1 wave start and Phase 2 start per D-10; STACK.md updated accordingly)
+- **Tech stack**: Jmix 2.8 + Spring Boot 3 + Vaadin Flow + Java 21 — fixed by host ecosystem (toolchain moved to Java 21 during v1.1; some older docs/AGENTS.md still say 17)
+- **Spring AI version**: 1.1.x — pinned via BOM (upgraded per D-10; verify current syntax via Context7/official docs, not training data)
 - **Vector store default**: pgvector — reuses Postgres infra familiar to Jmix enterprise deployments
-- **Data access**: `DataManager` only — `EntityManager` forbidden by project conventions and breaks Jmix security model
+- **Data access**: `DataManager` only — `EntityManager` forbidden by project conventions and breaks Jmix security model. System-internal writes (audit, idempotency, cleanup, exposure-rule reads, task-file resolution) use `UnconstrainedDataManager`; the regular `DataManager` is used for everything user-attributable, including LLM-driven mutations.
 - **Entities**: No Lombok on entities; UUID + `@JmixGeneratedValue` + `@Version` + `@InstanceName`; instantiate via `Metadata.create()` / `DataManager.create()`
-- **Security**: Jmix roles + data security is the single enforcement layer (per D-10 / MEMORY "AI is just another Jmix client"). No AI-specific exposure layer in v1; revisit only if a concrete "AI must see less than user" use case surfaces.
+- **Security**: Jmix roles + data security is the primary enforcement layer ("AI is just another Jmix client"). As of v1.1.0 there is **also** an admin-governed AI-specific exposure layer (`AiExposureRule` / `LlmExposurePolicy`, entity-level `EXCLUDE` only) that can narrow the LLM-visible surface **below** the current user's Jmix permissions — it never widens, and `AccessManager` remains authoritative for actual data access. Mutations require an explicit `AiAgentMutationRole` marker + host `ai-agent.tools.mutation.enabled=true` + normal Jmix CRUD/attribute policies. The LLM never receives `ViewNavigators` or any UI-mutation primitive.
 - **Packaging**: Must be distributable as Maven artifacts; no internal Jmix APIs; starter auto-configuration conventions
-- **Safety**: Read-only default; all tool calls auditable; mutations require explicit host opt-in
+- **Safety**: Read-only default; mutation tools default OFF (`@ConditionalOnProperty`, boot test asserts zero mutation callbacks under default config); `delete_record` reserved (absent even when mutations enabled); all tool calls auditable via `AuditWriter.writeToolCall` with no new `AuditKind`
 - **Testing**: Live LLM tests must be opt-in and excluded from default CI (cost + flakiness)
-- **UI**: Vaadin Flow server-side; all labels via `msg://` keys in `messages*.properties` (per `CLAUDE.md`)
+- **UI**: Vaadin Flow server-side, Jmix XML view descriptors + Jmix components by default; all labels via `msg://` keys in ALL locale bundles (`messages.properties` + `messages_*.properties`), per `CLAUDE.md`
 
 ## Key Decisions
 
@@ -124,7 +112,14 @@ Detailed REQ-IDs are produced by the v1.1 requirements gathering step that follo
 | Read-only MVP (6 generic tools, no mutations) | Safety + scope control; mutation SPI scaffolded for later opt-in | ✓ Good |
 | MVP UI: Chat + Conversations + Parameters + KB + Audit | Full admin suite modeled on `jmix-ai-backend` reference; "plug and play" requires no external tools | ✓ Good |
 | Any authenticated user gets Chat; admin role gates settings | Low friction for end-users; safe defaults for governance | ✓ Good |
-| File upload only for KB ingestion in v1 | Covers enterprise doc flows; URL crawling/entity auto-ingest deferred | ✓ Good |
+| File upload only for KB ingestion in v1.0 | Covers enterprise doc flows; URL crawling/entity auto-ingest deferred | ✓ Good |
+| **v1.1**: AI-specific exposure layer reinstated as admin governance (`AiExposureRule`, entity-level `EXCLUDE` only; `attributePath` deferred) | A concrete "AI must see less than user" need surfaced; `EXCLUDE`-only shape prevents widening; composition stays `userVisible AND NOT excluded` | ✓ Good |
+| **v1.1**: Mutation tools ship default-OFF behind `@ConditionalOnProperty` + `AiAgentMutationRole` marker; `delete_record` reserved | Safety; opt-in is per-host; destructive ops need separate confirmation/undo UX | ✓ Good |
+| **v1.1**: Two chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` Jmix `DialogWindow`); floating raw-Vaadin launcher + `SIDEBAR` + compact mode deferred | Jmix `DialogWindow` participates in the normal overlay stack (kills the old P-21 stacking problem); two surfaces cover the demand | ✓ Good |
+| **v1.1**: Chat task files are transient, structurally disjoint from KB ingestion; default chat model swapped to multimodal `qwen/qwen3.6-35b-a3b` (Apache-2.0) | File-read-then-act needs a multimodal model; self-host constraint requires open-weights; KB/`VectorStore` must stay untouched (TEST-16) | ✓ Good |
+| **v1.1**: Per-turn-all `Media` injection (13.1) with a mandatory LRU token-budget cap, replacing 13's single-turn injection | "AI agent thực thụ" multi-turn follow-up requires the file to stay in context; cap prevents context blowout on multi-file conversations | ✓ Good |
+| **v1.1**: Intent extraction never gives the LLM `ViewNavigators`/UI-mutation primitives; `prepare_form_draft` returns a structured payload, controller navigates after `AccessManager` view check; prefill is `setValueIfPermitted` only | Keeps the LLM out of UI control; Jmix detail-view validation + security remain the authority for the eventual Save (TEST-15 scanner enforces) | ✓ Good |
+| **v1.1**: Strict-mode extraction is prompt-only (`MetaClassDtoSynthesizer` emits schema text, no runtime DTO bytecode for host metamodels) | Avoids generating runtime classes; works with any host metamodel | ✓ Good |
 
 ### Deferred Decisions
 
@@ -152,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-27 — Phase 9 complete; Phase 10 next*
+*Last updated: 2026-05-11 — after v1.1.0 milestone (Prompt Hardening, Mutation Tools & Configurable Chat Surfaces) shipped*

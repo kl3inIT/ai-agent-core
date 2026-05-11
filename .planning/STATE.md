@@ -1,40 +1,41 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1.0
-milestone_name: milestone
-status: Phase 14 merged (PR #28). Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 → ROADMAP Backlog 999.2. Ready to run /gsd-complete-milestone 1.1
-stopped_at: "v1.1.0 closing — Phases 9-14 + 13.1 done; Phase 15 deferred to v1.2 (Backlog 999.2); awaiting /gsd-audit-milestone 1.1 then /gsd-complete-milestone 1.1"
-last_updated: "2026-05-11T00:00:00.000Z"
+milestone_name: "Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (shipped 2026-05-11)"
+status: Awaiting next milestone — run /gsd-new-milestone for v1.2
+stopped_at: "v1.1.0 closed and archived 2026-05-11"
+last_updated: "2026-05-11T09:30:00.000Z"
+last_activity: 2026-05-11 — Milestone v1.1.0 completed and archived; Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 Backlog (Phase 999.2)
 progress:
   total_phases: 7
   completed_phases: 7
-  total_plans: 63
-  completed_plans: 63
+  total_plans: 62
+  completed_plans: 62
   percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-05-08
+**Last updated:** 2026-05-11
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-04-26 — v1.1.0 milestone started)
+See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Closing v1.1.0 — run `/gsd-audit-milestone 1.1` then `/gsd-complete-milestone 1.1`. Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 (ROADMAP Backlog → Phase 999.2).
+**Current focus:** v1.1.0 shipped and archived. No active milestone — run `/gsd-new-milestone` to start v1.2 (likely scope: Phase 15 STT from Backlog 999.2, Phase 10 re-verification + Nyquist backfill, Phase 11 mutation-internals hardening from Backlog 999.1, PKG-05/TEST-07 clean-consumer smoke).
 
 ## Current Position
 
-Milestone: v1.1.0 — ALL DELIVERED PHASES COMPLETE (9, 10, 11, 12, 13, 13.1, 14); merged via PR #28. Phase 15 deferred to v1.2.
-Next: `/gsd-audit-milestone 1.1` → `/gsd-complete-milestone 1.1` → (v1.2) `/gsd-new-milestone`
+Milestone: v1.1.0 — COMPLETE & ARCHIVED (2026-05-11). No active phase.
+Next: `/gsd-new-milestone` → `/gsd-review-backlog`
 | Field | Value |
 |-------|-------|
-| Phase | v1.1.0 closing (no active phase) |
-| Plan | n/a |
-| Status | Phase 14 merged (PR #28); Phase 15 deferred to v1.2 (Backlog 999.2); ready for /gsd-complete-milestone 1.1 |
-| Last activity | 2026-05-11 — Merged PR #28 (Phase 14); fixed CI (ActionProposalServiceTest) + applied 6 code-review WARNING fixes; deferred Phase 15 → v1.2 Backlog; synced local main |
+| Milestone | v1.1.0 (shipped, archived) |
+| Phase | none active |
+| Status | Awaiting next milestone (v1.2) |
+| Last activity | 2026-05-11 — v1.1.0 closed: ROADMAP/REQUIREMENTS/MILESTONE-AUDIT archived to `milestones/v1.1.0-*`, PROJECT.md evolved, ROADMAP collapsed, REQUIREMENTS.md removed (fresh for v1.2), retrospective updated, tagged `v1.1.0` |
 
 ## Phase Status
 
@@ -77,6 +78,26 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 - Intent-driven extraction → prefilled Jmix forms — Phase 14.
 
 **Out of scope for v1.1:** collapsible tool-detail panel + ephemeral streaming-status indicator (deferred); clean-consumer smoke / PKG-05 / TEST-07 (Plan 08-05 carryover, deferred).
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.1.0 milestone close on 2026-05-11 (carried into v1.2 / backlog — NOT v1.1 gaps):
+
+| Category | Item | Status | Disposition |
+|----------|------|--------|-------------|
+| quick_task | 260427-9ci-add-a-read-only-jmix-admin-ui-view-to-in | complete (commit 6a39184) | Done — `BaselineContextView` admin diagnostic view; scanner mis-flags it as "missing" because the file lives in a subdir. No action needed. |
+| todo | 2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui | pending | Deferred — out of v1.1 scope per ROADMAP "Out of Scope" (UX polish). Revisit in v1.2+ if signal warrants. |
+| seed | SEED-001 reviewed-learning-loop-for-agent-failures | dormant | Still dormant — needs production-incident corpus. |
+| seed | SEED-002 pre-deploy-answer-quality-regression-gate | dormant | Still dormant — activate when v1.1 prompt rules produce signal. |
+| seed | SEED-003 outputscanner-spi | dormant | Still dormant — config-driven regex scanner sufficient. |
+| seed | SEED-004 replay-and-diff-runner-for-chat-cases | dormant | Still dormant — pairs with SEED-002. |
+| seed | SEED-006 strict-file-backed-knowledge-path | dormant | Still dormant — needs retrieval-drift trigger. |
+| seed | SEED-008 jpql-analytics-tool-with-attribute-level-acl | dormant | Still dormant — future tool surface. |
+| uat_gap | 09-UAT.md / 13-HUMAN-UAT.md / 13.1-UAT-FIX-01-SUMMARY.md / 14-HUMAN-UAT.md / 14-UAT-CHECKLIST.md | resolved/passed (0 open scenarios) | No open scenarios — these are completed/passed UAT artifacts; the scanner counts the files. No action. |
+| verification_gap | 10-VERIFICATION.md | human_needed | Phase 10 goal achieved (4/4 ROADMAP criteria, 12/12 REQ IDs); the substantive REVIEW items (BLOCKER-01/02, WARNING-08) are fixed in code (see `v1.1.0-MILESTONE-AUDIT.md`). Only the visual-UI checks + WARNING-01 (RAG partial-failure window) remain unrecorded. Optionally `/gsd-verify-work 10` in v1.2 to flip status to `passed`. |
+| nyquist | 09/10/11/12/13/13.1 missing *-VALIDATION.md | n/a | Discovery-only gap from `v1.1.0-MILESTONE-AUDIT.md` — backfill with `/gsd-validate-phase <N>` as a v1.2 hardening pass; does not block close. |
+
+Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.planning/todos/done/` (work shipped in Phases 9/11/12/14 — see `done/_INDEX.md`); SEED-005 → `implemented` (Phase 12), SEED-007 → `implemented` (Phase 10). Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 → ROADMAP Backlog Phase 999.2 + REQUIREMENTS "Deferred to v1.2".
 
 ## Accumulated Context
 
@@ -278,3 +299,7 @@ Detailed REQ-IDs in `.planning/REQUIREMENTS.md`. Roadmap in `.planning/ROADMAP.m
 **Blockers:** None for Phase 14 UAT. Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md.
 **Working-tree changes (uncommitted) from this session:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432; application.properties itself is UNCHANGED from origin and stays shippable with the 10.123.123.174:5555 URLs); ActionProposalTool `@ToolParam values` Object→Map<String,Object> fix + test cleanup. Plus pre-existing 14-11 WIP (cancel control, transcript-leak fix, ambiguous-count rules, full-page prefill source-conversation). See 14-HUMAN-UAT.md "Session Handoff - 2026-05-11 (UAT COMPLETE)".
 **Next action:** Decide commit strategy for the working-tree changes (the ActionProposalTool fix is small/isolated; the docker-compose/localhost datasource may be a local-only change). Add a regression test for full-page prefill Cancel→Don't save (Test 12). Then proceed to v1.1.0 milestone close.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
