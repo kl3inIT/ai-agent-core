@@ -1,8 +1,8 @@
 ---
 phase: 14-intent-driven-extraction-form-prefill
-verified: 2026-05-10T03:30:00+07:00
-status: human_needed
-score: "16/16 must-haves verified; manual UAT pending"
+verified: 2026-05-11T00:00:00+07:00
+status: pass
+score: "16/16 must-haves verified; manual chat-to-form UAT executed and accepted by user"
 overrides_applied: 1
 overrides:
   - must_have: "BL-01 - jmix-app/src/main/resources/application.properties contains no committed database passwords, admin default password, or host-specific database IP; local values move to environment variables or ignored .env."
@@ -32,14 +32,17 @@ human_verification:
   - test: "Run the manual chat-to-form UAT from 14-UAT-CHECKLIST.md in a browser"
     expected: "Chat opens with no entity/action intent card. The assistant clarifies missing required fields first. After enough data is available, a server-validated action-choice row appears. Create now is the only path that enables immediate mutation tools. Prefill form creates a draft and still requires clicking Open form to confirm before the Jmix detail view opens and Save applies normal validation."
     why_human: "Vaadin/Jmix rendering, real navigation, and real provider-backed extraction require a running app and browser session."
+    status: passed
+    accepted_by: "user"
+    accepted_at: "2026-05-11T00:00:00+07:00"
 ---
 
 # Phase 14: Intent-Driven Extraction -> Form Prefill Verification Report
 
 **Phase Goal:** The LLM produces a structured draft for a host entity, the user confirms through a chat-rendered button, and a Jmix detail view opens prefilled without giving the LLM any UI-mutation primitive. Jmix security and normal detail-view validation remain the authority for the eventual save.
-**Verified:** 2026-05-10T03:30:00+07:00
-**Status:** human_needed
-**Re-verification:** Yes - after 14-09 automated gap closure, then updated after 14-10 human-UAT gap closure
+**Verified:** 2026-05-11T00:00:00+07:00
+**Status:** pass
+**Re-verification:** Yes - after 14-09 automated gap closure, then updated after 14-10 human-UAT gap closure; manual chat-to-form UAT executed and accepted by user 2026-05-11
 
 ## Goal Achievement
 
@@ -64,7 +67,7 @@ human_verification:
 | 15 | Stream UI callbacks that touch secured Jmix services restore the captured current-user authentication. | VERIFIED | `ChatPanelFragment.accessUiAuthenticated(...)` wraps UI access; `ChatPanelFragmentConversationIdTest` covers authenticated callback behavior. |
 | 16 | RAG/embedding failures remain best-effort diagnostics and do not block non-RAG action-choice chat turns. | VERIFIED | `AuditingDocumentRetrieverTest` covers best-effort retrieval failure handling; `ProviderConfigurationContractTest` separates provider configuration diagnostics from action-choice UI behavior. |
 
-**Score:** 16/16 truths verified. Status is still `human_needed` because browser/manual UAT is required.
+**Score:** 16/16 truths verified. Browser/manual UAT was executed and accepted by the user on 2026-05-11; status is `pass`.
 
 ### Required Artifacts
 
@@ -153,7 +156,7 @@ human_verification:
 
 ### Gaps Summary
 
-No automated blocker gaps remain. Phase 14 should not be marked fully complete until the manual UAT above is executed and accepted.
+No gaps remain. No automated blocker gaps and the manual chat-to-form UAT above was executed and accepted by the user on 2026-05-11. Phase 14 is complete.
 
 ---
 
