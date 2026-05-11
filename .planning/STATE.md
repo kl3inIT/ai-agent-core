@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1.0
-milestone_name: "Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (shipped 2026-05-11)"
-status: Awaiting next milestone — run /gsd-new-milestone for v1.2
-stopped_at: "v1.1.0 closed and archived 2026-05-11"
-last_updated: "2026-05-11T09:30:00.000Z"
-last_activity: 2026-05-11 — Milestone v1.1.0 completed and archived; Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 Backlog (Phase 999.2)
+milestone: v1.2
+milestone_name: Operator Experience, Voice Input & Runtime Performance
+status: planning
+last_updated: "2026-05-11T10:07:55.724Z"
+last_activity: 2026-05-11
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 62
-  completed_plans: 62
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -28,14 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 ## Current Position
 
-Milestone: v1.1.0 — COMPLETE & ARCHIVED (2026-05-11). No active phase.
-Next: `/gsd-new-milestone` → `/gsd-review-backlog`
-| Field | Value |
-|-------|-------|
-| Milestone | v1.1.0 (shipped, archived) |
-| Phase | none active |
-| Status | Awaiting next milestone (v1.2) |
-| Last activity | 2026-05-11 — v1.1.0 closed: ROADMAP/REQUIREMENTS/MILESTONE-AUDIT archived to `milestones/v1.1.0-*`, PROJECT.md evolved, ROADMAP collapsed, REQUIREMENTS.md removed (fresh for v1.2), retrospective updated, tagged `v1.1.0` |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-11 — Milestone v1.2 started
 
 ## Phase Status
 
