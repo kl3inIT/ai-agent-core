@@ -14,7 +14,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 - [ ] **STT-02**: User taps the mic to record browser audio (`MediaRecorder`, `audio/webm;codecs=opus` with an `audio/mp4` Safari fallback, no transcoding) with a hard ~60-second cap, a visible countdown, and auto-stop; "recording" and "transcribing…" are distinct visible states.
 - [ ] **STT-03**: On stop, the audio is transcribed server-side and the resulting text is placed into `MessageInput` for the user to review/edit before sending — the transcription path never calls `ChatService.ask` and never auto-sends.
 - [ ] **STT-04**: The default transcription path is Soniox async STT via a custom Spring `RestClient` client (`POST /v1/files` → `POST /v1/transcriptions` `model=stt-async-v4` `language_hints:["vi","en"]` → poll `GET /v1/transcriptions/{id}` → `GET .../transcript` → `DELETE /v1/files/{id}` + `DELETE /v1/transcriptions/{id}` in a `finally` on every path including errors); an OpenAI-direct fallback (`OpenAiAudioApi` / `OpenAiAudioTranscriptionModel` against `https://api.openai.com/v1` with an independent key — never the OpenRouter chat base-url) is selectable via `ai-agent.stt.provider=soniox|openai|<host-bean-name>` (default `soniox`). Soniox, OpenAI-STT, and the OpenRouter chat key are three independent properties.
-- [ ] **STT-05**: STT failures (provider 4xx, network error, recording too long, no speech detected) surface a non-blocking inline error message + a retry button in the input area; the chat flow itself stays usable; transcription runs on a bounded executor and the result is pushed back via `ui.access(...)`, dropped silently (after running the Soniox `DELETE`s) if the UI/conversation has detached or closed mid-transcription.
+- [ ] **STT-05**: STT failures (provider 4xx, network error, recording too long, no speech detected) surface a non-blocking inline error message + a retry button in the input area (reusing the Phase 15 in-fragment status-row pattern); the chat flow itself stays usable; transcription runs on a bounded executor and the result is pushed back via `ui.access(...)`, dropped silently (after running the Soniox `DELETE`s) if the UI/conversation has detached or closed mid-transcription.
 - [ ] **STT-06**: Each transcription writes an `STT_TRANSCRIPTION` audit row via `AuditWriter.writeToolCall(eventName="stt_transcription", ...)` (no new `AuditKind`) recording duration, language, model, provider, and outcome plus a SHA-256 hash of the transcript by default (`AuditFieldHasher`); `ai-agent.stt.audit.store-transcript=true` stores the raw transcript instead. The Soniox/OpenAI HTTP clients never log response bodies (status/headers/ids at DEBUG only).
 
 ### Chat Observability & UX
@@ -33,7 +33,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 ### Admin Config-Knob Migration
 
 - [ ] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
-- [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`, `ai-agent.stt.enabled`, `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
+- [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 20, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
 - [ ] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
 
 ### Mutation Internals Hardening (Phase 11 follow-up)
@@ -94,51 +94,53 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 | A second `ChatClient` / second `ChatMemory` store | The STT path is disjoint; it never touches `ChatService` / `ChatClient` |
 | Proprietary / hosted-only models in the curated dropdown | Violates the self-hostable-open-weights policy; proprietary models are reachable only via the custom-entry escape hatch |
 | Secrets (API keys) in the admin config UI | Plaintext credentials in a DB table; secrets stay env / `application.properties`-backed (indicator-only in the UI) |
+| Migrating `ai-agent.stt.*` knobs in the Phase 17 config-knob pass | STT lands later (Phase 20); its knobs are mostly Tier-2 boot toggles / Tier-3 secrets, and the STT phase owns adding its own `store-transcript` toggle (or leaving it a property per CFG-02) |
 | Activation of dormant seeds SEED-001 / 002 / 003 / 004 / 006 / 008 | Their documented triggers are not met; do not activate in v1.2 |
 | Phase 10 re-verification, Nyquist backfill, PKG-05 / TEST-07 clean-consumer smoke | Explicitly deferred to a later hardening pass per the 2026-05-11 decision; must not be folded into a v1.2 phase |
 | `@Transactional` on the `MutationGateChain` itself | Only `MutationSaveExecutor.save` is transactional; the chain must throw before the save crosses the transaction boundary (fail-closed) |
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STT-01 | TBD | Pending |
-| STT-02 | TBD | Pending |
-| STT-03 | TBD | Pending |
-| STT-04 | TBD | Pending |
-| STT-05 | TBD | Pending |
-| STT-06 | TBD | Pending |
-| OBS-01 | TBD | Pending |
-| OBS-02 | TBD | Pending |
-| OBS-03 | TBD | Pending |
-| OBS-04 | TBD | Pending |
-| MODEL-01 | TBD | Pending |
-| MODEL-02 | TBD | Pending |
-| MODEL-03 | TBD | Pending |
-| CFG-01 | TBD | Pending |
-| CFG-02 | TBD | Pending |
-| CFG-03 | TBD | Pending |
-| MUT-15 | TBD | Pending |
-| MUT-16 | TBD | Pending |
-| MUT-17 | TBD | Pending |
-| MUT-18 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| PERF-03 | TBD | Pending |
-| PERF-04 | TBD | Pending |
-| PERF-05 | TBD | Pending |
-| TEST-18 | TBD | Pending |
-| TEST-19 | TBD | Pending |
-| TEST-20 | TBD | Pending |
-| SEC-08 | TBD | Pending |
+| OBS-01 | Phase 15 | Pending |
+| OBS-02 | Phase 15 | Pending |
+| OBS-03 | Phase 15 | Pending |
+| OBS-04 | Phase 15 | Pending |
+| TEST-19 | Phase 15 | Pending |
+| MODEL-01 | Phase 16 | Pending |
+| MODEL-02 | Phase 16 | Pending |
+| MODEL-03 | Phase 16 | Pending |
+| TEST-20 | Phase 16 | Pending |
+| CFG-01 | Phase 17 | Pending |
+| CFG-02 | Phase 17 | Pending |
+| CFG-03 | Phase 17 | Pending |
+| SEC-08 | Phase 17 | Pending |
+| MUT-15 | Phase 18 | Pending |
+| MUT-16 | Phase 18 | Pending |
+| MUT-17 | Phase 18 | Pending |
+| MUT-18 | Phase 18 | Pending |
+| PERF-01 | Phase 19 | Pending |
+| PERF-02 | Phase 19 | Pending |
+| PERF-03 | Phase 19 | Pending |
+| PERF-04 | Phase 19 | Pending |
+| PERF-05 | Phase 19 | Pending |
+| STT-01 | Phase 20 | Pending |
+| STT-02 | Phase 20 | Pending |
+| STT-03 | Phase 20 | Pending |
+| STT-04 | Phase 20 | Pending |
+| STT-05 | Phase 20 | Pending |
+| STT-06 | Phase 20 | Pending |
+| TEST-18 | Phase 20 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 29 total
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 29 ⚠️ (filled by roadmap)
+- Mapped to phases: 29 ✓ (Phase 15: 5 · Phase 16: 4 · Phase 17: 4 · Phase 18: 4 · Phase 19: 5 · Phase 20: 7)
+- Unmapped: 0
+- No orphans, no duplicates. (Future Requirements and Out of Scope sections are intentionally unmapped.)
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 after v1.2 milestone definition*
+*Last updated: 2026-05-11 — v1.2 roadmap created (Phases 15–20 mapped); revised same day — Soniox STT moved to Phase 20 (last in milestone); phases 15–20 re-ordered/re-numbered.*
