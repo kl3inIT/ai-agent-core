@@ -133,4 +133,25 @@ class RenderStreamEventTest {
                 new StreamEventRenderer.CitationState());
         assertThat(out).isEqualTo(payload);
     }
+
+    @Test
+    void activity_anyKind_emitsEmptyMarkdown_statusHandledByFragment() {
+        for (StreamingEvent.ActivityKind kind : StreamingEvent.ActivityKind.values()) {
+            StreamEventRenderer.CitationState state = new StreamEventRenderer.CitationState();
+            String out = StreamEventRenderer.renderStreamEvent(
+                    new StreamingEvent.Activity(kind), labels(), state);
+            assertThat(out).as("Activity(%s) markdown", kind).isEqualTo("");
+        }
+    }
+
+    @Test
+    void activityKind_isClosedEnum_chatToolRetrieval() {
+        assertThat(StreamingEvent.ActivityKind.values())
+                .containsExactly(StreamingEvent.ActivityKind.CHAT,
+                        StreamingEvent.ActivityKind.TOOL,
+                        StreamingEvent.ActivityKind.RETRIEVAL);
+        StreamingEvent activity = new StreamingEvent.Activity(StreamingEvent.ActivityKind.TOOL);
+        assertThat(activity).isInstanceOf(StreamingEvent.class);
+        assertThat(((StreamingEvent.Activity) activity).kind()).isEqualTo(StreamingEvent.ActivityKind.TOOL);
+    }
 }

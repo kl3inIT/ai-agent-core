@@ -141,6 +141,10 @@ public final class StreamEventRenderer {
                 String errorText = labels.getOrDefault(err.messageKey(), err.messageKey());
                 yield RenderedStreamEvent.markdown("\n\n---\n**%s:** %s".formatted(errorLabel, errorText));
             }
+            case StreamingEvent.Activity ignoredActivity ->
+                    // Phase 15 — no markdown contribution; the ephemeral status line is rendered
+                    // by ChatPanelFragment from the raw event (Plan 04), not via the markdown path.
+                    RenderedStreamEvent.markdown("");
             case StreamingEvent.Final ignoredFinal ->
                     // v1 — skip closing summary per RESEARCH Open Question 2.
                     RenderedStreamEvent.markdown("");
