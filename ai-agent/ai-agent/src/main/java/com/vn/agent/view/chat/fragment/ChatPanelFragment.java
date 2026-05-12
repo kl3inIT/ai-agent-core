@@ -591,7 +591,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     private void setConversationIdInternal(UUID cid) {
-        if (Objects.equals(this.conversationId, cid)) {
+        // 15-UAT Gap 1: new-conversation after an errored turn — an errored turn leaves
+        // conversationId == null with messageCount > 0 (the user message is still on screen).
+        // startNewChat() → setConversationIdInternal(null) must still clear; don't short-circuit
+        // the reset when there are stranded on-screen messages and we're resetting to no-conversation.
+        if (Objects.equals(this.conversationId, cid) && !(cid == null && messageCount > 0)) {
             return;
         }
 
@@ -881,6 +885,15 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 })
                 .doOnError(err -> {
                     log.warn("Chat stream failed", err);
+                    // 15-UAT Gap 1 (orthogonal): keep conversationId in sync when the run errored
+                    // after the server created the conversation. Best-effort; never throws.
+                    if (activeRunId != null && conversationId == null) {
+                        UUID serverConversationId = resolveConversationIdForRun(activeRunId);
+                        if (serverConversationId != null) {
+                            accessUiAuthenticated(submitAuthentication, () ->
+                                    initializeConversationFromFinalEvent(serverConversationId));
+                        }
+                    }
                     liveTurnSteps.clear();
                     accessUi(() -> { showGenericErrorNotification(); finishStreamInternal(); });
                 })
@@ -1179,6 +1192,39 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      * {@code outcome}/{@code errorClass} cross. Typed {@code load(AiAuditEvent.class)} infers the
      * {@code agentstore} store.
      */
+    /**
+     * 15-UAT Gap 1 (orthogonal) — resolve the {@code AiConversation} id the server created for a
+     * run that errored before delivering {@link StreamingEvent.Final}. Reuses the {@code loadTurnSteps}
+     * security pattern exactly: {@link UnconstrainedDataManager} + MANDATORY
+     * {@code where e.userUsername = :me and e.runId = :rid and e.parent is null} filter (never
+     * {@code runId}-only unconstrained, T-15-06-01); narrow projection (only {@code conversation.id});
+     * {@code catch (RuntimeException)} → debug-log + skip. Returns {@code null} when the run never
+     * reached the orchestration / never created a conversation.
+     */
+    private UUID resolveConversationIdForRun(UUID runId) {
+        if (runId == null) {
+            return null;
+        }
+        try {
+            for (io.jmix.core.entity.KeyValueEntity row : unconstrainedDataManager.loadValues(
+                            "select e.conversation.id from ai_AiAuditEvent e " +
+                            "where e.userUsername = :me and e.runId = :rid and e.parent is null")
+                    .store("agentstore")
+                    .properties("cid")
+                    .parameter("me", currentAuthentication.getUser().getUsername())
+                    .parameter("rid", runId)
+                    .list()) {
+                Object cid = row.getValue("cid");
+                if (cid instanceof UUID uuid) {
+                    return uuid;
+                }
+            }
+        } catch (RuntimeException failure) {
+            log.debug("Errored-run conversation-id resolve failed runId={}", runId, failure);
+        }
+        return null;
+    }
+
     private List<TurnDetailRenderer.StepRow> loadTurnSteps(UUID runId, UUID conversationId) {
         if (runId == null || conversationId == null) {
             return List.of();
