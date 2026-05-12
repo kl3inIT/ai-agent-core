@@ -36,7 +36,7 @@ Full detail: [milestones/v1.1.0-ROADMAP.md](milestones/v1.1.0-ROADMAP.md) · req
 
 Six near-independent feature areas layered on the shipped v1.1 agent harness with effectively zero new runtime dependencies. Hard ordering constraint: **Phase 18 (mutation-internals hardening) must precede Phase 19 (perf pass)** — the perf pass refactors the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated sequence. Phase 15 touches the chat surface mounter and `ChatPanelFragment`; Phase 16 is admin configuration UI only. Phase 17 is best scoped after Phase 16 so its config-knob migration covers the model-picker knobs in the same `AiParameters`/`AiUiSettings` schema design. Voice input (Phase 20) lands last in the milestone: it reuses Phase 15's in-fragment streaming-status-row pattern for its error/retry row. Phases 18/19 (the "invisible" passes) can run in parallel with 15/16/17.
 
-- [x] **Phase 15: Right-Sidebar Chat Surface & Observability UX** — `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus ephemeral streaming-status line and collapsed-by-default per-turn tool-detail disclosure driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree. Resolves the pending collapsible-tool-detail / ephemeral-status todo. The chat-state side panel is deferred. (All 5 plans complete 2026-05-12; TEST-19 leak gate + locale-completeness + no-DDL structural tests in place — ready for verification.)
+- [x] **Phase 15: Right-Sidebar Chat Surface & Observability UX** — `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus ephemeral streaming-status line and collapsed-by-default per-turn tool-detail disclosure driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree. Resolves the pending collapsible-tool-detail / ephemeral-status todo. The chat-state side panel is deferred. (Plans 01–05 complete 2026-05-12; TEST-19 leak gate + locale-completeness + no-DDL structural tests in place. UAT 9/10 — 15-06 gap-closure plan added 2026-05-12: new-conversation-after-errored-turn fix + Option-A inline anchoring of turn-detail/action-choice/NOTICE + disclosure restyle per the approved mockup.)
 - [ ] **Phase 16: Admin Model Management** — Curated open-weights model `ComboBox` + custom free-entry in the admin Parameters view; admin-only; flows to per-request `ChatOptions`; validate at use time.
 - [ ] **Phase 17: Admin Config-Knob Migration** — Three-tier knob taxonomy: Tier-1 runtime knobs (RAG top-k / similarity threshold / task-file token budget / TTL / migrated model-picker knobs) become editable `AiParameters`/`AiUiSettings`; Tier-2 boot toggles shown read-only with a "requires restart" note; Tier-3 secrets shown as "configured: yes/no" only. Publishes an `AiParameters` change event for cache eviction.
 - [ ] **Phase 18: Mutation-Internals Hardening (Phase 11 follow-up)** — Extract the canonical `MutationGateChain`; batch-load to-one FK refs via constrained `DataManager` `IN(...)`; memoize related-write metadata. Byte-for-byte behavior-identical; Phase 9/10/11 mutation test suites pass unchanged. Promotes Backlog 999.1.
@@ -57,7 +57,7 @@ Six near-independent feature areas layered on the shipped v1.1 agent harness wit
   5. TEST-19 — a UI-layer leak test (reusing the Phase 9 leak-guard pattern packs) asserts the streaming-status line and the per-turn tool-detail disclosure never emit internal `@Tool` method names or raw entity names.
 **Deferred**: Chat-state side panel for model/conversation/governance/attachment-budget facts (`OBS-FUT-01`). Do not implement it in Phase 15.
 **Note**: ROADMAP success-criterion 3's `AiAuditEventListView?runId=...` deep-link clause is DESCOPED for Phase 15 per `15-SPEC.md` (the disclosure is label-only, no link). Doc-sync follow-up only.
-**Plans**: 5 plans
+**Plans**: 6 plans
 Plans:
 **Wave 1**
 - [x] 15-01-PLAN.md — Add AiChatSurface.SIDEBAR + admin UI-settings participation + locale labels (no DDL)
@@ -71,6 +71,9 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [x] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
+
+**Wave 5 — gap closure (post-UAT)** *(closes the two open 15-UAT gaps)*
+- [ ] 15-06-PLAN.md — Gap 1: force-clear "new conversation" after an errored turn (conversationId stranded null) + .doOnError conversationId sync; Gap 2: anchor turn-detail/action-choice/NOTICE inline under their turn's <vaadin-message> (re-anchor after setItems + history replay) + restyle the disclosure + action-choice per the approved Option-A mockup
 **UI hint**: yes
 
 ### Phase 16: Admin Model Management
@@ -145,7 +148,7 @@ Plans:
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 5/5 | Complete — ready for verification | 2026-05-12 |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 5/6 | Plans 01–05 done; 15-06 gap-closure planned (closes 2 open UAT gaps) | - |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |
