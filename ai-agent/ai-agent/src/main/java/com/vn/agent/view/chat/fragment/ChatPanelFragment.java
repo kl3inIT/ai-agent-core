@@ -280,12 +280,19 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Subscribe
     public void onReady(final ReadyEvent event) {
         // Phase 13.1 UAT-fix — restore Vaadin MessageList substrate (Phase 7.1 baseline).
-        messageList = new MessageList();
-        messageList.setMarkdown(true);
-        messageList.setWidthFull();
-        messageList.getStyle().set("flex-grow", "1");
-        messageListSlot.add(messageList);
-        messageList.setItems(items);
+        // Phase 15 WR-03 — be idempotent w.r.t. the MessageList: a host view may have already
+        // called setConversationId(...) in onBeforeShow, which goes through clearMessageList()
+        // and creates+attaches a MessageList. Re-creating one here would leave two
+        // <vaadin-message-list> elements in messageListSlot. Only build the substrate if it has
+        // not been created yet.
+        if (messageList == null) {
+            messageList = new MessageList();
+            messageList.setMarkdown(true);
+            messageList.setWidthFull();
+            messageList.getStyle().set("flex-grow", "1");
+            messageListSlot.add(messageList);
+            messageList.setItems(items);
+        }
 
         messageInput = new MessageInput();
         messageInput.setWidthFull();
