@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
-status: verifying
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-05-11T17:44:57.574Z"
-last_activity: 2026-05-11
+status: executing
+stopped_at: Completed 15-05-PLAN.md — Phase 15 complete (all 5 plans), ready for verification
+last_updated: "2026-05-12T11:45:54.387Z"
+last_activity: 2026-05-12
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -28,9 +28,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 ## Current Position
 
-Phase: 15 (right-sidebar-chat-surface-observability-ux) — READY FOR VERIFICATION
-Plan: 5 of 5
-Status: Phase complete — ready for verification
+Phase: 15 (right-sidebar-chat-surface-observability-ux) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
 Last activity: 2026-05-12
 
 ## Phase Status
@@ -324,6 +324,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 15 P03 | ~95min | 2 tasks | 12 files |
 | Phase 15 P04 | ~75min | 3 tasks | 8 files |
 | Phase 15 P05 | ~40min | 3 tasks | 7 files |
+| Phase 15 P06 | ~3h | 3 tasks | 7 files |
 
 ### Quick Tasks Completed
 
@@ -333,7 +334,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-12T01:30:00.000Z
+**Last session:** 2026-05-12T11:45:42.579Z
 **Stopped at:** Completed 15-05-PLAN.md — Phase 15 complete (all 5 plans), ready for verification
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases should prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.

@@ -73,7 +73,7 @@ Plans:
 - [x] 15-05-PLAN.md — TEST-19 ObservabilityLeakTest (reuses Phase 9 packs) + locale-completeness/no-new-persisted-state tests + fold the 2026-04-26 todo to done/
 
 **Wave 5 — gap closure (post-UAT)** *(closes the two open 15-UAT gaps)*
-- [ ] 15-06-PLAN.md — Gap 1: force-clear "new conversation" after an errored turn (conversationId stranded null) + .doOnError conversationId sync; Gap 2: anchor turn-detail/action-choice/NOTICE inline under their turn's <vaadin-message> (re-anchor after setItems + history replay) + restyle the disclosure + action-choice per the approved Option-A mockup
+- [x] 15-06-PLAN.md — Gap 1: force-clear "new conversation" after an errored turn (conversationId stranded null) + .doOnError conversationId sync; Gap 2: anchor turn-detail/action-choice/NOTICE inline under their turn's <vaadin-message> (re-anchor after setItems + history replay) + restyle the disclosure + action-choice per the approved Option-A mockup
 **UI hint**: yes
 
 ### Phase 16: Admin Model Management
@@ -148,7 +148,7 @@ Plans:
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | v1.1.0 | 6/6 | Shipped | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 5/6 | Plans 01–05 done; 15-06 gap-closure planned (closes 2 open UAT gaps) | - |
+| 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Model Management | v1.2 | 0/? | Not started | - |
 | 17. Admin Config-Knob Migration | v1.2 | 0/? | Not started | - |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | v1.2 | 0/? | Not started | - |
