@@ -217,6 +217,13 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     private void mountSidebarPanel(UI ui, MountedChatSurfaceState mountedState) {
         Div panelDiv = mountedState.sidebarPanelDiv;
         if (panelDiv == null) {
+            // WR-01 — do NOT eagerly create the host view (and its ChatPanelFragment, which on
+            // onReady creates a temp upload directory) for every UI of every user. Mirror the
+            // HEADER_BUTTON dialog's laziness: only build the panel when the SIDEBAR surface is
+            // actually enabled AND the current user is permitted to see the host view.
+            if (!shouldShowSidebar(uiSettingsService.loadCurrent(), isSidebarViewPermitted())) {
+                return;
+            }
             panelDiv = createSidebarPanel(ui, mountedState);
             mountedState.sidebarPanelDiv = panelDiv;
         }
@@ -228,11 +235,17 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
             ui.getElement().appendChild(panelDiv.getElement());
         }
 
-        // Re-assert the push class on the (possibly new) AppLayout if the sidebar is open.
-        if (mountedState.sidebarOpen) {
-            findFirstComponent(ui, AppLayout.class)
-                    .ifPresent(appLayout -> appLayout.addClassName(CONTENT_PUSHED_CLASS));
-        }
+        // Keep the push class tracking sidebarOpen regardless of how the AppLayout was obtained
+        // (WR-04) — mirrors setSidebarOpen's add/remove symmetry. The else-branch is normally a
+        // no-op because Jmix replaces the AppLayout on navigation, but a host shell that keeps the
+        // same AppLayout while the sidebar is closed would otherwise stay shifted.
+        findFirstComponent(ui, AppLayout.class).ifPresent(appLayout -> {
+            if (mountedState.sidebarOpen) {
+                appLayout.addClassName(CONTENT_PUSHED_CLASS);
+            } else {
+                appLayout.removeClassName(CONTENT_PUSHED_CLASS);
+            }
+        });
     }
 
     private Div createSidebarPanel(UI ui, MountedChatSurfaceState mountedState) {
