@@ -49,6 +49,16 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
     static final int MAX_AUDITED_HITS = 50;
     static final int TEXT_PREVIEW_MAX_CHARS = 500;
 
+    /**
+     * Fallback RAG knobs for the delegate-based constructors (which do not receive a
+     * {@code VectorStore}/{@code AiAgentRagProperties}). MUST stay in sync with
+     * {@code AiAgentRagProperties.resolvedTopK()} / {@code resolvedSimilarityThreshold()}
+     * (AI-SPEC §4 defaults: topK = 5, similarity threshold = 0.50). The vector-store
+     * constructors take the resolved property values instead and never use these.
+     */
+    static final int DEFAULT_TOP_K = 5;
+    static final double DEFAULT_SIMILARITY_THRESHOLD = 0.50;
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final DocumentRetriever delegate;
@@ -72,8 +82,8 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
                                      StreamingSinkHolder streamingSinkHolder) {
         this.delegate = delegate;
         this.vectorStore = null;
-        this.defaultTopK = 5;
-        this.defaultSimilarityThreshold = 0.5;
+        this.defaultTopK = DEFAULT_TOP_K;
+        this.defaultSimilarityThreshold = DEFAULT_SIMILARITY_THRESHOLD;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
         this.streamingSinkHolder = streamingSinkHolder;
