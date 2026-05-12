@@ -5,6 +5,7 @@ import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.router.AfterNavigationEvent;
 import com.vaadin.flow.server.ServiceInitEvent;
@@ -23,6 +24,7 @@ import io.jmix.flowui.view.DialogWindow;
 import io.jmix.flowui.view.NavigateCloseAction;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewController;
+import io.jmix.flowui.view.ViewControllerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -38,6 +40,17 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     static final String CHAT_DIALOG_VIEW_ID = "AiAgent_ChatDialog";
     static final String FULL_CHAT_VIEW_ID = "AiAgent_Chat";
     static final String FULL_CHAT_MENU_ID = "aiAgent.chat";
+
+    // --- SIDEBAR surface (Phase 15 Plan 03 — D-01..D-04, REVIEWS point #1) ---
+    static final String SIDEBAR_VIEW_ID = "AiAgent_Sidebar";
+    static final String SIDEBAR_TOGGLE_BUTTON_ID = "aiAgentSidebarToggleButton";
+    static final String SIDEBAR_TOGGLE_BUTTON_CLASS = "ai-agent-sidebar-toggle-button";
+    static final String SIDEBAR_PANEL_CLASS = "ai-agent-sidebar";
+    static final String SIDEBAR_PANEL_HEADER_CLASS = "ai-agent-sidebar__header";
+    static final String SIDEBAR_PANEL_OPEN_CLASS = "ai-agent-sidebar--open";
+    static final String SIDEBAR_TOGGLE_ACTIVE_CLASS = "ai-agent-sidebar-toggle--active";
+    static final String CONTENT_PUSHED_CLASS = "ai-agent-content--pushed";
+    static final String SIDEBAR_CLOSE_BUTTON_CLASS = "ai-agent-sidebar__close-button";
 
     private static final Logger log = LoggerFactory.getLogger(ChatSurfaceMounter.class);
 
@@ -79,7 +92,12 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     }
 
     void refreshMountedSurfacesForTest(UI ui, boolean fullChatRoute) {
-        refreshMountedSurfaces(ui, uiSettingsService.loadCurrent(), isDialogViewPermitted(), fullChatRoute);
+        refreshMountedSurfaces(ui, uiSettingsService.loadCurrent(), isDialogViewPermitted(),
+                isSidebarViewPermitted(), fullChatRoute);
+    }
+
+    void toggleSidebarForTest(UI ui) {
+        toggleSidebar(ui);
     }
 
     private void initializeUi(UI ui) {
@@ -88,17 +106,20 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
 
         AiUiSettings settings = uiSettingsService.loadCurrent();
         mountHeaderButton(ui, mountedState, false);
-        refreshMountedSurfaces(ui, settings, isDialogViewPermitted(), false);
+        mountSidebar(ui, mountedState);
+        refreshMountedSurfaces(ui, settings, isDialogViewPermitted(), isSidebarViewPermitted(), false);
     }
 
     private void afterNavigation(UI ui, AfterNavigationEvent event) {
         AiUiSettings settings = uiSettingsService.loadCurrent();
         boolean fullChatRoute = isFullChatRoute(event);
         boolean dialogPermitted = isDialogViewPermitted();
+        boolean sidebarPermitted = isSidebarViewPermitted();
 
         MountedChatSurfaceState mountedState = mountedState(ui);
         mountHeaderButton(ui, mountedState, true);
-        refreshMountedSurfaces(ui, settings, dialogPermitted, fullChatRoute);
+        mountSidebar(ui, mountedState);
+        refreshMountedSurfaces(ui, settings, dialogPermitted, sidebarPermitted, fullChatRoute);
         syncDialogAvailability(settings, dialogPermitted, fullChatRoute);
     }
 
@@ -135,6 +156,180 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
                 .setAttribute("aria-label", messages.getMessage("chatSurfaceMounter.headerButton.ariaLabel"));
         chatButton.addClickListener(clickEvent -> toggleDialog());
         return chatButton;
+    }
+
+    // ---- SIDEBAR surface mount + toggle -----------------------------------
+
+    /**
+     * Mount (idempotently) the SIDEBAR navbar toggle and the fixed-position panel Div.
+     * <p>RESEARCH Open Q3 — mirrors the existing HEADER_BUTTON pattern: mount-always-then
+     * -{@code setVisible(false)} (see {@link #refreshMountedSurfaces}). Vaadin
+     * {@code setVisible(false)} removes the element from the rendered DOM, so "absent
+     * (not greyed) when disabled/not-permitted" holds. The panel lives on the UI element
+     * (NOT the AppLayout content slot, which {@code setContent()}-replaces on navigation)
+     * so it survives route navigation; {@code afterNavigation} re-asserts attachment, the
+     * push class and the toggle. The host view ({@link AiAgentSidebarView}) is created
+     * ONCE per UI via {@code views.create(...)} (the same way {@code openDialog()} creates
+     * {@code ChatDialogView}) and re-attached idempotently — never re-created.</p>
+     */
+    private void mountSidebar(UI ui, MountedChatSurfaceState mountedState) {
+        mountSidebarToggle(ui, mountedState);
+        mountSidebarPanel(ui, mountedState);
+    }
+
+    private void mountSidebarToggle(UI ui, MountedChatSurfaceState mountedState) {
+        if (mountedState.sidebarToggleButton != null
+                && mountedState.sidebarToggleButton.getParent().isPresent()) {
+            return;
+        }
+
+        Optional<JmixButton> existingButton = findComponentById(ui, SIDEBAR_TOGGLE_BUTTON_ID, JmixButton.class);
+        if (existingButton.isPresent()) {
+            mountedState.sidebarToggleButton = existingButton.get();
+            return;
+        }
+
+        Optional<AppLayout> appLayout = findFirstComponent(ui, AppLayout.class);
+        if (appLayout.isEmpty()) {
+            warnMissingAppLayoutOnce(mountedState, true);
+            return;
+        }
+
+        JmixButton toggleButton = createSidebarToggleButton(ui);
+        appLayout.get().addToNavbar(toggleButton);
+        mountedState.sidebarToggleButton = toggleButton;
+        applySidebarOpenStateToToggle(mountedState);
+    }
+
+    private JmixButton createSidebarToggleButton(UI ui) {
+        JmixButton toggleButton = uiComponents.create(JmixButton.class);
+        toggleButton.setId(SIDEBAR_TOGGLE_BUTTON_ID);
+        toggleButton.addClassName(SIDEBAR_TOGGLE_BUTTON_CLASS);
+        toggleButton.setIcon(VaadinIcon.PANEL.create());
+        toggleButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
+        toggleButton.getElement().setAttribute("aria-pressed", "false");
+        toggleButton.getElement().setAttribute("aria-label",
+                messages.getMessage("chatSurfaceMounter.sidebarToggle.ariaLabel.closed"));
+        toggleButton.addClickListener(clickEvent -> toggleSidebar(ui));
+        return toggleButton;
+    }
+
+    private void mountSidebarPanel(UI ui, MountedChatSurfaceState mountedState) {
+        Div panelDiv = mountedState.sidebarPanelDiv;
+        if (panelDiv == null) {
+            // WR-01 — do NOT eagerly create the host view (and its ChatPanelFragment, which on
+            // onReady creates a temp upload directory) for every UI of every user. Mirror the
+            // HEADER_BUTTON dialog's laziness: only build the panel when the SIDEBAR surface is
+            // actually enabled AND the current user is permitted to see the host view.
+            if (!shouldShowSidebar(uiSettingsService.loadCurrent(), isSidebarViewPermitted())) {
+                return;
+            }
+            panelDiv = createSidebarPanel(ui, mountedState);
+            mountedState.sidebarPanelDiv = panelDiv;
+        }
+
+        // Re-assert the panel is attached to the UI element (it survives navigation only
+        // because it lives on the UI, not the AppLayout content slot — mirrors
+        // attachDialogWindowToUi for the modeless HEADER_BUTTON dialog).
+        if (!panelDiv.getElement().getNode().isAttached()) {
+            ui.getElement().appendChild(panelDiv.getElement());
+        }
+
+        // Keep the push class tracking sidebarOpen regardless of how the AppLayout was obtained
+        // (WR-04) — mirrors setSidebarOpen's add/remove symmetry. The else-branch is normally a
+        // no-op because Jmix replaces the AppLayout on navigation, but a host shell that keeps the
+        // same AppLayout while the sidebar is closed would otherwise stay shifted.
+        findFirstComponent(ui, AppLayout.class).ifPresent(appLayout -> {
+            if (mountedState.sidebarOpen) {
+                appLayout.addClassName(CONTENT_PUSHED_CLASS);
+            } else {
+                appLayout.removeClassName(CONTENT_PUSHED_CLASS);
+            }
+        });
+    }
+
+    private Div createSidebarPanel(UI ui, MountedChatSurfaceState mountedState) {
+        Div panelDiv = new Div();
+        panelDiv.addClassName(SIDEBAR_PANEL_CLASS);
+
+        Div headerDiv = new Div();
+        headerDiv.addClassName(SIDEBAR_PANEL_HEADER_CLASS);
+
+        JmixButton closeButton = uiComponents.create(JmixButton.class);
+        closeButton.addClassName(SIDEBAR_CLOSE_BUTTON_CLASS);
+        closeButton.setIcon(VaadinIcon.ANGLE_DOUBLE_RIGHT.create());
+        closeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ICON);
+        closeButton.getElement().setAttribute("aria-label",
+                messages.getMessage("chatSurfaceMounter.sidebarCloser.ariaLabel"));
+        closeButton.addClickListener(clickEvent -> toggleSidebar(ui));
+        headerDiv.add(closeButton);
+        panelDiv.add(headerDiv);
+
+        // The lean Jmix-owned host view that owns the ChatPanelFragment (REVIEWS point #1)
+        // — created exactly the way openDialog() creates ChatDialogView. We attach the
+        // view's element directly under the panel Div and drive its show lifecycle via
+        // ViewControllerUtils.fireEvent(BeforeShowEvent, then ReadyEvent) — this is the
+        // Jmix 2.8 path for showing a non-routed, non-dialog view: views.create(...) has
+        // already completed @ViewComponent injection / @Subscribe wiring / fragment
+        // loading; firing ReadyEvent on the host view propagates to the fragment's
+        // own onReady (Fragment.onHostReadyInternal). No DialogWindow overlay machinery
+        // is involved, so there is no modality curtain and the main view stays interactive.
+        AiAgentSidebarView sidebarView = views.create(AiAgentSidebarView.class);
+        panelDiv.getElement().appendChild(sidebarView.getElement());
+        ViewControllerUtils.fireEvent(sidebarView, new View.BeforeShowEvent(sidebarView));
+        ViewControllerUtils.fireEvent(sidebarView, new View.ReadyEvent(sidebarView));
+        mountedState.sidebarHostView = sidebarView;
+
+        return panelDiv;
+    }
+
+    /** Single toggle path shared by the navbar toggle button AND the in-panel closer so
+     *  the open/closed state never drifts (D-03). Flips: the panel {@code --open} class,
+     *  the AppLayout push class, the toggle {@code --active} class, {@code aria-pressed},
+     *  and the toggle's {@code aria-label}. */
+    private void toggleSidebar(UI ui) {
+        MountedChatSurfaceState mountedState = mountedState(ui);
+        setSidebarOpen(ui, mountedState, !mountedState.sidebarOpen);
+    }
+
+    private void setSidebarOpen(UI ui, MountedChatSurfaceState mountedState, boolean open) {
+        mountedState.sidebarOpen = open;
+
+        if (mountedState.sidebarPanelDiv != null) {
+            if (open) {
+                mountedState.sidebarPanelDiv.addClassName(SIDEBAR_PANEL_OPEN_CLASS);
+            } else {
+                mountedState.sidebarPanelDiv.removeClassName(SIDEBAR_PANEL_OPEN_CLASS);
+            }
+        }
+
+        findFirstComponent(ui, AppLayout.class).ifPresent(appLayout -> {
+            if (open) {
+                appLayout.addClassName(CONTENT_PUSHED_CLASS);
+            } else {
+                appLayout.removeClassName(CONTENT_PUSHED_CLASS);
+            }
+        });
+
+        applySidebarOpenStateToToggle(mountedState);
+    }
+
+    private void applySidebarOpenStateToToggle(MountedChatSurfaceState mountedState) {
+        JmixButton toggleButton = mountedState.sidebarToggleButton;
+        if (toggleButton == null) {
+            return;
+        }
+
+        boolean open = mountedState.sidebarOpen;
+        if (open) {
+            toggleButton.addClassName(SIDEBAR_TOGGLE_ACTIVE_CLASS);
+        } else {
+            toggleButton.removeClassName(SIDEBAR_TOGGLE_ACTIVE_CLASS);
+        }
+        toggleButton.getElement().setAttribute("aria-pressed", Boolean.toString(open));
+        toggleButton.getElement().setAttribute("aria-label", messages.getMessage(open
+                ? "chatSurfaceMounter.sidebarToggle.ariaLabel.open"
+                : "chatSurfaceMounter.sidebarToggle.ariaLabel.closed"));
     }
 
     private void toggleDialog() {
@@ -255,6 +450,7 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     private void refreshMountedSurfaces(UI ui,
                                         AiUiSettings settings,
                                         boolean dialogPermitted,
+                                        boolean sidebarPermitted,
                                         boolean fullChatRoute) {
         MountedChatSurfaceState mountedState = mountedState(ui);
         if (mountedState.chatButton != null) {
@@ -263,6 +459,20 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
                     dialogPermitted,
                     fullChatRoute));
         }
+
+        boolean showSidebar = shouldShowSidebar(settings, sidebarPermitted);
+        if (mountedState.sidebarToggleButton != null) {
+            mountedState.sidebarToggleButton.setVisible(showSidebar);
+        }
+        if (mountedState.sidebarPanelDiv != null) {
+            mountedState.sidebarPanelDiv.setVisible(showSidebar);
+            if (!showSidebar && mountedState.sidebarOpen) {
+                // Mirrors syncDialogAvailability for the dialog — collapse the panel and
+                // drop the push class when the surface gets disabled/un-permitted.
+                setSidebarOpen(ui, mountedState, false);
+            }
+        }
+
         updateFullRouteMenuVisibility(ui, settings);
     }
 
@@ -293,8 +503,19 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
         return settings.getEnabledSurfaceSet().contains(AiChatSurface.FULL_ROUTE);
     }
 
+    static boolean shouldShowSidebar(AiUiSettings settings, boolean sidebarViewPermitted) {
+        return settings.getEnabledSurfaceSet().contains(AiChatSurface.SIDEBAR)
+                && sidebarViewPermitted;
+    }
+
     private boolean isDialogViewPermitted() {
         UiShowViewContext accessContext = new UiShowViewContext(CHAT_DIALOG_VIEW_ID);
+        accessManager.applyRegisteredConstraints(accessContext);
+        return accessContext.isPermitted();
+    }
+
+    private boolean isSidebarViewPermitted() {
+        UiShowViewContext accessContext = new UiShowViewContext(SIDEBAR_VIEW_ID);
         accessManager.applyRegisteredConstraints(accessContext);
         return accessContext.isPermitted();
     }
@@ -365,5 +586,14 @@ public class ChatSurfaceMounter implements VaadinServiceInitListener {
     private static final class MountedChatSurfaceState {
         private JmixButton chatButton;
         private boolean missingAppLayoutWarned;
+
+        // SIDEBAR surface — per-UI state (D-04 / REVIEWS point #1). Kept on the per-UI
+        // MountedChatSurfaceState (NOT AiChatSessionState, which stays at
+        // currentConversationId + listeners), so AiChatUIState.java is intentionally
+        // left untouched by this plan.
+        private JmixButton sidebarToggleButton;
+        private Div sidebarPanelDiv;
+        private AiAgentSidebarView sidebarHostView;
+        private boolean sidebarOpen;
     }
 }

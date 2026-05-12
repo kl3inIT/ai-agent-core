@@ -1,8 +1,8 @@
-# Jmix AI Copilot (ai-agent-core)
+# Jmix AI Agent (ai-agent-core)
 
 ## What This Is
 
-A reusable, enterprise-grade AI Copilot add-on for Jmix applications. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via the Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, can (opt-in) perform Jmix-secured create/update/related-write mutations, can read attached files directly (multimodal), can extract structured drafts that open prefilled Jmix detail views after user confirmation, and ships a built-in Flow UI (chat — full route or header-button dialog — conversations, parameters, knowledge base, exposure rules, vector-store debug, audit). Admins can narrow the LLM-visible surface below the current user's Jmix permissions via an entity-level exposure denylist. Hosts extend it through SPIs — custom tools, prompts, context providers, guards, mutation guards, fetch-plan customizers, intent extractors, custom ingesters, audit listeners — without forking.
+A reusable, enterprise-grade **AI agent add-on (agent harness)** for Jmix applications — the engineered runtime that wires an LLM agent into a Jmix app safely, not a packaged "copilot" product. Plug it into any Jmix 2.8+ app and it immediately understands the host's data model (via the Jmix metamodel), answers questions through chat with tool calls over `DataManager`, grounds responses in uploaded business documents via RAG, can (opt-in) perform Jmix-secured create/update/related-write mutations, can read attached files directly (multimodal), can extract structured drafts that open prefilled Jmix detail views after user confirmation, and ships a built-in Flow UI (chat — full route or header-button dialog — conversations, parameters, knowledge base, exposure rules, vector-store debug, audit). Admins can narrow the LLM-visible surface below the current user's Jmix permissions via an entity-level exposure denylist. Hosts extend it through SPIs — custom tools, prompts, context providers, guards, mutation guards, fetch-plan customizers, intent extractors, custom ingesters, audit listeners — without forking.
 
 ## Core Value
 
@@ -14,16 +14,26 @@ The non-negotiable floor: read-only Q&A over host entities + documents must work
 
 **Shipped versions:** v1.0.0 MVP (2026-04-26) · v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (2026-05-11, via PR #28).
 
-v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi-surface copilot without new core dependencies: prompt/tool-contract hardening (`agent.entities`/`agent.permissions` baseline, leak guards, `unknown_entity` retry), an admin LLM-exposure denylist (`AiExposureRule` + `LlmExposurePolicy`, uniform `unknown_entity` opacity), opt-in built-in mutation tools (layered fail-closed gating, idempotency, PII-safe errors, full audit), configurable chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` over one `ChatPanelFragment`, cross-surface continuity), chat task files (transient, attach + multimodal `Media` read + `bulk_save_records`, default model swap to Apache-2.0 `qwen/qwen3.6-35b-a3b`, CRM-style right-pane with per-turn-all injection), and intent-driven extraction → prefilled Jmix forms (`IntentExtractor<T>` SPI, `prepare_form_draft` / `propose_action_choices`, controller-side-only navigation, permission-gated prefill). Milestone audit: integration + E2E PASS; status `tech_debt` for bookkeeping (see below).
+v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi-surface AI agent without new core dependencies: prompt/tool-contract hardening (`agent.entities`/`agent.permissions` baseline, leak guards, `unknown_entity` retry), an admin LLM-exposure denylist (`AiExposureRule` + `LlmExposurePolicy`, uniform `unknown_entity` opacity), opt-in built-in mutation tools (layered fail-closed gating, idempotency, PII-safe errors, full audit), configurable chat surfaces (`FULL_ROUTE` + `HEADER_BUTTON` over one `ChatPanelFragment`, cross-surface continuity), chat task files (transient, attach + multimodal `Media` read + `bulk_save_records`, default model swap to Apache-2.0 `qwen/qwen3.6-35b-a3b`, CRM-style right-pane with per-turn-all injection), and intent-driven extraction → prefilled Jmix forms (`IntentExtractor<T>` SPI, `prepare_form_draft` / `propose_action_choices`, controller-side-only navigation, permission-gated prefill). Milestone audit: integration + E2E PASS; status `tech_debt` for bookkeeping (see below).
 
 **Carried debt (not blockers):**
 - Phase 10 `10-VERIFICATION.md` is still `human_needed` — goal achieved (4/4 ROADMAP criteria, 12/12 REQ IDs); the substantive REVIEW items (BLOCKER-01/02, WARNING-08) are fixed in code; visual-UI checks + WARNING-01 (RAG partial-failure window) never formally recorded. Optional `/gsd-verify-work 10`.
 - Nyquist `*-VALIDATION.md` exists only for Phase 14; backfill phases 9/10/11/12/13/13.1 with `/gsd-validate-phase` (v1.2 hardening pass).
 - Clean-consumer smoke (PKG-05 / TEST-07) still deferred from v1.0.0 Plan 08-05 — needs PostgreSQL/pgvector Testcontainers OR a starter-provided stub `VectorStore` boot mode.
 
-## Next Milestone: v1.2 (not started)
+## Current Milestone: v1.2 Operator Experience, Voice Input & Runtime Performance
 
-Run `/gsd-new-milestone` to define it, then `/gsd-review-backlog` to pull in Backlog items. Likely scope: Phase 15 — Chat Voice Input · Soniox STT (deferred from v1.1; ROADMAP Backlog → Phase 999.2); Phase 10 re-verification + Nyquist `*-VALIDATION.md` backfill; Phase 11 mutation-internals hardening (ROADMAP Backlog → Phase 999.1); PKG-05/TEST-07 clean-consumer smoke; possibly the collapsible per-turn tool-detail panel + ephemeral streaming-status indicator.
+**Goal:** Turn the v1.1 AI agent into one operators can tune and observe — admin model/config management, in-chat observability, voice input, mutation-internals hardening, and a targeted AI-runtime performance pass.
+
+**Target features:**
+- **Chat voice input — Soniox STT (trimmed):** Soniox default transcription path + OpenAI-direct fallback, browser `MediaRecorder` capture, privacy-safe `STT_TRANSCRIPTION` audit (SHA-256 hash by default / raw transcript opt-in), non-blocking error + retry UI, transcript lands in `MessageInput` for user review before send. `TranscriptionPostProcessor` SPI and custom-provider SPI deferred until a real host need appears.
+- **Right-sidebar chat surface & observability UX:** `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, plus collapsible per-turn tool-detail panel and ephemeral streaming-status indicator (resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo). The chat-state side panel is deferred.
+- **Admin model management:** curated common-model dropdown + custom model-name free-entry in the admin Parameters/Settings UI; admin-only (no per-conversation end-user model switching). Curated defaults stay self-hostable open-weights per project policy; the custom-entry field allows anything the host routes to.
+- **Admin config-knob migration:** audit prior-phase properties-only knobs (RAG top-k / similarity threshold, mutation toggle, task-file token budget, chat surface mode, STT toggle, etc.) and migrate the operator-relevant ones into editable `AiParameters` / admin UI.
+- **Phase 11 mutation-internals hardening:** refactor duplicated mutation-gate sequencing, batch-load to-one FK references during mutation binding, cache related-write metadata resolution where safe (ROADMAP Backlog → Phase 999.1).
+- **AI-runtime performance pass (targeted — no benchmark harness):** optimize known/suspected hotspots in chat turn execution, tool calls, mutation binding/save flow, media/attachment injection, RAG retrieval / filter building, prompt/context construction, and repeated metadata / security / exposure-policy resolution. Admin-screen performance is explicitly NOT in scope.
+
+**Deferred to a later hardening pass (NOT v1.2):** Phase 10 re-verification + Nyquist `*-VALIDATION.md` backfill (phases 9/10/11/12/13/13.1); PKG-05/TEST-07 clean-consumer smoke (v1.0.0 Plan 08-05 carryover); `TranscriptionPostProcessor` + custom STT-provider SPIs; per-conversation end-user model switching; admin-screen performance work; dormant-seed activation (SEED-001/002/003/004/006/008 triggers not met).
 
 ## Requirements
 
@@ -48,15 +58,23 @@ Run `/gsd-new-milestone` to define it, then `/gsd-review-backlog` to pull in Bac
 
 ### Active
 
-(None — v1.1.0 closed 2026-05-11. Next milestone v1.2 will be defined fresh via `/gsd-new-milestone`; see Backlog in `ROADMAP.md`.)
+v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigned in `REQUIREMENTS.md`, phases in `ROADMAP.md`):
 
-### Deferred (carried to v1.2+)
+- [ ] Chat voice input — Soniox STT (trimmed): Soniox default + OpenAI-direct fallback, `MediaRecorder` capture, privacy-safe `STT_TRANSCRIPTION` audit (hash default / raw opt-in), non-blocking error + retry UI, transcript → `MessageInput` for review before send. (Promotes ROADMAP Backlog Phase 999.2; `TranscriptionPostProcessor`/custom-provider SPIs deferred.)
+- [ ] Right-sidebar chat surface & observability UX: `SIDEBAR` / right-sidebar chat surface over the existing `ChatPanelFragment`, collapsible per-turn tool-detail panel, and ephemeral streaming-status indicator. (Resolves the pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo; chat-state side panel deferred.)
+- [ ] Admin model management: curated common-model dropdown + custom model-name free-entry in admin Parameters/Settings UI; admin-only.
+- [ ] Admin config-knob migration: surface operator-relevant prior-phase properties knobs as editable `AiParameters` / admin UI settings.
+- [ ] Phase 11 mutation-internals hardening: dedup gate sequencing, batch-load to-one FK refs during binding, cache related-write metadata. (Promotes ROADMAP Backlog Phase 999.1.)
+- [ ] AI-runtime performance pass (targeted): chat turn execution, tool calls, mutation binding/save, media/attachment injection, RAG retrieval/filter building, prompt/context construction, repeated metadata/security/exposure-policy resolution.
 
-- [ ] **Chat Voice Input · Soniox STT** (`STT-01..06`, `SPI-11`, `TEST-17`) — was Phase 15 of v1.1, sequenced last ("nice to have"), deferred 2026-05-11. Browser `MediaRecorder` capture + custom Spring `RestClient` Soniox provider + `TranscriptionService` strategy (+ optional OpenAI fallback) + `TranscriptionPostProcessor` SPI + privacy-safe `STT_TRANSCRIPTION` audit. See `ROADMAP.md` Backlog → Phase 999.2 and `milestones/v1.1.0-REQUIREMENTS.md` "Deferred to v1.2".
-- [ ] **Phase 11 mutation-internals hardening** — refactor duplicated mutation gate sequencing, batch-load to-one FK refs during binding, cache related-write metadata. See `ROADMAP.md` Backlog → Phase 999.1.
-- [ ] **Phase 10 re-verification + Nyquist backfill** — `/gsd-verify-work 10` to flip the stale `human_needed` status; `/gsd-validate-phase` for phases 9/10/11/12/13/13.1 (no `*-VALIDATION.md`).
-- [ ] **Clean-consumer smoke (PKG-05 / TEST-07)** — Plan 08-05 carryover from v1.0.0. Postgres/pgvector Testcontainers smoke OR a starter stub `VectorStore` boot mode.
-- [ ] **Collapsible per-turn tool-detail panel + ephemeral streaming-status indicator** in chat UI — secondary UX polish.
+### Deferred (carried to v1.3+ / later hardening pass)
+
+- [ ] **Phase 10 re-verification + Nyquist backfill** — `/gsd-verify-work 10` to flip the stale `human_needed` status; `/gsd-validate-phase` for phases 9/10/11/12/13/13.1 (no `*-VALIDATION.md`). Deferred from v1.2 per user decision 2026-05-11.
+- [ ] **Clean-consumer smoke (PKG-05 / TEST-07)** — Plan 08-05 carryover from v1.0.0. Postgres/pgvector Testcontainers smoke OR a starter stub `VectorStore` boot mode. Deferred from v1.2 per user decision 2026-05-11.
+- [ ] **`TranscriptionPostProcessor` SPI + custom STT-provider SPI** — trimmed out of v1.2 STT scope; revisit when a real host need appears.
+- [ ] **Per-conversation end-user model switching** — v1.2 model picker is admin-only; per-conversation switching deferred.
+- [ ] **Chat-state side panel** — model/conversation/governance/attachment-budget summary in chat is deferred per user decision 2026-05-11; Phase 15 implements the `SIDEBAR` / right-sidebar chat surface but must not add this separate state panel.
+- [ ] **Admin-screen performance work** — out of the v1.2 perf pass (which is AI-runtime only); separate effort if needed.
 - [ ] **Attribute-path-level exposure rules** (vs. entity-level only) — `attributePath` field on `AiExposureRule`; deferred per user decision 2026-04-27.
 
 ### Out of Scope
@@ -67,7 +85,7 @@ Run `/gsd-new-milestone` to define it, then `/gsd-review-backlog` to pull in Bac
 - URL/web crawling ingestion remains deferred.
 - Native non-OpenAI-compatible provider starters remain deferred; hosts can swap `ChatModel` or use OpenRouter-compatible routing.
 - Jmix internal APIs remain forbidden.
-- Universal-agent positioning remains out of scope; this project is specifically a Jmix copilot add-on.
+- Universal-agent positioning remains out of scope; this project is specifically a Jmix AI agent add-on (a metadata-first, Jmix-secured agent — not a generic agent framework).
 - Custom vector-store abstractions remain out of scope; use Spring AI `VectorStore` directly.
 
 ## Context
@@ -85,7 +103,7 @@ Run `/gsd-new-milestone` to define it, then `/gsd-review-backlog` to pull in Bac
 - Jmix 2.8 uses Spring Boot 3, Java 17, Vaadin Flow — matches Spring AI's Boot 3 requirement.
 - `DataManager` fluent API is the only supported entry point for secured data access; `EntityManager` bypasses Jmix security and is explicitly forbidden in this codebase (see `CLAUDE.md`).
 
-**Why now:** Jmix lacks a first-party AI copilot. Customer enterprise Jmix apps increasingly want "ask your data" UX, but rolling it safely is expensive. A reusable metadata-first add-on lets every Jmix app get a governed copilot with minimal custom code.
+**Why now:** Jmix lacks a first-party AI agent. Customer enterprise Jmix apps increasingly want "ask your data" UX, but rolling it safely is expensive. A reusable metadata-first add-on lets every Jmix app get a governed AI agent with minimal custom code.
 
 ## Constraints
 
@@ -147,4 +165,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-11 — after v1.1.0 milestone (Prompt Hardening, Mutation Tools & Configurable Chat Surfaces) shipped*
+*Last updated: 2026-05-11 — milestone v1.2 (Operator Experience, Voice Input & Runtime Performance) started*

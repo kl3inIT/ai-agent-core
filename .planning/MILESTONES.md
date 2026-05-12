@@ -1,8 +1,8 @@
-# Project Milestones: Jmix AI Copilot (ai-agent-core)
+# Project Milestones: Jmix AI Agent (ai-agent-core)
 
 ## v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (Shipped: 2026-05-11)
 
-**Delivered:** The v1.0 read-only Jmix AI Copilot grew into a mutation-capable, governance-aware, multi-surface chat add-on — without new core dependencies. Hard build-order honored: tool/prompt foundations → exposure policy → mutation tools → configurable surfaces / chat task file / intent extraction.
+**Delivered:** The v1.0 read-only Jmix AI Agent grew into a mutation-capable, governance-aware, multi-surface chat add-on — without new core dependencies. Hard build-order honored: tool/prompt foundations → exposure policy → mutation tools → configurable surfaces / chat task file / intent extraction.
 
 **Phases completed:** 7 — Phase 9, 10, 11, 12, 13, follow-up 13.1, 14 (62 plans, 138 tasks). Phase 15 (Chat Voice Input — Soniox STT) was sequenced last in v1.1, then deferred to v1.2.
 
@@ -41,7 +41,7 @@
 
 ## v1.0.0 MVP (Shipped: 2026-04-26)
 
-**Delivered:** A reusable Jmix AI Copilot add-on with secure metadata tools, Spring AI orchestration, RAG, guardrails, Flow UI, audit tree, release docs, and CI.
+**Delivered:** A reusable Jmix AI agent add-on with secure metadata tools, Spring AI orchestration, RAG, guardrails, Flow UI, audit tree, release docs, and CI.
 
 **Phases completed:** 1-8 plus inserted 7.1 and 7.2 (63 plans total)
 

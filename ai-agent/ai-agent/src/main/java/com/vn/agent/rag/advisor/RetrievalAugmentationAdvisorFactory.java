@@ -1,6 +1,7 @@
 package com.vn.agent.rag.advisor;
 
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
@@ -41,9 +42,11 @@ public class RetrievalAugmentationAdvisorFactory {
     public RetrievalAugmentationAdvisor retrievalAugmentationAdvisor(VectorStore vectorStore,
                                                                     AiAgentRagProperties props,
                                                                     AuditWriter auditWriter,
-                                                                    CurrentAuthentication currentAuthentication) {
+                                                                    CurrentAuthentication currentAuthentication,
+                                                                    StreamingSinkHolder streamingSinkHolder) {
         DocumentRetriever retriever = new AuditingDocumentRetriever(vectorStore,
-                props.resolvedTopK(), props.resolvedSimilarityThreshold(), auditWriter, currentAuthentication);
+                props.resolvedTopK(), props.resolvedSimilarityThreshold(), auditWriter, currentAuthentication,
+                streamingSinkHolder);
 
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(retriever)

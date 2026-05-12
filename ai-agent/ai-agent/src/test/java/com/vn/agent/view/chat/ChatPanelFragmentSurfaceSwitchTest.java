@@ -146,9 +146,55 @@ class ChatPanelFragmentSurfaceSwitchTest {
         });
     }
 
+    @Test
+    void sidebarSurfaceReusesSessionConversationIdForCrossSurfaceContinuity() {
+        systemAuthenticator.runWithUser(USERNAME, () -> {
+            AiChatSessionState chatSessionState = chatSessionStateProvider.getObject();
+            enableAllSurfaces();
+
+            // A conversation started elsewhere (e.g. the route surface) is visible after
+            // switching to the SIDEBAR surface — same AiChatSessionState.currentConversationId,
+            // same singleton ChatService / chat memory.
+            ChatResponseDto response = chatService.ask(USERNAME, null, ROUTE_MESSAGE);
+            chatSessionState.setCurrentConversationId(response.conversationId());
+
+            DialogWindow<AiAgentSidebarView> sidebar = dialogWindows
+                    .view(UiTestUtils.getCurrentView(), AiAgentSidebarView.class)
+                    .build();
+            sidebar.open();
+            ChatPanelFragment sidebarFragment = UiTestUtils.getComponent(sidebar.getView(), "chatPanelFragment");
+            assertThat(sidebarFragment.getConversationId())
+                    .as("sidebar fragment must reuse the active conversation id from session state")
+                    .isEqualTo(response.conversationId());
+
+            // And vice versa — a new (real) conversation set on the session is reflected
+            // after re-open (same continuity mechanism, both directions).
+            ChatResponseDto secondResponse = chatService.ask(USERNAME, null, DIALOG_MESSAGE);
+            chatSessionState.setCurrentConversationId(secondResponse.conversationId());
+            sidebar.close();
+
+            DialogWindow<AiAgentSidebarView> sidebarReopened = dialogWindows
+                    .view(UiTestUtils.getCurrentView(), AiAgentSidebarView.class)
+                    .build();
+            sidebarReopened.open();
+            ChatPanelFragment reopenedFragment =
+                    UiTestUtils.getComponent(sidebarReopened.getView(), "chatPanelFragment");
+            assertThat(reopenedFragment.getConversationId())
+                    .as("re-opened sidebar must pick up the latest session conversation id")
+                    .isEqualTo(secondResponse.conversationId());
+        });
+    }
+
     private void enableRouteAndHeaderSurfaces() {
         AiUiSettings settings = uiSettingsService.loadCurrent();
         settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON));
+        settings.setDefaultSurface(AiChatSurface.FULL_ROUTE);
+        unconstrainedDataManager.save(settings);
+    }
+
+    private void enableAllSurfaces() {
+        AiUiSettings settings = uiSettingsService.loadCurrent();
+        settings.setEnabledSurfaceSet(EnumSet.allOf(AiChatSurface.class));
         settings.setDefaultSurface(AiChatSurface.FULL_ROUTE);
         unconstrainedDataManager.save(settings);
     }

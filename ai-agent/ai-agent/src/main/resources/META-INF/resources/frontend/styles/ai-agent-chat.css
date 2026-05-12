@@ -208,18 +208,18 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
 
 /* --- Phase 14: inline "Open form to confirm" row --------------------------- */
 
+/* Phase 15-06 Gap 2 — anchored inline under the proposing turn's <vaadin-message>,
+ * indented under the assistant bubble (was a centered messageListSlot-tail row). */
 .ai-agent-intent-confirm {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: var(--lumo-space-s);
     padding: var(--lumo-space-s) var(--lumo-space-m);
-    margin: var(--lumo-space-s) auto;
-    min-height: 4rem;
-    max-width: fit-content;
+    margin: var(--lumo-space-s) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
     background: var(--lumo-base-color);
-    border: 0.0625rem solid var(--lumo-contrast-20pct);
-    border-radius: var(--lumo-border-radius-l);
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
     box-shadow: var(--lumo-box-shadow-xs);
 }
 
@@ -229,24 +229,243 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
 }
 
 /* --- Phase 14 gap closure: post-proposal action choices -------------------- */
-
+/* Phase 15-06 Gap 2 (Option A) — the action-choice block is now spliced inline
+ * directly after the proposing turn's <vaadin-message> (not stacked at the slot tail),
+ * indented under the assistant bubble, with a primary left border + primary-10pct tint
+ * per 15-option-A-mockup.html. The buttons inside still get Lumo primary/small/tertiary
+ * theme variants from Java. */
 .ai-agent-action-choice {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: var(--lumo-space-s);
     padding: var(--lumo-space-s) var(--lumo-space-m);
-    margin: var(--lumo-space-s) auto;
-    min-height: 4rem;
-    max-width: min(100%, 32rem);
-    background: var(--lumo-base-color);
-    border: 0.0625rem solid var(--lumo-contrast-20pct);
-    border-radius: var(--lumo-border-radius-l);
-    box-shadow: var(--lumo-box-shadow-xs);
+    margin: var(--lumo-space-s) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
+    background: var(--lumo-primary-color-10pct);
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-left: 3px solid var(--lumo-primary-color);
+    border-radius: var(--lumo-border-radius-m);
+    box-shadow: none;
 }
 
 .ai-agent-action-choice__summary {
-    color: var(--lumo-secondary-text-color);
+    flex-basis: 100%;
+    color: var(--lumo-body-text-color);
     font-size: var(--lumo-font-size-s);
+    margin-bottom: var(--lumo-space-xs);
+}
+
+/* --- Phase 15 Plan 03: SIDEBAR chat surface (D-01..D-04) -------------------
+ *
+ * The SIDEBAR surface is a non-modal, position:fixed docked Div on the UI element
+ * (ChatSurfaceMounter mounts it there so it survives route navigation — the
+ * AppLayout content slot is setContent()-replaced on every navigation). It hosts
+ * the existing ChatPanelFragment through a lean Jmix-owned host view
+ * (AiAgentSidebarView). Loaded on every chat/sidebar render via
+ * @CssImport("./styles/ai-agent-chat.css") on ChatPanelFragment (REVIEWS point #5).
+ * Justified raw-CSS exception per D-01 (no new Vaadin theme / theme.json).
+ *
+ * Width: clamp(640px, 32vw, 760px) — replaces the malformed `clamp(420px, 32vw, 32vw)`
+ * flagged in 15-REVIEWS point #4. The fragment's chat-panel-fragment.xml has a
+ * <split orientation="HORIZONTAL" splitterPosition="68"> (68% chat / 32% attachments),
+ * so 640px min ⇒ ~205px for the attachments pane — matching the project's ~200px
+ * attachment-card note (cf. ChatSurfaceMounter.configureDialogWindow comment). 32vw
+ * preferred; 760px cap on wide screens.
+ *
+ * top: var(--lumo-size-xl, 3.5rem) — a Lumo size token used as the navbar-height
+ * proxy with a 3.5rem fallback (this app's StandardMainView navbar is position:relative,
+ * so an exact value is not load-bearing; the fallback keeps the panel below the navbar
+ * on shells without the token).
+ */
+.ai-agent-sidebar {
+    position: fixed;
+    right: 0;
+    top: var(--lumo-size-xl, 3.5rem);
+    bottom: 0;
+    width: clamp(640px, 32vw, 760px);
+    display: none;
+    z-index: 5;
+    background: var(--lumo-base-color);
+    box-shadow: var(--lumo-box-shadow-l);
+}
+
+.ai-agent-sidebar--open {
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-agent-sidebar__header {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--lumo-space-xs);
+    flex: 0 0 auto;
+}
+
+/* The host view's element (below the header row) fills the remaining height. */
+.ai-agent-sidebar > :not(.ai-agent-sidebar__header) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Push the main content left when the panel is open. padding-right suffices because
+ * the navbar is position:relative; add padding-top only on a host with a fixed navbar. */
+.ai-agent-content--pushed {
+    padding-right: clamp(640px, 32vw, 760px);
+}
+
+/* Small devices (≤768px): the panel becomes a full-screen overlay and the push is
+ * dropped. The fragment's internal 68/32 split stacks per its own responsive rules. */
+@media (max-width: 768px) {
+    .ai-agent-sidebar {
+        width: 100vw;
+        left: 0;
+        right: 0;
+    }
+
+    .ai-agent-content--pushed {
+        padding-right: 0;
+    }
+}
+
+/* Lumo has no built-in "pressed" toggle variant — mark the navbar toggle's active
+ * (panel-open) state explicitly. Pairs with aria-pressed="true" set server-side. */
+.ai-agent-sidebar-toggle--active {
+    background: var(--lumo-primary-color-10pct);
+    color: var(--lumo-primary-text-color);
+}
+
+/* --- Phase 15 Plan 04: ephemeral streaming-status line (OBS-01) -------------
+ *
+ * A <span class="ai-agent-status" role="status" aria-live="polite"> rendered as a
+ * sibling AFTER <vaadin-message-list> inside the message-list slot — never inside a
+ * MessageListItem. Removed entirely on every terminal/teardown site (review #7), so
+ * it never lingers below a completed turn. A subtle animated ellipsis communicates
+ * "working" without grabbing attention; the prefers-reduced-motion guard stills it.
+ */
+.ai-agent-status {
+    display: block;
+    text-align: center;
+    font-size: var(--lumo-font-size-s);
+    color: var(--lumo-secondary-text-color);
+    padding: var(--lumo-space-xs) 0;
+}
+
+.ai-agent-status::after {
+    content: "";
+    display: inline-block;
+    width: 1.2em;
+    text-align: left;
+    animation: ai-agent-status-pulse 1.2s steps(4, end) infinite;
+}
+
+@keyframes ai-agent-status-pulse {
+    0% { content: ""; }
+    25% { content: "."; }
+    50% { content: ".."; }
+    75% { content: "..."; }
+    100% { content: ""; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-agent-status::after {
+        animation: none;
+        content: "…";
+    }
+}
+
+/* --- Phase 15 Plan 04 / 15-06 Gap 2 (Option A): per-turn tool-detail disclosure (OBS-02)
+ *
+ * Each <vaadin-details class="ai-agent-turn-activity"> is wrapped in a
+ * <div class="ai-agent-turn-extra"> and spliced into the <vaadin-message-list> light DOM
+ * immediately after its turn's <vaadin-message> (re-anchored after every setItems and after
+ * history replay). Styled per 15-option-A-mockup.html: border + light contrast tint + ⚙ in
+ * the summary + the native rotating toggle + per-step icon chips (🔍 / 📄 / 💬, ✕ red for an
+ * errored/rolled-back step) + right-aligned tabular-nums ms. --lumo-* tokens only.
+ */
+
+/* Indent wrapper — aligns the extra under the assistant bubble (≈ avatar + gap, ~40px). */
+.ai-agent-turn-extra {
+    margin: var(--lumo-space-xs) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
+}
+
+/* The disclosure itself (the class now sits on the <vaadin-details> element). */
+.ai-agent-turn-activity {
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-radius: var(--lumo-border-radius-m);
+    background: var(--lumo-contrast-5pct);
+    overflow: hidden;
+}
+
+.ai-agent-turn-activity::part(summary) {
+    padding: var(--lumo-space-xs) var(--lumo-space-s);
+    cursor: pointer;
+    font-size: var(--lumo-font-size-s);
+    color: var(--lumo-secondary-text-color);
+    user-select: none;
+}
+
+/* ⚙ gear before the summary text. */
+.ai-agent-turn-activity::part(summary)::before {
+    content: "⚙ ";
+    opacity: 0.7;
+}
+
+.ai-agent-turn-activity::part(content) {
+    padding: 0;
+}
+
+.ai-agent-turn-activity__steps {
+    width: 100%;
+    /* Indented under the summary text, matching the mockup's .steps padding. */
+    padding: var(--lumo-space-xs) var(--lumo-space-s) var(--lumo-space-s) var(--lumo-space-xl);
+}
+
+.ai-agent-turn-activity__step {
+    display: flex;
+    align-items: center;
+    gap: var(--lumo-space-s);
+    font-size: var(--lumo-font-size-s);
+    padding: 2px 0;
+    color: var(--lumo-body-text-color);
+}
+
+/* Per-step icon chip — content set by the KIND-keyed modifier class below. */
+.ai-agent-turn-activity__step::before {
+    content: "•";
+    width: 18px;
+    height: 18px;
+    border-radius: var(--lumo-border-radius-s);
+    background: var(--lumo-primary-color-10pct);
+    color: var(--lumo-primary-text-color);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.ai-agent-turn-activity__step--tool::before { content: "🔍"; }
+.ai-agent-turn-activity__step--retrieval::before { content: "📄"; }
+.ai-agent-turn-activity__step--chat::before { content: "💬"; }
+
+.ai-agent-turn-activity__step--errored::before {
+    content: "✕";
+    background: var(--lumo-error-color-10pct);
+    color: var(--lumo-error-text-color);
+}
+
+.ai-agent-turn-activity__step-label {
+    flex: 1;
+}
+
+.ai-agent-turn-activity__step-duration {
+    margin-left: auto;
+    color: var(--lumo-secondary-text-color);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--lumo-font-size-xs);
+}
+
+.ai-agent-turn-activity__step-error {
+    color: var(--lumo-error-text-color);
+    font-size: var(--lumo-font-size-xs);
 }
