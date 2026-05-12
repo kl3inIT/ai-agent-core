@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
-status: executing
+status: "Phase 15 shipped — PR #29"
 stopped_at: Completed 15-05-PLAN.md — Phase 15 complete (all 5 plans), ready for verification
-last_updated: "2026-05-12T11:45:54.387Z"
+last_updated: "2026-05-12T15:39:40.590Z"
 last_activity: 2026-05-12
 progress:
   total_phases: 6
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 Phase: 15 (right-sidebar-chat-surface-observability-ux) — EXECUTING
 Plan: 2 of 6
-Status: Ready to execute
+Status: Phase 15 shipped — PR #29
 Last activity: 2026-05-12
 
 ## Phase Status
