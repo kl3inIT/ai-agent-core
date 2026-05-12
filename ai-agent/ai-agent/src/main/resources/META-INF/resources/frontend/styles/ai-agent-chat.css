@@ -208,18 +208,18 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
 
 /* --- Phase 14: inline "Open form to confirm" row --------------------------- */
 
+/* Phase 15-06 Gap 2 — anchored inline under the proposing turn's <vaadin-message>,
+ * indented under the assistant bubble (was a centered messageListSlot-tail row). */
 .ai-agent-intent-confirm {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: var(--lumo-space-s);
     padding: var(--lumo-space-s) var(--lumo-space-m);
-    margin: var(--lumo-space-s) auto;
-    min-height: 4rem;
-    max-width: fit-content;
+    margin: var(--lumo-space-s) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
     background: var(--lumo-base-color);
-    border: 0.0625rem solid var(--lumo-contrast-20pct);
-    border-radius: var(--lumo-border-radius-l);
+    border: 1px solid var(--lumo-contrast-20pct);
+    border-radius: var(--lumo-border-radius-m);
     box-shadow: var(--lumo-box-shadow-xs);
 }
 
@@ -229,26 +229,30 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
 }
 
 /* --- Phase 14 gap closure: post-proposal action choices -------------------- */
-
+/* Phase 15-06 Gap 2 (Option A) — the action-choice block is now spliced inline
+ * directly after the proposing turn's <vaadin-message> (not stacked at the slot tail),
+ * indented under the assistant bubble, with a primary left border + primary-10pct tint
+ * per 15-option-A-mockup.html. The buttons inside still get Lumo primary/small/tertiary
+ * theme variants from Java. */
 .ai-agent-action-choice {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: var(--lumo-space-s);
     padding: var(--lumo-space-s) var(--lumo-space-m);
-    margin: var(--lumo-space-s) auto;
-    min-height: 4rem;
-    max-width: min(100%, 32rem);
-    background: var(--lumo-base-color);
-    border: 0.0625rem solid var(--lumo-contrast-20pct);
-    border-radius: var(--lumo-border-radius-l);
-    box-shadow: var(--lumo-box-shadow-xs);
+    margin: var(--lumo-space-s) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
+    background: var(--lumo-primary-color-10pct);
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-left: 3px solid var(--lumo-primary-color);
+    border-radius: var(--lumo-border-radius-m);
+    box-shadow: none;
 }
 
 .ai-agent-action-choice__summary {
-    color: var(--lumo-secondary-text-color);
+    flex-basis: 100%;
+    color: var(--lumo-body-text-color);
     font-size: var(--lumo-font-size-s);
+    margin-bottom: var(--lumo-space-xs);
 }
 
 /* --- Phase 15 Plan 03: SIDEBAR chat surface (D-01..D-04) -------------------
@@ -370,36 +374,98 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     }
 }
 
-/* --- Phase 15 Plan 04: per-turn tool-detail activity block (OBS-02) ---------
+/* --- Phase 15 Plan 04 / 15-06 Gap 2 (Option A): per-turn tool-detail disclosure (OBS-02)
  *
- * One ordered container Div appended after <vaadin-message-list>, holding the
- * collapsed-by-default <vaadin-details> disclosures in turn order (newest last) —
- * the only achievable rendering on the MessageList substrate (review #2). Label-only
- * KIND-keyed step rows; per-step duration ("— " when unknown, never "0 ms").
+ * Each <vaadin-details class="ai-agent-turn-activity"> is wrapped in a
+ * <div class="ai-agent-turn-extra"> and spliced into the <vaadin-message-list> light DOM
+ * immediately after its turn's <vaadin-message> (re-anchored after every setItems and after
+ * history replay). Styled per 15-option-A-mockup.html: border + light contrast tint + ⚙ in
+ * the summary + the native rotating toggle + per-step icon chips (🔍 / 📄 / 💬, ✕ red for an
+ * errored/rolled-back step) + right-aligned tabular-nums ms. --lumo-* tokens only.
  */
+
+/* Indent wrapper — aligns the extra under the assistant bubble (≈ avatar + gap, ~40px). */
+.ai-agent-turn-extra {
+    margin: var(--lumo-space-xs) 0 0 calc(var(--lumo-size-m) + var(--lumo-space-s));
+}
+
+/* The disclosure itself (the class now sits on the <vaadin-details> element). */
 .ai-agent-turn-activity {
-    display: flex;
-    flex-direction: column;
-    gap: var(--lumo-space-xs);
-    padding: 0 var(--lumo-space-m);
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-radius: var(--lumo-border-radius-m);
+    background: var(--lumo-contrast-5pct);
+    overflow: hidden;
+}
+
+.ai-agent-turn-activity::part(summary) {
+    padding: var(--lumo-space-xs) var(--lumo-space-s);
+    cursor: pointer;
+    font-size: var(--lumo-font-size-s);
+    color: var(--lumo-secondary-text-color);
+    user-select: none;
+}
+
+/* ⚙ gear before the summary text. */
+.ai-agent-turn-activity::part(summary)::before {
+    content: "⚙ ";
+    opacity: 0.7;
+}
+
+.ai-agent-turn-activity::part(content) {
+    padding: 0;
 }
 
 .ai-agent-turn-activity__steps {
     width: 100%;
+    /* Indented under the summary text, matching the mockup's .steps padding. */
+    padding: var(--lumo-space-xs) var(--lumo-space-s) var(--lumo-space-s) var(--lumo-space-xl);
 }
 
 .ai-agent-turn-activity__step {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--lumo-space-s);
     font-size: var(--lumo-font-size-s);
+    padding: 2px 0;
+    color: var(--lumo-body-text-color);
+}
+
+/* Per-step icon chip — content set by the KIND-keyed modifier class below. */
+.ai-agent-turn-activity__step::before {
+    content: "•";
+    width: 18px;
+    height: 18px;
+    border-radius: var(--lumo-border-radius-s);
+    background: var(--lumo-primary-color-10pct);
+    color: var(--lumo-primary-text-color);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.ai-agent-turn-activity__step--tool::before { content: "🔍"; }
+.ai-agent-turn-activity__step--retrieval::before { content: "📄"; }
+.ai-agent-turn-activity__step--chat::before { content: "💬"; }
+
+.ai-agent-turn-activity__step--errored::before {
+    content: "✕";
+    background: var(--lumo-error-color-10pct);
+    color: var(--lumo-error-text-color);
+}
+
+.ai-agent-turn-activity__step-label {
+    flex: 1;
 }
 
 .ai-agent-turn-activity__step-duration {
+    margin-left: auto;
     color: var(--lumo-secondary-text-color);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--lumo-font-size-xs);
 }
 
 .ai-agent-turn-activity__step-error {
     color: var(--lumo-error-text-color);
-    font-weight: 500;
+    font-size: var(--lumo-font-size-xs);
 }

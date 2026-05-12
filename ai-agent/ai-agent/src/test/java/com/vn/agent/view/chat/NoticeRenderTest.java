@@ -72,11 +72,13 @@ class NoticeRenderTest {
                 .as("text content must flow through Element.setText(...) for HTML escaping")
                 .contains(".setText(text)");
 
-        // 3. The element is appended to messageListSlot.getElement() (sibling of
-        //    the <vaadin-message-list> block).
+        // 3. Phase 15-06 Gap 2 (Option A) — the NOTICE element is anchored inline after the
+        //    current turn's transcript message via anchorExtra(...) (server-side a child of
+        //    messageListSlot right after the <vaadin-message-list>; client-side spliced into the
+        //    message-list light DOM), no longer blindly appended at the messageListSlot tail.
         assertThat(source)
-                .as("NOTICE rows attach as raw Element children to messageListSlot")
-                .contains("messageListSlot.getElement().appendChild(notice)");
+                .as("NOTICE rows are anchored inline per turn via anchorExtra(...)")
+                .contains("anchorExtra(items.isEmpty() ? 0 : items.size() - 1, notice)");
 
         // 4. History-replay loop dispatches AiMessageRole.NOTICE to appendNoticeRow.
         assertThat(source)

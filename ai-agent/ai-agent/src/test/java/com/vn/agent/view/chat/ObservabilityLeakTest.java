@@ -190,12 +190,15 @@ class ObservabilityLeakTest {
         assertThat(statusSpan.getClassList()).contains("ai-agent-status");
         assertNoLeak(statusSpan.getText(), tool, host);
 
-        // The ACTUAL rendered Details inside the .ai-agent-turn-activity block.
-        Div activityBlock = (Div) get(fragment, "turnActivityBlock");
-        assertThat(activityBlock).isNotNull();
-        assertThat(activityBlock.getClassName()).contains("ai-agent-turn-activity");
-        Details details = activityBlock.getChildren()
+        // The ACTUAL rendered Details inside the .ai-agent-turn-extra wrapper (Phase 15-06 Gap 2).
+        @SuppressWarnings("unchecked")
+        java.util.Map<UUID, Div> wrappers = (java.util.Map<UUID, Div>) get(fragment, "turnDetailWrapperByRunId");
+        Div wrapper = wrappers.get(RUN_ID);
+        assertThat(wrapper).isNotNull();
+        assertThat(wrapper.getClassName()).contains("ai-agent-turn-extra");
+        Details details = wrapper.getChildren()
                 .filter(c -> c instanceof Details).map(c -> (Details) c).findFirst().orElseThrow();
+        assertThat(details.getClassNames()).contains("ai-agent-turn-activity");
         // Summary text.
         assertNoLeak(details.getSummaryText(), tool, host);
         // Every rendered step-row text inside the Details.
@@ -262,6 +265,14 @@ class ObservabilityLeakTest {
         when(userDetails.getUsername()).thenReturn("alice");
         when(currentAuthentication.getUser()).thenReturn(userDetails);
         inject(fragment, "currentAuthentication", currentAuthentication);
+        // Phase 15-06 Gap 2 — appendTurnDetails anchors the disclosure after the current turn's
+        // transcript message; seed 2 items (USER + ASSISTANT) so the anchor exists.
+        @SuppressWarnings("unchecked")
+        java.util.List<com.vaadin.flow.component.messages.MessageListItem> items =
+                (java.util.List<com.vaadin.flow.component.messages.MessageListItem>) get(fragment, "items");
+        items.add(new com.vaadin.flow.component.messages.MessageListItem("u", java.time.Instant.now(), "u"));
+        items.add(new com.vaadin.flow.component.messages.MessageListItem("a", java.time.Instant.now(), "a"));
+        messageList.setItems(new java.util.ArrayList<>(items));
         return fragment;
     }
 

@@ -263,11 +263,28 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     /** Per-fragment-instance bounded live-turn step accumulator (NOT {@code AiChatSessionState}),
      *  capped at {@link #LIVE_TURN_STEP_CAP}, cleared on every terminal/teardown site. */
     private final List<LiveTurnStep> liveTurnSteps = new ArrayList<>();
-    /** The single ordered activity block ({@code <div class="ai-agent-turn-activity">}) appended
-     *  after {@code <vaadin-message-list>} in {@code messageListSlot}; holds the per-turn {@link Details}. */
-    private Div turnActivityBlock;
-    /** Per-turn {@link Details} anchored by {@code runId} (so a re-rendered turn replaces, not duplicates). */
+    /** Per-turn {@link Details} anchored by {@code runId} (so a re-rendered turn replaces, not duplicates).
+     *  Kept for the lazy history-load listener's memoization/defensive-removal bookkeeping. */
     private final Map<UUID, Details> turnDetailsByRunId = new HashMap<>();
+
+    // ---- Phase 15-06 Gap 2 — Option-A inline per-turn DOM anchoring --------
+    /**
+     * One "extra" element ({@code .ai-agent-turn-extra} wrapper around a {@code <vaadin-details>},
+     * an {@code .ai-agent-action-choice} {@code <div>}, an {@code .ai-agent-intent-confirm} {@code <div>},
+     * or an {@code .ai-agent-attachment-notice} {@code <div>}) anchored in the DOM immediately after the
+     * {@code turnIndex}-th {@code <vaadin-message>} child of {@code <vaadin-message-list>}.
+     * {@code turnIndex} is the index in {@link #items} of the transcript message the extra hangs under.
+     */
+    private record TurnExtra(int turnIndex, com.vaadin.flow.dom.Element element) {
+    }
+
+    /** Ordered registry of per-turn extras, kept sorted by {@code turnIndex} (stable for equal indices,
+     *  so multiple extras on the same turn keep their append order). Re-spliced into the message-list
+     *  light DOM by {@link #reanchorAllExtras()} after every {@code MessageList.setItems(...)}. */
+    private final List<TurnExtra> turnExtras = new ArrayList<>();
+    /** runId → the {@code .ai-agent-turn-extra} wrapper {@code <div>} that hosts that turn's
+     *  {@code <vaadin-details>}, so a re-rendered turn replaces (not duplicates) its disclosure. */
+    private final Map<UUID, Div> turnDetailWrapperByRunId = new HashMap<>();
 
     /** A live-turn step (transient ToolCall→ToolResult arrival delta is a FALLBACK only — the real
      *  {@code latencyMs} comes from the {@code AiAuditEvent} children read on {@code Final}). Holds
@@ -646,7 +663,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only).
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
-        int assistantTurnCount = 0;
+        // Phase 15-06 Gap 2 — per ASSISTANT turn, remember its index in `items` so the history
+        // disclosure can be anchored after the right <vaadin-message>.
+        List<Integer> assistantTurnIndices = new ArrayList<>();
         for (AiMessage m : history) {
             AiMessageRole role = m.getRole();
             if (role == AiMessageRole.USER) {
@@ -655,8 +674,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             } else if (role == AiMessageRole.ASSISTANT) {
                 items.add(buildItem(m, aiName, AI_COLOR));
                 messageCount++;
-                assistantTurnCount++;
+                assistantTurnIndices.add(items.size() - 1);
             } else if (role == AiMessageRole.NOTICE) {
+                // anchorExtra uses items.size()-1 = the last transcript item appended so far.
                 appendNoticeRow(m.getContent());
             }
         }
@@ -664,10 +684,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             messageList.setItems(new ArrayList<>(items));
         }
         // Phase 15 Plan 04 (SPEC req 5 / CONTEXT D-07) — additive post-navigation correlation:
-        // anchor a collapsed per-turn Details (in the .ai-agent-turn-activity block) by runId for
-        // each prior ASSISTANT turn whose AiAuditEvent CHAT root has >=1 tool/retrieval child,
-        // ONLY when the assistant-turn count matches the audit-root count (else none — no guess).
-        correlateHistoryTurnDetails(cid, assistantTurnCount);
+        // anchor a collapsed per-turn Details by runId for each prior ASSISTANT turn whose
+        // AiAuditEvent CHAT root has >=1 tool/retrieval child, ONLY when the assistant-turn count
+        // matches the audit-root count (else none — no guess).
+        correlateHistoryTurnDetails(cid, assistantTurnIndices);
+        // Phase 15-06 Gap 2 — all history extras (NOTICE rows + the just-anchored disclosures) now
+        // exist; re-splice them into the freshly-rendered message-list light DOM.
+        reanchorAllExtras();
     }
 
     public UUID getConversationId() { return conversationId; }
@@ -790,6 +813,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         messageCount++;
         // Pitfall #5 — last setItems of the turn; mid-stream chunks use appendText only.
         messageList.setItems(new ArrayList<>(items));
+        // Phase 15-06 Gap 2 — setItems wiped any spliced extras; re-anchor prior turns' disclosures /
+        // action-choice / NOTICE rows before the new turn streams.
+        reanchorAllExtras();
 
         setStreamingUiState(true);
         // Phase 15 Plan 04 — fresh per-turn observability state; neutral typing indicator
@@ -1074,20 +1100,71 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     // ---- Phase 15 Plan 04 — per-turn tool-detail Details (OBS-02) ----------
 
-    /** Lazily creates the single {@code <div class="ai-agent-turn-activity">} block (appended
-     *  after {@code <vaadin-message-list>} inside {@code messageListSlot}); the per-turn
-     *  {@link Details} are added INTO it in turn order. Review point #2: a {@link Details} cannot
-     *  be inserted between two {@link MessageListItem}s on the {@code MessageList} substrate, so
-     *  the disclosures are grouped here. */
-    private Div turnActivityBlock() {
-        if (turnActivityBlock == null) {
-            turnActivityBlock = new Div();
-            turnActivityBlock.addClassName("ai-agent-turn-activity");
-            if (messageListSlot != null) {
-                messageListSlot.add(turnActivityBlock);
-            }
+    // ---- Phase 15-06 Gap 2 — Option-A inline per-turn DOM anchoring helpers --------
+
+    /** Anchors {@code element} after the {@code turnIndex}-th transcript message, registering it so
+     *  {@link #reanchorAllExtras()} re-positions it after every {@code MessageList.setItems(...)}.
+     *  {@code turnIndex} is the index in {@link #items} of the transcript message the extra hangs under. */
+    private void anchorExtra(int turnIndex, com.vaadin.flow.dom.Element element) {
+        element.setAttribute("data-ai-turn-index", Integer.toString(Math.max(0, turnIndex)));
+        turnExtras.add(new TurnExtra(Math.max(0, turnIndex), element));
+        reanchorAllExtras();
+    }
+
+    /**
+     * Re-positions every registered {@link TurnExtra}. Server-side it keeps the extras as children of
+     * {@code messageListSlot} immediately after the {@code <vaadin-message-list>}, ordered by
+     * {@code turnIndex} (stable for equal indices) — so the model→DOM order is deterministic and unit-
+     * testable. Client-side a single {@code executeJs} pass then splices each extra into the
+     * {@code <vaadin-message-list>} light DOM right after its turn's {@code <vaadin-message>} (Option A:
+     * the user sees the disclosure / action-choice / NOTICE inline under the bubble it belongs to). The
+     * JS pass is keyed off the {@code data-ai-turn-index} attribute set in {@link #anchorExtra}, so it is
+     * idempotent and survives the {@code MessageList} re-render. On a detached element (unit tests) the
+     * {@code executeJs} is a queued no-op; the server-side ordering assertion still holds.
+     */
+    private void reanchorAllExtras() {
+        if (messageListSlot == null || turnExtras.isEmpty()) {
+            return;
         }
-        return turnActivityBlock;
+        int msgCount = items.size();
+        // Stable sort by turnIndex (preserves append order within a turn), drop extras whose turn is gone.
+        turnExtras.sort(java.util.Comparator.comparingInt(TurnExtra::turnIndex));
+        turnExtras.removeIf(te -> te.turnIndex() < 0 || te.turnIndex() >= msgCount);
+        com.vaadin.flow.dom.Element slotEl = messageListSlot.getElement();
+        com.vaadin.flow.dom.Element mlEl = messageList != null ? messageList.getElement() : null;
+        int insertAt = (mlEl != null && slotEl.indexOfChild(mlEl) >= 0)
+                ? slotEl.indexOfChild(mlEl) + 1
+                : slotEl.getChildCount();
+        for (TurnExtra te : turnExtras) {
+            te.element().removeFromParent();
+        }
+        // re-compute the anchor after detaching (detaching the extras shifts indices)
+        insertAt = (mlEl != null && slotEl.indexOfChild(mlEl) >= 0)
+                ? slotEl.indexOfChild(mlEl) + 1
+                : slotEl.getChildCount();
+        for (TurnExtra te : turnExtras) {
+            slotEl.insertChild(insertAt++, te.element());
+        }
+        if (mlEl != null) {
+            // Client-side: move each [data-ai-turn-index] element to sit right after the N-th
+            // <vaadin-message> inside the <vaadin-message-list> (newest-turn extra ends up after its
+            // own message; earlier-turn extras after theirs). Node-move only (insertBefore on the
+            // existing escaped elements) — text escaping is unchanged. $0 = the <vaadin-message-list>.
+            mlEl.executeJs(
+                    "const ml=$0; const slot=ml.parentNode; if(!slot) return;" +
+                    "const extras=Array.from(slot.querySelectorAll(':scope > [data-ai-turn-index]'));" +
+                    "extras.sort((a,b)=>(+a.getAttribute('data-ai-turn-index'))-(+b.getAttribute('data-ai-turn-index')));" +
+                    "for(const ex of extras){" +
+                    "  const idx=+ex.getAttribute('data-ai-turn-index');" +
+                    "  const msgs=ml.querySelectorAll(':scope > vaadin-message');" +
+                    "  if(idx>=msgs.length){continue;}" +
+                    "  const anchor=msgs[idx];" +
+                    "  let after=anchor.nextSibling;" +
+                    "  while(after && after.nodeType===1 && after.hasAttribute && after.hasAttribute('data-ai-turn-index')){after=after.nextSibling;}" +
+                    "  ml.insertBefore(ex, after);" +
+                    "}",
+                    mlEl);
+        }
     }
 
     /** Builds + appends a collapsed-by-default {@link Details} for a just-completed live turn
@@ -1096,15 +1173,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void appendTurnDetails(UUID runId, List<TurnDetailRenderer.StepRow> steps) {
         Details details = buildTurnDetails(steps);
         ComponentUtil.setData(details, TURN_DETAILS_LOADED_KEY, Boolean.TRUE);
-        replaceTurnDetails(runId, details);
+        // Live turn — the assistant <vaadin-message> being completed is the last transcript item.
+        replaceTurnDetails(runId, details, items.isEmpty() ? 0 : items.size() - 1);
     }
 
     /** Builds + appends a collapsed {@link Details} for a prior (history-replayed) turn whose
      *  CHAT root we already know has &ge;1 child. The step rows are read lazily on first expand
      *  via {@link #loadTurnSteps(UUID, UUID)} and memoized ({@link #TURN_DETAILS_LOADED_KEY}) so a
      *  re-expand does not re-query. If (defensively) zero children come back the {@link Details}
-     *  is removed. */
-    private void appendHistoryTurnDetails(UUID runId, UUID conversationId) {
+     *  is removed. {@code turnIndex} is the index in {@link #items} of that turn's ASSISTANT message. */
+    private void appendHistoryTurnDetails(UUID runId, UUID conversationId, int turnIndex) {
         Details details = new Details();
         details.setOpened(false);
         details.setSummaryText(messages.getMessage("chatView.turnDetail.summaryPending"));
@@ -1115,23 +1193,39 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             }
             List<TurnDetailRenderer.StepRow> steps = loadTurnSteps(runId, conversationId);
             if (steps.isEmpty()) {
-                details.removeFromParent();
+                Div wrapper = turnDetailWrapperByRunId.remove(runId);
+                if (wrapper != null) {
+                    turnExtras.removeIf(te -> te.element() == wrapper.getElement());
+                    wrapper.getElement().removeFromParent();
+                }
                 turnDetailsByRunId.remove(runId, details);
                 return;
             }
             populateTurnDetails(details, steps);
             ComponentUtil.setData(details, TURN_DETAILS_LOADED_KEY, Boolean.TRUE);
         });
-        replaceTurnDetails(runId, details);
+        replaceTurnDetails(runId, details, turnIndex);
     }
 
-    private void replaceTurnDetails(UUID runId, Details details) {
-        Details existing = turnDetailsByRunId.remove(runId);
-        if (existing != null) {
-            existing.removeFromParent();
+    /** Wraps {@code details} in a {@code .ai-agent-turn-extra} {@code <div>} and anchors it after the
+     *  {@code turnIndex}-th {@code <vaadin-message>}; a prior disclosure for the same {@code runId} is
+     *  removed first (replace, not duplicate). */
+    private void replaceTurnDetails(UUID runId, Details details, int turnIndex) {
+        Div oldWrapper = turnDetailWrapperByRunId.remove(runId);
+        if (oldWrapper != null) {
+            turnExtras.removeIf(te -> te.element() == oldWrapper.getElement());
+            oldWrapper.getElement().removeFromParent();
         }
-        turnActivityBlock().add(details);
+        Details oldDetails = turnDetailsByRunId.remove(runId);
+        if (oldDetails != null && oldDetails.getParent().isPresent()) {
+            oldDetails.removeFromParent();
+        }
+        details.addClassName("ai-agent-turn-activity");
+        Div wrapper = new Div(details);
+        wrapper.addClassName("ai-agent-turn-extra");
+        turnDetailWrapperByRunId.put(runId, wrapper);
         turnDetailsByRunId.put(runId, details);
+        anchorExtra(turnIndex, wrapper.getElement());
     }
 
     private Details buildTurnDetails(List<TurnDetailRenderer.StepRow> steps) {
@@ -1166,6 +1260,18 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private Div buildStepRow(TurnDetailRenderer.StepRow step) {
         Div row = new Div();
         row.addClassName("ai-agent-turn-activity__step");
+        // Phase 15-06 Gap 2 — KIND-keyed modifier class for the CSS per-step icon chip
+        // (the modifier is derived from the label KEY, never a tool/entity name — T-15-D1).
+        if (TurnDetailRenderer.STEP_TOOL_KEY.equals(step.labelKey())) {
+            row.addClassName("ai-agent-turn-activity__step--tool");
+        } else if (TurnDetailRenderer.STEP_RETRIEVAL_KEY.equals(step.labelKey())) {
+            row.addClassName("ai-agent-turn-activity__step--retrieval");
+        } else if (TurnDetailRenderer.STEP_CHAT_KEY.equals(step.labelKey())) {
+            row.addClassName("ai-agent-turn-activity__step--chat");
+        }
+        if (step.errored()) {
+            row.addClassName("ai-agent-turn-activity__step--errored");
+        }
         // Label-only KIND-keyed text — never a tool/entity name (T-15-D1).
         Span label = new Span(messages.getMessage(step.labelKey()));
         label.addClassName("ai-agent-turn-activity__step-label");
@@ -1173,12 +1279,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 ? TurnDetailRenderer.UNKNOWN_DURATION_TEXT
                 : step.latencyMs() + " ms");
         duration.addClassName("ai-agent-turn-activity__step-duration");
-        row.add(label, duration);
+        // Child order (matches the mockup): label, [error], duration — so duration stays rightmost.
+        row.add(label);
         if (step.errored()) {
             Span error = new Span(messages.getMessage(TurnDetailRenderer.errorIndicatorKey()));
             error.addClassName("ai-agent-turn-activity__step-error");
             row.add(error);
         }
+        row.add(duration);
         return row;
     }
 
@@ -1275,10 +1383,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      * wrong association is worse than none. Appends a collapsed history {@link Details} only for
      * roots with {@code childCount > 0}.
      */
-    private void correlateHistoryTurnDetails(UUID conversationId, int assistantTurnCount) {
-        if (conversationId == null || assistantTurnCount <= 0) {
+    private void correlateHistoryTurnDetails(UUID conversationId, List<Integer> assistantTurnIndices) {
+        if (conversationId == null || assistantTurnIndices == null || assistantTurnIndices.isEmpty()) {
             return;
         }
+        int assistantTurnCount = assistantTurnIndices.size();
         try {
             String me = currentAuthentication.getUser().getUsername();
             List<UUID> rootRunIds = new ArrayList<>();
@@ -1322,9 +1431,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         assistantTurnCount, rootRunIds.size());
                 return;
             }
-            for (UUID runId : rootRunIds) {
+            for (int i = 0; i < rootRunIds.size(); i++) {
+                UUID runId = rootRunIds.get(i);
                 if (childCounts.getOrDefault(runId, 0L) > 0L) {
-                    appendHistoryTurnDetails(runId, conversationId);
+                    appendHistoryTurnDetails(runId, conversationId, assistantTurnIndices.get(i));
                 }
             }
         } catch (RuntimeException failure) {
@@ -1435,7 +1545,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         com.vaadin.flow.dom.Element notice = new com.vaadin.flow.dom.Element("div");
         notice.getClassList().add("ai-agent-attachment-notice");
         notice.setText(text);
-        messageListSlot.getElement().appendChild(notice);
+        // Phase 15-06 Gap 2 — anchor inline after the current turn's <vaadin-message> (the last
+        // transcript item at append time, both for live uploads and history replay), not at the
+        // messageListSlot tail. setText() keeps the value HTML-escaped (T-13.1-17).
+        anchorExtra(items.isEmpty() ? 0 : items.size() - 1, notice);
         messageCount++;
     }
 
@@ -1464,7 +1577,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         });
 
         row.add(summary, confirmButton);
-        messageListSlot.add(row);
+        // Phase 15-06 Gap 2 — anchor inline under the current turn's <vaadin-message>.
+        anchorExtra(items.isEmpty() ? 0 : items.size() - 1, row.getElement());
         messageCount++;
     }
 
@@ -1518,7 +1632,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (existingRow != null) {
             removeActionChoiceRow(existingRow);
         }
-        messageListSlot.add(row);
+        // Phase 15-06 Gap 2 — anchor inline under the proposing turn's <vaadin-message>.
+        anchorExtra(items.isEmpty() ? 0 : items.size() - 1, row.getElement());
         actionChoiceRowsByProposalId.put(proposalPayload.proposalId(), row);
         messageCount++;
     }
@@ -1605,6 +1720,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (actionChoiceRow == null) {
             return;
         }
+        turnExtras.removeIf(te -> te.element() == actionChoiceRow.getElement());
         actionChoiceRow.removeFromParent();
         actionChoiceRowsByProposalId.values().removeIf(row -> row == actionChoiceRow);
         if (messageCount > 0) {
@@ -1673,8 +1789,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         // conversation; removeAllChildren() below detaches the status <span> + activity-block Div,
         // but the fields must be nulled so the next turn re-creates them in the fresh substrate.
         turnDetailsByRunId.clear();
+        turnDetailWrapperByRunId.clear();
+        turnExtras.clear();
         liveTurnSteps.clear();
-        turnActivityBlock = null;
         statusRow = null;
         turnContentSeen = false;
         if (messageListSlot != null) {
