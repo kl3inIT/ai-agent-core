@@ -129,7 +129,14 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
         // Phase 15 D-05: ephemeral streaming-status marker — carries only the closed ActivityKind
         // constant (never the @Tool method name / args), best-effort via the same emitToolEvent
         // helper (null-guards the sink holder, swallows RuntimeException).
-        emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.Activity(StreamingEvent.ActivityKind.TOOL)));
+        // WR-06: only emit the Activity(TOOL) status marker for tools that get a generic audit
+        // child row, so the live status line and the post-Final per-turn Details (which reads only
+        // persisted children) agree on the step set. The ToolCall/ToolResult pair is still emitted
+        // for every tool — StreamEventRenderer needs ToolResult's structured payload (e.g.
+        // prepare_form_draft → open_form_with_draft) regardless of auditing.
+        if (shouldWriteGenericAudit(toolName)) {
+            emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.Activity(StreamingEvent.ActivityKind.TOOL)));
+        }
         emitToolEvent(runId, sink -> sink.tryEmitNext(new StreamingEvent.ToolCall(toolCallId, toolName, cappedInput)));
 
         boolean success = false;
