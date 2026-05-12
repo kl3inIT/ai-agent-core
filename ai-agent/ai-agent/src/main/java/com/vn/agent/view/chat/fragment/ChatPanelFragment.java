@@ -1181,10 +1181,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     .query("select e from ai_AiAuditEvent e " +
                            "where e.userUsername = :me and e.conversation.id = :cid " +
                            "and e.runId = :rid and e.parent is not null " +
+                           "and e.kind in (:toolKind, :retrievalKind) " +
                            "order by e.startedAt asc")
                     .parameter("me", currentAuthentication.getUser().getUsername())
                     .parameter("cid", conversationId)
                     .parameter("rid", runId)
+                    .parameter("toolKind", com.vn.agent.spi.AuditKind.TOOL)
+                    .parameter("retrievalKind", com.vn.agent.spi.AuditKind.RETRIEVAL)
                     .fetchPlan(fp -> {
                         fp.add("kind");
                         fp.add("startedAt");
@@ -1228,12 +1231,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             List<UUID> rootRunIds = new ArrayList<>();
             for (io.jmix.core.entity.KeyValueEntity row : unconstrainedDataManager.loadValues(
                             "select e.runId from ai_AiAuditEvent e " +
-                            "where e.userUsername = :me and e.conversation.id = :cid and e.parent is null " +
+                            "where e.userUsername = :me and e.conversation.id = :cid " +
+                            "and e.parent is null and e.kind = :chatKind " +
                             "order by e.startedAt asc")
                     .store("agentstore")
                     .properties("runId")
                     .parameter("me", me)
                     .parameter("cid", conversationId)
+                    .parameter("chatKind", com.vn.agent.spi.AuditKind.CHAT)
                     .list()) {
                 Object rid = row.getValue("runId");
                 if (rid instanceof UUID uuid) {
@@ -1244,11 +1249,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             for (io.jmix.core.entity.KeyValueEntity row : unconstrainedDataManager.loadValues(
                             "select c.runId, count(c) from ai_AiAuditEvent c " +
                             "where c.userUsername = :me and c.conversation.id = :cid and c.parent is not null " +
+                            "and c.kind in (:toolKind, :retrievalKind) " +
                             "group by c.runId")
                     .store("agentstore")
                     .properties("runId", "cnt")
                     .parameter("me", me)
                     .parameter("cid", conversationId)
+                    .parameter("toolKind", com.vn.agent.spi.AuditKind.TOOL)
+                    .parameter("retrievalKind", com.vn.agent.spi.AuditKind.RETRIEVAL)
                     .list()) {
                 Object rid = row.getValue("runId");
                 Object cnt = row.getValue("cnt");
