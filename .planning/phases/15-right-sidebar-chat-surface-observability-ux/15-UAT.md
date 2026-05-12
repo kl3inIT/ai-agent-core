@@ -1,14 +1,14 @@
 ---
 status: complete
 phase: 15-right-sidebar-chat-surface-observability-ux
-source: [15-01-SUMMARY.md, 15-02-SUMMARY.md, 15-03-SUMMARY.md, 15-04-SUMMARY.md, 15-05-SUMMARY.md]
+source: [15-01-SUMMARY.md, 15-02-SUMMARY.md, 15-03-SUMMARY.md, 15-04-SUMMARY.md, 15-05-SUMMARY.md, 15-06-SUMMARY.md]
 started: 2026-05-12T02:45:34Z
-updated: 2026-05-12T09:25:00Z
+updated: 2026-05-12T15:25:00Z
 ---
 
 ## Current Test
 
-[testing complete — 9/10 pass, 1 cosmetic issue (test 7), 1 user report not reproduced]
+[testing complete — base 9/10 + 15-06 gap-closure retest: all 3 gaps (test 3, test 7×2) RESOLVED via Playwright UAT 2026-05-12T15:24Z]
 
 ## Tests
 
@@ -111,3 +111,27 @@ notes: 1 cosmetic issue (test 7 — turn-detail disclosure looks unstyled/"thô"
   artifacts: []
   missing: []
   debug_session: ""
+
+---
+
+## 15-06 Gap-Closure Retest (2026-05-12T15:24Z, Playwright, sidebar + header-button dialog, admin/admin, local profile @ :8088)
+
+All three gaps above are now RESOLVED. Verified against the running app:
+
+### Gap (test 3) — new conversation always clears — RESOLVED
+- Sidebar → sent "Liệt kê tất cả khách hàng" → got the customer table + turn-detail disclosure → clicked "Cuộc trò chuyện mới" → confirm "Yes" → message list fully cleared (DOM: `vaadin-message-list` light children = [], `items.length` = 0, 0 `.ai-agent-turn-extra`). Happy-path clear confirmed; the errored-turn-specific path (`setConversationIdInternal(null)` no longer short-circuits when `messageCount > 0`, plus `.doOnError` conversationId sync) is in `2c2f326`/`d165a0a` — the staged hand-revert of it was reconciled away in 15-06. Could not force a server error in this UAT pass; covered by code + `ChatPanelFragmentConversationIdTest`.
+
+### Gap (test 7) — turn-detail / action-choice / NOTICE anchored inline per-turn — RESOLVED (Option A)
+- After the assistant reply, `vaadin-message-list` light DOM = `[vaadin-message, vaadin-message, div.ai-agent-turn-extra[data-ai-turn-index=1]]` — the extras wrapper is spliced into the message-list light DOM immediately after the turn's assistant `<vaadin-message>` (server-side ordered children + `data-ai-turn-index`-keyed `executeJs` splice). Survives the conversation-switch re-render. Confirmed in both the SIDEBAR surface and the HEADER_BUTTON dialog surface.
+- Cross-surface continuity: started "Có bao nhiêu sản phẩm?" in the sidebar, opened the header-button dialog → same conversation + messages + per-turn disclosure shown (one MessageList, 2 messages, not doubled — WR-03 fix holds).
+
+### Gap (test 7, cosmetic) — disclosure visually styled per mockup — RESOLVED
+- Collapsed summary: "▸ agent đã làm gì — 2 bước · 96 ms" with caret + ⚙-style affordance; expanded: per-step rows "🔍 Đã tìm dữ liệu …… 35 ms" / "🔍 Đã tìm dữ liệu …… 61 ms" — per-step icon + label-only text + right-aligned tabular ms, inside a bordered/tinted `<vaadin-details>` block. Matches `15-option-A-mockup.html`. Step rows remain label-only (no tool/entity names) — leak gate intact.
+
+### Other checks
+- Ephemeral streaming-status line: showed "đang truy xuất tài liệu" below the message list while streaming, removed on Final (DOM: `.ai-agent-status` absent after completion). Sidebar pushes AppLayout content; main view stays interactive.
+- Console: 0 errors across the session.
+
+screenshots: uat-15-06-sidebar-open.png, uat-15-06-streaming-status.png, uat-15-06-turn-detail.png, uat-15-06-turn-detail-expanded.png, uat-15-06-cross-surface.png
+
+still pending (not coverable here): forced-server-error new-conversation path (code + unit-test covered); `:jmix-app:test` against real PostgreSQL (no PG provisioned — deferred-items.md).
