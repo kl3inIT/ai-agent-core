@@ -1,6 +1,7 @@
 package com.vn.agent.tools.mutation;
 
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.security.AiAgentMutationRole;
 import com.vn.agent.spi.MutationGuard;
@@ -25,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -100,6 +102,7 @@ public class BuiltInMutationTools {
     private final CurrentAuthentication currentAuthentication;
     private final AiAgentMutationProperties mutationProperties;
     private final AccessManager accessManager;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
 
     public BuiltInMutationTools(ToolEntityResolver toolEntityResolver,
                                 MutationAuthorizationService mutationAuthorizationService,
@@ -117,7 +120,8 @@ public class BuiltInMutationTools {
                                 MetadataTools metadataTools,
                                 CurrentAuthentication currentAuthentication,
                                 AiAgentMutationProperties mutationProperties,
-                                AccessManager accessManager) {
+                                AccessManager accessManager,
+                                AiUiSettingsResolver aiUiSettingsResolver) {
         this.toolEntityResolver = toolEntityResolver;
         this.mutationAuthorizationService = mutationAuthorizationService;
         this.mutationAttributeBinder = mutationAttributeBinder;
@@ -135,6 +139,19 @@ public class BuiltInMutationTools {
         this.currentAuthentication = currentAuthentication;
         this.mutationProperties = mutationProperties;
         this.accessManager = accessManager;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
+    }
+
+    /**
+     * Phase 16 D-01 + opencode MEDIUM Concern #4 — AiUiSettings persists the idempotency
+     * TTL as seconds (Long column) to avoid JPA Duration mapping. Resolver coerces to
+     * Duration for the existing MutationIntentRepository.reserveOrReplay(... Duration ttl)
+     * comparison logic (the repository computes {@code OffsetDateTime.now().plus(ttl)} to
+     * derive expires_at). Null column falls through to
+     * {@code mutationProperties.resolvedIdempotencyTtl()}.
+     */
+    private Duration resolveIdempotencyTtl() {
+        return Duration.ofSeconds(aiUiSettingsResolver.resolveMutationIdempotencyTtlSeconds());
     }
 
     // ----------------------------------------------------------------------
@@ -210,7 +227,7 @@ public class BuiltInMutationTools {
                     "create_record", entityName, null, null, null, safeAttributes);
             reservation = mutationIntentRepository.reserveOrReplay(
                     "create_record", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, mutationProperties.resolvedIdempotencyTtl());
+                    requestHash, resolveIdempotencyTtl());
             if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
                 return mutationCommitCoordinator.handleReservationResult(
                         reservation, "create_record", startedAt, userUsername,
@@ -353,7 +370,7 @@ public class BuiltInMutationTools {
                     "update_record", entityName, id, null, null, safeAttributes);
             reservation = mutationIntentRepository.reserveOrReplay(
                     "update_record", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, mutationProperties.resolvedIdempotencyTtl());
+                    requestHash, resolveIdempotencyTtl());
             if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
                 return mutationCommitCoordinator.handleReservationResult(
                         reservation, "update_record", startedAt, userUsername,
@@ -641,7 +658,7 @@ public class BuiltInMutationTools {
                     toolName, entityName, id, relationship, relatedId, java.util.Map.of());
             reservation = mutationIntentRepository.reserveOrReplay(
                     toolName, idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, mutationProperties.resolvedIdempotencyTtl());
+                    requestHash, resolveIdempotencyTtl());
             if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
                 return mutationCommitCoordinator.handleReservationResult(
                         reservation, toolName, startedAt, userUsername,
@@ -864,7 +881,10 @@ public class BuiltInMutationTools {
 
             // DoS guard — REVIEWS HIGH bulk-max-rows. Reject empty + oversized batches BEFORE any
             // entity resolution, hash, or DB work.
-            int maxRows = mutationProperties.resolvedBulkMaxRows();
+            // Phase 16 CFG-01 — read DoS-guard cap via AiUiSettingsResolver so admin
+            // edits take effect without a restart. Null column falls through to
+            // mutationProperties.resolvedBulkMaxRows().
+            int maxRows = aiUiSettingsResolver.resolveMutationBulkMaxRows();
             if (safeRecords.isEmpty()) {
                 throw new ToolUserError("validation_failed",
                         "records must be a non-empty array",
@@ -921,7 +941,7 @@ public class BuiltInMutationTools {
                     "bulk_save_records", entityName, null, null, null, batchEnvelope);
             reservation = mutationIntentRepository.reserveOrReplay(
                     "bulk_save_records", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, mutationProperties.resolvedIdempotencyTtl());
+                    requestHash, resolveIdempotencyTtl());
             if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
                 // REVIEWS HIGH-11: handleReservationResult reads AiMutationIntent.RESULT_SUMMARY
                 // and surfaces savedIds on IDEMPOTENT_REPLAY. Without this, bulk replay would

@@ -1,6 +1,7 @@
 package com.vn.agent.filter;
 
 import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.QueryUtils;
 import io.jmix.core.metamodel.model.MetaClass;
@@ -10,7 +11,6 @@ import io.jmix.core.querycondition.JpqlCondition;
 import io.jmix.core.querycondition.LogicalCondition;
 import io.jmix.core.querycondition.PropertyCondition;
 import io.jmix.core.querycondition.PropertyConditionUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -44,14 +44,14 @@ public class StructuredFilterConditionMapper {
 
     private final FilterLiteralValueConverter filterLiteralValueConverter;
     private final LlmExposurePolicy llmExposurePolicy;
-    private final int maxFilterDepth;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
 
     public StructuredFilterConditionMapper(FilterLiteralValueConverter filterLiteralValueConverter,
                                            LlmExposurePolicy llmExposurePolicy,
-                                           @Value("${jmix.ai-agent.tools.max-filter-depth:3}") int maxFilterDepth) {
+                                           AiUiSettingsResolver aiUiSettingsResolver) {
         this.filterLiteralValueConverter = filterLiteralValueConverter;
         this.llmExposurePolicy = llmExposurePolicy;
-        this.maxFilterDepth = maxFilterDepth;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
     }
 
     /**
@@ -219,6 +219,10 @@ public class StructuredFilterConditionMapper {
      */
     private MetaProperty validatePath(String path, MetaClass rootMetaClass) {
         String[] segments = path.split("\\.");
+        // Phase 16 CFG-01 — read depth cap via AiUiSettingsResolver so admin edits on
+        // AiUiSettings.toolsMaxFilterDepth take effect without a restart. Null column
+        // falls through to jmix.ai-agent.tools.max-filter-depth (default 3).
+        int maxFilterDepth = aiUiSettingsResolver.resolveToolsMaxFilterDepth();
         if (segments.length > maxFilterDepth) {
             throw new ToolUserError("filter_depth_exceeded",
                     "path " + path + " exceeds depth " + maxFilterDepth);

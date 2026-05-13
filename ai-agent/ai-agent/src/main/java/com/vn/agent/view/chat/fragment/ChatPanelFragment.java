@@ -34,6 +34,7 @@ import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.extraction.IntentOption;
 import com.vn.agent.extraction.IntentRegistry;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.rag.CancellationRegistry;
@@ -158,6 +159,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private Metadata metadataApi;
     @Autowired private FileStorageLocator fileStorageLocator;
     @Autowired private AiTaskFileProperties taskFileProperties;
+    // Phase 16 CFG-01 — read task-file upload cap + TTL via the resolver so admin
+    // edits on AiUiSettings take effect without a restart. Null columns fall through
+    // to taskFileProperties; sentinel -1 still disables (Phase 13.1).
+    @Autowired private AiUiSettingsResolver aiUiSettingsResolver;
 
     private MessageList messageList;
     private MessageInput messageInput;
@@ -283,7 +288,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         // by Jmix into a temp file under uploadTempDir; the lambda runs ONCE per file with
         // the metadata + Path. MIME / size validation runs INSIDE the lambda (REVIEWS HIGH-5)
         // BEFORE FileStorage.saveStream and BEFORE Metadata.create(AiTaskFile.class).
-        taskFileUpload.setMaxFileSize((int) Math.min(taskFileProperties.getMaxFileSizeBytes(), Integer.MAX_VALUE));
+        taskFileUpload.setMaxFileSize((int) Math.min(aiUiSettingsResolver.resolveTaskFileMaxFileSizeBytes(), Integer.MAX_VALUE));
         taskFileUpload.setUploadHandler(UploadHandler.toFile(
                 (uploadMetadata, stagedFile) -> handleUploadedFile(
                         uploadMetadata.fileName(),
@@ -1383,7 +1388,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             }
 
             // REVIEWS HIGH-5 — server-side size cap re-validated BEFORE blob persist.
-            long maxBytes = taskFileProperties.getMaxFileSizeBytes();
+            // Phase 16 CFG-01 — read cap via resolver (codex HIGH Concern #5: chat task-file
+            // upload cap, DISTINCT from RAG/KB upload cap).
+            long maxBytes = aiUiSettingsResolver.resolveTaskFileMaxFileSizeBytes();
             if (actualSizeBytes > maxBytes) {
                 log.warn("Upload rejected (size {} > cap {}): {}", actualSizeBytes, maxBytes, fileName);
                 notifications.create(messages.getMessage("chatView.attachments.upload.tooLarge"))
@@ -1425,7 +1432,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             // Phase 13.1 LIFE-01: ttlSeconds is the operator-facing TTL knob; sentinel
             // -1 disables purge and active-row filtering. Persist a DB-safe far-future
             // timestamp instead of the 24h default so sentinel uploads do not age out.
-            long ttlSeconds = taskFileProperties.getTtlSeconds();
+            // Phase 16 CFG-01 — read via resolver so admin edits on AiUiSettings take
+            // effect without a restart.
+            long ttlSeconds = aiUiSettingsResolver.resolveTaskFileTtlSeconds();
             row.setExpiresAt(ttlSeconds == -1L
                     ? NON_EXPIRING_EXPIRES_AT
                     : OffsetDateTime.now().plusSeconds(ttlSeconds));

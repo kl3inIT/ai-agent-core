@@ -77,19 +77,22 @@ public class BaselineContextProvider {
     private final MessageTools messageTools;
     private final ObjectMapper objectMapper;
     private final AiAgentPromptProperties promptProperties;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
 
     public BaselineContextProvider(CurrentAuthentication currentAuthentication,
                                    LlmExposurePolicy llmExposurePolicy,
                                    AccessManager accessManager,
                                    MessageTools messageTools,
                                    ObjectMapper objectMapper,
-                                   AiAgentPromptProperties promptProperties) {
+                                   AiAgentPromptProperties promptProperties,
+                                   AiUiSettingsResolver aiUiSettingsResolver) {
         this.currentAuthentication = currentAuthentication;
         this.llmExposurePolicy = llmExposurePolicy;
         this.accessManager = accessManager;
         this.messageTools = messageTools;
         this.objectMapper = objectMapper;
         this.promptProperties = promptProperties;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
     }
 
     public Map<String, Object> compose(UUID conversationId) {
@@ -195,7 +198,10 @@ public class BaselineContextProvider {
      * built from the SAME capped list so a denied/hidden tail entity never leaks via permissions.
      */
     private List<MetaClass> visibleEntities(Map<MetaClass, Set<String>> readableSchema) {
-        int limit = promptProperties.resolvedEntityInventoryLimit();
+        // Phase 16 CFG-01 — read entity-inventory limit via AiUiSettingsResolver so
+        // admin edits on AiUiSettings take effect without a restart. Null column falls
+        // through to promptProperties.resolvedEntityInventoryLimit().
+        int limit = aiUiSettingsResolver.resolvePromptEntityInventoryLimit();
         List<MetaClass> sorted = new ArrayList<>(readableSchema.keySet());
         sorted.sort(Comparator.comparing(MetaClass::getName));
         return sorted.size() > limit ? sorted.subList(0, limit) : sorted;
@@ -207,7 +213,10 @@ public class BaselineContextProvider {
      * verbatim D-03 truncation hint line as the final line of the rendered block.
      */
     private String renderEntitiesBlock(List<MetaClass> visibleEntities, int totalReadableEntityCount) {
-        int limit = promptProperties.resolvedEntityInventoryLimit();
+        // Phase 16 CFG-01 — read entity-inventory limit via AiUiSettingsResolver so
+        // admin edits on AiUiSettings take effect without a restart. Null column falls
+        // through to promptProperties.resolvedEntityInventoryLimit().
+        int limit = aiUiSettingsResolver.resolvePromptEntityInventoryLimit();
         boolean truncated = totalReadableEntityCount > limit;
         StringBuilder sb = new StringBuilder();
         boolean first = true;
