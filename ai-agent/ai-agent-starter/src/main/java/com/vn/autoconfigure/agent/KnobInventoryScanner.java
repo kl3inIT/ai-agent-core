@@ -222,6 +222,17 @@ public class KnobInventoryScanner {
                               List<KnobInventory.KnobRow> tier1,
                               List<KnobInventory.KnobRow> tier2) {
         String key = name.toString();
+        // CR-01 defense-in-depth (SPEC criterion 4): if the property key matches a
+        // Tier-3 secret glob, suppress the Tier-2 row entirely — regardless of
+        // whether the declaring record carried @KnobMetadata(tier=TIER_3). The
+        // env-walk pass in scanEnvironmentForSecrets emits a value-less
+        // SecretIndicatorRow for the same key, so the secret is still surfaced
+        // (configured: yes/no) but the raw value never reaches the Tier-2 grid.
+        // This catches a host that adds `@ConfigurationProperties("ai-agent.host")`
+        // with an `apiKey` field but forgets `@KnobMetadata(TIER_3)`.
+        if (matchesAny(key, compilePatterns(secretPatterns.resolvedPatterns()))) {
+            return;
+        }
         String resolvedValue = safeReadValue(key);
         KnobMetadata.Tier tier;
         boolean requiresRestart;
