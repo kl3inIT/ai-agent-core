@@ -2,6 +2,7 @@ package com.vn.agent;
 
 import com.vn.agent.action.ActionIntentId;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
@@ -144,6 +145,17 @@ public class DefaultChatServiceImpl implements ChatService {
      * as bad-model would create reissue loops on flaky upstream networks.
      */
     private static final Set<Integer> BAD_MODEL_STATUS_CODES = Set.of(400, 404, 422);
+
+    /**
+     * Phase 16 CR-02 — Jackson mapper for serializing {@code argumentsJson} payloads in
+     * {@code MODEL_VALIDATION_FAILURE} audit rows. The offending model id is admin-input via a
+     * ComboBox with {@code allowCustomValue=true} (Plan 16-05), so a value containing {@code "},
+     * {@code \}, or a newline must be properly escaped — string concatenation produces malformed
+     * JSON which downstream audit consumers cannot parse. Mirrors the
+     * {@code STRUCTURED_PAYLOAD_OBJECT_MAPPER} constant pattern in
+     * {@code com.vn.agent.audit.ToolCallbackAuditDecorator}.
+     */
+    private static final ObjectMapper AUDIT_ARGUMENTS_OBJECT_MAPPER = new ObjectMapper();
 
     private final ChatClient chatClient;
     private final ConversationGateway conversationGateway;
@@ -1161,6 +1173,17 @@ public class DefaultChatServiceImpl implements ChatService {
             String errorClass = cause.getClass().getSimpleName();
             String resultSummary = String.format(Locale.ROOT,
                     "model=%s status=%d error=%s", offendingModel, status, errorClass);
+            // CR-02 (P-22 sanitisation precedent): serialize the {model: offendingModel} payload
+            // via Jackson so a custom-entry model id containing `"`, `\`, or newline produces
+            // valid JSON. Raw string concatenation accepted admin-input verbatim and could write
+            // a malformed audit row that downstream JSON parsers reject — losing forensic context.
+            String argumentsJson;
+            try {
+                argumentsJson = AUDIT_ARGUMENTS_OBJECT_MAPPER.writeValueAsString(
+                        Map.of("model", offendingModel == null ? "" : offendingModel));
+            } catch (JsonProcessingException jpe) {
+                argumentsJson = "{}";
+            }
             auditWriter.writeAuditEvent(
                     AuditKind.MODEL_VALIDATION_FAILURE,
                     RunContext.getRootAuditId(),
@@ -1168,7 +1191,7 @@ public class DefaultChatServiceImpl implements ChatService {
                     userUsername,
                     convId,
                     /* toolName = sentinel — not a real @Tool method */ "model_validation",
-                    /* argumentsJson */ "{\"model\":\"" + offendingModel + "\"}",
+                    argumentsJson,
                     resultSummary,
                     /* latencyMs */ 0L,
                     AiToolCallOutcome.FAILED,
