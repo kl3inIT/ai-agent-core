@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
-stopped_at: Phase 16 Plan 04 in progress — AiUiSettingsResolver wired to 8 caller sites
-last_updated: "2026-05-13T14:03:19.106Z"
+stopped_at: Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
+last_updated: "2026-05-13T14:24:27.357Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 13
-  completed_plans: 10
-  percent: 77
+  completed_plans: 11
+  percent: 85
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
-Plan: 5 of 7 (Plans 01–03 complete 2026-05-13)
+Plan: 6 of 7 (Plans 01–03 complete 2026-05-13)
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: continue Plan 04 (AiUiSettingsResolver caller migration) → Plan 05+
 | Field | Value |
@@ -265,6 +265,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 15]: Plan 15-04: in-fragment observability. Status line (OBS-01) `<span class="ai-agent-status" role="status" aria-live="polite">` appended after `<vaadin-message-list>`; neutral typing indicator at turn start, flips to CHAT on the FIRST `Content` event, TOOL/RETRIEVAL on `Activity` events; `removeStatusRow()` in every teardown site. Per-turn tool-detail `Details` (OBS-02) — one ordered `Div.ai-agent-turn-activity` holds collapsed-by-default `<vaadin-details>` per turn with ≥1 tool call; label-only KIND-keyed step rows via `TurnDetailRenderer` with per-step ms + an error/rollback indicator. Live turn: `ToolCall`/`ToolResult` (dedup by `toolCallId`)/`Activity(RETRIEVAL)` accumulate into per-fragment `liveTurnSteps` capped at 50; on `Final` the disclosure's timings come from a lazy `loadTurnSteps` read. Post-navigation `correlateHistoryTurnDetails` loads the conversation's CHAT-root `runId`s + each root's child count via TWO narrow raw-JPQL `loadValues` with `.store("agentstore")` (raw `loadValues` does NOT infer the agentstore store — project memory `feedback_jmix_loadvalue_store`). All three audit reads use `UnconstrainedDataManager` with a MANDATORY ownership filter.
 - [Phase 15]: Plan 15-05 (Phase 15 close): cross-cutting tests + folded-todo move. `ObservabilityLeakTest` (TEST-19, D-09) reuses the Phase 9 `TOOL_NAME_LEAK` / `HOST_PREFIX_LEAK` pattern packs VERBATIM against both `TurnDetailRenderer` mapper output and a REAL rendered `ChatPanelFragment`. `ObservabilityMessagesCompletenessTest` — all 15 new Phase-15 `msg://` keys resolve non-blank in both locale bundles. `NoNewPersistedStateTest` (OBS-04) asserts the negative via THREE checks — no Phase-15-named `.xml` under `**/liquibase/**`, no `<include file=>` in agentstore-changelog.xml / changelog.xml, no `@Table(name=...)` under `com/vn/agent/entity` containing `TURN`/`ACTIVITY`/`DISCLOSURE`. The 2026-04-26 collapsible-tool-detail todo moved `pending/` → `done/`. `:ai-agent:ai-agent:test` green.
 - [Phase ?]: Plan 16-04: AiUiSettingsResolver shipped + 8 caller sites wired; refined plan-listed 10-caller list to actual 8 consumers via pre-edit code scout (codex MEDIUM Concern #5). Resolver mirrors AiParametersResolver shape exactly via UnconstrainedDataManager singleton load (Pitfall 3), 12 typed resolveXxx methods (codex HIGH Concern #5 split — task-file vs RAG upload caps DISTINCT), try/catch RuntimeException + WARN log Pattern C resilience. MutationIntentRepository / MutationSaveExecutor / KnowledgeDocumentUploadService / BuiltInDataTools / ToolEntityResolver DROPPED (don't consume knobs); StructuredFilterConditionMapper / KnowledgeBaseView ADDED. Mutation idempotency TTL Duration coercion in BuiltInMutationTools.resolveIdempotencyTtl per opencode Concern #4 + Suggestion #5. Two scaffolds green via Mockito workaround for Phase 11/13 boot regression; 3 Rule 1 caller-test fixes.
+- [Phase ?]: Phase 16 Plan 05: AiParameters listener publishes on full effective-settings-transition surface including DEACTIVATION (codex HIGH #6); AiUiSettings listener guards on SINGLETON_ID (codex MEDIUM #6); test uses pure-JUnit + Mockito per Rule 3 (Phase 11/13 boot regression).
 
 ### Performance Metrics
 
@@ -337,6 +338,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 16 P02 | ~20 min | 3 tasks | 5 files |
 | Phase 16 P03 | ~12 min | 3 tasks | 5 files |
 | Phase 16 P04 | ~45 min | 3 tasks | 14 files |
+| Phase 16 P05 | 25min | 3 tasks | 7 files |
 
 ### Quick Tasks Completed
 
@@ -346,8 +348,8 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T14:02:51.543Z
-**Stopped at:** Phase 16 Plan 04 in progress — AiUiSettingsResolver wired to 8 caller sites
+**Last session:** 2026-05-13T14:24:27.340Z
+**Stopped at:** Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)

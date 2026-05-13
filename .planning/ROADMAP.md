@@ -101,7 +101,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 - [x] 16-04-PLAN.md — AiUiSettingsResolver + 10 caller injections + read-through fallthrough test + sentinel-survives test
-- [ ] 16-05-PLAN.md — Entity listeners (AiParametersEntityListener + AiUiSettingsEntityListener) + modelField ComboBox swap + single-publish-site invariant test
+- [x] 16-05-PLAN.md — Entity listeners (AiParametersEntityListener + AiUiSettingsEntityListener) + modelField ComboBox swap + single-publish-site invariant test
 
 **Wave 3** *(blocked on Wave 2)*
 - [ ] 16-06-PLAN.md — @KnobMetadata annotation pass on 10 records + KnobInventoryScanner (starter) + AiUiSettingsDetailView tier1/bootConfig/secrets tabs + SEC-08 + KnobInventoryClassificationTest
@@ -160,7 +160,7 @@ Plans:
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
-| 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 4/7 | In Progress|  |
+| 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 5/7 | In Progress|  |
 | 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 0/? | Not started | - |
 | 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 0/? | Not started | - |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |

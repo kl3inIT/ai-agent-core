@@ -30,15 +30,15 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 #### Model Picker
 
-- [ ] **MODEL-01**: In the admin Parameters/Settings view the chat-model field becomes a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
+- [x] **MODEL-01**: In the admin Parameters/Settings view the chat-model field becomes a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
 - [ ] **MODEL-02**: The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); the curated list contains only open-weights models per the self-hostable policy and custom entry is the escape hatch. Model validity is checked at first use with a clear error surfaced, not at save time.
-- [ ] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`. All new labels use `msg://` keys in all locale bundles.
+- [x] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`. All new labels use `msg://` keys in all locale bundles.
 
 #### Config-Knob Migration
 
 - [x] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
 - [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 19, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
-- [ ] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
+- [x] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
 
 ### Mutation Internals Hardening (Phase 11 follow-up)
 
@@ -116,13 +116,13 @@ Which phases cover which requirements.
 | OBS-02 | Phase 15 | Complete |
 | OBS-04 | Phase 15 | Complete |
 | TEST-19 | Phase 15 | Complete |
-| MODEL-01 | Phase 16 | Pending |
+| MODEL-01 | Phase 16 | Complete |
 | MODEL-02 | Phase 16 | Pending |
-| MODEL-03 | Phase 16 | Pending |
+| MODEL-03 | Phase 16 | Complete |
 | TEST-20 | Phase 16 | Pending |
 | CFG-01 | Phase 16 | Complete |
 | CFG-02 | Phase 16 | Pending |
-| CFG-03 | Phase 16 | Pending |
+| CFG-03 | Phase 16 | Complete |
 | SEC-08 | Phase 16 | Pending |
 | MUT-15 | Phase 17 | Pending |
 | MUT-16 | Phase 17 | Pending |
