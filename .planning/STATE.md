@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: "Phase 15 shipped — PR #29"
-stopped_at: Completed 15-05-PLAN.md — Phase 15 complete (all 5 plans), ready for verification
-last_updated: "2026-05-12T15:39:40.590Z"
+stopped_at: Phase 16 context gathered
+last_updated: "2026-05-13T07:04:56.966Z"
 last_activity: 2026-05-12
 progress:
-  total_phases: 6
+  total_phases: 5
   completed_phases: 1
   total_plans: 6
   completed_plans: 6
@@ -334,9 +334,9 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-12T11:45:42.579Z
-**Stopped at:** Completed 15-05-PLAN.md — Phase 15 complete (all 5 plans), ready for verification
-**Resume file:** None
+**Last session:** 2026-05-13T07:04:56.930Z
+**Stopped at:** Phase 16 context gathered
+**Resume file:** .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-CONTEXT.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases should prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried from the v1.1.0 close session:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432; application.properties itself UNCHANGED). Plus pre-existing 14-11 WIP (cancel control, transcript-leak fix, ambiguous-count rules, full-page prefill source-conversation). See 14-HUMAN-UAT.md "Session Handoff - 2026-05-11 (UAT COMPLETE)". (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** `/gsd-verify-work` for Phase 15 (all 5 plans complete; TEST-19 leak gate + locale-completeness + no-DDL structural tests + the folded-todo move done). Then `/gsd-plan-phase 16` (Admin Settings — Model Picker & Config-Knob Migration — merged from former 16+17 on 2026-05-13). (Phases 16+ independent; **17 must precede 18**; voice input is Phase 19, last — its STT error/retry row reuses Phase 15's in-fragment status-row pattern.)
