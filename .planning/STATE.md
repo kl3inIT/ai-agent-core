@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
 stopped_at: Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
-last_updated: "2026-05-13T14:24:27.357Z"
+last_updated: "2026-05-13T14:53:37.552Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 13
-  completed_plans: 11
-  percent: 85
+  completed_plans: 12
+  percent: 92
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
-Plan: 6 of 7 (Plans 01–03 complete 2026-05-13)
+Plan: 7 of 7 (Plans 01–03 complete 2026-05-13)
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: continue Plan 04 (AiUiSettingsResolver caller migration) → Plan 05+
 | Field | Value |
@@ -266,6 +266,8 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 15]: Plan 15-05 (Phase 15 close): cross-cutting tests + folded-todo move. `ObservabilityLeakTest` (TEST-19, D-09) reuses the Phase 9 `TOOL_NAME_LEAK` / `HOST_PREFIX_LEAK` pattern packs VERBATIM against both `TurnDetailRenderer` mapper output and a REAL rendered `ChatPanelFragment`. `ObservabilityMessagesCompletenessTest` — all 15 new Phase-15 `msg://` keys resolve non-blank in both locale bundles. `NoNewPersistedStateTest` (OBS-04) asserts the negative via THREE checks — no Phase-15-named `.xml` under `**/liquibase/**`, no `<include file=>` in agentstore-changelog.xml / changelog.xml, no `@Table(name=...)` under `com/vn/agent/entity` containing `TURN`/`ACTIVITY`/`DISCLOSURE`. The 2026-04-26 collapsible-tool-detail todo moved `pending/` → `done/`. `:ai-agent:ai-agent:test` green.
 - [Phase ?]: Plan 16-04: AiUiSettingsResolver shipped + 8 caller sites wired; refined plan-listed 10-caller list to actual 8 consumers via pre-edit code scout (codex MEDIUM Concern #5). Resolver mirrors AiParametersResolver shape exactly via UnconstrainedDataManager singleton load (Pitfall 3), 12 typed resolveXxx methods (codex HIGH Concern #5 split — task-file vs RAG upload caps DISTINCT), try/catch RuntimeException + WARN log Pattern C resilience. MutationIntentRepository / MutationSaveExecutor / KnowledgeDocumentUploadService / BuiltInDataTools / ToolEntityResolver DROPPED (don't consume knobs); StructuredFilterConditionMapper / KnowledgeBaseView ADDED. Mutation idempotency TTL Duration coercion in BuiltInMutationTools.resolveIdempotencyTtl per opencode Concern #4 + Suggestion #5. Two scaffolds green via Mockito workaround for Phase 11/13 boot regression; 3 Rule 1 caller-test fixes.
 - [Phase ?]: Phase 16 Plan 05: AiParameters listener publishes on full effective-settings-transition surface including DEACTIVATION (codex HIGH #6); AiUiSettings listener guards on SINGLETON_ID (codex MEDIUM #6); test uses pure-JUnit + Mockito per Rule 3 (Phase 11/13 boot regression).
+- [Phase ?]: Plan 16-06: KnobInventoryScanner uses bean.asBindTarget().getType().resolve() since getType() is package-private
+- [Phase ?]: Plan 16-06: Long-typed Tier-1 form fields bind via <textField property=...> (Jmix 2.8 typed-text coerces String<->Long); avoid bigDecimalField/numberField/integerField type mismatch
 
 ### Performance Metrics
 
@@ -339,6 +341,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 16 P03 | ~12 min | 3 tasks | 5 files |
 | Phase 16 P04 | ~45 min | 3 tasks | 14 files |
 | Phase 16 P05 | 25min | 3 tasks | 7 files |
+| Phase 16 P06 | 45min | 3 tasks | 20 files |
 
 ### Quick Tasks Completed
 
@@ -348,7 +351,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T14:24:27.340Z
+**Last session:** 2026-05-13T14:52:34.799Z
 **Stopped at:** Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.

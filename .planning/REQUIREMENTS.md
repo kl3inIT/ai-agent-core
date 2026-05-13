@@ -37,7 +37,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 #### Config-Knob Migration
 
 - [x] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
-- [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 19, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
+- [x] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 19, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
 - [x] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
 
 ### Mutation Internals Hardening (Phase 11 follow-up)
@@ -60,7 +60,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 - [ ] **TEST-18**: STT coverage — the `STT_TRANSCRIPTION` audit row is asserted in both hash-default and `store-transcript=true` modes; a source-scan test asserts the `com.vn.agent.stt` package has zero reference to `ChatService`; a default-config boot test asserts no STT beans and no mic button.
 - [x] **TEST-19**: Chat-observability leak test — the streaming-status line and the per-turn tool-detail disclosure never emit internal `@Tool` method names or raw entity names (reuses the Phase 9 leak-guard pattern packs at the UI layer). *(`ObservabilityLeakTest` — Plan 15-05; reuses `ToolNamePatternProvider` / `HostPrefixPatternProvider` verbatim against the `TurnDetailRenderer` mapper output AND a real rendered `ChatPanelFragment`'s `<span.ai-agent-status>` + `Details` step-row, with a passing negative control.)*
 - [ ] **TEST-20**: Curated-model allowlist test — every model id in the curated dropdown catalog is on a self-hostable open-weights allowlist (comment references `project_self_hostable_models_only.md`).
-- [ ] **SEC-08**: Config-knob secret denylist — a test asserts no `*.api-key` (or other secret) property is surfaced as an editable or displayed admin setting, and boot-time `@ConditionalOnProperty` toggles are not presented as runtime-editable.
+- [x] **SEC-08**: Config-knob secret denylist — a test asserts no `*.api-key` (or other secret) property is surfaced as an editable or displayed admin setting, and boot-time `@ConditionalOnProperty` toggles are not presented as runtime-editable.
 
 ## Future Requirements (deferred — not in the v1.2 roadmap)
 
@@ -121,9 +121,9 @@ Which phases cover which requirements.
 | MODEL-03 | Phase 16 | Complete |
 | TEST-20 | Phase 16 | Pending |
 | CFG-01 | Phase 16 | Complete |
-| CFG-02 | Phase 16 | Pending |
+| CFG-02 | Phase 16 | Complete |
 | CFG-03 | Phase 16 | Complete |
-| SEC-08 | Phase 16 | Pending |
+| SEC-08 | Phase 16 | Complete |
 | MUT-15 | Phase 17 | Pending |
 | MUT-16 | Phase 17 | Pending |
 | MUT-17 | Phase 17 | Pending |
