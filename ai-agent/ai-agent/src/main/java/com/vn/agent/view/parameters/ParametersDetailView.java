@@ -331,7 +331,13 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     }
 
     private void populateFormFromBody(AiParametersBody body) {
-        modelField.setValue(nullToBlank(body.model()));
+        // WR-06 — ComboBox (Plan 16-05) handles null as "no selection" cleanly. The previous
+        // nullToBlank wrapper produced an empty-string selection that the value-change handler
+        // treated as a custom value (allowCustomValue=true), surfacing `model: ''` in the YAML
+        // preview. Pass the raw body.model() so a fresh AiParameters with model=null lands in
+        // the form as "no selection" — required=true validation then asks the operator to pick
+        // one rather than failing on an empty custom value.
+        modelField.setValue(body.model());
         temperatureField.setValue(body.temperature());
         topPField.setValue(body.topP());
         maxTokensField.setValue(body.maxTokens());
