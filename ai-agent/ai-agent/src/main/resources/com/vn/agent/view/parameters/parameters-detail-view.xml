@@ -22,10 +22,12 @@
         <tabSheet id="editTabs" width="100%">
             <tab id="formTab" label="msg:///parametersDetail.tab.form">
                 <vbox id="formLayout" padding="true" spacing="true" width="100%">
-                    <textField id="modelField"
-                               label="msg:///parametersDetail.field.model"
-                               required="true"
-                               requiredMessage="msg:///parametersDetail.validation.modelRequired"/>
+                    <comboBox id="modelField"
+                              label="msg:///parametersDetail.field.model"
+                              allowCustomValue="true"
+                              required="true"
+                              requiredMessage="msg:///parametersDetail.validation.modelRequired"
+                              helperText="msg:///parametersDetail.modelField.customValueHint"/>
                     <bigDecimalField id="temperatureField"
                                      label="msg:///parametersDetail.field.temperature"/>
                     <bigDecimalField id="topPField"
