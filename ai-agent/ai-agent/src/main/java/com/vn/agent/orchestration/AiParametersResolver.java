@@ -122,6 +122,29 @@ public class AiParametersResolver {
     }
 
     /**
+     * Phase 16 D-05 — returns the seed model from {@code default-params.yaml} (via
+     * {@link AiAgentDefaultsProperties#model()}). Used by
+     * {@code DefaultChatServiceImpl.executeBlockingTurn(...)} to reissue a turn whose
+     * active-profile model was rejected by the provider as invalid (MODEL-02 catch + reissue
+     * contract).
+     *
+     * <p>Bypasses the active-profile read-through chain — calling
+     * {@code effectiveModel(resolveActive())} after a bad-model failure would return the same
+     * bad model and loop (RESEARCH Open Question 1 — locked-decision rationale). The saved
+     * {@link AiParameters#getBodyYaml()} {@code model} field is NEVER mutated by this path;
+     * the admin's saved typo stays until the admin corrects it via the
+     * {@code ParametersDetailView} ComboBox.
+     *
+     * <p>The defensive guard {@code fallback.equals(offendingModel)} that prevents a
+     * reissue-into-the-same-bad-model loop lives in the caller (so the caller can choose to
+     * surface the original exception unchanged); this accessor is intentionally inert apart
+     * from the {@code defaults.model()} delegation.
+     */
+    public String fallbackModel() {
+        return defaults.model();
+    }
+
+    /**
      * Per-run override of the active profile's model slug (D-01). If {@code overrides} is null,
      * or its {@link Overrides#model()} is null/blank, falls back to
      * {@link #effectiveModel(AiParameters)}. Slug format is validated identically to the
