@@ -1,11 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1.0
-milestone_name: "Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (shipped 2026-05-11)"
+milestone_name: Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (shipped 2026-05-11)
 status: Awaiting next milestone — run /gsd-new-milestone for v1.2
-stopped_at: "v1.1.0 closed and archived 2026-05-11"
-last_updated: "2026-05-11T09:30:00.000Z"
-last_activity: 2026-05-11 — Milestone v1.1.0 completed and archived; Phase 15 (Chat Voice Input — Soniox STT) deferred to v1.2 Backlog (Phase 999.2)
+stopped_at: "Phase 14 manual UAT — all 14 checks pass (driven live on localhost:8088 against a local docker Postgres)"
+last_updated: "2026-05-13T09:36:34.802Z"
 progress:
   total_phases: 7
   completed_phases: 7
@@ -24,10 +23,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** v1.1.0 shipped and archived. No active milestone — run `/gsd-new-milestone` to start v1.2 (likely scope: Phase 15 STT from Backlog 999.2, Phase 10 re-verification + Nyquist backfill, Phase 11 mutation-internals hardening from Backlog 999.1, PKG-05/TEST-07 clean-consumer smoke).
+**Current focus:** Phase 16 — Admin Settings Model Picker & Config Knob Migration
 
 ## Current Position
 
+Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
+Plan: 2 of 7 (Plan 01 complete 2026-05-13)
 Milestone: v1.1.0 — COMPLETE & ARCHIVED (2026-05-11). No active phase.
 Next: `/gsd-new-milestone` → `/gsd-review-backlog`
 | Field | Value |
@@ -135,6 +136,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ### Decisions
 
+- [Phase 16]: Plan 16-01: Wave-0 foundation scaffolding shipped — `AiSettingsChangedEvent` (typed ApplicationEvent with `Kind {PARAMETERS, UI_SETTINGS}` D-04 order locked, single-publish-site invariant sentence in Javadoc for SEC-08 scan), `KnobMetadata` annotation (RUNTIME, `@Target({RECORD_COMPONENT, FIELD, METHOD})`, `Tier {TIER_1, TIER_2, TIER_3}` + `requiresRestart` + `displayMessageKey`), `AuditKind.MODEL_VALIDATION_FAILURE = "MODEL_VALIDATION_FAILURE"` (24-char verbatim per D-05). Additive `AuditWriter.writeAuditEvent(String kind, ...)` overload closes consensus HIGH Concern #1 — body extracted to shared private `writeAuditRow` helper; existing `writeToolCall` callers see zero behavior change. Eight Wave-0 test scaffolds carry BOTH class-level `@Disabled` AND `@Tag("phase-16-scaffold")` + `fail()`-bodied methods so `:ai-agent:test` stays GREEN between plans (codex HIGH Concern #3). `AiUiSettingsBeanValidationTest` added to Plan 01 inventory per codex MEDIUM scaffold-drift fix; `DefaultChatServiceImplModelValidationFallbackTest` includes `directRestClientResponseExceptionTriggersReissue` + `userVisibleFallbackNotificationFires` methods per codex HIGH Concerns #8 + #9.
 - 2026-04-27 (Plan 09-01): AUD-07 plumbing (`AuditFieldHasher` + `AiAgentAuditProperties`) shipped with intentional zero callers per CONTEXT D-18. Phase 11 `MutationErrorTranslator` is the planned consumer. SHA-256 over UTF-8 byte encoding (locale-independent), lowercase 64-char hex via `java.util.HexFormat`. No SPI extraction — deferred until a host requests non-SHA-256 hashing.
 - 2026-04-27 (Plan 09-01): Spring config defaults landed in `module.properties`, NOT in `default-params.yaml` (which is strict `AiParameters` seed YAML). Planner-review carve-out honored.
 - [Phase ?]: Plan 09-02: Locked the Phase-9 SPI contract surface — ToolFetchPlanCustomizer (D-09 signature) + FetchPlanContext concrete request snapshot + SpiDefaultsAutoConfiguration no-op default. FetchPlanContext does NOT carry RunContext (per D-10 review correction: RunContext is final + private constructor + static accessors). Verbatim TOOL-11 phrase 'fetch plan is projection, not security.' authored at the SPI seam; Plan 09-04 will repeat the phrase at the FetchPlanIntersector consumer seam.
@@ -284,6 +286,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 14 P06 | 17min | 6 tasks | 10 files |
 | Phase 14 P07 | 46min | 3 tasks | 8 files |
 | Phase 14 P08 | 2h 29m | 5 tasks | 6 files |
+| Phase 16 P01 | ~12min | 3 tasks | 12 files | 2026-05-13
 
 ### Quick Tasks Completed
 
@@ -293,8 +296,8 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-11T13:00:00.000Z
-**Stopped at:** Phase 14 manual UAT — all 14 checks pass (driven live on localhost:8088 against a local docker Postgres)
+**Last session:** 2026-05-13T16:00:00.000Z
+**Stopped at:** Phase 16 Plan 01 complete — Wave-0 foundation (event/annotation/AuditKind/AuditWriter overload + 8 @Disabled scaffolds)
 **Resume file:** None
 **Blockers:** None for Phase 14 UAT. Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md.
 **Working-tree changes (uncommitted) from this session:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432; application.properties itself is UNCHANGED from origin and stays shippable with the 10.123.123.174:5555 URLs); ActionProposalTool `@ToolParam values` Object→Map<String,Object> fix + test cleanup. Plus pre-existing 14-11 WIP (cancel control, transcript-leak fix, ambiguous-count rules, full-page prefill source-conversation). See 14-HUMAN-UAT.md "Session Handoff - 2026-05-11 (UAT COMPLETE)".
