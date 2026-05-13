@@ -1,4 +1,4 @@
-# Jmix AI Copilot
+# Jmix AI Agent
 
 Drop-in Jmix add-on (2.8+) that lets end-users safely converse with their data and documents. Built on Spring AI 1.1.4. No agent framework code required from the host team.
 

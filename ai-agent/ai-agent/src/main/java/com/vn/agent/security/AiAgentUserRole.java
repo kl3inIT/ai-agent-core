@@ -58,6 +58,11 @@ public interface AiAgentUserRole {
     @ViewPolicy(viewIds = {
             "AiAgent_Chat",
             "AiAgent_ChatDialog",
+            // Phase 15 Plan 03 — SIDEBAR surface host view; chat users must be able to
+            // open it (parity with AiAgent_ChatDialog). ChatSurfaceMounter gates the
+            // sidebar mount on UiShowViewContext("AiAgent_Sidebar"), so a user without
+            // this policy gets neither the panel nor the toggle.
+            "AiAgent_Sidebar",
             "AiAgent_Conversation.list",
             "AiAgent_Conversation.detail"})
     void userViews();

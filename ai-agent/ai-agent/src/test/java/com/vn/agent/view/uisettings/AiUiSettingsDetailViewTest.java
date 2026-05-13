@@ -108,6 +108,28 @@ class AiUiSettingsDetailViewTest {
     }
 
     @Test
+    void sidebarSurfaceIsSelectableInBothControlsAndShipsEnabledByDefault() {
+        systemAuthenticator.runWithUser("admin", () -> {
+            AiUiSettingsDetailView view = openDialog();
+
+            JmixCheckboxGroup<AiChatSurface> enabledSurfacesField =
+                    UiTestUtils.getComponent(view, "enabledSurfacesField");
+            JmixRadioButtonGroup<AiChatSurface> defaultSurfaceField =
+                    UiTestUtils.getComponent(view, "defaultSurfaceField");
+
+            assertThat(itemsOf(enabledSurfacesField)).contains(AiChatSurface.SIDEBAR);
+            assertThat(itemsOf(defaultSurfaceField)).contains(AiChatSurface.SIDEBAR);
+        });
+
+        AiUiSettings reloaded = unconstrainedDataManager.load(AiUiSettings.class)
+                .id(AiUiSettings.SINGLETON_ID)
+                .one();
+
+        assertThat(reloaded.getEnabledSurfaceSet()).contains(AiChatSurface.SIDEBAR);
+        assertThat(reloaded.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
+    }
+
+    @Test
     void validationRejectsEmptyEnabledSurfacesAndMissingDefaultSurface() {
         systemAuthenticator.runWithUser("admin", () -> {
             AiUiSettingsDetailView view = openDialog();
@@ -128,7 +150,7 @@ class AiUiSettingsDetailViewTest {
                 .one();
 
         assertThat(reloaded.getEnabledSurfaceSet())
-                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON, AiChatSurface.SIDEBAR);
         assertThat(reloaded.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
 
         systemAuthenticator.runWithUser("admin", () -> {
@@ -150,8 +172,13 @@ class AiUiSettingsDetailViewTest {
                 .one();
 
         assertThat(reloaded.getEnabledSurfaceSet())
-                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON);
+                .containsExactly(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON, AiChatSurface.SIDEBAR);
         assertThat(reloaded.getDefaultSurface()).isEqualTo(AiChatSurface.FULL_ROUTE);
+    }
+
+    private static <V extends com.vaadin.flow.data.provider.ListDataView<AiChatSurface, ?>>
+            Set<AiChatSurface> itemsOf(com.vaadin.flow.data.provider.HasListDataView<AiChatSurface, V> field) {
+        return field.getListDataView().getItems().collect(java.util.stream.Collectors.toSet());
     }
 
     private AiUiSettingsDetailView openDialog() {

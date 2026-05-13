@@ -1,6 +1,7 @@
 package com.vn.agent.rag.advisor;
 
 import com.vn.agent.audit.AuditWriter;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import io.jmix.core.security.CurrentAuthentication;
 import org.junit.jupiter.api.Test;
@@ -22,10 +23,11 @@ class RetrievalAugmentationAdvisorFactoryTest {
                 null, null, null, null, null, null, null, null, null);
         AuditWriter auditWriter = mock(AuditWriter.class);
         CurrentAuthentication currentAuthentication = mock(CurrentAuthentication.class);
+        StreamingSinkHolder streamingSinkHolder = new StreamingSinkHolder();
 
         RetrievalAugmentationAdvisor advisor =
                 new RetrievalAugmentationAdvisorFactory().retrievalAugmentationAdvisor(
-                        vectorStore, props, auditWriter, currentAuthentication);
+                        vectorStore, props, auditWriter, currentAuthentication, streamingSinkHolder);
 
         Field queryAugmenterField = RetrievalAugmentationAdvisor.class.getDeclaredField("queryAugmenter");
         queryAugmenterField.setAccessible(true);

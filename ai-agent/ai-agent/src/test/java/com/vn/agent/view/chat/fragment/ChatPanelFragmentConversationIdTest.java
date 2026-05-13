@@ -2,6 +2,10 @@ package com.vn.agent.view.chat.fragment;
 
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.messages.MessageInput;
+import com.vaadin.flow.component.messages.MessageList;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.orchestration.ConversationGateway;
@@ -93,6 +97,62 @@ class ChatPanelFragmentConversationIdTest {
         assertThat(fragment.getConversationId()).isNull();
         assertThat(sessionState.getCurrentConversationId()).isNull();
         assertThat(editTitleButton.isVisible()).isFalse();
+    }
+
+    @Test
+    void startNewChat_afterErroredTurn_forceClearsStrandedMessages() throws Exception {
+        // 15-UAT Gap 1: an errored turn left conversationId == null with the user message still
+        // rendered (messageCount > 0). startNewChat() must still clear, not early-return.
+        ChatPanelFragment fragment = new ChatPanelFragment();
+        VerticalLayout slot = new VerticalLayout();
+        MessageList messageList = new MessageList();
+        slot.add(messageList);
+        inject(fragment, "messageListSlot", slot);
+        inject(fragment, "messageList", messageList);
+        inject(fragment, "messageInput", new MessageInput());
+        inject(fragment, "streamProgressBar", new ProgressBar());
+        Messages messages = mock(Messages.class);
+        when(messages.getMessage(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        inject(fragment, "messages", messages);
+        // a stranded NOTICE-style div sibling, plus the messageCount bookkeeping
+        slot.getElement().appendChild(new com.vaadin.flow.dom.Element("div"));
+        inject(fragment, "conversationId", null);
+        setInt(fragment, "messageCount", 1);
+
+        fragment.startNewChat();
+
+        assertThat(fragment.hasMessages()).isFalse();
+        assertThat(getInt(fragment, "messageCount")).isZero();
+        // the stale sibling row is gone; only a fresh <vaadin-message-list> remains
+        assertThat(slot.getElement().getChildren()
+                .filter(e -> "vaadin-message-list".equals(e.getTag())).count()).isEqualTo(1);
+        assertThat(slot.getElement().getChildCount()).isEqualTo(1);
+    }
+
+    @Test
+    void startNewChat_happyPathNoOp_isPreserved() throws Exception {
+        // conversationId == null && messageCount == 0 → no work, no throw, stays cleared.
+        ChatPanelFragment fragment = new ChatPanelFragment();
+        inject(fragment, "conversationId", null);
+        setInt(fragment, "messageCount", 0);
+
+        fragment.startNewChat();
+
+        assertThat(fragment.getConversationId()).isNull();
+        assertThat(getInt(fragment, "messageCount")).isZero();
+    }
+
+    @Test
+    void doOnError_keepsConversationIdInSyncFromAuditChatRoot() throws Exception {
+        String source = readSource();
+        assertThat(source)
+                .contains(".doOnError(err -> {")
+                .contains("if (activeRunId != null && conversationId == null)")
+                .contains("resolveConversationIdForRun(activeRunId)")
+                .contains("initializeConversationFromFinalEvent(serverConversationId)")
+                // the resolve helper reuses the loadTurnSteps security pattern (mandatory filter)
+                .contains("where e.userUsername = :me and e.runId = :rid and e.parent is null")
+                .contains(".store(\"agentstore\")");
     }
 
     @Test
@@ -227,6 +287,18 @@ class ChatPanelFragmentConversationIdTest {
         Field field = ChatPanelFragment.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(fragment, value);
+    }
+
+    private static void setInt(ChatPanelFragment fragment, String fieldName, int value) throws Exception {
+        Field field = ChatPanelFragment.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.setInt(fragment, value);
+    }
+
+    private static int getInt(ChatPanelFragment fragment, String fieldName) throws Exception {
+        Field field = ChatPanelFragment.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getInt(fragment);
     }
 
     private static void invokeSaveManualConversationTitle(ChatPanelFragment fragment, String title) throws Exception {

@@ -7,9 +7,9 @@
 # Spring AI pgvector table). Liquibase changelogs run on app boot and create the
 # schema; pgvector is enabled in agentstore by the init script.
 #
-# Host port 5432 (standard). Note: host port 5555 collides with a local
-# SoftEther vpnserver on this machine, so we map to 5432 instead. The app's
-# datasource URLs in application.properties point at localhost:5432.
+# Host port 5433: 5432 is held by another local docker Postgres, and 5555 is held
+# by a local SoftEther vpnserver (vpnserver_x64) over IPv4 which RSTs the Postgres
+# handshake. 5433 is free. Point your datasource URL at localhost:5433.
 
 services:
   postgres:
@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: admin123
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ai-agent-pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro

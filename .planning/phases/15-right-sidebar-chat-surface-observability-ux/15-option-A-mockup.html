@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Option A — turn-detail & action-choice neo dưới message (mockup)</title>
+<style>
+  :root{
+    --lumo-primary:#3b82f6; --lumo-primary-10:#eaf2ff; --lumo-primary-50:#3b82f6;
+    --bg:#f6f7f9; --panel:#ffffff; --border:#e3e6ea; --text:#1f2329; --text2:#6b7280;
+    --user:#d61f8f; --ai:#0f8a8a; --ok:#16a34a; --err:#dc2626;
+    --radius:10px; --font: -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);padding:28px;line-height:1.45}
+  h1{font-size:18px;margin-bottom:4px}
+  .sub{color:var(--text2);font-size:13px;margin-bottom:22px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  .col-title{font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+  .bad{color:var(--err)} .good{color:var(--ok)}
+
+  /* chat panel shell */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;height:620px}
+  .panel-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .panel-head h3{font-size:15px;font-weight:600;flex:1}
+  .icon-btn{width:28px;height:28px;border:none;background:transparent;border-radius:6px;color:var(--text2);cursor:pointer;font-size:16px;display:grid;place-items:center}
+  .icon-btn:hover{background:#f0f1f3}
+  .msg-area{flex:1;overflow-y:auto;padding:14px 14px 6px}
+  .composer{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}
+  .composer input{flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--text2)}
+  .composer button{background:var(--lumo-primary);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+
+  /* messages */
+  .msg{display:flex;gap:10px;margin-bottom:14px}
+  .avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+  .avatar.u{background:var(--user)} .avatar.a{background:var(--ai)}
+  .msg-body{flex:1;min-width:0}
+  .msg-name{font-size:12px;font-weight:600}
+  .msg-time{font-size:11px;color:var(--text2);margin-left:6px;font-weight:400}
+  .msg-text{font-size:13.5px;margin-top:3px}
+  .msg-text table{border-collapse:collapse;margin-top:6px;font-size:12.5px}
+  .msg-text th,.msg-text td{border:1px solid var(--border);padding:4px 8px;text-align:left}
+  .msg-text th{background:#fafbfc;font-weight:600}
+  .lnk{color:var(--lumo-primary);text-decoration:none}
+
+  /* === OPTION A: turn-detail disclosure, anchored under the AI message, inside msg area === */
+  .turn-extra{margin:6px 0 0 40px} /* 40px = avatar(30)+gap(10) → aligns under the AI bubble */
+  details.turn-detail{border:1px solid var(--border);border-radius:8px;background:#fbfcfd;overflow:hidden}
+  details.turn-detail>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12.5px;color:var(--text2);user-select:none}
+  details.turn-detail>summary::-webkit-details-marker{display:none}
+  details.turn-detail>summary::before{content:"▸";font-size:10px;color:var(--text2);transition:transform .12s}
+  details.turn-detail[open]>summary::before{transform:rotate(90deg)}
+  details.turn-detail>summary .gear{font-size:13px;opacity:.7}
+  details.turn-detail .steps{padding:2px 10px 9px 28px}
+  .step-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;color:var(--text)}
+  .step-row .ic{width:18px;height:18px;border-radius:5px;background:var(--lumo-primary-10);color:var(--lumo-primary);display:grid;place-items:center;font-size:11px;flex-shrink:0}
+  .step-row .lbl{flex:1}
+  .step-row .ms{color:var(--text2);font-variant-numeric:tabular-nums;font-size:11.5px}
+  .step-row.errored .ic{background:#fdeaea;color:var(--err)}
+  .step-row .errtag{color:var(--err);font-size:11px}
+
+  /* === OPTION A: action-choice prompt, anchored under the AI message that proposed it === */
+  .action-choice{margin:8px 0 0 40px;border:1px solid var(--border);border-left:3px solid var(--lumo-primary);border-radius:8px;background:var(--lumo-primary-10);padding:10px 12px}
+  .action-choice .ac-summary{font-size:12.5px;margin-bottom:8px}
+  .action-choice .ac-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .action-choice button{font-size:12px;border-radius:6px;padding:5px 11px;cursor:pointer;border:1px solid var(--border);background:#fff;display:inline-flex;align-items:center;gap:5px}
+  .action-choice button.primary{background:var(--lumo-primary);color:#fff;border-color:var(--lumo-primary)}
+  .action-choice button.tertiary{border-color:transparent;color:var(--text2);background:transparent}
+
+  /* === "BEFORE" column: everything stacked at the bottom, after the message list === */
+  .before-stack{margin-top:10px;padding-top:10px;border-top:1px dashed #d6b3b3}
+  .before-note{font-size:11px;color:var(--err);margin-bottom:6px}
+  .before-stack details.turn-detail,.before-stack .action-choice{margin-left:0;margin-bottom:8px}
+
+  .legend{margin-top:22px;font-size:12.5px;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+  .legend b{color:var(--text)}
+  .legend ul{margin:6px 0 0 18px}
+  .legend li{margin:3px 0}
+</style>
+</head>
+<body>
+
+<h1>Option A — “agent đã làm gì” & prompt xác nhận neo NGAY DƯỚI câu trả lời, trong vùng message</h1>
+<div class="sub">Mockup so sánh hiện trạng (trái) vs đề xuất Option A (phải). Cùng một hội thoại 2 lượt: lượt 1 hỏi danh sách KH, lượt 2 đề xuất tạo bản ghi.</div>
+
+<div class="cols">
+
+  <!-- ================= BEFORE ================= -->
+  <div>
+    <div class="col-title bad">Hiện trạng — mọi thứ dồn xuống đáy, tách rời lượt</div>
+    <div class="panel">
+      <div class="panel-head"><h3>Email khách hàng Acme Corp…</h3><button class="icon-btn">✎</button><button class="icon-btn">＋</button></div>
+      <div class="msg-area">
+        <div class="msg"><div class="avatar u">B</div><div class="msg-body"><div><span class="msg-name">Bạn</span><span class="msg-time">16:16</span></div><div class="msg-text">Liệt kê tất cả khách hàng</div></div></div>
+        <div class="msg"><div class="avatar a">AI</div><div class="msg-body"><div><span class="msg-name">Trợ lý AI</span><span class="msg-time">16:16</span></div>
+          <div class="msg-text">Dưới đây là danh sách khách hàng:
+            <table><tr><th>Tên</th><th>Email</th></tr><tr><td>Acme Corporation</td><td class="lnk">contact@acme.example</td></tr><tr><td>Globex Trading</td><td class="lnk">sales@globex.example</td></tr></table>
+          </div></div></div>
+        <div class="msg"><div class="avatar u">B</div><div class="msg-body"><div><span class="msg-name">Bạn</span><span class="msg-time">16:18</span></div><div class="msg-text">Tạo khách hàng mới “Wayne Industries”</div></div></div>
+        <div class="msg"><div class="avatar a">AI</div><div class="msg-body"><div><span class="msg-name">Trợ lý AI</span><span class="msg-time">16:18</span></div><div class="msg-text">Mình đã chuẩn bị bản ghi khách hàng “Wayne Industries”. Bạn muốn tạo luôn hay mở form xem trước?</div></div></div>
+
+        <!-- ❌ tất cả "extra" của mọi lượt bị gom ở đây, cuối list -->
+        <div class="before-stack">
+          <div class="before-note">⟂ các khối này hiện nằm ngoài MessageList, dồn xuống đáy — không biết của lượt nào:</div>
+          <details class="turn-detail"><summary><span class="gear">⚙</span>agent đã làm gì — 1 bước · 60 ms</summary><div class="steps"><div class="step-row"><span class="ic">🔍</span><span class="lbl">Đã tìm dữ liệu</span><span class="ms">60 ms</span></div></div></details>
+          <div class="action-choice"><div class="ac-summary">Bản ghi đề xuất: <b>Wayne Industries</b></div><div class="ac-btns"><button class="primary">✔ Tạo ngay</button><button>↗ Mở form xem trước</button><button class="tertiary">✕ Bỏ qua</button></div></div>
+        </div>
+      </div>
+      <div class="composer"><input placeholder="Message" disabled><button>Send</button></div>
+    </div>
+  </div>
+
+  <!-- ================= AFTER (OPTION A) ================= -->
+  <div>
+    <div class="col-title good">Option A — neo dưới đúng message, scroll cùng, ở trong vùng message</div>
+    <div class="panel">
+      <div class="panel-head"><h3>Email khách hàng Acme Corp…</h3><button class="icon-btn">✎</button><button class="icon-btn">＋</button></div>
+      <div class="msg-area">
+        <div class="msg"><div class="avatar u">B</div><div class="msg-body"><div><span class="msg-name">Bạn</span><span class="msg-time">16:16</span></div><div class="msg-text">Liệt kê tất cả khách hàng</div></div></div>
+        <div class="msg"><div class="avatar a">AI</div><div class="msg-body"><div><span class="msg-name">Trợ lý AI</span><span class="msg-time">16:16</span></div>
+          <div class="msg-text">Dưới đây là danh sách khách hàng:
+            <table><tr><th>Tên</th><th>Email</th></tr><tr><td>Acme Corporation</td><td class="lnk">contact@acme.example</td></tr><tr><td>Globex Trading</td><td class="lnk">sales@globex.example</td></tr></table>
+          </div></div></div>
+        <!-- ✅ disclosure neo ngay dưới câu trả lời của AI, thụt theo bubble -->
+        <div class="turn-extra"><details class="turn-detail" open><summary><span class="gear">⚙</span>agent đã làm gì — 1 bước · 60 ms</summary><div class="steps">
+          <div class="step-row"><span class="ic">🔍</span><span class="lbl">Đã tìm dữ liệu</span><span class="ms">60 ms</span></div>
+        </div></details></div>
+
+        <div class="msg"><div class="avatar u">B</div><div class="msg-body"><div><span class="msg-name">Bạn</span><span class="msg-time">16:18</span></div><div class="msg-text">Tạo khách hàng mới “Wayne Industries”</div></div></div>
+        <div class="msg"><div class="avatar a">AI</div><div class="msg-body"><div><span class="msg-name">Trợ lý AI</span><span class="msg-time">16:18</span></div><div class="msg-text">Mình đã chuẩn bị bản ghi khách hàng “Wayne Industries”. Bạn muốn tạo luôn hay mở form xem trước?</div></div></div>
+        <!-- ✅ prompt xác nhận (phase 14) neo ngay dưới message đề xuất -->
+        <div class="action-choice"><div class="ac-summary">Bản ghi đề xuất: <b>Wayne Industries</b></div><div class="ac-btns"><button class="primary">✔ Tạo ngay</button><button>↗ Mở form xem trước</button><button class="tertiary">✕ Bỏ qua</button></div></div>
+        <!-- ✅ và disclosure của lượt 2 (nhiều bước, có lỗi rollback) cũng neo dưới đúng lượt -->
+        <div class="turn-extra"><details class="turn-detail"><summary><span class="gear">⚙</span>agent đã làm gì — 3 bước · 412 ms</summary><div class="steps">
+          <div class="step-row"><span class="ic">🔍</span><span class="lbl">Đã tìm dữ liệu</span><span class="ms">124 ms</span></div>
+          <div class="step-row"><span class="ic">📄</span><span class="lbl">Đã truy xuất tài liệu</span><span class="ms">266 ms</span></div>
+          <div class="step-row errored"><span class="ic">✕</span><span class="lbl">Đã tìm dữ liệu</span><span class="errtag">(lỗi — đã hoàn tác)</span><span class="ms">22 ms</span></div>
+        </div></details></div>
+      </div>
+      <div class="composer"><input placeholder="Message"><button>Send</button></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <b>Option A — những gì thay đổi:</b>
+  <ul>
+    <li><b>Vị trí:</b> mỗi <code>&lt;vaadin-details&gt;</code> "agent đã làm gì", mỗi prompt xác nhận (phase 14), và mỗi NOTICE row được <b>chèn vào DOM ngay sau <code>&lt;vaadin-message&gt;</code> của lượt tương ứng</b> (vẫn trong <code>messageListSlot</code>) — re-anchor sau mỗi <code>MessageList.setItems</code> và sau history-replay. Không còn dồn xuống đáy.</li>
+    <li><b>Căn lề:</b> các khối "extra" thụt vào ngang với bubble của AI (≈ avatar + gap) → đọc rõ là "thuộc về lượt này".</li>
+    <li><b>Style disclosure:</b> viền bo + nền xám nhạt + icon ⚙ ở summary + caret xoay, step rows có icon nhỏ (🔍 tìm dữ liệu / 📄 truy xuất tài liệu / 💬 tạo phản hồi), duration canh phải tabular, dòng lỗi tô đỏ + "(lỗi — đã hoàn tác)". Hết "thô".</li>
+    <li><b>Prompt xác nhận (phase 14):</b> khối có viền trái màu primary + nền primary-10, summary "Bản ghi đề xuất: …", 3 nút (Tạo ngay / Mở form / Bỏ qua) — nằm ngay dưới câu trả lời đề xuất.</li>
+    <li><b>Không đổi:</b> nội dung nhãn vẫn label-only (không lộ tên tool/entity), lazy-load step rows khi mở disclosure history, transient status line vẫn như cũ, tất cả 3 surface (full route / dialog / sidebar) hưởng chung vì đều dùng <code>ChatPanelFragment</code>.</li>
+  </ul>
+</div>
+
+</body>
+</html>

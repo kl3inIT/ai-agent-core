@@ -44,9 +44,42 @@ class ChatDialogViewTest {
         assertThat(elementByIdOrNull(document, "dialogHeaderBar")).isNull();
     }
 
+    @Test
+    void chatDialogViewIsUnchangedAndSidebarHostMirrorsIt() throws Exception {
+        // Phase 15 Plan 03 — ChatDialogView (HEADER_BUTTON host) keeps its shape; the new
+        // SIDEBAR host AiAgentSidebarView is a sibling lean StandardView composing the SAME
+        // ChatPanelFragment class via XML (no new fragment subclass, no custom chrome).
+        ViewController dialogController = ChatDialogView.class.getAnnotation(ViewController.class);
+        assertThat(dialogController.value()).isEqualTo("AiAgent_ChatDialog");
+
+        ViewController sidebarController = AiAgentSidebarView.class.getAnnotation(ViewController.class);
+        ViewDescriptor sidebarDescriptor = AiAgentSidebarView.class.getAnnotation(ViewDescriptor.class);
+        assertThat(StandardView.class).isAssignableFrom(AiAgentSidebarView.class);
+        assertThat(sidebarController).isNotNull();
+        assertThat(sidebarController.value()).isEqualTo("AiAgent_Sidebar");
+        assertThat(sidebarDescriptor).isNotNull();
+        assertThat(sidebarDescriptor.value()).isEqualTo("ai-agent-sidebar-view.xml");
+        assertThat(AiAgentSidebarView.class.getAnnotation(com.vaadin.flow.router.Route.class)).isNull();
+
+        Document sidebarDoc = readDescriptor("/com/vn/agent/view/chat/ai-agent-sidebar-view.xml");
+        Element fragment = elementById(sidebarDoc, "chatPanelFragment");
+        assertThat(fragment.getTagName()).isEqualTo("fragment");
+        assertThat(fragment.getAttribute("class"))
+                .isEqualTo("com.vn.agent.view.chat.fragment.ChatPanelFragment");
+        // No custom chrome — the in-panel closer lives in ChatSurfaceMounter's panel Div.
+        assertThat(elementByIdOrNull(sidebarDoc, "closeButton")).isNull();
+
+        // Same ChatPanelFragment class on both hosts — no duplicate fragment implementation.
+        assertThat(AiAgentSidebarView.class.getDeclaredField("chatPanelFragment").getType())
+                .isEqualTo(ChatDialogView.class.getDeclaredField("chatPanelFragment").getType());
+    }
+
     private static Document readDescriptor() throws Exception {
-        try (InputStream stream = ChatDialogViewTest.class.getResourceAsStream(
-                "/com/vn/agent/view/chat/chat-dialog-view.xml")) {
+        return readDescriptor("/com/vn/agent/view/chat/chat-dialog-view.xml");
+    }
+
+    private static Document readDescriptor(String resourcePath) throws Exception {
+        try (InputStream stream = ChatDialogViewTest.class.getResourceAsStream(resourcePath)) {
             assertThat(stream).isNotNull();
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(false);

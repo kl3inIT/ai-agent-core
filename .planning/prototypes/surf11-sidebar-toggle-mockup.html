@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SURF-11 Sidebar Toggle Mockup</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #677084;
+      --line: #d9dee8;
+      --line-strong: #b9c2d1;
+      --accent: #176bff;
+      --accent-soft: #e7efff;
+      --ok: #16845b;
+      --shadow: 0 18px 48px rgba(23, 32, 51, 0.14);
+      --sidebar-width: 380px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.7), rgba(245,247,250,0.96)),
+        repeating-linear-gradient(90deg, rgba(23,32,51,0.035) 0, rgba(23,32,51,0.035) 1px, transparent 1px, transparent 48px);
+      color: var(--ink);
+      font: 15px/1.45 "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      grid-template-rows: 64px minmax(0, 1fr);
+    }
+
+    .rail {
+      grid-row: 1 / 3;
+      background: #eef2f7;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding-top: 22px;
+    }
+
+    .hamburger,
+    .rail-dot {
+      width: 24px;
+      height: 24px;
+      border: 0;
+      background: transparent;
+      position: relative;
+    }
+
+    .hamburger::before,
+    .hamburger::after,
+    .hamburger span {
+      content: "";
+      position: absolute;
+      left: 3px;
+      width: 18px;
+      height: 2px;
+      background: #596579;
+      border-radius: 2px;
+    }
+
+    .hamburger::before { top: 6px; }
+    .hamburger span { top: 11px; }
+    .hamburger::after { top: 16px; }
+
+    .rail-dot {
+      border-radius: 8px;
+      border: 1px solid transparent;
+    }
+
+    .rail-dot::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 2px solid #657186;
+      border-radius: 50%;
+    }
+
+    .rail-dot.active {
+      background: #dbe8ff;
+      border-color: #c2d5ff;
+    }
+
+    .topbar {
+      grid-column: 2;
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 22px;
+      background: rgba(255,255,255,0.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0;
+      margin-right: auto;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #31405a;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .icon-button:hover {
+      background: #f0f3f8;
+      border-color: var(--line);
+    }
+
+    .icon-button[aria-pressed="true"] {
+      background: var(--accent-soft);
+      border-color: #b9ceff;
+      color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(23,107,255,0.08);
+    }
+
+    .icon-button:active {
+      transform: translateY(1px);
+    }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+      position: relative;
+      display: block;
+    }
+
+    .icon.search::before {
+      content: "";
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      left: 2px;
+      top: 2px;
+    }
+
+    .icon.search::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 2px;
+      background: currentColor;
+      transform: rotate(45deg);
+      right: 1px;
+      bottom: 3px;
+      border-radius: 2px;
+    }
+
+    .icon.chat::before {
+      content: "";
+      position: absolute;
+      inset: 3px 2px 5px 2px;
+      border: 2px solid currentColor;
+      border-radius: 7px;
+    }
+
+    .icon.chat::after {
+      content: "";
+      position: absolute;
+      left: 7px;
+      bottom: 2px;
+      width: 7px;
+      height: 7px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: skew(-18deg);
+      background: white;
+    }
+
+    .icon.panel-right::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border: 2px solid currentColor;
+      border-radius: 4px;
+    }
+
+    .icon.panel-right::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      right: 5px;
+      width: 5px;
+      height: 14px;
+      background: currentColor;
+      border-radius: 2px;
+      opacity: 0.9;
+    }
+
+    .icon.gear::before {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      box-shadow: 0 -7px 0 -5px currentColor, 0 7px 0 -5px currentColor, 7px 0 0 -5px currentColor, -7px 0 0 -5px currentColor;
+    }
+
+    .workspace {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 0;
+      transition: grid-template-columns 220ms ease;
+    }
+
+    .workspace.sidebar-open {
+      grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+    }
+
+    .content {
+      min-width: 0;
+      padding: 28px 28px 34px;
+      overflow: auto;
+    }
+
+    .content-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      font-size: 28px;
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .status-pill {
+      border: 1px solid #bde2d3;
+      color: var(--ok);
+      background: #ecfbf5;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      height: 36px;
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 7px;
+      padding: 0 13px;
+      color: #26344d;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .button.primary {
+      border-color: #b9ceff;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .table-card {
+      background: rgba(255,255,255,0.86);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 10px 28px rgba(23,32,51,0.06);
+      overflow: hidden;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 720px;
+    }
+
+    th,
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #e5e9f0;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      color: #4d596e;
+      font-size: 13px;
+      background: #f8fafc;
+      font-weight: 650;
+    }
+
+    td {
+      color: #25334a;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      min-width: 0;
+      overflow: hidden;
+      border-left: 1px solid var(--line-strong);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      transform: translateX(100%);
+      transition: transform 220ms ease;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .workspace.sidebar-open .sidebar {
+      transform: translateX(0);
+    }
+
+    .sidebar-header {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sidebar-title {
+      font-weight: 700;
+      font-size: 17px;
+      margin-right: auto;
+    }
+
+    .sidebar-body {
+      min-height: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fbfcfe;
+    }
+
+    .messages {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bubble {
+      max-width: 88%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e6ef;
+      background: white;
+      color: #243249;
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: #eaf1ff;
+      border-color: #c8d9ff;
+    }
+
+    .work-row {
+      font-size: 13px;
+      color: var(--muted);
+      border: 1px dashed #ccd4e0;
+      border-radius: 7px;
+      padding: 8px 10px;
+      background: #ffffff;
+    }
+
+    .input-row {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      background: white;
+    }
+
+    .input-row input {
+      min-width: 0;
+      height: 38px;
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      padding: 0 11px;
+      font: inherit;
+    }
+
+    .dialog-pop {
+      position: fixed;
+      right: 78px;
+      top: 74px;
+      width: 300px;
+      padding: 14px;
+      border: 1px solid #cad3e1;
+      border-radius: 8px;
+      background: white;
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 3;
+    }
+
+    .dialog-pop.open {
+      display: block;
+    }
+
+    .note {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --sidebar-width: min(380px, 86vw);
+      }
+
+      .workspace,
+      .workspace.sidebar-open {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: fixed;
+        right: 0;
+        top: 64px;
+        bottom: 0;
+        z-index: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail" aria-label="Navigation rail">
+      <button class="hamburger" aria-label="Menu"><span></span></button>
+      <button class="rail-dot active" aria-label="Customers"></button>
+      <button class="rail-dot" aria-label="Orders"></button>
+      <button class="rail-dot" aria-label="Parameters"></button>
+    </aside>
+
+    <header class="topbar">
+      <div class="title">Customers</div>
+      <div class="header-actions" aria-label="Header actions">
+        <button class="icon-button" title="Search" aria-label="Search">
+          <span class="icon search"></span>
+        </button>
+        <button class="icon-button" title="Settings" aria-label="Settings">
+          <span class="icon gear"></span>
+        </button>
+        <button id="dialogToggle" class="icon-button" title="Open chat dialog" aria-label="Open chat dialog" aria-pressed="false">
+          <span class="icon chat"></span>
+        </button>
+        <button id="sidebarToggle" class="icon-button" title="Open chat sidebar" aria-label="Open chat sidebar" aria-pressed="false">
+          <span class="icon panel-right"></span>
+        </button>
+      </div>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <section class="content" aria-label="Current view">
+        <div class="content-header">
+          <div>
+            <div class="eyebrow">Current routed view</div>
+            <h1>Customer list</h1>
+          </div>
+          <div class="status-pill">Main view remains usable: modal=false</div>
+        </div>
+
+        <div class="toolbar">
+          <button class="button primary">Create</button>
+          <button class="button">Edit</button>
+          <button class="button">Remove</button>
+          <button class="button">Export</button>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>First name</th>
+                <th>Last name</th>
+                <th>Email</th>
+                <th>Age</th>
+                <th>Active</th>
+                <th>Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Katherine</td><td>Potter</td><td>k.potter@jmix.io</td><td>34</td><td>True</td><td>High</td></tr>
+              <tr><td>John</td><td>Doe</td><td>j.doe@jmix.io</td><td>39</td><td>False</td><td>Standard</td></tr>
+              <tr><td>Andy</td><td>Lewis</td><td>a.lewis@jmix.io</td><td>35</td><td>False</td><td>Standard</td></tr>
+              <tr><td>Edward</td><td>Harris</td><td>e.harris@jmix.io</td><td>27</td><td>True</td><td>Standard</td></tr>
+              <tr><td>George</td><td>Moore</td><td>g.moore@jmix.io</td><td>41</td><td>True</td><td>Premium</td></tr>
+              <tr><td>Philipp</td><td>Brown</td><td>p.brown@jmix.io</td><td>30</td><td>True</td><td>Standard</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="note">
+          The sidebar button is the far-right header action. It is separate from the chat dialog button,
+          and its active state tracks whether the right panel is open.
+        </p>
+      </section>
+
+      <aside class="sidebar" aria-label="Chat sidebar">
+        <div class="sidebar-header">
+          <span class="icon panel-right" aria-hidden="true"></span>
+          <div class="sidebar-title">AI chat sidebar</div>
+          <button id="sidebarClose" class="icon-button" title="Close chat sidebar" aria-label="Close chat sidebar">
+            <span aria-hidden="true">x</span>
+          </button>
+        </div>
+        <div class="sidebar-body">
+          <div class="messages">
+            <div class="bubble user">Find customers in Hanoi with recent orders.</div>
+            <div class="bubble">I found matching customer records. Open the audit link under a turn for details.</div>
+            <div class="work-row">Collapsed tool detail: what the agent did - 3 steps, 1.2s</div>
+            <div class="bubble user">Keep this chat open while I check Orders.</div>
+            <div class="bubble">The sidebar is app-level, so it can stay open while routed content changes.</div>
+          </div>
+          <div class="input-row">
+            <input aria-label="Message" value="Ask about the current view...">
+            <button class="button primary">Send</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="dialogPop" class="dialog-pop" role="dialog" aria-label="Chat dialog preview">
+    <strong>HEADER_BUTTON dialog</strong>
+    <p class="note">This is the existing floating dialog surface. Opening the sidebar would normally close this so only one chat surface is active.</p>
+  </div>
+
+  <script>
+    const workspace = document.getElementById("workspace");
+    const sidebarToggle = document.getElementById("sidebarToggle");
+    const sidebarClose = document.getElementById("sidebarClose");
+    const dialogToggle = document.getElementById("dialogToggle");
+    const dialogPop = document.getElementById("dialogPop");
+
+    function setSidebar(open) {
+      workspace.classList.toggle("sidebar-open", open);
+      sidebarToggle.setAttribute("aria-pressed", String(open));
+      sidebarToggle.title = open ? "Close chat sidebar" : "Open chat sidebar";
+      sidebarToggle.setAttribute("aria-label", sidebarToggle.title);
+      if (open) {
+        setDialog(false);
+      }
+    }
+
+    function setDialog(open) {
+      dialogPop.classList.toggle("open", open);
+      dialogToggle.setAttribute("aria-pressed", String(open));
+      dialogToggle.title = open ? "Close chat dialog" : "Open chat dialog";
+      dialogToggle.setAttribute("aria-label", dialogToggle.title);
+      if (open) {
+        setSidebar(false);
+      }
+    }
+
+    sidebarToggle.addEventListener("click", () => {
+      setSidebar(!workspace.classList.contains("sidebar-open"));
+    });
+
+    sidebarClose.addEventListener("click", () => setSidebar(false));
+
+    dialogToggle.addEventListener("click", () => {
+      setDialog(!dialogPop.classList.contains("open"));
+    });
+
+    setSidebar(true);
+  </script>
+</body>
+</html>

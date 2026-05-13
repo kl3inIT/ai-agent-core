@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.orchestration.RunContext;
+import com.vn.agent.orchestration.StreamingEvent;
+import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.rag.ChunkMetadata;
 import io.jmix.core.security.CurrentAuthentication;
 import org.slf4j.Logger;
@@ -47,6 +49,16 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
     static final int MAX_AUDITED_HITS = 50;
     static final int TEXT_PREVIEW_MAX_CHARS = 500;
 
+    /**
+     * Fallback RAG knobs for the delegate-based constructors (which do not receive a
+     * {@code VectorStore}/{@code AiAgentRagProperties}). MUST stay in sync with
+     * {@code AiAgentRagProperties.resolvedTopK()} / {@code resolvedSimilarityThreshold()}
+     * (AI-SPEC §4 defaults: topK = 5, similarity threshold = 0.50). The vector-store
+     * constructors take the resolved property values instead and never use these.
+     */
+    static final int DEFAULT_TOP_K = 5;
+    static final double DEFAULT_SIMILARITY_THRESHOLD = 0.50;
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final DocumentRetriever delegate;
@@ -55,16 +67,26 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
     private final double defaultSimilarityThreshold;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
+    /** Phase 15 — best-effort streaming-status emit hook; may be {@code null} (blocking/test path). */
+    private final StreamingSinkHolder streamingSinkHolder;
 
     public AuditingDocumentRetriever(DocumentRetriever delegate,
                                      AuditWriter auditWriter,
                                      CurrentAuthentication currentAuthentication) {
+        this(delegate, auditWriter, currentAuthentication, null);
+    }
+
+    public AuditingDocumentRetriever(DocumentRetriever delegate,
+                                     AuditWriter auditWriter,
+                                     CurrentAuthentication currentAuthentication,
+                                     StreamingSinkHolder streamingSinkHolder) {
         this.delegate = delegate;
         this.vectorStore = null;
-        this.defaultTopK = 5;
-        this.defaultSimilarityThreshold = 0.5;
+        this.defaultTopK = DEFAULT_TOP_K;
+        this.defaultSimilarityThreshold = DEFAULT_SIMILARITY_THRESHOLD;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.streamingSinkHolder = streamingSinkHolder;
     }
 
     public AuditingDocumentRetriever(VectorStore vectorStore,
@@ -72,12 +94,22 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
                                      double defaultSimilarityThreshold,
                                      AuditWriter auditWriter,
                                      CurrentAuthentication currentAuthentication) {
+        this(vectorStore, defaultTopK, defaultSimilarityThreshold, auditWriter, currentAuthentication, null);
+    }
+
+    public AuditingDocumentRetriever(VectorStore vectorStore,
+                                     int defaultTopK,
+                                     double defaultSimilarityThreshold,
+                                     AuditWriter auditWriter,
+                                     CurrentAuthentication currentAuthentication,
+                                     StreamingSinkHolder streamingSinkHolder) {
         this.delegate = null;
         this.vectorStore = vectorStore;
         this.defaultTopK = defaultTopK;
         this.defaultSimilarityThreshold = defaultSimilarityThreshold;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.streamingSinkHolder = streamingSinkHolder;
     }
 
     @Override
@@ -90,6 +122,7 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
                 runId = uuid;
             }
         }
+        emitRetrievalActivity(runId);
         String userUsername = safeUsername();
         long startNanos = System.nanoTime();
         List<Document> docs = null;
@@ -127,6 +160,25 @@ public class AuditingDocumentRetriever implements DocumentRetriever {
             } catch (Throwable t2) {
                 log.warn("Retrieval audit write failed for parentId={} runId={}", parentId, runId, t2);
             }
+        }
+    }
+
+    /**
+     * Phase 15 D-05 — emit {@code Activity(RETRIEVAL)} onto the active streaming sink at the
+     * start of {@code retrieve(...)}, best-effort. Mirrors this class's "audit-write failures
+     * never rethrow into the retrieval path" convention: any {@link RuntimeException} from the
+     * sink lookup or {@code tryEmitNext} is swallowed — observability must never break retrieval.
+     */
+    private void emitRetrievalActivity(UUID runId) {
+        if (streamingSinkHolder == null) {
+            return;
+        }
+        try {
+            streamingSinkHolder.currentOrForRun(runId).ifPresent(sink ->
+                    sink.tryEmitNext(new StreamingEvent.Activity(StreamingEvent.ActivityKind.RETRIEVAL)));
+        } catch (RuntimeException ignored) {
+            // observability emit must never break retrieval
+            log.debug("Streaming retrieval-activity emission failed; continuing retrieval", ignored);
         }
     }
 

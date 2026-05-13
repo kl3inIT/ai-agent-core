@@ -10,12 +10,14 @@ import java.util.UUID;
  * {@code Flux<ChatResponse>} content chunks with out-of-band tool and
  * citation events emitted via {@code Sinks.Many} (D-01, RESEARCH Pattern 1).
  *
- * <p>Six variants cover the full surface of a single run:
+ * <p>Variants covering the full surface of a single run:
  * <ul>
  *   <li>{@link Content} — an incremental markdown chunk for the assistant bubble.</li>
  *   <li>{@link ToolCall} — a tool invocation was started by the model.</li>
  *   <li>{@link ToolResult} — the matching tool completed (success, blocked, or error).</li>
  *   <li>{@link Citation} — a retrieval citation marker to render inline.</li>
+ *   <li>{@link Activity} — a Phase 15 ephemeral streaming-status marker carrying only a
+ *       closed {@link ActivityKind} constant (never a tool name or entity name) — see D-05.</li>
  *   <li>{@link Final} — terminal event carrying run id, conversation id, and usage metrics.</li>
  *   <li>{@link Error} — terminal error event carrying an i18n message key.</li>
  * </ul>
@@ -25,6 +27,7 @@ public sealed interface StreamingEvent
                 StreamingEvent.ToolCall,
                 StreamingEvent.ToolResult,
                 StreamingEvent.Citation,
+                StreamingEvent.Activity,
                 StreamingEvent.Final,
                 StreamingEvent.Error {
 
@@ -44,6 +47,29 @@ public sealed interface StreamingEvent
     }
 
     record Citation(int index, UUID documentId, String snippet) implements StreamingEvent {}
+
+    /**
+     * Phase 15 D-05 — the closed set of streaming-activity kinds surfaced by the ephemeral
+     * status line in the chat UI. This enum is the <em>only</em> payload an {@link Activity}
+     * event carries: it deliberately never carries a {@code @Tool} method name, an entity name,
+     * or any free-form text — the UI fragment maps the constant to a {@code msg://} key and
+     * never touches {@code toolName}/{@code argsJson} (the structural no-leak guarantee, T-15-B1).
+     *
+     * <p>{@link #CHAT} is a legal value (it is a valid audit {@code kind} and the UI uses
+     * {@code statusKeyFor(CHAT)}), but it is <strong>never emitted from the orchestration edge</strong>
+     * — the UI derives CHAT from the first {@link Content} event of the turn (Phase 15 review
+     * point #11). Only {@link #TOOL} and {@link #RETRIEVAL} are explicitly signalled (by
+     * {@code ToolCallbackAuditDecorator} and {@code AuditingDocumentRetriever} respectively).
+     */
+    enum ActivityKind { CHAT, TOOL, RETRIEVAL }
+
+    /**
+     * Phase 15 ephemeral streaming-status marker (D-05). Additive variant — carries only a
+     * closed {@link ActivityKind} constant; never a tool name, entity name, or free text.
+     * Emitted best-effort from the orchestration edge for {@link ActivityKind#TOOL} and
+     * {@link ActivityKind#RETRIEVAL}; {@link ActivityKind#CHAT} is derived by the UI, not emitted.
+     */
+    record Activity(ActivityKind kind) implements StreamingEvent {}
 
     /**
      * Terminal streaming event. Carries the run id + conversation id + usage metrics for the

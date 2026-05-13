@@ -2,6 +2,7 @@ package com.vn.agent.view.chat;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiChatSurface;
@@ -41,6 +42,7 @@ import java.nio.file.Paths;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +79,8 @@ class ChatSurfaceMounterTest {
     ViewNavigators viewNavigators;
     @Autowired
     UiComponents uiComponents;
+    @Autowired
+    org.springframework.context.ApplicationContext applicationContext;
 
     @BeforeEach
     @AfterEach
@@ -198,6 +202,174 @@ class ChatSurfaceMounterTest {
                     .extracting(Component::isVisible)
                     .isEqualTo(false);
         });
+    }
+
+    // ---- SIDEBAR surface (Phase 15 Plan 03) ----------------------------------
+
+    @Test
+    void defaultSettingsMountSidebarToggleAndClosedPanelForChatUser() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+
+            chatSurfaceMounter.initializeUiForTest(ui);
+
+            JmixButton toggle = findSidebarToggle(ui).orElseThrow();
+            assertThat(toggle.isVisible()).isTrue();
+            assertThat(iconName(toggle)).isEqualTo("vaadin:panel");
+            assertThat(toggle.getElement().getAttribute("aria-pressed")).isEqualTo("false");
+
+            Div panel = findSidebarPanel(ui).orElseThrow();
+            assertThat(panel.isVisible()).isTrue();
+            assertThat(panel.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isFalse();
+            // Header with the in-panel closer.
+            assertThat(panel.getChildren()
+                    .anyMatch(c -> c instanceof Div d && d.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_HEADER_CLASS)))
+                    .isTrue();
+            assertThat(findInPanelCloser(panel)).isPresent();
+            // The panel hosts the AiAgentSidebarView, which owns the ChatPanelFragment.
+            assertThat(findFirstComponentOfType(panel, AiAgentSidebarView.class)).isPresent();
+            assertThat(findFirstComponentOfType(panel, ChatPanelFragment.class)).isPresent();
+            // The toggle is distinct from the magic header button.
+            assertThat(findHeaderButtons(ui)).singleElement()
+                    .extracting(c -> iconName((JmixButton) c)).isEqualTo("vaadin:magic");
+            // Panel lives on the UI element, not the AppLayout content slot.
+            assertThat(panel.getElement().getNode().isAttached()).isTrue();
+            assertThat(findFirstComponentOfType(appLayout, Div.class)
+                    .filter(d -> d.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_CLASS)))
+                    .as("the sidebar panel must not be nested inside the AppLayout content slot")
+                    .isEmpty();
+            assertThat(findSidebarPanel(ui)).isPresent();
+        });
+    }
+
+    @Test
+    void togglingSidebarFlipsOpenClassesAriaAndInPanelCloserAlsoCloses() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+
+            Div panel = findSidebarPanel(ui).orElseThrow();
+            JmixButton toggle = findSidebarToggle(ui).orElseThrow();
+            JmixButton closer = findInPanelCloser(panel).orElseThrow();
+
+            // open
+            chatSurfaceMounter.toggleSidebarForTest(ui);
+            assertThat(panel.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isTrue();
+            assertThat(appLayout.hasClassName(ChatSurfaceMounter.CONTENT_PUSHED_CLASS)).isTrue();
+            assertThat(toggle.hasClassName(ChatSurfaceMounter.SIDEBAR_TOGGLE_ACTIVE_CLASS)).isTrue();
+            assertThat(toggle.getElement().getAttribute("aria-pressed")).isEqualTo("true");
+
+            // close via the in-panel closer
+            closer.click();
+            assertThat(panel.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isFalse();
+            assertThat(appLayout.hasClassName(ChatSurfaceMounter.CONTENT_PUSHED_CLASS)).isFalse();
+            assertThat(toggle.hasClassName(ChatSurfaceMounter.SIDEBAR_TOGGLE_ACTIVE_CLASS)).isFalse();
+            assertThat(toggle.getElement().getAttribute("aria-pressed")).isEqualTo("false");
+        });
+    }
+
+    @Test
+    void sidebarAndHeaderButtonAreTwoDistinctIndependentButtons() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+
+            AiChatUIState chatUIState = chatUIStateProvider.getObject();
+            JmixButton headerButton = (JmixButton) findHeaderButtons(ui).get(0);
+            JmixButton toggle = findSidebarToggle(ui).orElseThrow();
+            assertThat(toggle).isNotSameAs(headerButton);
+            assertThat(iconName(headerButton)).isEqualTo("vaadin:magic");
+            assertThat(iconName(toggle)).isEqualTo("vaadin:panel");
+
+            // Toggling the sidebar must not touch the header dialog.
+            chatSurfaceMounter.toggleSidebarForTest(ui);
+            assertThat(chatUIState.getDialogInstance()).isNull();
+
+            // Opening the header dialog must not change the sidebar open state.
+            DialogWindow<ChatDialogView> dialogWindow = chatSurfaceMounter.openDialogForTest();
+            assertThat(chatUIState.getDialogInstance()).isSameAs(dialogWindow);
+            assertThat(findSidebarPanel(ui).orElseThrow()
+                    .hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isTrue();
+        });
+    }
+
+    @Test
+    void disablingSidebarRemovesToggleAndPanelFromRenderedDom() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+
+            AiUiSettings settings = uiSettingsService.loadCurrent();
+            settings.setEnabledSurfaceSet(EnumSet.of(AiChatSurface.FULL_ROUTE, AiChatSurface.HEADER_BUTTON));
+            unconstrainedDataManager.save(settings);
+
+            chatSurfaceMounter.refreshMountedSurfacesForTest(ui, false);
+
+            // setVisible(false) removes the element from the rendered DOM (absent, not greyed).
+            assertThat(findSidebarToggle(ui)).hasValueSatisfying(b -> assertThat(b.isVisible()).isFalse());
+            assertThat(findSidebarPanel(ui)).hasValueSatisfying(p -> assertThat(p.isVisible()).isFalse());
+            // The magic header button is unaffected.
+            assertThat(findHeaderButtons(ui)).singleElement()
+                    .extracting(Component::isVisible).isEqualTo(true);
+        });
+    }
+
+    @Test
+    void sidebarSurvivesNavigationBetweenTwoRoutesKeepingPushClassAndOpenState() {
+        systemAuthenticator.runWithUser("alice", () -> {
+            UI ui = UI.getCurrent();
+            JmixAppLayout appLayout = uiComponents.create(JmixAppLayout.class);
+            ui.add(appLayout);
+            chatSurfaceMounter.initializeUiForTest(ui);
+            chatSurfaceMounter.toggleSidebarForTest(ui);
+            Div panel = findSidebarPanel(ui).orElseThrow();
+            assertThat(panel.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isTrue();
+
+            viewNavigators.view(UiTestUtils.getCurrentView(), ConversationListView.class).navigate();
+            chatSurfaceMounter.refreshMountedSurfacesForTest(ui, false);
+            viewNavigators.view(UiTestUtils.getCurrentView(), ConversationListView.class).navigate();
+            chatSurfaceMounter.refreshMountedSurfacesForTest(ui, false);
+
+            Div panelAfter = findSidebarPanel(ui).orElseThrow();
+            assertThat(panelAfter).isSameAs(panel);
+            assertThat(panelAfter.getElement().getNode().isAttached()).isTrue();
+            assertThat(panelAfter.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_OPEN_CLASS)).isTrue();
+            assertThat(findSidebarToggle(ui)).isPresent();
+            // No modal-overlay element was added by the panel — the main view stays interactive.
+            assertThat(findFirstComponentOfType(ui, com.vaadin.flow.component.dialog.Dialog.class)).isEmpty();
+        });
+    }
+
+    @Test
+    void sidebarUsesTheSameSingletonChatServiceAndExistingFragmentImplementation() throws Exception {
+        // The sidebar's fragment is hosted by the existing ChatPanelFragment class — no new
+        // fragment subclass, no second fragment-class XML reference, no second ChatService.
+        assertThat(readSidebarDescriptorSource())
+                .contains("com.vn.agent.view.chat.fragment.ChatPanelFragment");
+
+        String mounterSource = readMounterSource();
+        assertThat(mounterSource)
+                .contains("views.create(AiAgentSidebarView.class)")
+                .contains("AiChatSurface.SIDEBAR")
+                .contains("ui.getElement().appendChild(panelDiv.getElement())")
+                .contains("VaadinIcon.PANEL");
+
+        // Exactly one ChatService bean in the context — no second instance for the sidebar.
+        assertThat(applicationContext.getBeanNamesForType(com.vn.agent.ChatService.class)).hasSize(1);
+
+        // AiAgentSidebarView and ChatDialogView both compose the SAME ChatPanelFragment class
+        // (the fragment field type is identical) — no duplicate fragment implementation.
+        assertThat(AiAgentSidebarView.class.getDeclaredField("chatPanelFragment").getType())
+                .isEqualTo(ChatPanelFragment.class)
+                .isEqualTo(ChatDialogView.class.getDeclaredField("chatPanelFragment").getType());
     }
 
     @Test
@@ -378,6 +550,58 @@ class ChatSurfaceMounterTest {
         ListMenu.MenuItem chatMenuItem = menu.getMenuItem(ChatSurfaceMounter.FULL_CHAT_MENU_ID);
         assertThat(chatMenuItem).isNotNull();
         assertThat(chatMenuItem.isVisible()).isEqualTo(visible);
+    }
+
+    private static Optional<JmixButton> findSidebarToggle(Component root) {
+        return findFirstComponentMatching(root, c -> c instanceof JmixButton
+                && c.getId().orElse("").equals(ChatSurfaceMounter.SIDEBAR_TOGGLE_BUTTON_ID))
+                .map(JmixButton.class::cast);
+    }
+
+    private static Optional<Div> findSidebarPanel(Component root) {
+        return findFirstComponentMatching(root, c -> c instanceof Div d
+                && d.hasClassName(ChatSurfaceMounter.SIDEBAR_PANEL_CLASS))
+                .map(Div.class::cast);
+    }
+
+    private static Optional<JmixButton> findInPanelCloser(Component root) {
+        return findFirstComponentMatching(root, c -> c instanceof JmixButton b
+                && b.hasClassName(ChatSurfaceMounter.SIDEBAR_CLOSE_BUTTON_CLASS))
+                .map(JmixButton.class::cast);
+    }
+
+    private static <T extends Component> Optional<T> findFirstComponentOfType(Component root, Class<T> type) {
+        return findFirstComponentMatching(root, type::isInstance).map(type::cast);
+    }
+
+    private static Optional<Component> findFirstComponentMatching(Component root,
+                                                                 java.util.function.Predicate<Component> predicate) {
+        if (predicate.test(root)) {
+            return Optional.of(root);
+        }
+        return root.getChildren()
+                .map(child -> findFirstComponentMatching(child, predicate))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+    }
+
+    private static String iconName(JmixButton button) {
+        Component icon = button.getIcon();
+        if (icon == null) {
+            return null;
+        }
+        return icon.getElement().getAttribute("icon");
+    }
+
+    private static String readSidebarDescriptorSource() throws Exception {
+        Path primary = Paths.get("src/main/resources/com/vn/agent/view/chat/ai-agent-sidebar-view.xml");
+        if (Files.exists(primary)) {
+            return Files.readString(primary, StandardCharsets.UTF_8);
+        }
+        Path fallback = Paths.get(System.getProperty("user.dir"))
+                .resolve("ai-agent/ai-agent/src/main/resources/com/vn/agent/view/chat/ai-agent-sidebar-view.xml");
+        return Files.readString(fallback, StandardCharsets.UTF_8);
     }
 
     private static String readMounterSource() throws Exception {

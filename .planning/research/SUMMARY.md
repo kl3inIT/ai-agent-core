@@ -1,222 +1,177 @@
-# Project Research Summary — v1.1.0
+# Project Research Summary
 
-**Project:** Jmix AI Copilot (`ai-agent-core`)
-**Domain:** Enterprise AI copilot add-on for Jmix 2.8 / Spring AI 1.1.4 / Vaadin Flow — v1.1.0 milestone
-**Researched:** 2026-04-26
-**Confidence:** HIGH (incremental research on a shipped v1.0 baseline; every claim grounded in existing source files, MEMORY rules, or Context7-verified library docs)
+**Project:** Jmix AI Agent (`ai-agent-core`) — v1.2 milestone "Operator Experience, Voice Input & Runtime Performance"
+**Domain:** Subsequent-milestone increment to a shipped enterprise Jmix 2.8 + Spring Boot 3 + Spring AI 1.1.4 + Vaadin Flow + pgvector AI agent add-on (agent harness)
+**Researched:** 2026-05-11
+**Confidence:** HIGH (stack + integration seams verified against current docs and the repo's own source; STT API specifics MEDIUM-HIGH — re-verify Soniox/OpenAI request shapes at plan time)
 
 ## Executive Summary
 
-v1.1.0 is a **stack-stable, governance-first** milestone built on top of a working v1.0 read-only Copilot. STACK research confirms **zero new core dependencies**: Spring AI 1.1.4 already on the classpath supplies `OpenAiAudioTranscriptionModel` for STT, the `@Tool` + `ToolExecutionException` contract for mutations, and `BeanOutputConverter` + `chatClient.prompt().call().entity(Class)` for intent extraction. Vaadin Flow 24 (via Jmix 2.8.1) supplies the `Dialog(MODELESS, draggable)` floating launcher, the `slot="drawer-end"` sidebar, the `MediaRecorder`-via-`executeJs` browser audio path, and `ViewNavigators.detailView(...).withInitializer(...)` form prefill. The whole milestone is activations + new beans, not platform churn.
+v1.2 is an **incremental hardening + operator-experience milestone** layered on a working v1.1 agent harness — it adds six near-independent features and introduces **effectively zero new runtime dependencies**. The headline capabilities: in-chat **voice input** (Soniox async STT as the default path, OpenAI-direct transcription as a fallback, browser `MediaRecorder` capture, transcript landing in `MessageInput` for review — never auto-sent — with a privacy-safe `STT_TRANSCRIPTION` audit that hashes the transcript by default); **chat observability** (a right-sidebar chat-state panel, a collapsed-by-default per-turn tool-detail panel, an ephemeral streaming-status line that clears on completion — resolving the long-pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo); an **admin model picker** (curated open-weights dropdown + "custom…" free-entry, admin-only); an **admin config-knob migration** (move operator-relevant prior-phase `module.properties` knobs into editable `AiParameters` / admin UI under a strict three-tier taxonomy); **Phase 11 mutation-internals hardening** (de-dup the fail-closed gate sequencing into one canonical path, batch-load to-one FK refs during binding, cache related-write metadata — byte-for-byte behavior-identical); and a **targeted AI-runtime performance pass** (per-turn memoization of metadata/security/exposure resolution, RAG filter built once per retrieval, media encoded once per turn — no benchmark harness, no admin-screen perf).
 
-The **load-bearing thesis** of all four research files is the same: the LLM is just another Jmix client, and v1.1's job is to keep that thesis intact while widening the action surface. That requires three paired guarantees that must ship together — (1) an admin-governed `LlmExposurePolicy` that can only narrow below user permissions (never widen), (2) mutation tools that go through policy-checked `DataManager` (NEVER `UnconstrainedDataManager`) and pass per-attribute `EntityAttributeContext.canModify` before any save, and (3) an auditable, idempotent tool-call shape that reuses the existing `AuditWriter` REQUIRES_NEW tree and the `writeToolCall` event rather than inventing a new audit kind. Three configurable chat surfaces (full route / right-sidebar drawer / floating launcher), browser STT, and intent-driven extraction are technically simpler but carry their own subtle invariants — one `ChatPanelFragment`, one `ChatService`, one `AiConversation` per user-session across all surfaces; STT transcripts are PII and must be hash-only in audit by default; intent extraction returns a structured DTO that the chat *controller* (not the LLM) navigates with.
+How experts build this: the research is unanimous that the work is **integration into existing contracts, not greenfield**. Voice input is a *disjoint* pathway — capture, transcribe, drop text into the input box; it never touches `ChatService`/`ChatClient`. The OpenAI fallback needs its **own** `OpenAiAudioApi` against `https://api.openai.com` with an independent key (OpenRouter does not proxy `/audio/transcriptions`). The observability panels read the **existing** `StreamingEvent` flux and the durable `AiAuditEvent` tree — no new "turn model" entity, no parallel state. Migrated knobs extend the **established** `AiParametersResolver` read-through (prefer the `AiParameters`/`AiUiSettings` value, fall back to the property), never the strict `default-params.yaml` seed. The mutation-hardening refactor is a *mechanical* extraction locked by the unchanged Phase 11 test suite. The perf pass memoizes only within a single `RunContext` (one chat turn) for anything user/role/exposure-sensitive, and wires every longer-lived cache to `LlmExposureChangedEvent`.
 
-The **dominant risk** is concentrated in two places. First, mutation tools introduce four reinforcing pitfalls every prior-art enterprise copilot has stumbled on: silent default-on auto-config, `@Composition` cascade-deletes from a "merge children" tool param, "tool returned success but transaction rolled back," and JPA constraint exception messages echoing user-supplied PII into the LLM result string. Second, the exposure policy is monotonic-only by design (`EXCLUDE`-only rule type, `userVisible AND NOT excluded` boolean composition); any UI label or rule shape that admits an `ALLOW` form is a baseline-correctness regression. Both risks are mitigated by hard-ordering the build: tool-layer foundations + prompt-contract hardening → exposure policy → mutation tools.
+Key risks and mitigations: (1) **privacy/security leaks** — raw transcripts into audit rows/logs (default to SHA-256 hash; source-scan test), internal tool/entity names into the user-facing observability panel (reuse the Phase 9 leak-guard humanization; UI-level leak test), API keys swept into the admin UI (explicit secret denylist), batch FK loads bypassing row-level security (constrained `DataManager` `IN (...)` only). (2) **the "invisible" refactors silently changing behavior** — the mutation-hardening and perf passes must keep the Phase 9/10/11 test suites green *unchanged*; if a test needs editing, stop. (3) **cache staleness** — every perf cache needs an invalidation hook (`LlmExposureChangedEvent`, an `AiParameters` change event); a cache without invalidation is a correctness regression. (4) **Vaadin threading** — STT round-trips and any parallelized perf work must run on a bounded executor and push UI updates through `ui.access(...)`, guarding for detached UI (the `HEADER_BUTTON` dialog can close mid-transcription). (5) **scope creep** — the deferred debt (Phase 10 re-verification, Nyquist `*-VALIDATION.md` backfill, PKG-05/TEST-07 clean-consumer smoke) and the dormant seeds (SEED-001/002/003/004/006/008) must NOT be folded into any v1.2 phase.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new core dependencies. v1.1 fits inside the v1.0 Spring AI 1.1.4 BOM, the Jmix 2.8.1 platform, and Vaadin Flow 24. Activations are config-property-only.
+**Net new runtime dependency for v1.2: zero.** Everything needed is already on the classpath. The OpenAI transcription fallback uses `OpenAiAudioApi` / `OpenAiAudioTranscriptionModel` / `OpenAiAudioTranscriptionOptions` / `AudioTranscriptionPrompt` / `AudioTranscriptionResponse` — all shipped inside `org.springframework.ai:spring-ai-openai:1.1.4`, already declared (`ai-agent.gradle:29`); wire it manually (mirroring the existing manual OpenRouter `ChatModel` wiring) — do **not** add `spring-ai-starter-model-openai` just for property auto-config. Soniox has **no Java SDK** (Python/Node/Web/React only) — use Spring built-in `RestClient` against `https://api.soniox.com/v1`. Browser audio capture is a ~50-line first-party `@JsModule` JS file wrapping `MediaRecorder` + `getUserMedia`, posting the blob to the server — prefer a Vaadin `UploadHandler.toFile(...)` server-side receiver (the existing `taskFileUpload` idiom) over a bespoke `@RestController` so the audio stays inside the Vaadin session/security context (and avoids the deprecated `Upload.getReceiver/setReceiver` path). The model picker is a Vaadin `ComboBox<String>` with `setAllowCustomValue(true)` (or combo + conditional `TypedTextField`). The perf pass reuses the already-present `spring-boot-starter-cache` + `ConcurrentMapCacheManager` — **do not add Caffeine** (the hotspots are bounded, low-churn, JVM-lifetime-stable; no eviction policy needed). No benchmark harness — reuse the test-scoped `net.ttddyy:datasource-proxy` (`ai-agent.gradle:111`) for "N+1 to 1" SELECT-count assertions.
 
-**Core technologies (all present, activated for v1.1):**
-- **Spring AI 1.1.4 `OpenAiAudioTranscriptionModel`** — STT for voice input. Caveat: OpenRouter does NOT proxy `/audio/transcriptions`; hosts must point STT at OpenAI directly with a separate key.
-- **Spring AI 1.1.4 `@Tool` + `ToolExecutionException` + `DefaultToolExecutionExceptionProcessor`** — mutation tools' structured error contract. `internalToolExecutionEnabled=false` is the documented HITL primitive but v1.1 prefers delegating confirmation to the Jmix UI flow.
-- **Spring AI 1.1.4 `BeanOutputConverter` + `chatClient.prompt().call().entity(Class)`** — intent extraction binds JSON Schema-derived structured output to typed Java records.
-- **Jmix 2.8.1 `ViewNavigators.detailView(...).newEntity().withInitializer(...).navigate()`** — controller-layer-only prefill seam.
-- **Vaadin Flow 24 primitives** — `Dialog.setModality(MODELESS).setDraggable(true)`, `AppLayout slot="drawer-end"`, `Element.executeJs` + `MediaRecorder` + `UploadHandler.inMemory` (no transcoding — Whisper accepts `webm/opus` and `mp4` natively).
+**Core technologies (all already present):**
+- `org.springframework.ai:spring-ai-openai:1.1.4` — OpenAI-direct transcription fallback (`OpenAiAudioApi` + `OpenAiAudioTranscriptionModel`, fresh API against `api.openai.com`, independent key) — audio classes ship in this already-declared module
+- Spring `RestClient` (Spring Framework 6.1+, transitively present) — Soniox async client: `POST /v1/files` then `POST /v1/transcriptions` (`model=stt-async-v4`, `language_hints:["vi","en"]`) then poll `GET /v1/transcriptions/{id}` then `GET .../transcript` (tokens array) then `DELETE` both — no Java SDK exists, none needed
+- `@JsModule` + `MediaRecorder`/`getUserMedia` + Vaadin `UploadHandler.toFile` — first-party ~50-line mic recorder mounted in `ChatPanelFragment.messageInputSlot`; send `audio/webm;codecs=opus` (Safari fallback `audio/mp4`) as-is — no transcoding (Soniox + OpenAI auto-detect)
+- Jmix Flow UI / Vaadin `ComboBox` (`allowCustomValue`) — admin model picker in `ParametersDetailView` / `AiConfigurationView`; chat-state / tool-detail / streaming-status panels inside `ChatPanelFragment`
+- `spring-boot-starter-cache` + `ConcurrentMapCacheManager` (already present) + `java.util.concurrent` maps — per-turn memoization for the perf pass; `AuditFieldHasher` (SHA-256, present since Phase 9) for the privacy-safe STT audit
+- `jakarta.validation` / Hibernate Validator (already present) + a Liquibase changelog on the **`agentstore`** data store — new `AiParameters`/`AiUiSettings` fields for the config-knob migration; messages in **all** locale bundles
 
-**Anti-list:** second `ChatClient`, second `ChatMemory` store, Web Speech API client-side STT, FFmpeg/JCodec, Hilla/Copilot dev modules (already excluded), `webkitSpeechRecognition`, new `RestController` family, ArchUnit rule for "no `DataManager.save` outside mutation tools," Spring Retry / Resilience4j on mutations.
-
-Detailed: `.planning/research/STACK.md`.
+> Avoid: a "Soniox Java SDK" dependency (none exists); `spring-ai-starter-model-openai` just for STT; OkHttp/Apache HttpClient/Retrofit/Feign/`WebClient` for Soniox; Caffeine; any benchmark harness (JMH/Gatling); routing Soniox/OpenAI transcription through OpenRouter; client-side audio transcoding; community "Audio Recorder for Vaadin" add-ons; a new `AuditKind` for STT (`STT_TRANSCRIPTION`/`stt_transcription` already reserved per AUD-06); a `TranscriptionPostProcessor`/custom-provider SPI beyond plain `ai-agent.stt.provider=<bean-name>`.
 
 ### Expected Features
 
-**Must have (table stakes):** entity inventory in baseline; hide internal names; richer `describe_entity`; `unknown_entity` retry contract; LLM permission inventory; mutation tools (create/update/related-write) gated by `AccessManager`, opt-in, audited; AI exposure denylist with admin Flow UI; STT input; task-scoped file attachment (separate from KB); three configurable surfaces over one `ChatPanelFragment`.
+**Must have (table stakes — ship with v1.2):**
+- **Voice input** — mic button gated by `ai-agent.stt.enabled` AND a provider key (hidden, not greyed, when off); tap-to-toggle recording with a hard ~60s cap + visible countdown + auto-stop; distinct "recording" then "transcribing…" states; transcript lands in `MessageInput` for review/edit — **never auto-sent** (the #1 reported regression in this space — hard architectural rule); non-blocking inline error + retry on failure (4xx / network / too-long / no-speech); privacy-safe `STT_TRANSCRIPTION` audit (SHA-256 hash + duration + language + model + outcome by default; raw transcript only on `storeTranscript=true`); Soniox default + OpenAI-direct fallback selectable via `ai-agent.stt.provider=soniox|openai|<bean>`; VI + EN language hints; Soniox `DELETE` cleanup in a `finally` block (success and every error path)
+- **Chat UX & observability** — ephemeral streaming-status line in a **sibling slot** (not inside the bubble), `KIND`-keyed ("thinking…", "searching data…", "retrieving documents…"), clears completely on turn finalization (fixes the current concatenation defect); collapsed-by-default per-turn "what the AI did (N steps, total ms)" with **humanized label-only** steps + per-step timing — hidden entirely when the turn had zero tool calls; never print internal `@Tool`/entity names (UI-side counterpart of the Phase 9 leak guard); error/rollback indication on failed steps; right-sidebar chat-state panel showing the active model code, conversation id + title, exposure-policy active flag (boolean), mutation-tools-enabled flag, attached-file count, token-budget usage, last-turn summary; deep-link from a turn into the filtered audit list (`AiAuditEventListView?runId=`)
+- **Admin model picker** — curated open-weights `ComboBox` with readable labels (default marked) + "custom…" free-entry accepting any string; admin-only (no per-conversation switching); chosen model flows to the chat-state panel + per-request `ChatOptions`; validate at *use* time, not save time; curated list contains **only** self-hostable open-weights (`qwen/qwen3.6-35b-a3b` and siblings — no GPT-4o/Claude/Gemini Pro/Qwen3.6 Plus/Flash in defaults); free-entry is the escape hatch
+- **Config-knob migration** — RAG top-k + similarity threshold + task-file token budget + TTL editable in the admin UI (read fresh each retrieval/turn, take effect next turn, no restart); boot-time `@ConditionalOnProperty` knobs (`ai-agent.tools.mutation.enabled`, `ai-agent.stt.enabled`, provider selection) shown **read-only with a clear "property only / requires restart" marker** — never silently absent, never pretend-editable; secrets (`*.api-key`) **never** in the UI — at most a "configured: yes/no" indicator; the three-tier taxonomy (Tier 1 runtime-editable -> migrate; Tier 2 boot/wiring -> read-only with note; Tier 3 secrets -> indicator-only) applied; all new labels via `msg://` in all locale bundles
+- **Phase 11 mutation-internals hardening** — extract one canonical `MutationGateChain` running the fail-closed sequence (role -> exposure -> `AccessManager` entity+attribute -> `AiMutationIntent` idempotency -> `MutationGuard` SPI -> `@Transactional` save) for create/update/add-related/remove-related/bulk; batch-load to-one FK refs during binding (one constrained `DataManager.load(...).ids(...)` per target class); cache related-write metadata (`(parentMetaClass, relationshipName)` -> `SupportedRelatedRelationship` — pure metadata, no eviction); **byte-for-byte identical** behavior (same gating order, exception classification, audit rows, idempotency semantics, `MutationGuard` SPI contract) — locked by the unchanged Phase 11 test suite + the default-config zero-callback boot test
+- **AI-runtime perf pass (targeted)** — per-turn memoization of `getReadableSchema()` / metadata / `AccessManager` / exposure resolution (compute once per turn, share across tool calls); app-wide memoization of `getDenylistedEntityNames()` (evicted on `LlmExposureChangedEvent`) and pure-metadata derivations (`name` -> `MetaClass`); RAG `Filter.Expression` built once per retrieval; task-file `Media` cached per `(convId, taskFileId)` (evicted on attach/delete); prompt/context not re-serialized within a turn; FK batch-load (shared with the hardening phase); **no benchmark harness, no admin-screen perf**; each change ships with a checkable proxy (SELECT-count assertion, "1 query not N", call-count assertion)
 
-**Should have (differentiators):** host-override SPI for fetch plans; intent-driven extraction → prefilled Jmix form (highest novelty); per-turn audit visibility of resolved permission inventory; structured-error envelope.
+**Should have (competitive — P2, fast-follow):**
+- Keyboard shortcut to start/stop dictation
+- Second-level expand for scrubbed tool arguments in the tool-detail panel
+- "Test this model" button + "may not be multimodal" advisory in the Parameters view
+- "Effective value" display (UI override vs property default) + grouped Parameters sections ("Retrieval", "Chat", "Attachments", "Voice", "Governance (read-only)")
+- DEBUG-level per-turn timing breakdown (log-only, off by default)
+- A short "perf notes" doc recording what was optimized and the before/after proxies
 
-**Defer (v1.2+ if scope shrinks):** intent-driven extraction (self-contained, can ship as v1.1.1); floating launcher (keep full + sidebar); host-override SPI.
-
-**Hard anti-features:** auto-approving mutations without HITL; parallel ACL on top of `AccessManager`; speech-to-speech; KB ingestion of task-scoped attachments; multi-step autonomous mutation chains; per-screen contextual injection in launcher; free-form intent inference.
-
-Detailed: `.planning/research/FEATURES.md`.
+**Defer (v1.3+ / out of this increment):**
+- `TranscriptionPostProcessor` SPI + custom STT-provider SPI beyond bean-name selection (explicitly trimmed from v1.2)
+- Per-conversation / per-user end-user model switching
+- Voice output (TTS)
+- Admin-screen performance work
+- Live-interim/partial transcript display (Soniox async is batch, not streaming — do not build a streaming path)
+- Auto-send the transcript; audio transcoding; transcribe-whole-conversations / meeting-mode
+- Phase 10 re-verification + Nyquist `*-VALIDATION.md` backfill (phases 9/10/11/12/13/13.1); PKG-05/TEST-07 clean-consumer smoke (NOT v1.2 per the 2026-05-11 decision)
+- Activation of dormant seeds SEED-001/002/003/004/006/008 (triggers not met)
 
 ### Architecture Approach
 
-v1.1 composes new beans inside the existing v1.0 orchestration spine — there is **no parallel pipeline**. `DefaultChatServiceImpl.ask` remains the single per-turn integration point; `ChatClientFactory` returns one cached `ChatClient`; `AgentToolCallbacks.forCurrentUser` remains the single tool-composition seam; `BaselineContextProvider.renderAsText` remains byte-deterministic; `AuditWriter` remains REQUIRES_NEW.
+The Flow UI is **already inside the functional `ai-agent` module** (`com.vn.agent.view.*`) — the four-module split (D-01) stays deferred; v1.2 adds packages under the existing two modules. New code: a `com.vn.agent.stt.*` package (`TranscriptionService` strategy interface + `SonioxTranscriptionService` (RestClient) + `SpringAiTranscriptionService` (fresh `OpenAiAudioApi`) + `AiAgentSttProperties` + a selector `@Bean` that resolves `ai-agent.stt.provider` to soniox/openai/a host bean — `ai-agent.stt.enabled` itself stays a `@ConditionalOnProperty` boot toggle gating the whole subsystem + the mic button); a `@JsModule` mic recorder + `UploadHandler`-based audio receiver in `ChatPanelFragment.messageInputSlot`; a `MutationGateChain` `@Component` + a `RelatedWriteMetadataCache`; small in-memory `TurnDetail`/`ToolCallDetail` POJOs and a `ChatStatePanel`/`ToolDetailDisclosure` Composite inside `view.chat.fragment` (no new entity); new `AiParameters`/`AiUiSettings` fields + an `agentstore` Liquibase changelog + thin `*ConfigResolver` read-throughs.
 
-**Major components (new + extended):**
-1. **`LlmExposurePolicy`** — wraps `CurrentUserSchemaAccess`; consumed by `BuiltInDataTools`, `BuiltInMutationTools`, `BaselineContextProvider`, AND `RetrievalFilterBuilder` (RAG cross-cut is non-obvious but mandatory).
-2. **`AiExposureRule`** entity (`agentstore`, `EXCLUDE`-only) + admin Flow views.
-3. **`BuiltInMutationTools`** — separate `@Component`, `@ConditionalOnProperty` opt-in, default OFF; layered gating (exposure → `CrudEntityContext` + per-attribute `canModify` → `MutationGuard` SPI → `@Transactional` `DataManager.save`).
-4. **`AiUiSettings`** + `ChatSurfaceMounter` + `SidebarChatComponent` + `FloatingChatLauncher` + `AiChatSessionState` (`@VaadinSessionScope`) — three surfaces share one `ChatPanelFragment` and one active conversation tracker.
-5. **`TranscriptionService`** + `AudioCaptureComponent` — STT transcribes server-side, injects text into `MessageInput`; never calls `ChatService.ask` directly.
-6. **`AiExtractionDraft`** + `IntentExtractor` SPI + `ExtractionService` + `prepare_form_draft` `@Tool` — LLM produces typed DTO; chat UI renders confirm card; controller calls `ViewNavigators` after `accessManager.isPermitted(ViewContext)`.
-7. **`ToolFetchPlanCustomizer`** SPI + `ToolResultPayloads` + `ToolEntityResolver` — richer allowlisted-DTO `describe_entity`; host-supplied fetch plans wrapped to enforce attribute-policy intersection.
-8. **`BaselineContextProvider`** extended — `agent.entities` + `agent.permissions` keys sourced from `LlmExposurePolicy`, alphabetically ordered.
-9. **`AuditWriter`** signature unchanged — mutations, intent extraction, STT all reuse `writeToolCall` with new `eventName` strings + new outcomes (`IDEMPOTENT_REPLAY`, `COMMIT_FAILED`).
-
-Detailed: `.planning/research/ARCHITECTURE.md`.
+**Major components / where each feature attaches:**
+1. **`TranscriptionService` (new, `com.vn.agent.stt`)** — disjoint from `ChatService`/`ChatClient`; called only by the mic component in `ChatPanelFragment`; returns text -> `MessageInput.setValue(...)`; writes `STT_TRANSCRIPTION` audit via `AuditWriter.writeToolCall(eventName="stt_transcription", ...)` with the transcript SHA-256-hashed by default; runs on a bounded `aiAgentSttExecutor` (mirroring `aiAgentIngestExecutor`), pushes the result via `ui.access(...)` guarding for detached UI
+2. **`ChatPanelFragment` (modified)** — gains the mic button + JS bridge + error/retry row in `messageInputSlot`; the chat-state side panel as a section *inside* the existing `attachmentsPanel` column (keeps the `ChatSurfaceMounter` slot id + Phase 12 contract files zero-diff); the collapsible per-turn tool-detail disclosure + the ephemeral streaming-status badge — all driven by the `StreamingEvent` flux it already consumes (`ToolCall`/`ToolResult`/`Citation`/`Final` events), **not** by round-tripping the audit table (audit rows are written `afterCommit`, async — unavailable during streaming); renders in both `FULL_ROUTE` and `HEADER_BUTTON` surfaces
+3. **`ParametersDetailView` / `AiConfigurationView` (modified)** — the chat-model field becomes a curated-catalog `ComboBox` + custom entry (writes the existing free-text `model` string in `AiParametersBody.bodyYaml` — nothing new downstream); new editable fields for the migrated Tier-1 knobs; read-only rows for Tier-2 boot toggles; "configured: yes/no" indicators for Tier-3 secrets
+4. **`AiParametersResolver` + `*ConfigResolver` (extended)** — the existing read-through (prefer the active `AiParameters`/`AiUiSettings` value, fall back to the `module.properties` default) is the migration mechanism; strict `default-params.yaml` stays strict; an `AiParameters` entity listener publishes a change event so any perf cache around settings can evict (single publish site, mirroring `AiExposureRuleEntityListener` -> `LlmExposureChangedEvent`)
+5. **`MutationGateChain` (new) + `MutationAttributeBinder`/`RelatedWriteMetadataResolver` (modified)** — the `BuiltInMutationTools` four `@Tool` methods + the bulk path become thin adapters over `MutationGateChain.execute(...)`; the chain carries **no `@Transactional`** (only `MutationSaveExecutor.save` is, crossed via a separate bean); batch FK loads go through the **constrained** `DataManager` `IN (...)` (never `UnconstrainedDataManager` — row-level security must still apply); related-write metadata memoized (immutable Jmix metamodel — safe long-lived)
+6. **Perf-pass touch points (modified, no new components)** — `BaselineContextProvider`, `LlmExposurePolicy`, `FetchPlanResolver`/`FetchPlanIntersector`, `ToolEntityResolver`, `AiTaskFileMediaResolver`, `RetrievalFilterBuilder`, `SystemPromptComposer`/`AgentSystemPromptRulesComposer`, `MutationAttributeBinder` (overlap with #5) — every memo respects the per-request security context: no entry reused across users/roles/`LlmExposureChangedEvent`; user/role/exposure-sensitive data is scoped to the current `RunContext` (one turn) or keyed `(userId, roleSet, metaclass-name-set [, locale])` + an `@EventListener(LlmExposureChangedEvent.class)` evictor
 
 ### Critical Pitfalls
 
-1. **Mutation tools bypass `AccessManager` because `DataManager.save` doesn't enforce attribute policies (P-1)** — symmetric API, asymmetric enforcement. Avoid: mandatory pre-flight `CrudEntityContext` + per-attribute `EntityAttributeContext.canModify`; fail-closed; "READ but not MODIFY → blocked write" integration test.
-2. **Mutation auto-config default-on silently flips read-only to write on upgrade (P-2)** — Avoid: `@ConditionalOnProperty` at the bean level + boot-test asserting zero mutation callbacks under default config + CHANGELOG SAFETY section.
-3. **Exposure policy widens via `ALLOW` rule shape (P-6)** — Avoid: `EXCLUDE`-only rule type (no `ALLOW` enum value); composition is `userVisible AND NOT excluded`, never OR; UI label "Hide from AI" / "Visible to AI."
-4. **Mutation idempotency: LLM retries duplicate writes (P-3)** — Avoid: mandatory `idempotencyKey` (UUID) `@ToolParam` + server-side `AiMutationIntent` lookup + `IDEMPOTENT_REPLAY` audit outcome.
-5. **Intent extraction lets LLM call `ViewNavigators` directly (P-17)** — Avoid: LLM gets NO `navigate` tool — only `prepare_form_draft` returning a structured intent DTO; controller renders confirm card; controller calls `ViewNavigators` after `accessManager.isPermitted(ViewContext)`; intent → view-id mapping is server-side allowlist.
-
-Honorable mention: **baseline non-determinism (P-8)** — `Metadata.getSession().getClasses()` HashMap iteration breaks the v1.0 byte-deterministic prompt-cache invariant unless every inventory rendering sorts entities/attributes alphabetically and renders locale-sensitive labels outside the cache key.
-
-Full set of 25 pitfalls in `.planning/research/PITFALLS.md`.
+1. **Voice input is not disjoint / leaks PII** — the STT path calls `ChatService.ask` (auto-sends an unreviewed transcript -> wrong tool call/mutation), or writes the raw transcript into the `STT_TRANSCRIPTION` audit row / `log.info` by default. **Avoid:** `TranscriptionService` has zero reference to `ChatService` (structural source-scan test); transcript only sets `MessageInput.setValue`; SHA-256 hash by default (`AuditFieldHasher`), raw only on `storeTranscript=true`; the Soniox HTTP client logs status/headers/ids at DEBUG only — never the response body; a `TranscriptLeakScannerTest` (source-grep) + TEST-17 covering both audit modes.
+2. **OpenAI fallback wired to OpenRouter / wrong key** — OpenRouter does not proxy `/audio/transcriptions` (404/415 at runtime); or the Soniox path is handed the chat key (401). **Avoid:** three independent properties (`ai-agent.openrouter...` chat, `ai-agent.stt.openai.api-key` against `https://api.openai.com/v1`, `ai-agent.stt.soniox.api-key`); `SpringAiTranscriptionService` builds a **fresh** `OpenAiAudioApi` with an explicit `base-url` — never inherit the chat `base-url`; Soniox `DELETE /v1/files/{id}` + `DELETE /v1/transcriptions/{id}` in a `finally` block on every path; a startup INFO line states the active provider + endpoint (no secrets); README has a "key -> provider -> endpoint" table.
+3. **Vaadin UI thread blocked / wrong `UI.access` discipline** — the mic handler synchronously runs the Soniox round-trip + polling on the UI thread (session freeze), or pushes the transcript without `ui.access(...)` to a possibly-detached UI (the `HEADER_BUTTON` dialog can close mid-transcription). **Avoid:** bounded `aiAgentSttExecutor`; the UI handler only kicks off the task + shows "transcribing…"; the result is pushed via `ui.access(...)` guarding `ui.isClosing()`/detached/stale conversation id (drop silently on detach, still run the Soniox `DELETE`s); `@Push` confirmed; a hard ~60s client-side cap with countdown + auto-stop. Also gate the mic *button* (not just the bean) on the same property — inject `ObjectProvider<TranscriptionService>`, add the button only when available; a "default config = no mic, no bean" boot test.
+4. **The "invisible" refactors silently change behavior or bypass security** — Phase 11 hardening reorders the fail-closed gate chain / changes audit rows / `MutationErrorTranslator` codes / the `MutationGuard` SPI; or batch FK loading uses `UnconstrainedDataManager`/raw JPQL and bypasses row-level checks; the perf pass caches schema/permission/exposure resolution keyed too coarsely (one user sees the schema of another; stale denylist after an admin `EXCLUDE`) or drops the RAG `(source_entity IS NULL) OR (NOT IN <denied>)` clause as "redundant". **Avoid:** the Phase 9/10/11 test suites (TEST-08/09/10..13, `MutationToolInvariantsTest`, the gating-order test, audit-row assertions, `MutationErrorTranslator` canned-template tests, the host-guard veto test, `RetrievalFilterBuilderDenylistTest`) must pass **unchanged** — if a test needs editing, stop; lock the gate order with a source-level invariant test asserting role -> exposure -> `AccessManager` -> idempotency -> guard -> save (every gate throws *before* the `@Transactional` save); batch FK loads via the **constrained** `DataManager` `IN (...)` only; any perf cache around schema/permission/exposure is keyed `(user/roles, locale, exposure-version)` + evicted on `LlmExposureChangedEvent`, with `AccessManager` staying authoritative.
+5. **Cache staleness, secret leakage, scope creep** — an admin edits a knob mid-session but cached settings (made worse by the perf pass) keep the old value until restart; the config-knob migration sweeps `*.api-key` into the admin `AiParameters` UI (plaintext credentials in a DB table); the curated model dropdown ships proprietary/hosted-only models (violates the self-hostable policy); a v1.2 phase plan absorbs the deferred debt (Phase 10 re-verification, Nyquist backfill, PKG-05/TEST-07) or activates a dormant seed. **Avoid:** an `AiParameters` entity listener publishes a change event -> the settings cache evicts (admin edit visible within one turn); an explicit secret + boot-time-toggle denylist for the migration (keys stay env/`application.properties`-backed; `@ConditionalOnProperty` toggles stay properties or are clearly "requires restart"); a test asserting every curated model id is on an open-weights allowlist (comment -> `project_self_hostable_models_only.md`) and the dropdown labels "Self-hostable (recommended)" vs "Custom model name"; the roadmapper + `/gsd-discuss-phase` explicitly note the deferred debt and dormant seeds are NOT in v1.2 — reject any phase plan that includes them.
 
 ## Implications for Roadmap
 
-All four research files converge on the same build order. ARCHITECTURE explicitly states the chain: tool-layer foundations + prompt-contract hardening → exposure policy → mutation tools. FEATURES affirms "exposure policy MUST land before mutation tools." PITFALLS maps each pitfall to its prevention phase identically.
+Based on research, the six features are near-independent; the one **hard ordering constraint** is mutation-hardening before the perf pass (so the perf pass refactors the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated sequence). Recommended order: **15 -> 16 -> 17 -> 18 -> 19 -> 20** (ARCHITECTURE.md uses 15-19 with a different feature-to-number mapping; the numbering below follows PITFALLS.md, which the downstream phases reference).
 
-### Phase 9: Tool-Layer Foundations & Prompt-Contract Hardening
+### Phase 15: Chat Voice Input — Soniox STT (+ OpenAI fallback)
+**Rationale:** Promotes ROADMAP Backlog 999.2; depends only on `ChatPanelFragment.messageInputSlot` (stable since v1.0/Phase 12) — functionally independent of everything else. Biggest new surface; benefits from landing alongside or after the observability work so its error/retry row can reuse the Phase 16 in-fragment status-row pattern, but can go first if preferred.
+**Delivers:** `com.vn.agent.stt.*` package (`TranscriptionService` + `SonioxTranscriptionService` + `SpringAiTranscriptionService` + `AiAgentSttProperties` + selector `@Bean`), `@JsModule` mic recorder + `UploadHandler` audio receiver in `ChatPanelFragment.messageInputSlot`, `STT_TRANSCRIPTION` audit (hash default / raw opt-in, no new `AuditKind`), bounded `aiAgentSttExecutor`, non-blocking error+retry UI, ~60s cap.
+**Addresses:** Voice-input table-stakes set (FEATURES Category 1).
+**Avoids:** Pitfalls 1-7 (PII leak, non-disjoint path, OpenRouter/wrong-key mis-wiring, missing Soniox cleanup, UI-thread block / `UI.access` mishandling, `@ConditionalOnProperty` mic-button mismatch, browser codec/permission/length edge cases).
+**Uses:** `spring-ai-openai:1.1.4` audio classes (manual wiring), `RestClient`, `MediaRecorder`/`@JsModule`, `AuditFieldHasher`.
 
-**Rationale:** Lowest risk, highest leverage. Pure additions; no new entity, no behavioral risk. Foundation for everything downstream.
-**Delivers:** Richer `describe_entity` DTO; `agent.entities` + `agent.permissions` baseline keys; permission-inventory tool (only entities user can READ); `ToolFetchPlanCustomizer` SPI with security-intersection wrapper; `unknown_entity` retry contract; output-scanner pattern additions.
-**Addresses:** Prompt-contract hardening; richer `describe_entity`; LLM permission inventory; host-override SPI.
-**Avoids:** P-7, P-8, P-9, P-10, P-11, P-12.
+### Phase 16: Chat UX & Observability
+**Rationale:** Resolves the long-pending `add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo and fixes a visible defect (intermediate model text concatenated into the final bubble). Depends only on `ChatPanelFragment` + the existing `StreamingEvent` flux + the `AiAuditEvent` tree — independent; can overlap Phases 19/20.
+**Delivers:** ephemeral streaming-status badge in a sibling slot (`KIND`-keyed, clears on completion); collapsed-by-default per-turn tool-detail disclosure (humanized label-only steps + timing, hidden when empty); right-sidebar chat-state panel (model / conversation / exposure flag / mutation flag / attachment count / token budget / last-turn summary) inside the existing `attachmentsPanel` column; deep-link from a turn into `AiAuditEventListView?runId=`; small in-memory `TurnDetail`/`ToolCallDetail` POJOs; all labels in all locale bundles.
+**Addresses:** Chat UX & observability table-stakes set (FEATURES Category 2).
+**Avoids:** Pitfalls 8 (parallel turn model / leak of internal tool/entity names — read the audit tree + the streaming flux, humanize names, UI-level leak test), 9 (per-turn detail bloating `AiChatSessionState` — keep it thin, lazy-query the audit tree on expand), 24 (do not grow into SEED-002/004 territory — display only); honors the `ChatSurfaceMounter` slot contract (Phase 12 zero-diff).
+**Implements:** the observability UI as a consumer of existing `StreamingEvent` + `AiAuditEvent` — no new entity, no service change.
 
-### Phase 10: AI Exposure Policy
+### Phase 17: Admin Model Management
+**Rationale:** Smallest, lowest-risk; unblocks nothing else; informs the Phase 18 config-knob audit (the model field is already a free-text `AiParameters` param, so this is purely a UI affordance change). Can run first or in parallel.
+**Delivers:** curated open-weights `ComboBox` (readable labels, default marked) + "custom…" free-entry in `ParametersDetailView`/`AiConfigurationView`; admin-only; chosen model flows to the chat-state panel + per-request `ChatOptions`; validate at use time; optional lightweight save-time validation ping (loud at the point of change, does not block save); curated-list open-weights allowlist test.
+**Addresses:** Admin model management (FEATURES Category 3).
+**Avoids:** Pitfalls 10 (non-self-hostable models in defaults — open-weights-only curated list, allowlist test, labeled sections), 11 (invalid custom model only failing at first chat turn — save-time ping + graceful chat-turn fallback), 12 (model choice persisted somewhere that overrides the strict seed — write the existing free-text `model` field in `AiParametersBody`, never `default-params.yaml`).
 
-**Rationale:** Must precede mutation tools. Read-only path first.
-**Delivers:** `AiExposureRule` (`EXCLUDE`-only) + `LlmExposurePolicy` boundary + admin views + `LlmExposureChangedEvent` cache invalidation. **Critical:** migrate `RetrievalFilterBuilder` to consult policy (RAG cross-cut).
-**Implements:** ARCH components #1, #2.
-**Avoids:** P-6, P-13, P-14.
+### Phase 18: Admin Config-Knob Migration
+**Rationale:** Depends on Phases 15 + 17 being scoped (it migrates their knobs — STT enable/provider/audit-mode, the model picker persistence) — co-design the `AiParameters`/`AiUiSettings` schema once.
+**Delivers:** a reviewed audit table classifying every `jmix.ai-agent.*` / `ai-agent.*` knob (Tier 1 migrate / Tier 2 read-only / Tier 3 secret-indicator); RAG top-k + similarity threshold + task-file token budget + TTL editable in the admin UI via the existing `AiParametersResolver` read-through; boot-time `@ConditionalOnProperty` knobs shown read-only with a clear "property only / requires restart" marker; secrets shown as "configured: yes/no" only; an `AiParameters` change-event publisher (single publish site) so perf caches can evict; new fields + `agentstore` Liquibase changelog + locale messages.
+**Addresses:** Admin config-knob migration (FEATURES Category 4).
+**Avoids:** Pitfalls 12 (precedence bug — honor the `module.properties` -> `AiParameters` layering; precedence test; admin override survives reseed), 13 (secrets in the admin UI — explicit secret + boot-toggle denylist; test asserting no `*.api-key` has an `AiParameters` key), 14 (cache staleness — provide the invalidation hook here, a hard constraint on Phase 20).
 
-### Phase 11: Mutation Tools
+### Phase 19: Phase 11 Mutation-Internals Hardening
+**Rationale:** Promotes ROADMAP Backlog 999.1; **must precede Phase 20** so the perf pass refactors the consolidated chain + the shared batch-FK load, not the duplicated sequence. Functionally independent otherwise.
+**Delivers:** `MutationGateChain` `@Component` (one canonical fail-closed sequence for create/update/add-related/remove-related/bulk; no `@Transactional` on the chain); `BuiltInMutationTools` `@Tool` methods become thin adapters; batch-load to-one FK refs via the **constrained** `DataManager` `IN (...)` in `MutationAttributeBinder`; `RelatedWriteMetadataResolver` memoized (`(parentMetaClass, relationshipName)` -> `SupportedRelatedRelationship`, no eviction); an extended `MutationToolInvariantsTest` asserting the call order + the absence of `@Transactional` on the chain.
+**Addresses:** Phase 11 mutation-internals hardening (FEATURES Category 5) — byte-for-byte behavior-identical.
+**Avoids:** Pitfalls 15 (the refactor being a behavior change — Phase 11 tests pass unchanged; the 6-code D-04 taxonomy stays closed; `MutationGuard` SPI signature/timing unchanged; same audit rows; no new `AuditKind`), 16 (batch FK loading bypassing row-level checks — constrained `DataManager` `IN (...)` only; the Phase 11 row-level mutation-security test passes unchanged).
 
-**Rationale:** Hard-depends on Phases 9 and 10. Default-OFF on ship.
-**Delivers:** `BuiltInMutationTools` (`@ConditionalOnProperty` opt-in); `MutationGuard` SPI; mandatory `idempotencyKey` + `AiMutationIntent` dedup table; `AiAgentMutationProperties`; audit `eventName` extensions; `MutationErrorTranslator` for safe error codes (no PII echo); locale messages for denial in all locales.
-**Implements:** ARCH component #3.
-**Avoids:** P-1, P-2, P-3, P-4, P-5, P-22.
-
-### Phase 12: Configurable Chat Surfaces
-
-**Rationale:** Independent of exposure-policy/mutation chain. Sequential after to avoid interleaving UI refactor with security work.
-**Delivers:** `AiUiSettings` (single-row); `SidebarChatComponent` (`AppLayout slot="drawer-end"`); `FloatingChatLauncher` (Vaadin overlay primitive — NOT raw CSS); `ChatSurfaceMounter`; `AiChatSessionState` (`@VaadinSessionScope`); admin runtime-toggle Flow view.
-**Implements:** ARCH component #4.
-**Avoids:** P-19, P-20, P-21.
-
-### Phase 13: Chat Task Input (STT + Task-Scoped File)
-
-**Rationale:** Independent. Lowest cross-feature coupling. STT does NOT call `ChatService.ask`; task files NEVER touch `VectorStore`.
-**Delivers:** `AudioCaptureComponent`; `TranscriptionService` over `OpenAiAudioTranscriptionModel`; `AiAgentTranscriptionProperties` (default OFF); `TranscriptionPostProcessor` SPI; task-scoped file path injecting `Media` only; `ai.agent.audio.audit.storeTranscript=false` default with hash-only audit; `STT_TRANSCRIPTION` audit event.
-**Implements:** ARCH component #5.
-**Avoids:** P-15, P-16, P-23, P-24.
-
-### Phase 14: Intent-Driven Extraction → Form Prefill
-
-**Rationale:** Highest novelty + complexity. Depends on Phases 9 and 10. Hard-defer candidate if scope shrinks (can ship as v1.1.1).
-**Delivers:** `AiExtractionDraft` entity (TTL purge); `IntentExtractor<T>` SPI + reference impl using `chatClient.prompt().call().entity(Class)`; `ExtractionService`; `ExtractionToolBridge` exposing `prepare_form_draft` `@Tool`; chat-UI response renderer for `{ "action": "open_form_with_draft", ... }`; controller-side `ViewNavigators` wired from confirm button after `ViewContext` permission check; intent → view-id allowlist; per-attribute `canModify` filter on prefill; `dataContext.validate()` pre-Save.
-**Implements:** ARCH component #6.
-**Avoids:** P-17, P-18, P-25.
+### Phase 20: AI-Runtime Performance Pass (targeted)
+**Rationale:** Depends on Phase 19 (mutation-binding/FK-batch work lands in the shared chain). Touches only already-shipped components.
+**Delivers:** per-turn memoization of `getReadableSchema()`/metadata/`AccessManager`/exposure resolution (compute once per turn, share across tool calls); app-wide memoization of `getDenylistedEntityNames()` (evicted on `LlmExposureChangedEvent`) and pure-metadata derivations (`name` -> `MetaClass`); RAG `Filter.Expression` built once per retrieval; task-file `Media` cached per `(convId, taskFileId)` (evicted on attach/delete/TTL); prompt/context not re-serialized within a turn; each change ships with a checkable proxy (SELECT-count assertion via `datasource-proxy`, "1 query not N", call-count assertion); a short perf-notes doc.
+**Addresses:** AI-runtime performance pass (FEATURES Category 6) — no benchmark harness, no admin-screen perf.
+**Avoids:** Pitfalls 14 (cache without invalidation — every cache wires to its invalidation event; "admin edit visible within one turn" is a success criterion), 17 (caching across users/requests/`LlmExposureChangedEvent` — key on (user/roles, locale, exposure-version); prefer request-scoped; `AccessManager` stays authoritative), 18 (locale-keying mistakes — `agent.permissions` locale-invariant cacheable without locale; `agent.entities` locale-resolved must include locale), 19 (dropping the RAG denylist/role-scope clause — both load-bearing; refactor mechanics not clauses; TEST-09 RAG leg unchanged), 20 (data races into the Vaadin per-session model — UI updates only via `ui.access`; thread-safe or request-scoped caches; the mutation chain stays sequential), 21 (declaring "done" with no proxy — "no benchmark harness" != "no measurement"; each change has a checkable claim), 22 (scope creep into a benchmark harness / admin-screen perf — copy the PROJECT.md exclusions verbatim into the phase out-of-scope section).
 
 ### Phase Ordering Rationale
 
-- **Hard chain 9 → 10 → 11.** Mutation tools require admin-narrowing layer (otherwise opt-in is binary host-wide) AND permission inventory. All three research files converge on this chain.
-- **Soft sequence 12 → 13 → 14.** All independent of each other but all assume Phase 9. Linear order produces shippable intermediate states.
-- **Cross-cutting: exposure policy must touch RAG (`RetrievalFilterBuilder`)**, not just baseline + tools — non-obvious cross-feature regression risk.
-- **Cross-cutting: audit reuses `writeToolCall`**, not a new audit kind. Mutation, extraction, STT all share `AiAuditEvent` parent/child tree with new `eventName` strings.
+- **Hard constraint:** Phase 19 (mutation hardening) before Phase 20 (perf pass) — the perf pass must refactor the consolidated `MutationGateChain` + the shared batch-FK load, not the duplicated code it is about to delete.
+- **Soft groupings:** Phases 15 (voice) + 16 (chat UX) both touch `ChatPanelFragment` — treat the chat-UI changes as one coordinated UI workstream (or sequence 16 before 15 so the STT error/retry row reuses the 16 status-row infra). Phase 17 (model picker) is a smaller, separable Parameters-view change. Phase 18 (config migration) depends on 15 + 17 being scoped (it migrates their knobs) — co-design the `AiParameters` schema once.
+- **Low-risk-first:** Phases 17 -> 16 -> 15 ascending in surface size; Phase 18 follows. Phases 19/20 (the invisible passes) can run in parallel with 15/16/17/18.
+- **How this avoids pitfalls:** sequencing 19 before 20 prevents wasted perf work on duplicated code (Pitfalls 15, 21); scoping 18 after 15/17 prevents schema churn; the leak/security pitfalls (1, 8, 13, 16, 17) are addressed *within* each phase success criteria, not by ordering.
 
 ### Research Flags
 
-Phases needing deeper research (`/gsd-research-phase`):
-- **Phase 11 (Mutation Tools):** Spring AI 1.1.x has no built-in tool-approval API; `internalToolExecutionEnabled=false` semantics + transaction interaction (P-4: success-before-flush) need a focused spike.
-- **Phase 14 (Intent-Driven Extraction):** Per-intent SPI + metadata-driven default extractor vs SPI + reference impl only? Prefill via `DataContext.create(Customer.class)` + per-attribute `canModify` interaction needs a Jmix-specific spike.
-- **Phase 12 (Configurable Surfaces):** Floating-launcher Vaadin overlay primitive choice + dialog-open listener for hide-on-modal — HIGH on shape, MEDIUM on exact Jmix 2.8.1 MainView hook.
+Phases likely needing deeper research during planning:
+- **Phase 15 (Voice Input):** re-verify the Soniox `/v1/files` + `/v1/transcriptions` request/response shapes (incl. the separate `GET .../transcript` tokens array and `model=stt-async-v4`), the OpenAI `OpenAiAudioApi`/`OpenAiAudioTranscriptionOptions` builder method names (Spring AI 1.1.x is a milestone release — verify via Context7), and the Jmix-2.8 `UploadHandler.toFile` / `@JsModule`-to-Flow round-trip pattern at plan time. MEDIUM-confidence area.
+- **Phase 20 (Perf Pass):** the safe-caching boundaries for `BaselineContextProvider`/`LlmExposurePolicy`/`FetchPlanIntersector` are subtle (per-turn vs app-wide vs locale-keyed); a focused `/gsd-research-phase` confirming each cache key dimensions + eviction hook against the actual source is worthwhile before implementation.
 
-Standard patterns (skip phase research):
-- **Phase 9, 10, 13** — Patterns are mechanical; HIGH confidence.
-
-### Convergence and Divergence
-
-**Convergence (HIGH):**
-- All four files name **exposure-before-mutation** as the hard order.
-- All four reject `UnconstrainedDataManager` for mutation tools (audit/seed only).
-- All four require ONE `ChatPanelFragment`, ONE `ChatService`, ONE `AiConversation` per user-session.
-- STACK and PITFALLS reject Web Speech API for server-side Whisper.
-- ARCHITECTURE and PITFALLS require RAG to consult exposure policy.
-- ARCHITECTURE and FEATURES converge: LLM never receives `ViewNavigators`.
-
-**Divergence (open decisions):**
-- **`BuiltInMutationTools` separate component vs methods on `BuiltInDataTools`** — ARCHITECTURE says separate (preserves v1.0 ASM read-only test). **Resolution:** separate.
-- **HITL pattern** — STACK suggests delegate-to-Jmix-UI; FEATURES leaves `internalToolExecutionEnabled=false` open. **Resolution:** delegate as default; `returnDirect=true` preview as Phase 11 spike.
-- **Intent-extraction draft persistence** — STACK leans `VaadinSession`; ARCHITECTURE/PITFALLS specify persisted entity. **Resolution:** persisted `AiExtractionDraft` (survives navigation, has TTL, no cross-user `Map` leak).
-- **Mutation tool depth** — open. **Resolution to roadmapper/requirements:** ship CREATE + UPDATE + ADD/REMOVE_RELATED in v1.1 with per-tool `@ConditionalOnProperty`; DELETE off-by-default even when mutations on.
-
-**Open questions deferred to requirements step:**
-1. Mutation tool depth (CREATE+UPDATE+RELATED vs include DELETE).
-2. Intent-extraction provider routing (follow chat model vs pin to JSON-strong model).
-3. STT recording UX (push-to-talk vs click-to-toggle 60s cap).
-4. Floating launcher placement (configurable corner vs bottom-right always).
-5. v1.1 vs v1.1.1 phasing for intent-driven extraction.
+Phases with standard patterns (skip research-phase):
+- **Phase 16 (Chat UX):** consumes the existing `StreamingEvent` flux + `AiAuditEvent` tree + standard Jmix Flow components — well-trodden; the leak-guard discipline is documented (Phase 9 pattern packs).
+- **Phase 17 (Model Picker):** a `ComboBox` with `allowCustomValue` writing an existing `AiParameters` field — trivial Jmix view work.
+- **Phase 18 (Config Migration):** extends the established `AiParametersResolver` read-through + standard entity/changelog/messages work; the three-tier taxonomy is fully specified in FEATURES.
+- **Phase 19 (Mutation Hardening):** mechanical extraction of an existing inlined sequence; the constraint (Phase 11 tests unchanged) is the spec.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All four library surfaces Context7-verified. Zero new core deps. |
-| Features | HIGH (table stakes); MEDIUM-HIGH (intent extraction prior art) | Microsoft Copilot Studio, Dynamics 365, CopilotKit cited as concrete prior art for every "must have." |
-| Architecture | HIGH | Every claim grounded in named files + line numbers; integration seams are existing extension points. MEDIUM only on `BuiltInMutationTools` `@Transactional` per-method vs per-call (Phase 11 spike). |
-| Pitfalls | HIGH | Each pitfall framed as regression against named v1.0 invariant; mitigations map 1:1 to existing test classes. |
+| Stack | HIGH | Spring AI 1.1.4 transcription API + config keys verified against current spring.io/spring-ai/reference (Context7); Soniox HTTP contract verified against current soniox.com/docs; all build coords read from the repo own *.gradle files; net new runtime dep = zero. MEDIUM only on the browser-mic component choice (no first-party Jmix/Vaadin microphone primitive — a small first-party `@JsModule` is the standard option). |
+| Features | MEDIUM-HIGH | UX conventions for voice-to-textbox / tool-call transparency / streaming status are well-established (HIGH, multiple comparable products: ChatGPT, Intercom, Microsoft Copilot Studio, CopilotKit, GitHub Copilot). The config-knob three-tier taxonomy and "done" criteria for the invisible refactor/perf phases are project-specific judgment grounded in the existing codebase (MEDIUM). |
+| Architecture | HIGH | Existing-architecture seams read directly from `com.vn.agent.**` source; the codebase-reality corrections (Flow UI already in the functional module; `ChatPanelFragment` at ~1340 lines; `AiParametersResolver` already does the read-through; `MutationGateChain` is an extraction of an inlined sequence) are verified. MEDIUM-HIGH only on the exact Spring AI 1.1.4 audio builder names. |
+| Pitfalls | HIGH | Every pitfall references a concrete v1.1 contract from this repo PROJECT/ROADMAP/STATE + the project-memory notes (leak guards, fail-closed mutation chain, `LlmExposurePolicy` composition, strict-YAML/`module.properties` split, `UnconstrainedDataManager` scoping, self-hostable-models-only, the deferred-debt list). MEDIUM only on the Soniox/OpenAI STT-API specifics (re-verify at Phase 15 plan time). |
 
-**Overall confidence:** HIGH.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Mutation HITL pattern verification** — Phase 11 spike: Context7-verified check of Spring AI 1.1.4 `internalToolExecutionEnabled=false` samples before plan authoring.
-- **Surface-portal hook into host MainView** — Phase 12 planning-time Context7 + jmix-context7 lookup.
-- **Intent-extraction provider/model choice** — requirements step decides; ship `jmix.ai-agent.intent.model` override property; default = follow chat parameter.
-- **Cross-locale baseline-cache key** — verify existing baseline cache-key implementation excludes locale-sensitive labels.
-- **v1.0 deferred PKG-05/TEST-07 clean-consumer smoke** — explicitly out of v1.1 scope (PROJECT.md, STATE.md). Do not pull into roadmap.
+- **Soniox / OpenAI request shapes:** the async flow (`POST /v1/files` field name `file` -> `POST /v1/transcriptions` with `model`/`file_id`/`language_hints` -> poll `GET /v1/transcriptions/{id}` for `status` -> `GET .../transcript` for the `tokens` array -> `DELETE` both) and the OpenAI builder method names should be re-confirmed via Context7 + the live docs at Phase 15 plan time, not taken from this summary verbatim. The ROADMAP Backlog notes had two errors (no status field on the `/transcript` resource; transcript text is a separate `tokens`-array call) — STACK.md corrects them; carry the correction forward.
+- **Mic component transport choice:** STACK.md leans toward a `@RestController` upload endpoint; ARCHITECTURE.md prefers a Vaadin `UploadHandler`-based receiver (stays inside the Vaadin session/security context, avoids the deprecated `Upload.getReceiver/setReceiver`). Resolve this in the Phase 15 plan — both are zero-dep; the `UploadHandler` route is the better fit with the existing `taskFileUpload` idiom and the project Jmix-first posture.
+- **Curated model list:** the *policy* (open-weights / Apache-2.0+ only, `qwen/qwen3.6-35b-a3b` as the marked default) is load-bearing; the exact sibling slugs will be stale by ship — confirm against current provider availability at Phase 17 plan time and back the list with the allowlist test.
+- **`AiParameters` vs `AiUiSettings` for migrated knobs:** ARCHITECTURE.md suggests extending `AiParametersBody` for chat-profile-shaped knobs and reusing the `AiUiSettings` singleton (or a new `AiOperatorSettings` singleton) for non-profile runtime singletons — settle the split in the Phase 18 plan so the schema is designed once (co-designed with the Phase 15 STT knobs).
+- **Per-turn vs app-wide cache boundaries (Phase 20):** confirm each cache key dimensions + eviction hook against the actual `BaselineContextProvider`/`LlmExposurePolicy`/`FetchPlanIntersector`/`RetrievalFilterBuilder` source — `BaselineContextProvider` already carries a comment mandating `(userId, roleSet, metaclass-name-set [, locale])` keying + an `LlmExposureChangedEvent` evictor; honor it.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Context7 `/spring-projects/spring-ai` (1.1.x) — audio transcription, structured output, tool calling, advisor primitives.
-- Context7 `/vaadin/docs` (24.x) — Dialog modality/draggable, AppLayout drawer slots, Element JS bridge.
-- Context7 `/jmix-framework/jmix-context7` (Jmix 2.8) — `ViewNavigators.withInitializer`, `AccessManager` contexts, entity/attribute policy annotations.
-- v1.0 shipped code — `BuiltInDataTools`, `BaselineContextProvider`, `ToolCallbackAuditDecorator`, `ChatPanelFragment`, `OwnershipOpacityTest`, `DefaultChatServiceImpl`, `ChatClientFactory`, `AgentToolCallbacks`, `CurrentUserSchemaAccess`, `AuditWriter`.
-- `MEMORY.md` — "AI is just another Jmix client"; "UnconstrainedDataManager for system writes" (audit/seed only); "Reuse Jmix built-ins"; "Jmix-first UI"; "Avoid ArchUnit"; "SPIs only for app-specific behavior."
-- `.planning/PROJECT.md`, `.planning/STATE.md`, `SEED-005`, `SEED-007`.
+- `/websites/spring_io_spring-ai_reference` (Context7) + docs.spring.io/spring-ai/reference/api/audio/transcriptions/openai-transcriptions.html — `OpenAiAudioApi` / `OpenAiAudioTranscriptionModel` / `OpenAiAudioTranscriptionOptions` / `AudioTranscriptionPrompt` / `AudioTranscriptionResponse` / `AudioTranscriptionModel`; `spring.ai.openai.audio.transcription.*` properties; supported models (`whisper-1`, `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`); custom `base-url`
+- soniox.com/docs/stt/async/async-transcription, soniox.com/docs/api-reference, soniox.com/docs/api-reference/stt/transcriptions/create_transcription, soniox.com/docs/stt/models, github.com/soniox, soniox.com/docs/sdk/* — async flow (`POST /v1/files` field `file` -> `POST /v1/transcriptions` `model`/`file_id`/`language_hints`/webhooks -> `GET /v1/transcriptions/{id}` status -> `GET .../transcript` tokens -> `DELETE` cleanup), base URL `https://api.soniox.com/v1`, error codes, `stt-async-v4` (current; `stt-async-v3` alias -> v4), 5h max, no Java SDK (Python/Node/Web/React only)
+- Existing codebase read directly — `com.vn.agent.view.chat.fragment.ChatPanelFragment` / `StreamEventRenderer` / `chat-panel-fragment.xml`, `view/configuration/AiConfigurationView.java`, `view/parameters/ParametersDetailView.java`, `orchestration/DefaultChatServiceImpl.java` / `ChatService.java` / `ChatClientFactory.java` / `AiParametersResolver.java` / `BaselineContextProvider.java` / `StreamingEvent.java`, `audit/AuditWriter.java` / `AuditAdvisor.java` / `ToolCallbackAuditDecorator.java` / `AuditFieldHasher.java`, `tools/AgentToolCallbacks.java` / `tools/mutation/BuiltInMutationTools.java` / `MutationAuthorizationService.java` / `MutationAttributeBinder.java` / `RelatedWriteMetadataResolver.java` / `MutationCommitCoordinator.java` / `AiAgentMutationProperties.java`, `exposure/LlmExposurePolicy.java` / `LlmExposureRuleRepository.java` / `AiExposureRuleEntityListener.java`, `rag/RetrievalFilterBuilder.java`, `entity/AiAuditEvent.java` / `AiParameters.java`, `parameters/AiParametersBody.java`, `module.properties`, `ai-agent.gradle`, `ai-agent-starter.gradle`, `jmix-app/build.gradle`, `application.properties`
+- `.planning/PROJECT.md`, `.planning/ROADMAP.md` (Backlog 999.1 / 999.2 + cross-cutting STT constraints), `.planning/MILESTONES.md`, `.planning/STATE.md` (Hard Build-Order, Decisions, Deferred Items, Seeds Reviewed), `.planning/todos/pending/2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md`, project memory `MEMORY.md` (`project_self_hostable_models_only`, `feedback_jmix_loadvalue_store` (agentstore), `feedback_jmix_first_ui`, `feedback_jmix_unconstrained_for_system_writes`, `feedback_jmix_upload_receiver_deprecated`, `project_local_dev_port` (8088), `feedback_fresh_phase_scope`, `feedback_ai_as_jmix_client`)
 
 ### Secondary (MEDIUM confidence)
-- Microsoft 365 Copilot data protection architecture; Copilot Studio governance; Copilot UI guidelines.
-- CopilotKit HITL docs; `CopilotChat` / `CopilotSidebar` / `CopilotPopup`.
-- GitHub Copilot enterprise AI controls; Dynamics 365 Copilot 2026.
-- Levelpath / Stack AI / Azure architecture — intent-extraction prior art.
-- Spring AI Tool Approval Strategy discussion #4878.
-- LiteLLM audit logs; EU AI Act August 2026.
+- Vaadin Directory ("Audio Recorder for Vaadin", "Vcamera"), MDN `MediaRecorder` / `getUserMedia` — context for the `@JsModule` decision (community add-ons evaluated and rejected); secure-context requirement (https or `localhost`)
+- Comparable-product conventions — ChatGPT / Intercom Messenger / Google Chat voice transcription (tap-to-record, server transcribe, **review before send**; the ChatGPT removal of the review step is a cited regression); Discord/TeamSpeak push-to-talk-vs-toggle; Microsoft Copilot Studio / Business Central "glass-box" tool-call observability; CopilotKit "agent streams are tricky" (separate transient status from final content); AG-UI tools concept; GitHub Copilot function-calling UI; LibreChat voice-shortcut feature request; OpenAI Developer Community voice-dictation-regression thread
+
+### Tertiary (LOW confidence)
+- (none — all findings trace to primary docs, the repo source, or established multi-source product conventions)
 
 ---
-
-### Roadmap Implications
-
-Suggested phases: **6** (Phases 9–14)
-
-1. **Phase 9 — Tool-Layer Foundations & Prompt-Contract Hardening** — pure additive; no behavioral risk; foundation for everything.
-2. **Phase 10 — AI Exposure Policy** — must precede mutation tools; ships read-only narrowing first; **must include RAG cross-cut**.
-3. **Phase 11 — Mutation Tools** — hard-depends on 9 and 10; default OFF; mandatory idempotency key.
-4. **Phase 12 — Configurable Chat Surfaces** — independent; one fragment, one service, one conversation across surfaces.
-5. **Phase 13 — Chat Task Input (STT + Task File)** — independent; lowest coupling; STT never calls ChatService directly; files never touch VectorStore.
-6. **Phase 14 — Intent-Driven Extraction → Form Prefill** — highest novelty; LLM never navigates; controller does, after permission check.
-
-### Research Flags
-
-Needs research-phase: **Phase 11** (Spring AI HITL pattern spike), **Phase 14** (Jmix prefill + DataContext interaction spike), **Phase 12** (Jmix MainView hook for surface mounter).
-Standard patterns: **Phase 9, Phase 10, Phase 13**.
-
-### Confidence
-
-**Overall: HIGH.**
-Gaps: Spring AI HITL pattern verification (Phase 11), Jmix MainView mounting hook (Phase 12), intent-extraction provider/model decision (requirements), v1.1 vs v1.1.1 scope decision for intent extraction (requirements).
-
-### Ready for Requirements
-
-Synthesis ready. Proceeding to requirements definition.
+*Research completed: 2026-05-11*
+*Ready for roadmap: yes*
