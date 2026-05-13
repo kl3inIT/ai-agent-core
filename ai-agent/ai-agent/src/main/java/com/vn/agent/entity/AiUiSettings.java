@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.Version;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -333,5 +334,55 @@ public class AiUiSettings {
 
     public void setUploadMaxFileSizeBytes(Long uploadMaxFileSizeBytes) {
         this.uploadMaxFileSizeBytes = uploadMaxFileSizeBytes;
+    }
+
+    // ---- Phase 16 WR-01 cross-field validators for discontinuous sentinel ranges ----
+    // The plain @Min(-1)/@Max(...) annotations on the sentinel-bearing fields accept every
+    // value in the closed interval — including the "invalid gap" between -1 and the lower
+    // bound documented in SPEC criterion 3. These @AssertTrue methods enforce the actual
+    // discontinuous range {-1} ∪ [lower, upper], so a saved value like ttlSeconds=5
+    // (5-second TTL — files expire immediately on upload) is rejected at validate time.
+
+    /**
+     * SPEC criterion 3: {@code taskFileTtlSeconds ∈ {-1} ∪ [60, 604_800]}.
+     * Value -1 disables cleanup (Phase 13.1 sentinel); otherwise the TTL must be at least
+     * one minute to be useful. Null falls through to module.properties default.
+     */
+    @AssertTrue(message = "{aiUiSettings.validation.taskFileTtl.range}")
+    @Transient
+    public boolean isTaskFileTtlSecondsRangeValid() {
+        if (taskFileTtlSeconds == null) {
+            return true;
+        }
+        long v = taskFileTtlSeconds;
+        return v == -1L || (v >= 60L && v <= 604_800L);
+    }
+
+    /**
+     * SPEC criterion 3: {@code taskFilePerTurnMaxFiles ∈ {-1} ∪ [1, 100]}.
+     * Value -1 disables per-turn limit (sentinel); 0 would silently break uploads.
+     */
+    @AssertTrue(message = "{aiUiSettings.validation.taskFilePerTurnMaxFiles.range}")
+    @Transient
+    public boolean isTaskFilePerTurnMaxFilesRangeValid() {
+        if (taskFilePerTurnMaxFiles == null) {
+            return true;
+        }
+        int v = taskFilePerTurnMaxFiles;
+        return v == -1 || (v >= 1 && v <= 100);
+    }
+
+    /**
+     * SPEC criterion 3: {@code taskFilePerTurnMaxTotalBytes ∈ {-1} ∪ [1, 524_288_000]}.
+     * Value -1 disables per-turn total-bytes limit (sentinel); 0 would silently disable uploads.
+     */
+    @AssertTrue(message = "{aiUiSettings.validation.taskFilePerTurnMaxTotalBytes.range}")
+    @Transient
+    public boolean isTaskFilePerTurnMaxTotalBytesRangeValid() {
+        if (taskFilePerTurnMaxTotalBytes == null) {
+            return true;
+        }
+        long v = taskFilePerTurnMaxTotalBytes;
+        return v == -1L || (v >= 1L && v <= 524_288_000L);
     }
 }
