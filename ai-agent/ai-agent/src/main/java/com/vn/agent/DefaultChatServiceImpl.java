@@ -1147,15 +1147,50 @@ public class DefaultChatServiceImpl implements ChatService {
      * Extracts the HTTP status from the cause chain for audit-row stamping; returns {@code -1}
      * if no {@link RestClientResponseException} is found (defensive — callers only invoke this
      * after {@link #isBadModelException} returned true, so a status WILL be present).
+     *
+     * <p>WR-04: mirrors {@link #isBadModelException}'s traversal — including the descent into
+     * {@link org.springframework.ai.retry.NonTransientAiException#getCause()} for the Case B
+     * (wrapped RCRE) shape. The previous linear-outer-walk-only implementation returned
+     * {@code -1} for chains where the RCRE was nested inside a NonTransientAiException, so the
+     * audit row recorded a misleading {@code status=-1} even though the classifier had matched.</p>
      */
     private static int extractBadModelStatus(Throwable cause) {
-        Throwable cursor = cause;
+        RestClientResponseException rcre = findCausalRcre(cause);
+        return rcre == null ? -1 : rcre.getStatusCode().value();
+    }
+
+    /**
+     * WR-04 — shared cause-chain walker used by {@link #extractBadModelStatus} (and tested in
+     * parallel with {@link #isBadModelException}). Returns the first {@link RestClientResponseException}
+     * reachable in the depth-bounded (≤ 5) outer chain OR, when the cursor is a
+     * {@link org.springframework.ai.retry.NonTransientAiException}, the depth-bounded inner-chain
+     * walk underneath it. Returns {@code null} if no RCRE is found.
+     *
+     * <p>Note: the classifier {@link #isBadModelException} additionally filters by
+     * {@link #matchesBadModelShape}; this helper deliberately does NOT — its job is to surface
+     * the status code for the audit row even if the body/message-substring check would have
+     * failed (the audit row records what the classifier saw, including the status of a
+     * shape-matched RCRE; callers only invoke it after the classifier returned true).</p>
+     */
+    private static RestClientResponseException findCausalRcre(Throwable t) {
+        Throwable cursor = t;
         for (int depth = 0; cursor != null && depth < 5; depth++, cursor = cursor.getCause()) {
             if (cursor instanceof RestClientResponseException rcre) {
-                return rcre.getStatusCode().value();
+                return rcre;
+            }
+            if (cursor instanceof org.springframework.ai.retry.NonTransientAiException) {
+                Throwable inner = cursor.getCause();
+                int innerDepth = 0;
+                while (inner != null && innerDepth < 5) {
+                    if (inner instanceof RestClientResponseException rcre) {
+                        return rcre;
+                    }
+                    inner = inner.getCause();
+                    innerDepth++;
+                }
             }
         }
-        return -1;
+        return null;
     }
 
     /**
