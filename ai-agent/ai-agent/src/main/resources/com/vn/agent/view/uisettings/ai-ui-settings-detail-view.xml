@@ -7,30 +7,117 @@
             <fetchPlan extends="_base"/>
             <loader id="uiSettingsDl"/>
         </instance>
+        <collection id="bootConfigDc" class="com.vn.agent.admin.config.KnobInventory$KnobRow"/>
+        <collection id="secretsDc" class="com.vn.agent.admin.config.KnobInventory$SecretIndicatorRow"/>
     </data>
     <actions>
         <action id="saveAction" type="detail_saveClose"/>
         <action id="closeAction" type="detail_close"/>
     </actions>
     <layout padding="true" spacing="true">
-        <formLayout id="settingsForm">
-            <responsiveSteps>
-                <responsiveStep minWidth="0" columns="1"/>
-            </responsiveSteps>
-            <checkboxGroup id="enabledSurfacesField"
-                           label="msg:///aiUiSettingsDetail.field.enabledSurfaces"
-                           helperText="msg:///aiUiSettingsDetail.field.enabledSurfaces.helper"
-                           required="true"
-                           requiredMessage="msg:///aiUiSettingsDetail.validation.enabledSurfacesRequired"
-                           width="100%"/>
-            <radioButtonGroup id="defaultSurfaceField"
-                              label="msg:///aiUiSettingsDetail.field.defaultSurface"
-                              helperText="msg:///aiUiSettingsDetail.field.defaultSurface.helper"
-                              required="true"
-                              requiredMessage="msg:///aiUiSettingsDetail.validation.defaultSurfaceRequired"
-                              themeNames="vertical"
-                              width="100%"/>
-        </formLayout>
+        <tabSheet id="editTabs" width="100%">
+            <tab id="generalTab" label="msg:///aiUiSettings.tab.general">
+                <formLayout id="settingsForm">
+                    <responsiveSteps>
+                        <responsiveStep minWidth="0" columns="1"/>
+                    </responsiveSteps>
+                    <checkboxGroup id="enabledSurfacesField"
+                                   label="msg:///aiUiSettingsDetail.field.enabledSurfaces"
+                                   helperText="msg:///aiUiSettingsDetail.field.enabledSurfaces.helper"
+                                   required="true"
+                                   requiredMessage="msg:///aiUiSettingsDetail.validation.enabledSurfacesRequired"
+                                   width="100%"/>
+                    <radioButtonGroup id="defaultSurfaceField"
+                                      label="msg:///aiUiSettingsDetail.field.defaultSurface"
+                                      helperText="msg:///aiUiSettingsDetail.field.defaultSurface.helper"
+                                      required="true"
+                                      requiredMessage="msg:///aiUiSettingsDetail.validation.defaultSurfaceRequired"
+                                      themeNames="vertical"
+                                      width="100%"/>
+                </formLayout>
+            </tab>
+            <tab id="tier1KnobsTab" label="msg:///aiUiSettings.tab.tier1Knobs">
+                <vbox id="tier1Layout" padding="true" spacing="true" width="100%">
+                    <formLayout id="taskFileSection" dataContainer="uiSettingsDc">
+                        <responsiveSteps>
+                            <responsiveStep minWidth="0" columns="1"/>
+                        </responsiveSteps>
+                        <textField property="taskFileTtlSeconds"
+                                   label="msg:///aiUiSettings.field.taskFileTtlSeconds"/>
+                        <integerField property="taskFilePerTurnMaxFiles"
+                                      label="msg:///aiUiSettings.field.taskFilePerTurnMaxFiles"/>
+                        <textField property="taskFilePerTurnMaxTotalBytes"
+                                   label="msg:///aiUiSettings.field.taskFilePerTurnMaxTotalBytes"/>
+                        <textField property="taskFileMaxFileSizeBytes"
+                                   label="msg:///aiUiSettings.field.taskFileMaxFileSizeBytes"/>
+                    </formLayout>
+                    <formLayout id="mutationSection" dataContainer="uiSettingsDc">
+                        <responsiveSteps>
+                            <responsiveStep minWidth="0" columns="1"/>
+                        </responsiveSteps>
+                        <checkbox property="mutationConfirmationRequired"
+                                  label="msg:///aiUiSettings.field.mutationConfirmationRequired"/>
+                        <textField property="mutationIdempotencyTtlSeconds"
+                                   label="msg:///aiUiSettings.field.mutationIdempotencyTtlSeconds"/>
+                        <integerField property="mutationBulkMaxRows"
+                                      label="msg:///aiUiSettings.field.mutationBulkMaxRows"/>
+                    </formLayout>
+                    <formLayout id="promptToolsSection" dataContainer="uiSettingsDc">
+                        <responsiveSteps>
+                            <responsiveStep minWidth="0" columns="1"/>
+                        </responsiveSteps>
+                        <integerField property="promptEntityInventoryLimit"
+                                      label="msg:///aiUiSettings.field.promptEntityInventoryLimit"/>
+                        <integerField property="toolsMaxFilterDepth"
+                                      label="msg:///aiUiSettings.field.toolsMaxFilterDepth"/>
+                    </formLayout>
+                    <formLayout id="titleSection" dataContainer="uiSettingsDc">
+                        <responsiveSteps>
+                            <responsiveStep minWidth="0" columns="1"/>
+                        </responsiveSteps>
+                        <integerField property="titleMaxContextMessages"
+                                      label="msg:///aiUiSettings.field.titleMaxContextMessages"/>
+                        <integerField property="titleMinAssistantMessagesTrigger"
+                                      label="msg:///aiUiSettings.field.titleMinAssistantMessagesTrigger"/>
+                    </formLayout>
+                    <formLayout id="uploadSection" dataContainer="uiSettingsDc">
+                        <responsiveSteps>
+                            <responsiveStep minWidth="0" columns="1"/>
+                        </responsiveSteps>
+                        <textField property="uploadMaxFileSizeBytes"
+                                   label="msg:///aiUiSettings.field.uploadMaxFileSizeBytes"/>
+                    </formLayout>
+                </vbox>
+            </tab>
+            <tab id="bootConfigTab" label="msg:///aiUiSettings.tab.bootConfig">
+                <vbox id="bootConfigLayout" padding="true" spacing="true" width="100%">
+                    <span id="bootConfigSnapshotNote"
+                          text="msg:///aiUiSettings.bootConfig.snapshotNote"/>
+                    <dataGrid id="bootConfigGrid" dataContainer="bootConfigDc" width="100%">
+                        <columns>
+                            <column key="key"
+                                    header="msg:///aiUiSettings.bootConfig.column.key"/>
+                            <column key="resolvedValue"
+                                    header="msg:///aiUiSettings.bootConfig.column.value"/>
+                            <column key="badge"
+                                    header="msg:///aiUiSettings.bootConfig.column.badge"/>
+                        </columns>
+                    </dataGrid>
+                </vbox>
+            </tab>
+            <tab id="secretsTab" label="msg:///aiUiSettings.tab.secrets">
+                <vbox id="secretsLayout" padding="true" spacing="true" width="100%">
+                    <dataGrid id="secretsGrid" dataContainer="secretsDc" width="100%">
+                        <columns>
+                            <column key="key"
+                                    header="msg:///aiUiSettings.secrets.column.key"/>
+                            <column key="configured"
+                                    header="msg:///aiUiSettings.secrets.column.configured"/>
+                        </columns>
+                    </dataGrid>
+                </vbox>
+            </tab>
+        </tabSheet>
         <hbox id="detailActions" spacing="true">
             <button id="saveAndCloseButton"
                     action="saveAction"
