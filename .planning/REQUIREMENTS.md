@@ -24,16 +24,20 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 - [x] **OBS-02**: Each completed turn shows a collapsed-by-default "what the agent did — N steps, total ms" disclosure listing humanized, label-only steps (KIND-keyed, never internal tool/entity names) with per-step timing and error/rollback indication; the disclosure is hidden entirely for turns with zero tool calls. A turn deep-links to its filtered audit list (`AiAuditEventListView?runId=...`).
 - [x] **OBS-04**: The observability panels are driven by the existing `StreamingEvent` flux and `AiAuditEvent` tree — no new persisted "turn" entity, no parallel state store; per-turn detail held in the panels does not accumulate unbounded in `AiChatSessionState`. New labels use `msg://` keys in all locale bundles. (Resolves the pending `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo.)
 
-### Admin Model Management
+### Admin Settings — Model Picker & Config-Knob Migration
+
+*(Section header consolidates the former "Admin Model Management" + "Admin Config-Knob Migration" sections after the 2026-05-13 Phase 16+17 merge; requirement IDs `MODEL-*`, `TEST-20`, `CFG-*`, and `SEC-08` all map to the new Phase 16.)*
+
+#### Model Picker
 
 - [ ] **MODEL-01**: In the admin Parameters/Settings view the chat-model field becomes a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
 - [ ] **MODEL-02**: The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); the curated list contains only open-weights models per the self-hostable policy and custom entry is the escape hatch. Model validity is checked at first use with a clear error surfaced, not at save time.
 - [ ] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`. All new labels use `msg://` keys in all locale bundles.
 
-### Admin Config-Knob Migration
+#### Config-Knob Migration
 
 - [ ] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
-- [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 20, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
+- [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 19, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
 - [ ] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
 
 ### Mutation Internals Hardening (Phase 11 follow-up)
@@ -95,7 +99,8 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 | A second `ChatClient` / second `ChatMemory` store | The STT path is disjoint; it never touches `ChatService` / `ChatClient` |
 | Proprietary / hosted-only models in the curated dropdown | Violates the self-hostable-open-weights policy; proprietary models are reachable only via the custom-entry escape hatch |
 | Secrets (API keys) in the admin config UI | Plaintext credentials in a DB table; secrets stay env / `application.properties`-backed (indicator-only in the UI) |
-| Migrating `ai-agent.stt.*` knobs in the Phase 17 config-knob pass | STT lands later (Phase 20); its knobs are mostly Tier-2 boot toggles / Tier-3 secrets, and the STT phase owns adding its own `store-transcript` toggle (or leaving it a property per CFG-02) |
+| Migrating `ai-agent.stt.*` knobs in the Phase 16 config-knob pass | STT lands later (Phase 19); its knobs are mostly Tier-2 boot toggles / Tier-3 secrets, and the STT phase owns adding its own `store-transcript` toggle (or leaving it a property per CFG-02) |
+| Per-tool description / per-tool `topK` / per-tool `similarityThreshold` map shape in the admin UI (jmix-ai-backend style) | Only one retriever exists today and rich `@Tool` descriptions are designed in-source (`feedback_rich_tool_descriptions.md`); promote to Backlog if/when a second retriever lands |
 | Activation of dormant seeds SEED-001 / 002 / 003 / 004 / 006 / 008 | Their documented triggers are not met; do not activate in v1.2 |
 | Phase 10 re-verification, Nyquist backfill, PKG-05 / TEST-07 clean-consumer smoke | Explicitly deferred to a later hardening pass per the 2026-05-11 decision; must not be folded into a v1.2 phase |
 | `@Transactional` on the `MutationGateChain` itself | Only `MutationSaveExecutor.save` is transactional; the chain must throw before the save crosses the transaction boundary (fail-closed) |
@@ -115,33 +120,33 @@ Which phases cover which requirements.
 | MODEL-02 | Phase 16 | Pending |
 | MODEL-03 | Phase 16 | Pending |
 | TEST-20 | Phase 16 | Pending |
-| CFG-01 | Phase 17 | Pending |
-| CFG-02 | Phase 17 | Pending |
-| CFG-03 | Phase 17 | Pending |
-| SEC-08 | Phase 17 | Pending |
-| MUT-15 | Phase 18 | Pending |
-| MUT-16 | Phase 18 | Pending |
-| MUT-17 | Phase 18 | Pending |
-| MUT-18 | Phase 18 | Pending |
-| PERF-01 | Phase 19 | Pending |
-| PERF-02 | Phase 19 | Pending |
-| PERF-03 | Phase 19 | Pending |
-| PERF-04 | Phase 19 | Pending |
-| PERF-05 | Phase 19 | Pending |
-| STT-01 | Phase 20 | Pending |
-| STT-02 | Phase 20 | Pending |
-| STT-03 | Phase 20 | Pending |
-| STT-04 | Phase 20 | Pending |
-| STT-05 | Phase 20 | Pending |
-| STT-06 | Phase 20 | Pending |
-| TEST-18 | Phase 20 | Pending |
+| CFG-01 | Phase 16 | Pending |
+| CFG-02 | Phase 16 | Pending |
+| CFG-03 | Phase 16 | Pending |
+| SEC-08 | Phase 16 | Pending |
+| MUT-15 | Phase 17 | Pending |
+| MUT-16 | Phase 17 | Pending |
+| MUT-17 | Phase 17 | Pending |
+| MUT-18 | Phase 17 | Pending |
+| PERF-01 | Phase 18 | Pending |
+| PERF-02 | Phase 18 | Pending |
+| PERF-03 | Phase 18 | Pending |
+| PERF-04 | Phase 18 | Pending |
+| PERF-05 | Phase 18 | Pending |
+| STT-01 | Phase 19 | Pending |
+| STT-02 | Phase 19 | Pending |
+| STT-03 | Phase 19 | Pending |
+| STT-04 | Phase 19 | Pending |
+| STT-05 | Phase 19 | Pending |
+| STT-06 | Phase 19 | Pending |
+| TEST-18 | Phase 19 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 29 total
-- Mapped to phases: 29 ✓ (Phase 15: 5 · Phase 16: 4 · Phase 17: 4 · Phase 18: 4 · Phase 19: 5 · Phase 20: 7)
+- Mapped to phases: 29 ✓ (Phase 15: 5 · Phase 16: 8 · Phase 17: 4 · Phase 18: 5 · Phase 19: 7)
 - Unmapped: 0
 - No orphans, no duplicates. (Future Requirements and Out of Scope sections are intentionally unmapped.)
 
 ---
 *Requirements defined: 2026-05-11*
-*Last updated: 2026-05-11 — v1.2 roadmap created (Phases 15–20 mapped); revised same day — Soniox STT moved to Phase 20 (last in milestone); phases 15–20 re-ordered/re-numbered.*
+*Last updated: 2026-05-13 — Former Phase 16 "Admin Model Management" + Phase 17 "Admin Config-Knob Migration" merged into the new Phase 16 (MODEL-* + CFG-* + SEC-08 + TEST-20 all share the same phase); former Phases 18/19/20 renumbered to 17/18/19.*
