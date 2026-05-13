@@ -1,5 +1,6 @@
 package com.vn.agent.guard;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -28,9 +29,17 @@ import java.util.List;
  */
 @ConfigurationProperties("jmix.ai-agent.guard")
 public record AiAgentGuardProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.guard.rateLimit")
         RateLimit rateLimit,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.guard.tokenBreaker")
         TokenBreaker tokenBreaker,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.guard.iterationCap")
         IterationCap iterationCap,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.guard.outputScanner")
         OutputScanner outputScanner) {
 
     /** Per-user chat rate limiter config (D-13, GUARD-04). */

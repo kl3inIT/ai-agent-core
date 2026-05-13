@@ -2,3 +2,4 @@ com.vn.autoconfigure.agent.AIAutoConfiguration
 com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration
 com.vn.autoconfigure.agent.AiToolsAutoConfiguration
 com.vn.autoconfigure.agent.AiAgentGuardAutoConfiguration
+com.vn.autoconfigure.agent.KnobInventoryAutoConfiguration

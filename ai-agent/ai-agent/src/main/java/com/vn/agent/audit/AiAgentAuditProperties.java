@@ -1,5 +1,6 @@
 package com.vn.agent.audit;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.Set;
@@ -27,7 +28,11 @@ import java.util.Set;
  */
 @ConfigurationProperties("jmix.ai-agent.audit")
 public record AiAgentAuditProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.audit.hashSensitiveFields")
         Boolean hashSensitiveFields,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.audit.sensitiveFields")
         Set<String> sensitiveFields) {
 
     /** D-18: hash-sensitive-fields defaults to enabled when key omitted. */

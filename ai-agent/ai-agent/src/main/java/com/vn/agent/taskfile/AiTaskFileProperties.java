@@ -1,5 +1,6 @@
 package com.vn.agent.taskfile;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -33,14 +34,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AiTaskFileProperties {
 
     /** TTL in seconds. Default 86400 (24h). Sentinel -1 = no TTL (skip cleanup-job purge). */
+    @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+            displayMessageKey = "bootConfig.knob.taskFile.ttlSeconds")
     private long ttlSeconds = 86_400L;
 
+    @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+            displayMessageKey = "bootConfig.knob.taskFile.maxFileSizeBytes")
     private long maxFileSizeBytes = 104_857_600L;
 
     /** Per-turn cap on file count for AiTaskFileMediaResolver. Default 10. Sentinel -1 disables. */
+    @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+            displayMessageKey = "bootConfig.knob.taskFile.perTurnMaxFiles")
     private int perTurnMaxFiles = 10;
 
     /** Per-turn cap on total Media bytes. Default 52428800 (50 MB). Sentinel -1 disables. */
+    @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+            displayMessageKey = "bootConfig.knob.taskFile.perTurnMaxTotalBytes")
     private long perTurnMaxTotalBytes = 52_428_800L;
 
     public long getTtlSeconds() {

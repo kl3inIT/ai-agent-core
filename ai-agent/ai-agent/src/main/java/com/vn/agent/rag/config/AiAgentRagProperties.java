@@ -1,5 +1,6 @@
 package com.vn.agent.rag.config;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -42,14 +43,32 @@ import java.time.Duration;
  */
 @ConfigurationProperties("jmix.ai-agent.rag")
 public record AiAgentRagProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.adminBypass")
         Boolean adminBypass,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.rag.topK")
         Integer topK,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.rag.similarityThreshold")
         Double similarityThreshold,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.splitter")
         Splitter splitter,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.embedRetry")
         EmbedRetry embedRetry,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.sampleIngester")
         SampleIngester sampleIngester,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.ingestExecutor")
         IngestExecutor ingestExecutor,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.rag.ingest")
         Ingest ingest,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.rag.upload")
         Upload upload) {
 
     private static final int DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES = 104_857_600;
