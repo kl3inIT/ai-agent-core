@@ -31,7 +31,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 #### Model Picker
 
 - [x] **MODEL-01**: In the admin Parameters/Settings view the chat-model field becomes a `ComboBox` populated from a configurable curated catalog of common self-hostable open-weights model slugs with readable labels (the default marked); selecting an item writes the existing free-text `model` value in the active `AiParameters` profile.
-- [ ] **MODEL-02**: The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); the curated list contains only open-weights models per the self-hostable policy and custom entry is the escape hatch. Model validity is checked at first use with a clear error surfaced, not at save time.
+- [x] **MODEL-02**: The same control lets an admin enter a custom model name (any string) when the desired model is not in the curated list (`ComboBox.allowCustomValue` or a "Custom…" sentinel revealing a text field); the curated list contains only open-weights models per the self-hostable policy and custom entry is the escape hatch. Model validity is checked at first use with a clear error surfaced, not at save time.
 - [x] **MODEL-03**: Model selection is admin-only — end users cannot switch model per conversation; the chosen model flows through to per-request `ChatOptions`. All new labels use `msg://` keys in all locale bundles.
 
 #### Config-Knob Migration
@@ -117,7 +117,7 @@ Which phases cover which requirements.
 | OBS-04 | Phase 15 | Complete |
 | TEST-19 | Phase 15 | Complete |
 | MODEL-01 | Phase 16 | Complete |
-| MODEL-02 | Phase 16 | Pending |
+| MODEL-02 | Phase 16 | Complete |
 | MODEL-03 | Phase 16 | Complete |
 | TEST-20 | Phase 16 | Pending |
 | CFG-01 | Phase 16 | Complete |

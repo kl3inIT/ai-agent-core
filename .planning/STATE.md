@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
-status: executing
-stopped_at: Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
-last_updated: "2026-05-13T14:53:37.552Z"
+status: ready_for_verification
+stopped_at: Phase 16 Plan 07 complete — MODEL-02 catch+reissue + user-visible fallback notification shipped (Phase 16 done)
+last_updated: "2026-05-13T15:20:48.980Z"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 13
-  completed_plans: 12
-  percent: 92
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -23,20 +23,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 16 — Admin Settings Model Picker & Config Knob Migration (Plan 04 in progress)
+**Current focus:** Phase 16 complete (all 7 plans shipped 2026-05-13) — awaiting phase-level verification before advancing to Phase 17 (mutation-internals hardening).
 
 ## Current Position
 
-Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
-Plan: 7 of 7 (Plans 01–03 complete 2026-05-13)
+Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — COMPLETE (7/7 plans)
+Plan: 7 of 7 shipped 2026-05-13
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
-Next: continue Plan 04 (AiUiSettingsResolver caller migration) → Plan 05+
+Next: phase-level verification of Phase 16, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
 | Field | Value |
 |-------|-------|
 | Milestone | v1.2 (executing) |
-| Phase | 16 (Plan 04 in progress) |
-| Status | EXECUTING |
-| Last activity | 2026-05-13 — Phase 16 Plan 04 wiring AiUiSettingsResolver into 8 caller sites |
+| Phase | 16 (complete — ready for verification) |
+| Status | READY_FOR_VERIFICATION |
+| Last activity | 2026-05-13 — Phase 16 Plan 07 (MODEL-02 catch+reissue + ChatModelFallbackAppliedEvent) shipped |
 
 ## Phase Status
 
@@ -50,8 +50,7 @@ Next: continue Plan 04 (AiUiSettingsResolver caller migration) → Plan 05+
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | Phase complete — ready for verification | 5/5 | 2026-05-11 | 2026-05-12 |
-| 16. Admin Model Management | Not started | 0/? | - | - |
-| 17. Admin Config-Knob Migration | Not started | 0/? | - | - |
+| 16. Admin Settings — Model Picker & Config-Knob Migration | Complete — ready for verification | 7/7 | 2026-05-13 | 2026-05-13 |
 | 18. Mutation-Internals Hardening (Phase 11 follow-up) | Not started | 0/? | - | - |
 | 19. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
 | 20. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
@@ -268,6 +267,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase ?]: Phase 16 Plan 05: AiParameters listener publishes on full effective-settings-transition surface including DEACTIVATION (codex HIGH #6); AiUiSettings listener guards on SINGLETON_ID (codex MEDIUM #6); test uses pure-JUnit + Mockito per Rule 3 (Phase 11/13 boot regression).
 - [Phase ?]: Plan 16-06: KnobInventoryScanner uses bean.asBindTarget().getType().resolve() since getType() is package-private
 - [Phase ?]: Plan 16-06: Long-typed Tier-1 form fields bind via <textField property=...> (Jmix 2.8 typed-text coerces String<->Long); avoid bigDecimalField/numberField/integerField type mismatch
+- [Phase ?]: Phase 16 complete — MODEL-02 catch+reissue lands user-visible notification surface; ChatModelFallbackAppliedEvent is distinct from AiSettingsChangedEvent so the single-publish-site invariant remains intact
 
 ### Performance Metrics
 
@@ -342,6 +342,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 16 P04 | ~45 min | 3 tasks | 14 files |
 | Phase 16 P05 | 25min | 3 tasks | 7 files |
 | Phase 16 P06 | 45min | 3 tasks | 20 files |
+| Phase 16 P07 | ~50 min | 2 tasks | 11 files |
 
 ### Quick Tasks Completed
 
@@ -351,7 +352,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T14:52:34.799Z
+**Last session:** 2026-05-13T15:20:11.990Z
 **Stopped at:** Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
