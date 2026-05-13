@@ -400,6 +400,34 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         }
     }
 
+    /**
+     * Phase 16 D-05 / MODEL-02 — user-visible fallback notification. Fires after
+     * {@code DefaultChatServiceImpl.executeBlockingTurn(...)} caught a bad-model failure and
+     * successfully reissued against {@code AiParametersResolver.fallbackModel()}. Filtered by
+     * the fragment's currently-attached conversation id so an unrelated chat panel does not
+     * flash the toast.
+     *
+     * <p>The locale key {@code chat.notice.modelFallbackApplied} is resolved via the
+     * Class-less {@link Messages#getMessage(String)} form so the lookup goes against the root
+     * {@code com.vn.agent} bundle (per project memory {@code feedback_jmix_messages_over_spring}).
+     * The persistent {@code chat.error.modelValidationFailure} key lands in both bundles for
+     * operator-visible documentation / audit-row context; the user-facing toast intentionally
+     * uses only the shorter notice key.
+     */
+    @EventListener
+    public void onChatModelFallbackApplied(
+            final com.vn.agent.orchestration.ChatModelFallbackAppliedEvent event) {
+        if (event.getConversationId() == null
+                || !Objects.equals(conversationId, event.getConversationId())) {
+            return;
+        }
+        accessUi(() -> notifications.create(
+                        messages.getMessage("chat.notice.modelFallbackApplied"))
+                .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                .withDuration(8000)
+                .show());
+    }
+
     private void refreshTaskFiles() {
         if (taskFilesDc == null || attachmentsEmptyState == null || attachmentsGridLayout == null) {
             return;

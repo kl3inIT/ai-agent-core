@@ -30,6 +30,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.content.Media;
+import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
@@ -97,6 +98,7 @@ class DefaultChatServiceImplStreamFallbackTest {
     private ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     private AiTaskFileMediaResolver taskFileMediaResolver;
     private AiTaskFileRepository taskFileRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     private DefaultChatServiceImpl sut;
 
@@ -125,6 +127,7 @@ class DefaultChatServiceImplStreamFallbackTest {
         titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
         taskFileMediaResolver = mock(AiTaskFileMediaResolver.class);
         taskFileRepository = mock(AiTaskFileRepository.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
 
         // ConversationGateway: return a conversation with the fixed convId for both
         // the streaming entrypoint and the blocking ask() path.
@@ -182,7 +185,8 @@ class DefaultChatServiceImplStreamFallbackTest {
                 intentRegistry,
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
-                taskFileRepository);
+                taskFileRepository,
+                eventPublisher);
     }
 
     /**
