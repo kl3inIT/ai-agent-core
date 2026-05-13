@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1.0
 milestone_name: Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (shipped 2026-05-11)
 status: Awaiting next milestone — run /gsd-new-milestone for v1.2
-stopped_at: "Phase 14 manual UAT — all 14 checks pass (driven live on localhost:8088 against a local docker Postgres)"
-last_updated: "2026-05-13T09:36:34.802Z"
+stopped_at: Phase 16 Plan 01 complete — Wave-0 foundation (event/annotation/AuditKind/AuditWriter overload + 8 @Disabled scaffolds)
+last_updated: "2026-05-13T10:03:02.091Z"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 62
-  completed_plans: 62
-  percent: 100
+  total_phases: 2
+  completed_phases: 0
+  total_plans: 7
+  completed_plans: 2
+  percent: 29
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
-Plan: 2 of 7 (Plan 01 complete 2026-05-13)
+Plan: 3 of 7 (Plan 01 complete 2026-05-13)
 Milestone: v1.1.0 — COMPLETE & ARCHIVED (2026-05-11). No active phase.
 Next: `/gsd-new-milestone` → `/gsd-review-backlog`
 | Field | Value |
@@ -224,6 +224,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 14]: Plan 14-06: Confirm rows are appended by ChatPanelFragment and delegate clicks to OpenFormWithDraftHandler; StreamEventRenderer remains navigation-free.
 - [Phase 14]: Plan 14-06: UI tests use source/XML contract checks because full Jmix UI boot remains affected by the pre-existing agentstore Spring context blocker documented in prior phase summaries.
 - [Phase 14]: Plan 14-09 is a dependent gap-closure pass for `14-VERIFICATION.md` blockers BL-02 through BL-05; BL-01 was narrowed by user correction so datasource/UI defaults stay in application.properties and only OpenRouter API key remains env-backed. It intentionally adds no new AI tool, entity table, audit kind, Jmix view/menu, or AI-specific exposure layer.
+- [Phase ?]: Plan 16-02: AiUiSettings 12-column Tier-1 schema lock + Liquibase 120 + locale parity + 8 green bean-validation tests; codex HIGH Concern #4 (distinct task-file vs RAG upload cap) honored; Rule 1 fix on AI_AGENT_AUDIT_EVENT table name; Rule 3 fix using JSR-380 Validator tests due to pre-existing Phase 11/13 boot regression
 
 ### Performance Metrics
 
@@ -287,6 +288,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 14 P07 | 46min | 3 tasks | 8 files |
 | Phase 14 P08 | 2h 29m | 5 tasks | 6 files |
 | Phase 16 P01 | ~12min | 3 tasks | 12 files | 2026-05-13
+| Phase 16 P02 | ~20 min | 3 tasks | 5 files |
 
 ### Quick Tasks Completed
 
@@ -296,7 +298,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T16:00:00.000Z
+**Last session:** 2026-05-13T10:02:21.466Z
 **Stopped at:** Phase 16 Plan 01 complete — Wave-0 foundation (event/annotation/AuditKind/AuditWriter overload + 8 @Disabled scaffolds)
 **Resume file:** None
 **Blockers:** None for Phase 14 UAT. Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md.
