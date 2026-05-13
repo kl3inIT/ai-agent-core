@@ -90,7 +90,22 @@ Plans:
   6. Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator; a documented three-tier taxonomy classifies every audited knob. (When STT ships in Phase 19, its `ai-agent.stt.enabled` / `ai-agent.stt.provider` boot toggles are added under this same Tier-2 read-only treatment.)
   7. New editable settings are persisted as fields on `AiParameters`/`AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles; an `AiParameters`/`AiUiSettings` change event is published so any cache around settings (see Phase 18) evicts — an admin edit is visible within one turn.
   8. SEC-08 — a test asserts no `*.api-key` (or other secret) property is surfaced as an editable or displayed admin setting, and boot-time `@ConditionalOnProperty` toggles are not presented as runtime-editable.
-**Plans**: TBD
+**Plans**: 7 plans
+Plans:
+**Wave 0**
+- [ ] 16-01-PLAN.md — Foundation: AiSettingsChangedEvent + KnobMetadata annotation + AuditKind.MODEL_VALIDATION_FAILURE + 7 Wave-0 test scaffolds
+
+**Wave 1** *(parallel — blocked on Wave 0)*
+- [ ] 16-02-PLAN.md — AiUiSettings schema: 11 nullable Tier-1 columns + Liquibase changelog 120 + KIND varchar(32) widening + bean-validation test
+- [ ] 16-03-PLAN.md — Curated catalog: ChatModelCatalog + SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST + module.properties seed + TEST-20
+
+**Wave 2** *(blocked on Wave 1)*
+- [ ] 16-04-PLAN.md — AiUiSettingsResolver + 10 caller injections + read-through fallthrough test + sentinel-survives test
+- [ ] 16-05-PLAN.md — Entity listeners (AiParametersEntityListener + AiUiSettingsEntityListener) + modelField ComboBox swap + single-publish-site invariant test
+
+**Wave 3** *(blocked on Wave 2)*
+- [ ] 16-06-PLAN.md — @KnobMetadata annotation pass on 10 records + KnobInventoryScanner (starter) + AiUiSettingsDetailView tier1/bootConfig/secrets tabs + SEC-08 + KnobInventoryClassificationTest
+- [ ] 16-07-PLAN.md — DefaultChatServiceImpl catch+reissue at executeBlockingTurn + AuditKind.MODEL_VALIDATION_FAILURE audit emission + fallbackModel() accessor + locale notification keys
 **UI hint**: yes
 
 ### Phase 17: Mutation-Internals Hardening (Phase 11 follow-up)

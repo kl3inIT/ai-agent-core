@@ -2,8 +2,8 @@
 phase: 16
 slug: admin-settings-model-picker-config-knob-migration
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: false  # Plan 16-01 scaffolds Wave 0; flips true after 16-01 execution
 created: 2026-05-13
 ---
 
@@ -40,7 +40,25 @@ created: 2026-05-13
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | _TBD_ | ⬜ pending |
+| 16-01-T1 | 16-01 | 0 | MODEL-02,CFG-03,SEC-08 | T-16-02,T-16-04 | Event + annotation + audit kind types compile | unit | ./gradlew :ai-agent:compileJava | scaffold | ⬜ pending |
+| 16-01-T2 | 16-01 | 0 | MODEL-02,CFG-03,SEC-08,TEST-20 | — | 7 test scaffolds compile and fail() with named owner plans | unit | ./gradlew :ai-agent:compileTestJava | scaffold | ⬜ pending |
+| 16-02-T1 | 16-02 | 1 | CFG-01,CFG-03 | T-16-02 | 11 nullable columns with @Min/@Max + field-name-matching setters (Pitfall 1) | unit | ./gradlew :ai-agent:compileJava | yes | ⬜ pending |
+| 16-02-T2 | 16-02 | 1 | CFG-03 | T-16-04 | Liquibase 120 additive: 11 columns + KIND varchar(32); 080 byte-identical | integration | ./gradlew :ai-agent:test --tests "*ApplicationContextTest*" | yes | ⬜ pending |
+| 16-02-T3 | 16-02 | 1 | CFG-01,CFG-03 | T-16-02 | Per-knob out-of-range save throws ConstraintViolationException; locale parity holds | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.AiUiSettingsBeanValidationTest" | yes | ⬜ pending |
+| 16-03-T1 | 16-03 | 1 | MODEL-01 | — | ChatModelCatalogProperties + AdminSecretPatternProperties bind | unit | ./gradlew :ai-agent:compileJava | yes | ⬜ pending |
+| 16-03-T2 | 16-03 | 1 | MODEL-01,TEST-20 | T-16-06 | Catalog seed validates exactly-one-default + drift gate at boot | integration | ./gradlew :ai-agent:test --tests "*ApplicationContextTest*" | yes | ⬜ pending |
+| 16-03-T3 | 16-03 | 1 | TEST-20 | T-16-06 | Catalog ⊆ allowlist + drift assertion green | unit | ./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.ChatModelCatalogAllowlistTest" | yes | ⬜ pending |
+| 16-04-T1 | 16-04 | 2 | CFG-01 | T-16-05 | Resolver loads singleton via UnconstrainedDataManager + 11 typed resolveXxx with property fallback | unit | ./gradlew :ai-agent:compileJava | yes | ⬜ pending |
+| 16-04-T2 | 16-04 | 2 | CFG-01 | — | 10 callers inject resolver; existing Phase 9/10/11/12/13/13.1 suites pass unchanged | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.tools.mutation.*" | yes | ⬜ pending |
+| 16-04-T3 | 16-04 | 2 | CFG-01 | — | DB→property→constant fall-through per cluster + sentinel -1 survives source swap (Phase 13.1 invariant) | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.AiUiSettingsResolverReadThroughTest" --tests "com.vn.agent.taskfile.TtlConfigSentinelSurvivesAiUiSettingsTest" | yes | ⬜ pending |
+| 16-05-T1 | 16-05 | 2 | CFG-03 | Twin-publisher(R2) | Single publish site per entity; active=true guard for PARAMETERS | unit | ./gradlew :ai-agent:compileJava | yes | ⬜ pending |
+| 16-05-T2 | 16-05 | 2 | MODEL-01,MODEL-03 | T-16-05 | ComboBox allowCustomValue + setItems + label generator + CustomValueSetEvent wire | unit | ./gradlew :ai-agent:test --tests "*Parameters*" | yes | ⬜ pending |
+| 16-05-T3 | 16-05 | 2 | CFG-03 | Twin-publisher(R2) | Active save → 1 event, inactive → 0, UI-settings → 1; source-scan: only 2 listener classes publish | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.AiSettingsChangedEventListenerInvariantTest" | yes | ⬜ pending |
+| 16-06-T1 | 16-06 | 3 | CFG-02 | T-16-01,T-16-02 | @KnobMetadata on 10 records; KnobInventoryScanner @EventListener(ApplicationReadyEvent) in starter | unit | ./gradlew :ai-agent:compileJava :ai-agent-starter:compileJava | yes | ⬜ pending |
+| 16-06-T2 | 16-06 | 3 | CFG-02,CFG-01 | T-16-01,T-16-02 | tier1KnobsTab + bootConfigTab + secretsTab via @Supply renderers; raw secret value NEVER reaches DOM | integration | ./gradlew :ai-agent:test --tests "*AiUiSettings*" | yes | ⬜ pending |
+| 16-06-T3 | 16-06 | 3 | SEC-08,CFG-02 | T-16-01,T-16-02,Twin-publisher | SEC-08 three legs + KnobInventoryClassificationTest pass; locale parity | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.SecretRedactionInvariantsTest" --tests "com.vn.agent.admin.config.KnobInventoryClassificationTest" | yes | ⬜ pending |
+| 16-07-T1 | 16-07 | 3 | MODEL-02 | T-16-03 | fallbackModel() returns defaults.model() (loop avoidance) | unit | ./gradlew :ai-agent:compileJava | yes | ⬜ pending |
+| 16-07-T2 | 16-07 | 3 | MODEL-02,MODEL-03 | T-16-03,T-16-04 | Catch+reissue with classifier (status ∈ {400,404,422} + "model" substring); 2 audit rows share runId; profile unmutated; 5xx propagates | integration | ./gradlew :ai-agent:test --tests "com.vn.agent.DefaultChatServiceImplModelValidationFallbackTest" --tests "com.vn.agent.DefaultChatServiceImplStreamFallbackTest" | yes | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -90,4 +108,4 @@ created: 2026-05-13
 - [ ] Feedback latency < 30s per task (Jmix `@JmixTest` boots are amortised across class loads)
 - [ ] `nyquist_compliant: true` set in frontmatter after planner finalises the per-task verification map.
 
-**Approval:** pending
+**Approval:** approved 2026-05-13 by planner
