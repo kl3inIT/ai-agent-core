@@ -1,7 +1,7 @@
 package com.vn.agent.admin.config;
 
 import com.vn.agent.entity.AiParameters;
-import io.jmix.core.DataManager;
+import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.event.AttributeChanges;
 import io.jmix.core.event.EntityChangedEvent;
 import org.springframework.context.ApplicationEventPublisher;
@@ -45,10 +45,16 @@ public class AiParametersEntityListener {
     private static final String ACTIVE_ATTRIBUTE = "active";
 
     private final ApplicationEventPublisher eventPublisher;
-    private final DataManager dataManager;
+    // WR-03: the re-read decides whether the system publishes a system-internal
+    // event for cache eviction. It must NOT be gated by the current user's READ
+    // policy on AiParameters — a future Liquibase / system seeder save with no
+    // SecurityContext would otherwise return null from constrained DataManager
+    // and silently suppress the event. Mirrors the AiExposureRuleEntityListener
+    // precedent (Plan 10-06 R2) for the same re-read pattern.
+    private final UnconstrainedDataManager dataManager;
 
     public AiParametersEntityListener(ApplicationEventPublisher eventPublisher,
-                                      DataManager dataManager) {
+                                      UnconstrainedDataManager dataManager) {
         this.eventPublisher = eventPublisher;
         this.dataManager = dataManager;
     }

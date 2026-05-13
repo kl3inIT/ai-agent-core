@@ -2,9 +2,9 @@ package com.vn.agent.admin.config;
 
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiUiSettings;
-import io.jmix.core.DataManager;
 import io.jmix.core.FluentLoader;
 import io.jmix.core.Id;
+import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.event.AttributeChanges;
 import io.jmix.core.event.EntityChangedEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +66,7 @@ class AiSettingsChangedEventListenerInvariantTest {
     private static final UUID PARAMETERS_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
     private ApplicationEventPublisher publisher;
-    private DataManager dataManager;
+    private UnconstrainedDataManager dataManager;
     private AiParametersEntityListener parametersListener;
     private AiUiSettingsEntityListener uiSettingsListener;
 
@@ -74,7 +74,7 @@ class AiSettingsChangedEventListenerInvariantTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     void setUp() {
         publisher = mock(ApplicationEventPublisher.class);
-        dataManager = mock(DataManager.class);
+        dataManager = mock(UnconstrainedDataManager.class);
 
         // Default: any AiParameters load returns empty. Individual tests rewire to
         // return a stub row when the listener must re-read the current `active` value.
