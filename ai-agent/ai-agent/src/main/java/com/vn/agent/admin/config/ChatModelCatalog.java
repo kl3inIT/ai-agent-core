@@ -53,8 +53,14 @@ public class ChatModelCatalog {
     private final ChatModelCatalogProperties properties;
     private final AiAgentDefaultsProperties defaults;
 
-    private List<Entry> entries;
-    private Entry defaultEntry;
+    // WR-05: volatile + List.copyOf at assignment point. Spring's singleton publication
+    // typically provides happens-before publication for the bean reference, but if a
+    // future change ever re-invokes validate() (reload hook, custom @EventListener),
+    // unsynchronised readers iterating `entries` in findById(...) would see torn state.
+    // volatile ensures safe publication of subsequent assignments; List.copyOf at the
+    // assignment point yields an immutable snapshot.
+    private volatile List<Entry> entries;
+    private volatile Entry defaultEntry;
 
     public ChatModelCatalog(ChatModelCatalogProperties properties,
                             AiAgentDefaultsProperties defaults) {
@@ -107,13 +113,18 @@ public class ChatModelCatalog {
                             "' (drift gate — SPEC criterion 4 / RESEARCH §7).");
         }
 
-        this.entries = raw.stream()
+        // WR-05 — List.copyOf wraps the stream result so the field publishes an immutable
+        // snapshot. Set defaultEntry BEFORE entries to keep readers consistent: a reader
+        // that observes the new entries list also observes a matching defaultEntry, never
+        // a stale one pointing into the previous list.
+        List<Entry> nextEntries = List.copyOf(raw.stream()
                 .map(e -> new Entry(e.id(), e.labelMessageKey(), Boolean.TRUE.equals(e.isDefault())))
-                .toList();
-        this.defaultEntry = entries.stream()
+                .toList());
+        this.defaultEntry = nextEntries.stream()
                 .filter(Entry::isDefault)
                 .findFirst()
                 .orElseThrow();
+        this.entries = nextEntries;
     }
 
     /** Immutable, ordered list of catalog rows. Source ordering preserved from properties. */
