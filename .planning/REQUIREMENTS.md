@@ -36,7 +36,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 #### Config-Knob Migration
 
-- [ ] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
+- [x] **CFG-01**: Operator-relevant runtime-tunable prior-phase knobs — RAG `top-k`, RAG similarity threshold, task-file token budget, task-file TTL, and any other Tier-1 knobs identified by the audit — become editable in the admin UI, read fresh on each retrieval/turn, and take effect on the next turn without a restart, via the existing `AiParametersResolver`-style read-through (prefer the `AiParameters` / `AiUiSettings` value, fall back to the `module.properties` default). The strict `default-params.yaml` seed stays strict.
 - [ ] **CFG-02**: Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`; when STT ships in Phase 19, also `ai-agent.stt.enabled` / `ai-agent.stt.provider`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator. A documented three-tier taxonomy (runtime-editable → migrate; boot/wiring → read-only with note; secret → indicator only) classifies every audited knob.
 - [ ] **CFG-03**: New editable settings are persisted as fields on `AiParameters` / `AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles. An `AiParameters` / `AiUiSettings` change event is published so any cache around settings (see PERF) evicts — an admin edit is visible within one turn.
 
@@ -120,7 +120,7 @@ Which phases cover which requirements.
 | MODEL-02 | Phase 16 | Pending |
 | MODEL-03 | Phase 16 | Pending |
 | TEST-20 | Phase 16 | Pending |
-| CFG-01 | Phase 16 | Pending |
+| CFG-01 | Phase 16 | Complete |
 | CFG-02 | Phase 16 | Pending |
 | CFG-03 | Phase 16 | Pending |
 | SEC-08 | Phase 16 | Pending |

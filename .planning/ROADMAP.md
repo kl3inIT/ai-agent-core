@@ -93,14 +93,14 @@ Plans:
 **Plans**: 7 plans
 Plans:
 **Wave 0**
-- [ ] 16-01-PLAN.md — Foundation: AiSettingsChangedEvent + KnobMetadata annotation + AuditKind.MODEL_VALIDATION_FAILURE + 7 Wave-0 test scaffolds
+- [x] 16-01-PLAN.md — Foundation: AiSettingsChangedEvent + KnobMetadata annotation + AuditKind.MODEL_VALIDATION_FAILURE + 7 Wave-0 test scaffolds
 
 **Wave 1** *(parallel — blocked on Wave 0)*
-- [ ] 16-02-PLAN.md — AiUiSettings schema: 11 nullable Tier-1 columns + Liquibase changelog 120 + KIND varchar(32) widening + bean-validation test
-- [ ] 16-03-PLAN.md — Curated catalog: ChatModelCatalog + SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST + module.properties seed + TEST-20
+- [x] 16-02-PLAN.md — AiUiSettings schema: 11 nullable Tier-1 columns + Liquibase changelog 120 + KIND varchar(32) widening + bean-validation test
+- [x] 16-03-PLAN.md — Curated catalog: ChatModelCatalog + SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST + module.properties seed + TEST-20
 
 **Wave 2** *(blocked on Wave 1)*
-- [ ] 16-04-PLAN.md — AiUiSettingsResolver + 10 caller injections + read-through fallthrough test + sentinel-survives test
+- [x] 16-04-PLAN.md — AiUiSettingsResolver + 10 caller injections + read-through fallthrough test + sentinel-survives test
 - [ ] 16-05-PLAN.md — Entity listeners (AiParametersEntityListener + AiUiSettingsEntityListener) + modelField ComboBox swap + single-publish-site invariant test
 
 **Wave 3** *(blocked on Wave 2)*
@@ -160,7 +160,7 @@ Plans:
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | v1.1.0 | 7/7 | Shipped | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
-| 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 0/? | Not started | - |
+| 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 4/7 | In Progress|  |
 | 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 0/? | Not started | - |
 | 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 0/? | Not started | - |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |

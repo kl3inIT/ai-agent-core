@@ -3,15 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: executing
-stopped_at: Phase 16 Plan 04 in progress — AiUiSettingsResolver wired to 8 caller sites (16-04)
-last_updated: "2026-05-13T10:13:58.192Z"
-last_activity: 2026-05-13 -- Phase 16 Plan 04 wiring (AiUiSettingsResolver caller migration)
+stopped_at: Phase 16 Plan 04 in progress — AiUiSettingsResolver wired to 8 caller sites
+last_updated: "2026-05-13T14:03:19.106Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 13
-  completed_plans: 9
-  percent: 69
+  completed_plans: 10
+  percent: 77
 ---
 
 # Project State
@@ -29,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — EXECUTING
-Plan: 4 of 7 (Plans 01–03 complete 2026-05-13)
+Plan: 5 of 7 (Plans 01–03 complete 2026-05-13)
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: continue Plan 04 (AiUiSettingsResolver caller migration) → Plan 05+
 | Field | Value |
@@ -265,6 +264,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase 15]: Plan 15-03: SIDEBAR chat surface mounted by ChatSurfaceMounter through a new lean Jmix host view `AiAgentSidebarView` (`@ViewController("AiAgent_Sidebar")`, `ai-agent-sidebar-view.xml` = a single `<fragment id=chatPanelFragment class=...ChatPanelFragment/>` — NO new fragment subclass; syncs `setConversationId` from `AiChatSessionState` on BeforeShow/Ready, mirroring ChatDialogView). The host view is created via `views.create(AiAgentSidebarView.class)` and SHOWN via `views.create(...)` + `panelDiv.getElement().appendChild(sidebarView.getElement())` + `ViewControllerUtils.fireEvent(new View.BeforeShowEvent(v))` then `ViewControllerUtils.fireEvent(new View.ReadyEvent(v))` (chosen over a DialogWindow wrapper — the `<vaadin-dialog>` overlay doesn't live inside an arbitrary Div and brings modality machinery; the `fireEvent` path drives the non-routed view's lifecycle and ReadyEvent propagates to the fragment's `@Subscribe onReady` via `Fragment.onHostReadyInternal`; no modal curtain). The panel is a `position:fixed` `Div.ai-agent-sidebar` appended to `UI.getCurrent().getElement()` (NOT the AppLayout content slot — survives navigation; re-asserted on `AfterNavigationEvent` along with the push class + toggle visibility), containing a `Div.ai-agent-sidebar__header` close button + the host view. A far-right navbar toggle `aiAgentSidebarToggleButton` (VaadinIcon.PANEL, LUMO_TERTIARY+LUMO_ICON, `aria-pressed` + `.ai-agent-sidebar-toggle--active`) and the in-panel closer both route through one `toggleSidebar(ui)` (flips `--open` + `ai-agent-content--pushed` + `--active` + `aria-pressed` + the toggle's `aria-label` together). Sidebar state (panelDiv / sidebarHostView / toggleButton / sidebarOpen) lives on the per-UI `MountedChatSurfaceState` — `AiChatUIState.java` left untouched. Gating: `shouldShowSidebar(settings, permitted)` = `getEnabledSurfaceSet().contains(SIDEBAR) && isSidebarViewPermitted()` where `isSidebarViewPermitted()` = `UiShowViewContext("AiAgent_Sidebar")` + `accessManager.applyRegisteredConstraints`; disabled/not-permitted = mount-always-then-`setVisible(false)` (mirrors the magic header button — RESEARCH Open Q3). `AiAgent_Sidebar` view id added to AiAgentUserRole.userViews() + AiAgentAdminRole.adminViews(). `@CssImport("./styles/ai-agent-chat.css")` moved onto ChatPanelFragment (REVIEWS #5). CSS (Task 2): `.ai-agent-sidebar` width `clamp(640px, 32vw, 760px)`, `top: var(--lumo-size-xl, 3.5rem)`, `display:none` default; `.ai-agent-sidebar--open`; `.ai-agent-sidebar__header`; `.ai-agent-content--pushed`; `.ai-agent-sidebar-toggle--active`; `@media (max-width: 768px)` → 100vw overlay + push dropped. SURF-11 holds via same `ChatPanelFragment` CLASS + singleton `ChatService` bean + `AiChatSessionState.currentConversationId` continuity.
 - [Phase 15]: Plan 15-04: in-fragment observability. Status line (OBS-01) `<span class="ai-agent-status" role="status" aria-live="polite">` appended after `<vaadin-message-list>`; neutral typing indicator at turn start, flips to CHAT on the FIRST `Content` event, TOOL/RETRIEVAL on `Activity` events; `removeStatusRow()` in every teardown site. Per-turn tool-detail `Details` (OBS-02) — one ordered `Div.ai-agent-turn-activity` holds collapsed-by-default `<vaadin-details>` per turn with ≥1 tool call; label-only KIND-keyed step rows via `TurnDetailRenderer` with per-step ms + an error/rollback indicator. Live turn: `ToolCall`/`ToolResult` (dedup by `toolCallId`)/`Activity(RETRIEVAL)` accumulate into per-fragment `liveTurnSteps` capped at 50; on `Final` the disclosure's timings come from a lazy `loadTurnSteps` read. Post-navigation `correlateHistoryTurnDetails` loads the conversation's CHAT-root `runId`s + each root's child count via TWO narrow raw-JPQL `loadValues` with `.store("agentstore")` (raw `loadValues` does NOT infer the agentstore store — project memory `feedback_jmix_loadvalue_store`). All three audit reads use `UnconstrainedDataManager` with a MANDATORY ownership filter.
 - [Phase 15]: Plan 15-05 (Phase 15 close): cross-cutting tests + folded-todo move. `ObservabilityLeakTest` (TEST-19, D-09) reuses the Phase 9 `TOOL_NAME_LEAK` / `HOST_PREFIX_LEAK` pattern packs VERBATIM against both `TurnDetailRenderer` mapper output and a REAL rendered `ChatPanelFragment`. `ObservabilityMessagesCompletenessTest` — all 15 new Phase-15 `msg://` keys resolve non-blank in both locale bundles. `NoNewPersistedStateTest` (OBS-04) asserts the negative via THREE checks — no Phase-15-named `.xml` under `**/liquibase/**`, no `<include file=>` in agentstore-changelog.xml / changelog.xml, no `@Table(name=...)` under `com/vn/agent/entity` containing `TURN`/`ACTIVITY`/`DISCLOSURE`. The 2026-04-26 collapsible-tool-detail todo moved `pending/` → `done/`. `:ai-agent:ai-agent:test` green.
+- [Phase ?]: Plan 16-04: AiUiSettingsResolver shipped + 8 caller sites wired; refined plan-listed 10-caller list to actual 8 consumers via pre-edit code scout (codex MEDIUM Concern #5). Resolver mirrors AiParametersResolver shape exactly via UnconstrainedDataManager singleton load (Pitfall 3), 12 typed resolveXxx methods (codex HIGH Concern #5 split — task-file vs RAG upload caps DISTINCT), try/catch RuntimeException + WARN log Pattern C resilience. MutationIntentRepository / MutationSaveExecutor / KnowledgeDocumentUploadService / BuiltInDataTools / ToolEntityResolver DROPPED (don't consume knobs); StructuredFilterConditionMapper / KnowledgeBaseView ADDED. Mutation idempotency TTL Duration coercion in BuiltInMutationTools.resolveIdempotencyTtl per opencode Concern #4 + Suggestion #5. Two scaffolds green via Mockito workaround for Phase 11/13 boot regression; 3 Rule 1 caller-test fixes.
 
 ### Performance Metrics
 
@@ -336,6 +336,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 16 P01 | ~12min | 3 tasks | 12 files | 2026-05-13
 | Phase 16 P02 | ~20 min | 3 tasks | 5 files |
 | Phase 16 P03 | ~12 min | 3 tasks | 5 files |
+| Phase 16 P04 | ~45 min | 3 tasks | 14 files |
 
 ### Quick Tasks Completed
 
@@ -345,9 +346,9 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T10:13:42.249Z
+**Last session:** 2026-05-13T14:02:51.543Z
 **Stopped at:** Phase 16 Plan 04 in progress — AiUiSettingsResolver wired to 8 caller sites
-**Resume file:** .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-04-PLAN.md
+**Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** Pop stash → continue Phase 16 Plan 04 wiring + tests → Plan 05+.
