@@ -3,9 +3,7 @@ package com.vn.agent.security;
 import com.vn.agent.AITestConfiguration;
 import io.jmix.core.AccessManager;
 import io.jmix.core.security.SystemAuthenticator;
-import io.jmix.flowui.accesscontext.UiMenuContext;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
-import io.jmix.flowui.menu.MenuItem;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -33,22 +31,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class AdminViewAccessTest {
 
-    private static final String AI_UI_SETTINGS_MENU_ID = "aiAgent.uiSettings";
-
     @Autowired AccessManager accessManager;
     @Autowired SystemAuthenticator systemAuthenticator;
 
     private boolean permittedFor(String username, String viewId) {
         return systemAuthenticator.withUser(username, () -> {
             UiShowViewContext accessContext = new UiShowViewContext(viewId);
-            accessManager.applyRegisteredConstraints(accessContext);
-            return accessContext.isPermitted();
-        });
-    }
-
-    private boolean uiSettingsMenuPermittedFor(String username) {
-        return systemAuthenticator.withUser(username, () -> {
-            UiMenuContext accessContext = new UiMenuContext(new MenuItem(AI_UI_SETTINGS_MENU_ID));
             accessManager.applyRegisteredConstraints(accessContext);
             return accessContext.isPermitted();
         });
@@ -85,19 +73,9 @@ class AdminViewAccessTest {
     }
 
     @Test
-    void deniesAiUiSettingsForNonAdmin() {
-        assertThat(permittedFor("alice", "AiAgent_AiUiSettings.detail"))
-                .as("Non-admin must NOT see AI UI settings").isFalse();
-        assertThat(uiSettingsMenuPermittedFor("alice"))
-                .as("Non-admin must NOT see AI UI settings menu item").isFalse();
-    }
-
-    @Test
     void allowsAdminViewsForAdmin() {
         assertThat(permittedFor("admin", "AiAgent_ChatDialog")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_Configuration")).isTrue();
-        assertThat(permittedFor("admin", "AiAgent_AiUiSettings.detail")).isTrue();
-        assertThat(uiSettingsMenuPermittedFor("admin")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();
