@@ -7,6 +7,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.router.Route;
+import com.vn.agent.admin.config.AiKnobDefaults;
 import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiUiSettings;
@@ -32,12 +33,14 @@ import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.list.CreateAction;
 import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.action.list.RemoveAction;
+import io.jmix.flowui.component.checkbox.JmixCheckbox;
 import io.jmix.flowui.component.checkboxgroup.JmixCheckboxGroup;
 import io.jmix.flowui.component.codeeditor.CodeEditor;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.component.multiselectcombobox.JmixMultiSelectComboBox;
 import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.textfield.TypedTextField;
+import io.jmix.flowui.component.textfield.JmixIntegerField;
 import io.jmix.flowui.kit.action.ActionPerformedEvent;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.DefaultMainViewParent;
@@ -102,6 +105,31 @@ public class AiConfigurationView extends StandardView {
     @ViewComponent
     private JmixRadioButtonGroup<AiChatSurface> defaultSurfaceField;
 
+    @ViewComponent
+    private TypedTextField<String> taskFileTtlSecondsField;
+    @ViewComponent
+    private JmixIntegerField taskFilePerTurnMaxFilesField;
+    @ViewComponent
+    private TypedTextField<String> taskFilePerTurnMaxTotalBytesField;
+    @ViewComponent
+    private TypedTextField<String> taskFileMaxFileSizeBytesField;
+    @ViewComponent
+    private JmixCheckbox mutationConfirmationRequiredField;
+    @ViewComponent
+    private TypedTextField<String> mutationIdempotencyTtlSecondsField;
+    @ViewComponent
+    private JmixIntegerField mutationBulkMaxRowsField;
+    @ViewComponent
+    private JmixIntegerField promptEntityInventoryLimitField;
+    @ViewComponent
+    private JmixIntegerField toolsMaxFilterDepthField;
+    @ViewComponent
+    private JmixIntegerField titleMaxContextMessagesField;
+    @ViewComponent
+    private JmixIntegerField titleMinAssistantMessagesTriggerField;
+    @ViewComponent
+    private TypedTextField<String> uploadMaxFileSizeBytesField;
+
     @Autowired
     private ParametersService parametersService;
     @Autowired
@@ -118,6 +146,8 @@ public class AiConfigurationView extends StandardView {
     private MetaclassComboBoxHelper metaclassComboBoxHelper;
     @Autowired
     private AiUiSettingsService uiSettingsService;
+    @Autowired
+    private AiKnobDefaults knobDefaults;
     @Autowired
     private MessageTools messageTools;
     @Autowired
@@ -146,6 +176,8 @@ public class AiConfigurationView extends StandardView {
         enabledSurfacesField.setItemLabelGenerator(messages::getMessage);
         defaultSurfaceField.setItems(AiChatSurface.class);
         defaultSurfaceField.setItemLabelGenerator(messages::getMessage);
+
+        applyTier1DefaultHints();
     }
 
     @Subscribe
@@ -153,6 +185,7 @@ public class AiConfigurationView extends StandardView {
         refreshExposureSelection();
         refreshBaselinePreview();
         refreshGeneralSelection();
+        refreshTier1Selection();
     }
 
     @Subscribe(id = "parametersDl", target = Target.DATA_LOADER)
@@ -269,6 +302,61 @@ public class AiConfigurationView extends StandardView {
         refreshGeneralSelection();
     }
 
+    @Subscribe("saveTier1Button")
+    public void onSaveTier1ButtonClick(final ClickEvent<Button> event) {
+        Long taskFileTtl;
+        Integer taskFilePerTurnMaxFiles;
+        Long taskFilePerTurnMaxTotalBytes;
+        Long taskFileMaxFileSize;
+        Long mutationIdempotencyTtl;
+        Long uploadMaxFileSize;
+        try {
+            taskFileTtl = parseNullableLong(taskFileTtlSecondsField.getValue(),
+                    "aiUiSettings.field.taskFileTtlSeconds");
+            taskFilePerTurnMaxFiles = taskFilePerTurnMaxFilesField.getValue();
+            taskFilePerTurnMaxTotalBytes = parseNullableLong(taskFilePerTurnMaxTotalBytesField.getValue(),
+                    "aiUiSettings.field.taskFilePerTurnMaxTotalBytes");
+            taskFileMaxFileSize = parseNullableLong(taskFileMaxFileSizeBytesField.getValue(),
+                    "aiUiSettings.field.taskFileMaxFileSizeBytes");
+            mutationIdempotencyTtl = parseNullableLong(mutationIdempotencyTtlSecondsField.getValue(),
+                    "aiUiSettings.field.mutationIdempotencyTtlSeconds");
+            uploadMaxFileSize = parseNullableLong(uploadMaxFileSizeBytesField.getValue(),
+                    "aiUiSettings.field.uploadMaxFileSizeBytes");
+        } catch (NumberFormatException invalid) {
+            notifyGeneralError("aiUiSettings.tier1.error.notANumber");
+            return;
+        }
+        currentUiSettings.setTaskFileTtlSeconds(taskFileTtl);
+        currentUiSettings.setTaskFilePerTurnMaxFiles(taskFilePerTurnMaxFiles);
+        currentUiSettings.setTaskFilePerTurnMaxTotalBytes(taskFilePerTurnMaxTotalBytes);
+        currentUiSettings.setTaskFileMaxFileSizeBytes(taskFileMaxFileSize);
+        currentUiSettings.setMutationConfirmationRequired(mutationConfirmationRequiredField.getValue());
+        currentUiSettings.setMutationIdempotencyTtlSeconds(mutationIdempotencyTtl);
+        currentUiSettings.setMutationBulkMaxRows(mutationBulkMaxRowsField.getValue());
+        currentUiSettings.setPromptEntityInventoryLimit(promptEntityInventoryLimitField.getValue());
+        currentUiSettings.setToolsMaxFilterDepth(toolsMaxFilterDepthField.getValue());
+        currentUiSettings.setTitleMaxContextMessages(titleMaxContextMessagesField.getValue());
+        currentUiSettings.setTitleMinAssistantMessagesTrigger(titleMinAssistantMessagesTriggerField.getValue());
+        currentUiSettings.setUploadMaxFileSizeBytes(uploadMaxFileSize);
+
+        try {
+            currentUiSettings = uiSettingsService.save(currentUiSettings);
+            refreshTier1Selection();
+            notifications.create(messages.getMessage("aiUiSettingsDetail.notification.saved"))
+                    .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
+                    .show();
+        } catch (Exception ex) {
+            log.warn("Unable to save Tier-1 AI UI settings", ex);
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "aiUiSettingsDetail.notification.saveError", ex);
+        }
+    }
+
+    @Subscribe("resetTier1Button")
+    public void onResetTier1ButtonClick(final ClickEvent<Button> event) {
+        refreshTier1Selection();
+    }
+
     private void onParameterRowAction(AiParameters row, ActionColumnType type) {
         parametersDataGrid.select(row);
         switch (type) {
@@ -343,6 +431,75 @@ public class AiConfigurationView extends StandardView {
                 ? EnumSet.noneOf(AiChatSurface.class)
                 : EnumSet.copyOf(enabled));
         defaultSurfaceField.setValue(currentUiSettings.getDefaultSurface());
+    }
+
+    private void refreshTier1Selection() {
+        if (currentUiSettings == null) {
+            currentUiSettings = uiSettingsService.loadCurrent();
+        }
+        taskFileTtlSecondsField.setValue(longToText(currentUiSettings.getTaskFileTtlSeconds()));
+        taskFilePerTurnMaxFilesField.setValue(currentUiSettings.getTaskFilePerTurnMaxFiles());
+        taskFilePerTurnMaxTotalBytesField.setValue(longToText(currentUiSettings.getTaskFilePerTurnMaxTotalBytes()));
+        taskFileMaxFileSizeBytesField.setValue(longToText(currentUiSettings.getTaskFileMaxFileSizeBytes()));
+        mutationConfirmationRequiredField.setValue(
+                currentUiSettings.getMutationConfirmationRequired() != null
+                        && currentUiSettings.getMutationConfirmationRequired());
+        mutationIdempotencyTtlSecondsField.setValue(longToText(currentUiSettings.getMutationIdempotencyTtlSeconds()));
+        mutationBulkMaxRowsField.setValue(currentUiSettings.getMutationBulkMaxRows());
+        promptEntityInventoryLimitField.setValue(currentUiSettings.getPromptEntityInventoryLimit());
+        toolsMaxFilterDepthField.setValue(currentUiSettings.getToolsMaxFilterDepth());
+        titleMaxContextMessagesField.setValue(currentUiSettings.getTitleMaxContextMessages());
+        titleMinAssistantMessagesTriggerField.setValue(currentUiSettings.getTitleMinAssistantMessagesTrigger());
+        uploadMaxFileSizeBytesField.setValue(longToText(currentUiSettings.getUploadMaxFileSizeBytes()));
+    }
+
+    private void applyTier1DefaultHints() {
+        applyDefaultHint(taskFileTtlSecondsField, String.valueOf(knobDefaults.taskFileTtlSeconds()));
+        applyDefaultHint(taskFilePerTurnMaxFilesField, String.valueOf(knobDefaults.taskFilePerTurnMaxFiles()));
+        applyDefaultHint(taskFilePerTurnMaxTotalBytesField, String.valueOf(knobDefaults.taskFilePerTurnMaxTotalBytes()));
+        applyDefaultHint(taskFileMaxFileSizeBytesField, String.valueOf(knobDefaults.taskFileMaxFileSizeBytes()));
+        applyDefaultHint(mutationConfirmationRequiredField, String.valueOf(knobDefaults.mutationConfirmationRequired()));
+        applyDefaultHint(mutationIdempotencyTtlSecondsField, String.valueOf(knobDefaults.mutationIdempotencyTtlSeconds()));
+        applyDefaultHint(mutationBulkMaxRowsField, String.valueOf(knobDefaults.mutationBulkMaxRows()));
+        applyDefaultHint(promptEntityInventoryLimitField, String.valueOf(knobDefaults.promptEntityInventoryLimit()));
+        applyDefaultHint(toolsMaxFilterDepthField, String.valueOf(knobDefaults.toolsMaxFilterDepth()));
+        applyDefaultHint(titleMaxContextMessagesField, String.valueOf(knobDefaults.titleMaxContextMessages()));
+        applyDefaultHint(titleMinAssistantMessagesTriggerField, String.valueOf(knobDefaults.titleMinAssistantMessagesTrigger()));
+        applyDefaultHint(uploadMaxFileSizeBytesField, String.valueOf(knobDefaults.uploadMaxFileSizeBytes()));
+    }
+
+    /**
+     * Stamps placeholder + helperText on a Tier-1 input so admins see the
+     * resolver fallback value when a field is empty. Saving an empty field
+     * persists {@code null} so future default changes flow through.
+     */
+    private void applyDefaultHint(com.vaadin.flow.component.AbstractField<?, ?> field, String defaultText) {
+        String helper = messages.formatMessage("", "aiUiSettings.tier1.helper.default", defaultText);
+        if (field instanceof com.vaadin.flow.component.HasPlaceholder placeholderField) {
+            placeholderField.setPlaceholder(defaultText);
+        }
+        if (field instanceof com.vaadin.flow.component.HasHelper helperField) {
+            helperField.setHelperText(helper);
+        }
+    }
+
+    private static String longToText(Long value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private static Long parseNullableLong(String text, String fieldKey) {
+        if (text == null) {
+            return null;
+        }
+        String trimmed = text.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(trimmed);
+        } catch (NumberFormatException ex) {
+            throw new NumberFormatException("Field " + fieldKey + " is not a valid integer: " + text);
+        }
     }
 
     private void notifyGeneralError(String messageKey) {
