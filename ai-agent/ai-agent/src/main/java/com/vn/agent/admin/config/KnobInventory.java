@@ -21,17 +21,16 @@ import java.util.concurrent.atomic.AtomicReference;
  * crashed the AI UI Settings detail view at open with
  * {@code IllegalArgumentException: MetaClass not found ...}.</p>
  *
- * <p>Consumers (Plan 16-06 {@code AiUiSettingsDetailView}):</p>
+ * <p>Consumers:</p>
  * <ul>
- *   <li>{@link #tier1()} — runtime-editable knobs, surfaced as form fields bound to
- *       the {@code AiUiSettings} singleton (the UI ignores this list directly; it
- *       reads the singleton via the existing data container — the list exists for
- *       completeness / inspection tooling).</li>
- *   <li>{@link #tier2()} — boot-time knobs, surfaced read-only on the
- *       {@code bootConfigTab} {@code dataGrid} with a {@code requiresRestart}
- *       badge column.</li>
- *   <li>{@link #tier3()} — secret material; surfaced on the {@code secretsTab}
- *       {@code dataGrid} as a {@code configured: yes/no} indicator only —
+ *   <li>{@link #tier1()} — runtime-editable knobs surfaced as form fields in
+ *       {@code AiConfigurationView}'s "Tier-1 Knobs" tab, bound to the
+ *       {@code AiUiSettings} singleton. The view reads the singleton directly;
+ *       this list exists for inventory/inspection tooling.</li>
+ *   <li>{@link #tier2()} — boot-time knobs. No active UI consumer after the
+ *       admin-surface consolidation; preserved here for future diagnostic
+ *       tooling and {@code KnobInventoryScanner} startup logging.</li>
+ *   <li>{@link #tier3()} — secret material, configured/not-configured only —
  *       {@link AiSecretIndicatorRow} intentionally does NOT carry a value field
  *       (defense-in-depth — SEC-08).</li>
  * </ul>

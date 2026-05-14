@@ -31,7 +31,7 @@ class AiConfigurationViewDescriptorTest {
     }
 
     @Test
-    void descriptorGroupsConfigurationIntoThreeTabs() throws Exception {
+    void descriptorGroupsConfigurationIntoFiveTabs() throws Exception {
         Document document = readDescriptor();
         Element tabSheet = elementById(document, "configurationTabs");
 
@@ -40,7 +40,9 @@ class AiConfigurationViewDescriptorTest {
                 .containsExactly(
                         "msg:///aiConfiguration.tab.parameters",
                         "msg:///aiConfiguration.tab.exposureRules",
-                        "msg:///aiConfiguration.tab.promptContext");
+                        "msg:///aiConfiguration.tab.promptContext",
+                        "msg:///aiUiSettings.tab.tier1Knobs",
+                        "msg:///aiUiSettings.tab.general");
     }
 
     @Test

@@ -35,11 +35,13 @@ public @interface KnobMetadata {
 
     /** Admin-UI tier classification. */
     enum Tier {
-        /** Runtime-editable operator knob; surfaced as a form field in {@code AiUiSettingsDetailView}. */
+        /** Runtime-editable operator knob; surfaced as a form field in the
+         * {@code AiConfigurationView} "Tier-1 Knobs" tab. */
         TIER_1,
-        /** Boot-time knob; surfaced read-only on the Boot Config tab with a {@code requiresRestart} badge. */
+        /** Boot-time knob; surfaced in {@code KnobInventoryScanner} logs (no live UI consumer
+         *  after admin-surface consolidation). */
         TIER_2,
-        /** Secret material; surfaced as a {@code configured: yes/no} indicator only — value never rendered. */
+        /** Secret material; classified by the inventory but never rendered — value is never read into a UI. */
         TIER_3
     }
 

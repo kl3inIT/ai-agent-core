@@ -6,8 +6,8 @@ import java.util.List;
 
 /**
  * Phase 16 D-02 (Tier-3 secret pattern, defense-in-depth) — configurable
- * pattern list driving the {@code AiUiSettingsDetailView} "Secrets" indicator
- * section.
+ * pattern list consumed by the {@code KnobInventoryScanner} when computing
+ * Tier-3 secret indicators.
  *
  * <p>Bound to {@code ai-agent.admin.*}. Picked up automatically by the
  * {@code @ConfigurationPropertiesScan} on
@@ -15,10 +15,10 @@ import java.util.List;
  *
  * <p>The locked default list per D-02 / SPEC criterion 4 is exactly
  * {@code ["*.api-key", "*.password", "*.secret", "*.token"]} — matched at
- * render time across ALL {@code Environment} keys (annotated and
+ * scan time across ALL {@code Environment} keys (annotated and
  * un-annotated). Defense-in-depth: a host adding a new {@code *.api-key}
  * field without {@code @KnobMetadata(tier=TIER_3)} still gets the value
- * masked from the admin UI.</p>
+ * classified as a secret in the inventory.</p>
  *
  * <p>Hosts that ship additional secret-bearing property shapes (e.g.
  * {@code *.private-key}, {@code *.credential}) override the list via
