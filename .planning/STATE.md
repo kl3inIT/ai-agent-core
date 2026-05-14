@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
-status: ready_for_verification
-stopped_at: Phase 16 Plan 07 complete — MODEL-02 catch+reissue + user-visible fallback notification shipped (Phase 16 done)
-last_updated: "2026-05-13T15:20:48.980Z"
+status: phase_complete
+stopped_at: Phase 16 closed mid-UAT (3/16 PASSED, 13 superseded) — proceeding with in-place UI Settings → AI Configuration consolidation refactor
+last_updated: "2026-05-14T16:30:00+07:00"
 progress:
   total_phases: 5
   completed_phases: 2
@@ -23,20 +23,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 16 complete (all 7 plans shipped 2026-05-13) — awaiting phase-level verification before advancing to Phase 17 (mutation-internals hardening).
+**Current focus:** Phase 16 CLOSED (7 plans shipped 2026-05-13; UAT closed mid-run 2026-05-14 with 3/16 PASSED + 13 superseded). In-place UI Settings → AI Configuration consolidation refactor in progress (no separate phase issued). Next: Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass).
 
 ## Current Position
 
-Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — COMPLETE (7/7 plans)
+Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — CLOSED (7/7 plans shipped; UAT 3/16 PASSED + 13 superseded)
 Plan: 7 of 7 shipped 2026-05-13
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
-Next: phase-level verification of Phase 16, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
+Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
 | Field | Value |
 |-------|-------|
 | Milestone | v1.2 (executing) |
-| Phase | 16 (complete — ready for verification) |
-| Status | READY_FOR_VERIFICATION |
-| Last activity | 2026-05-13 — Phase 16 Plan 07 (MODEL-02 catch+reissue + ChatModelFallbackAppliedEvent) shipped |
+| Phase | 16 (closed — UI consolidation refactor in-flight) |
+| Status | PHASE_COMPLETE |
+| Last activity | 2026-05-14 — Phase 16 UAT closed (tests 1–3 PASSED; AiUiSettingsDetailView consolidation into AiConfigurationView starting) |
 
 ## Phase Status
 
@@ -166,6 +166,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - 2026-04-26 (v1.1 scope decision): prompt-contract hardening bundle promoted into v1.1 first phase. Activates SEED-005 (refined to three configurable chat surfaces) and SEED-007 (AI exposure policy). Adds new mutation-tools scope on top of pending todos.
 - 2026-04-26 (v1.1 roadmap): six phases (9–14) defined; numbering continues from v1.0.0 close (Phase 8 + 7.1 + 7.2). All active REQ-IDs mapped; no orphans.
 - 2026-05-11 (v1.2 roadmap): six phases (15–20) defined; numbering continues monotonically from v1.1.0 close (Phase 14 + follow-up 13.1). Backlog Phase 999.1 → Phase 18; Backlog Phase 999.2 → Phase 20 (Soniox STT lands last in the milestone, per the same-day revision); the collapsible-tool-detail todo + `SIDEBAR` / right-sidebar chat surface → Phase 15; chat-state side panel deferred. Hard ordering constraint: Phase 18 before Phase 19. All 29 v1.2 REQ-IDs mapped (Phase 15: 5 · 16: 4 · 17: 4 · 18: 4 · 19: 5 · 20: 7); no orphans. Deferred debt (Phase 10 re-verification, Nyquist backfill, PKG-05/TEST-07, chat-state side panel) and dormant seeds explicitly NOT folded into any v1.2 phase.
+- 2026-05-14 (mid-UAT scope correction): Phase 16 UAT closed after 3/16 tests (tests 1–3 PASSED; tests 4–16 superseded). UI Settings view consolidation (merge `AiUiSettingsDetailView` into `AiConfigurationView`, drop Boot Config + Secrets tabs, add Tier-1 Knob defaults via placeholder + helperText) tracked as a series of in-place refactor commits against the Phase 16 codebase — no separate phase number issued.
 
 ### Decisions
 

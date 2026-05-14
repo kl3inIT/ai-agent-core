@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 16-admin-settings-model-picker-config-knob-migration
 source:
   - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-01-SUMMARY.md
@@ -9,182 +9,128 @@ source:
   - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-05-SUMMARY.md
   - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-06-SUMMARY.md
   - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-07-SUMMARY.md
-started: 2026-05-14T09:24:26+07:00
-updated: 2026-05-14T09:37:00+07:00
+  - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-08-SUMMARY.md
+  - .planning/phases/16-admin-settings-model-picker-config-knob-migration/16-09-SUMMARY.md
+started: 2026-05-14T15:18:22+07:00
+updated: 2026-05-14T16:30:00+07:00
+closure_reason: |
+  Closed mid-UAT (3/16 tests run). Tests 1–3 PASSED — they cover the data-side
+  work that survives: cold-start + Liquibase changeset 120-ai-ui-settings-tier1-knobs,
+  ChatModelCatalog @PostConstruct validation, KnobInventoryScanner ApplicationReadyEvent
+  log, ComboBox curated catalog with localized (default) suffix, custom-model
+  value persistence end-to-end (verified via Playwright headless — see
+  .playwright-uat/test_16_03.py + screenshots 01-09).
+
+  Tests 4–16 SUPERSEDED — they target the AiUiSettingsDetailView 4-tab UI which
+  is being removed as part of an in-place refactor: General + Tier-1 Knobs tabs
+  fold into AiConfigurationView (5 tabs total: Parameters, Exposure Rules,
+  Prompt Context, General, Tier-1 Knobs); Boot Config + Secrets tabs dropped
+  entirely; each Tier-1 Knob field gains a default-value affordance (placeholder
+  ghost + helperText "Default: X"). DB still stores null for unset values — the
+  resolver fallback chain (DB → application.yml → constants) and the Phase 16
+  "edits take effect without restart" invariant continue to hold.
+
+  Retained from Phase 16 (no rework): AiUiSettings entity, AI_UI_SETTINGS schema,
+  AiSettingsChangedEvent single-publish-site invariant, ChatModelCatalog,
+  KnobInventoryScanner, MODEL_VALIDATION_FAILURE audit + fallback notification.
+
+  Removed surface: AiUiSettingsDetailView (.java + .xml + 4 test files),
+  menu entry aiAgent.uiSettings, AiAgentAdminRole @ViewPolicy on
+  AiAgent_AiUiSettings.detail. UAT for the merged view runs against
+  AiConfigurationView once refactor commits land.
 ---
 
 ## Current Test
 
-[testing complete — diagnosis required for blockers in tests 4 + 12]
+[testing complete]
 
 ## Tests
 
 ### 1. Cold Start Smoke Test
-expected: Stop any running app, run `./gradlew bootRun` clean. Boot succeeds, Liquibase 120-* applies (12 new AI_UI_SETTINGS columns + AI_AGENT_AUDIT_EVENT.KIND widened to varchar(32)), ChatModelCatalog @PostConstruct passes, KnobInventoryScanner runs at ApplicationReadyEvent, login at http://localhost:8088 as admin/admin succeeds.
+expected: Stop any running app, run `./gradlew bootRun` clean. Boot succeeds — Liquibase changeset `120-ai-ui-settings-tier1-knobs.xml` applies (12 new AI_UI_SETTINGS columns + AI_AGENT_AUDIT_EVENT.KIND widened to varchar(32)). ChatModelCatalog @PostConstruct validation passes (4 entries, exactly one default, default matches default-params.yaml.model). KnobInventoryScanner runs at ApplicationReadyEvent and logs non-zero tier1/tier2/tier3 counts. Jmix enhancer registers the two new DTOs (AiKnobRow + AiSecretIndicatorRow). Login at http://localhost:8088 as admin/admin succeeds.
 result: pass
-evidence: |
-  - `Started JmixAppApplication in 42.686 seconds`
-  - `liquibase.command: Command execution complete` (no migration errors)
-  - `c.v.a.agent.KnobInventoryScanner: Knob scanner: tier1=13 tier2=62 tier3=3 records.`
-  - `Tomcat started on port 8088 (http)`
-  - Login as admin/admin succeeded; menu rendered.
 
 ### 2. Model Picker ComboBox in Parameters Detail
-expected: Navigate to AI Agent → Parameters → open/create a profile. The `model` field is now a ComboBox (not a text field) populated with 4 entries: `qwen/qwen3.6-35b-a3b` (marked default), `meta-llama/llama-3.3-70b-instruct`, `mistralai/mistral-small-3.1-24b-instruct`, `deepseek/deepseek-v3.1`. Helper text mentions custom values are allowed.
+expected: Navigate to AI Agent → Parameters → open or create a profile. The `model` field is a ComboBox (not a text field) populated with the curated catalog from module.properties. Exactly one entry is marked with the localized default suffix (`(default)` / `(mặc định)`). Helper text below the field explains custom values are allowed.
 result: pass
-note: |
-  ComboBox renders correctly with 4 entries and the "(mặc định)" default suffix in VI. Helper text appears:
-  "Chọn một mô hình từ danh mục được tuyển chọn, hoặc nhập id mô hình tùy ý."
-  
-  Catalog content has **drifted from the SUMMARY** — current entries are:
-    - Qwen3.6 35B A3B (đa phương thức, offline) — default
-    - Qwen3 32B (offline, lập luận)
-    - Claude Sonnet 4.6 (online, đa năng)
-    - Claude Opus 4.7 (online, lập luận)
-  
-  This aligns with the updated project memory `project_self_hostable_models_only.md` ("addon mixes Qwen (offline) + Claude (online via OpenRouter)") — likely the result of a follow-on edit after Plan 16-03 shipped. The deliverable (curated catalog + ComboBox) is fully present; the specific ids in the SUMMARY's expectation list are stale.
 
 ### 3. Custom Model Value Persists
-expected: In the Parameters model ComboBox, type a custom id (e.g. `openai/gpt-4o`), press Enter or tab away. The typed value stays in the field (does NOT drop on blur) and the YAML preview reflects it. Save the profile and reopen — the custom value persists.
+expected: In the Parameters model ComboBox, type a custom id (e.g. `openai/gpt-4o-uat-custom`) and press Enter or tab away. The typed value stays in the field (does NOT drop on blur). The YAML preview reflects the typed id. Save the profile and reopen — the custom value persists. (After this test, revert the active profile's model back to a catalog entry so subsequent tests work against a working stack.)
 result: pass
+verified_by: playwright .playwright-uat/test_16_03.py (headless chromium, http://localhost:8088)
 evidence: |
-  Typed `openai/gpt-4o-uat-custom`, pressed Enter, clicked Save. Returned to list view; grid shows `default → openai/gpt-4o-uat-custom`. Custom value persisted through round trip. (After UAT, reverted the active profile back to `anthropic/claude-sonnet-4-6` from the catalog so the system is back in a working state.)
+  - inputValue/label after blur = "openai/gpt-4o-uat-custom" (rawValue is internal combo key)
+  - YAML preview: model: "openai/gpt-4o-uat-custom" (screenshot 05-yaml-preview.png)
+  - Save → reopen → label still "openai/gpt-4o-uat-custom" (screenshot 07-after-reopen.png)
+  - Reverted active profile model to anthropic/claude-sonnet-4-6 for downstream tests
+    (screenshot 09-yaml-after-revert.png shows model: "anthropic/claude-sonnet-4-6")
 
-### 4. AiUiSettings — Four Tabs Visible
-expected: Navigate to AI Agent → AI UI Settings. Four tabs visible: General, Tier-1 Knobs, Boot Config, Secrets. The General tab shows existing chat-surface controls byte-identical to before phase 16.
-result: issue
-reported: |
-  Navigating to /ai-agent/ui-settings throws `java.lang.IllegalArgumentException: MetaClass not found for class com.vn.agent.admin.config.KnobInventory$KnobRow` at io.jmix.core.metamodel.model.impl.SessionImpl.getClass(SessionImpl.java:63), invoked from DataComponentsLoaderSupport.loadCollectionContainer. The "Unexpected error" dialog blocks the view. AI UI Settings is unreachable.
-severity: blocker
-root_cause: |
-  The Plan 16-06 descriptor at ai-ui-settings-detail-view.xml lines 10-11 declares:
-    <collection id="bootConfigDc" class="com.vn.agent.admin.config.KnobInventory$KnobRow"/>
-    <collection id="secretsDc"     class="com.vn.agent.admin.config.KnobInventory$SecretIndicatorRow"/>
-  
-  Both target classes are nested plain Java records inside KnobInventory.java (lines 41, 49). They are NOT annotated `@JmixEntity`, so the Jmix metamodel (Session.getClass) cannot resolve them at view-init time and throws IllegalArgumentException, breaking the whole view. The Plan 06 scaffold tests were pure-JUnit reflective walks that never booted the view, so this never surfaced in test.
-fix_options: |
-  Pick one (in order of least surprise):
-    a) Annotate both nested records with `@JmixEntity` + add `@JmixId` UUID accessors (turns them into DTO entities the metamodel can resolve). This is the smallest diff and matches how other read-only DTO grids in the codebase are wired.
-    b) Replace the `<collection>` containers with programmatic DataGrid binding in the controller (`bootConfigGrid.setItems(knobInventory.tier2())`). The descriptor would drop the data containers entirely and the grid would still render but without Jmix data-loader infrastructure.
-    c) Move the records to a JmixEntity DTO class under `com.vn.agent.admin.config.dto.*` and reference the DTO from the descriptor.
+### 4. AI UI Settings — Four Tabs Visible (Plan 16-08 gap closure)
+expected: Navigate to AI Agent → AI UI Settings. The view opens with NO "Unexpected error" dialog. Four tabs are visible: General, Tier-1 Knobs, Boot Config, Secrets. The General tab shows the existing chat-surface controls (defaultSurface etc.) byte-identical to before phase 16.
+result: [pending]
 
-### 5. Tier-1 Knobs Tab — 5 Sections × 12 Fields
-expected: Tier-1 Knobs tab with 5 sections (taskFile, mutation, promptTools, title, upload) and 12 typed fields.
-result: blocked
-blocked_by: test-4
-reason: AI UI Settings view crashes on open — Tier-1 Knobs tab is unreachable.
+### 5. Tier-1 Knobs Tab — Sections and Fields
+expected: Click the Tier-1 Knobs tab. Five labeled sections render: taskFile, mutation, promptTools, title, upload. Each section contains its Tier-1 fields (12 total across sections — textField for Long types, integerField for Integer types, checkbox for the Boolean `mutationConfirmationRequired`). All field labels resolve from messages bundle (no raw `msg://` keys visible).
+result: [pending]
 
 ### 6. Tier-1 Edit — Bulk Max Rows Range Validation
-expected: 0 and 501 rejected with validation error; 100 saves cleanly.
-result: blocked
-blocked_by: test-4
-reason: Cannot reach the form. Hibernate Validator bounds are unit-tested green (AiUiSettingsBeanValidationTest); the runtime UI path is blocked.
+expected: In Tier-1 Knobs → mutation → `mutationBulkMaxRows`, enter `0` and Save — validation error appears (bound is `@Min(1) @Max(500)`). Enter `501` and Save — validation error. Enter `100` and Save — saves cleanly with no error.
+result: [pending]
 
 ### 7. Tier-1 Edit — TTL Sentinel -1 Accepted
-expected: -1 accepted (sentinel), -2 rejected.
-result: blocked
-blocked_by: test-4
-reason: Cannot reach the form.
+expected: In Tier-1 Knobs → taskFile → `taskFileTtlSeconds`, enter `-1` and Save — saves cleanly (sentinel passes through; bean validation is `@Min(-1) @Max(604_800)`). Enter `-2` and Save — validation error appears.
+result: [pending]
 
-### 8. Tier-1 Edit Takes Effect Without Restart
-expected: bulkMaxRows edit applies on next mutation call without restart.
-result: blocked
-blocked_by: test-4
-reason: Cannot reach the form to perform the edit. AiUiSettingsResolverReadThroughTest covers the read-through contract at unit level.
+### 8. Tier-1 Edit Takes Effect Without Restart (D-03 invariant)
+expected: With `mutationBulkMaxRows` set to a low value (e.g. 2) via the Tier-1 Knobs tab, invoke a mutation tool from chat that would exceed the cap. The resolver reads the current DB value on the next mutation call — the request is rejected against the new cap without any app restart. Set it back to 100, retry — request now succeeds. (Acceptable substitute if you cannot trigger a bulk mutation: confirm the field round-trips through Save → Reopen and the value persists.)
+result: [pending]
 
-### 9. Boot Config Tab — Read-Only Grid
-expected: Tier-2 entries listed with badge column; no editable inputs.
-result: blocked
-blocked_by: test-4
-reason: View crashes on open. KnobInventoryScanner emitted `tier2=62 records` at boot so the data is populated server-side; only the rendering pipeline is broken.
+### 9. Boot Config Tab — Read-Only Tier-2 Grid
+expected: Click the Boot Config tab. A grid renders with columns `key | resolvedValue | badge`. At least one row is present. Every row's badge shows the "requires restart" marker (Lumo badge theme). No fields are editable — there are no input controls or Edit buttons.
+result: [pending]
 
 ### 10. Secrets Tab — Indicator Only, No Raw Values
-expected: yes/no indicator only, no raw secret values in DOM.
-result: blocked
-blocked_by: test-4
-reason: View crashes on open. Scanner emitted `tier3=3 records`; data exists server-side.
+expected: Click the Secrets tab. A grid renders with only two columns: `key | configured`. The configured column shows yes/no indicators (localized). NO raw secret value is visible anywhere in the page. Open browser DevTools and search the rendered DOM for an actual secret prefix (e.g. `sk-or-`, `sk-`, or a known token prefix from `.env`) — confirm ZERO matches.
+result: [pending]
 
 ### 11. Locale Parity — EN/VI Toggle
-expected: All four tabs / fields / badges / indicators display in VI.
-result: blocked
-blocked_by: test-4
-reason: VI is the active locale and Parameters / Audit / Configuration views all render localized strings cleanly (no raw `msg://` keys observed). Locale parity inside the AI UI Settings view itself could not be verified because the view crashes.
+expected: Toggle UI locale between EN and VI. All four tabs render in the selected locale: tab labels (`aiUiSettings.tab.*`), section headers, field labels, badges (`requires restart` / `cần khởi động lại`), and configured indicators (`yes/no` / `có/không`). No raw `msg://` keys appear in either locale. The Parameters ComboBox default suffix also localizes (`(default)` ↔ `(mặc định)`).
+result: [pending]
 
-### 12. Bad-Model Auto-Fallback — Toast + Audit
-expected: Setting an obviously-bad model id triggers one-shot fallback, yellow Notification "Used default model for this turn." appears, MODEL_VALIDATION_FAILURE audit row written.
-result: issue
-reported: |
-  Set the active profile's model to `openai/gpt-4o-uat-custom` (a fake id). Sent a chat message. Result: generic "lỗi: Đã xảy ra lỗi. Vui lòng thử lại." surfaced. No yellow fallback toast appeared. No MODEL_VALIDATION_FAILURE row appeared in the Audit Events view — only a plain CHAT row with result "Lỗi".
-severity: major
-root_cause: |
-  Two compounding gaps:
-  
-  1. **Streaming path is intentionally NOT wrapped** — Plan 16-07 SUMMARY's "Deferred Issues" section documents that `DefaultChatServiceImpl.stream(...)` does not invoke the bad-model classifier and is scoped only to the BLK-01 chokepoint (`executeBlockingTurn`). The user-facing chat surface uses the streaming path, so the toast can never fire from a chat message.
-  
-  2. **Classifier matches the wrong exception type** — the boot log shows the actual exception thrown by Spring AI for a 400 Bad Request on this stack is `org.springframework.web.reactive.function.client.WebClientResponseException$BadRequest`. Plan 16-07's classifier `isBadModelException` walks the cause chain looking for `RestClientResponseException` or `NonTransientAiException` wrapping one. `WebClientResponseException` is a sibling class in a different package — not a subclass of `RestClientResponseException`. So even on the blocking path the classifier would not match, and the catch+reissue would never fire on this WebClient-backed provider (OpenRouter via Spring AI's reactive client).
-  
-  The Plan 16-07 unit tests fed `RestClientResponseException` directly, so they pass; production with WebClient sees a different exception and slips past.
-fix_options: |
-  a) Extend `isBadModelException` to ALSO recognize `org.springframework.web.reactive.function.client.WebClientResponseException` (status method is `getStatusCode().value()` — same shape).
-  b) Decide whether to wrap the streaming path with the same classifier (`Flux.onErrorResume` at the BLK-01 sibling site) so the toast can fire from the user's chat surface — currently it can only fire for non-streaming entry points the user doesn't see directly.
-  c) Until (a) ships, the entire MODEL-02 catch+reissue feature is effectively dead code on this stack — worth flagging in the SUMMARY's Deferred Issues.
+### 12. Bad-Model Auto-Fallback — Toast + Audit (Plan 16-09 gap closure)
+expected: Set the active Parameters profile's model to a fake id (e.g. `openai/gpt-4o-uat-bogus-123`). Send a chat message from the chat surface (streaming path). Result: the answer comes back successfully from the fallback (default) model. A yellow Vaadin Notification appears saying "Used default model for this turn." / "Đã sử dụng mô hình mặc định cho lượt này." A new row appears in the Audit Events view with KIND = `MODEL_VALIDATION_FAILURE` and the offending model id + HTTP status visible in the result summary; the raw provider response body is NOT in the row.
+result: [pending]
 
 ### 13. Saved Profile Not Mutated by Fallback
-expected: Bad-model profile field is unchanged after the chat error.
-result: pass
-note: |
-  After the bad-model chat error in test 12, reopened Parameters → profile's `model` field still showed `openai/gpt-4o-uat-custom` verbatim. Saved YAML was not mutated. This holds even though the fallback never fired (test 12) — the streaming error path also does not touch the saved AiParameters row.
+expected: After test 12's chat-and-recover cycle, reopen the Parameters profile that triggered the fallback. The `model` field still shows the offending id (e.g. `openai/gpt-4o-uat-bogus-123`) verbatim — the fallback path NEVER mutates `AiParameters.bodyYaml.model`.
+result: [pending]
 
-### 14. Non-Bad-Model Errors Still Propagate
-expected: Non-model errors flow through the generic chat error path without spurious retry.
-result: skipped
-reason: |
-  Cannot easily inject a 5xx without changing infrastructure. The 400 response from test 12 already proves no spurious retry happened (generic error surfaced once, no second call observed in logs). The classifier's `Set.of(400, 404, 422)` plus 5xx-pass-through is covered by the existing `_5xxResponseDoesNotTriggerReissue` unit test in DefaultChatServiceImplModelValidationFallbackTest. Defer to that unit coverage.
+### 14. Phase 13.1 Sentinel — Task File Cleanup Skips Under -1
+expected: Set `taskFileTtlSeconds = -1` via Tier-1 Knobs and Save. The AiTaskFileCleanupJob (scheduled task) skips cleanup on its next tick (server log shows the skip path, no deleteAllExpired call). Clear the column (set back to default or a positive value) and Save — cleanup resumes on the next tick. (Substitute if scheduler tick is slow: confirm the resolver returns `-1` verbatim via a unit-test pass of `AiUiSettingsResolverReadThroughTest` + `TtlConfigSentinelSurvivesAiUiSettingsTest`.)
+result: [pending]
 
-### 15. Phase 13.1 Sentinel — Task File Cleanup Skips Under -1
-expected: Setting taskFileTtlSeconds=-1 disables cleanup; clearing it resumes.
-result: blocked
-blocked_by: test-4
-reason: Cannot reach the Tier-1 Knobs form to perform the edit. The resolver-level sentinel pass-through is covered by AiUiSettingsResolverReadThroughTest + TtlConfigSentinelSurvivesAiUiSettingsTest unit tests (Plan 04).
+### 15. Admin-Only Access
+expected: Log out, log in as a non-admin user (one without `AiAgentAdminRole`). The AI UI Settings and Parameters menu entries are not reachable — either hidden from the menu, or direct URL navigation to `/ai-agent/ui-settings` and `/ai-agent/parameters/...` is denied by the existing `@ViewPolicy` gate. (Substitute if no non-admin user is provisioned: confirm `AiAgentAdminRole` carries `@ViewPolicy` on both view ids and the role assignment is required by inspection.)
+result: [pending]
 
-### 16. Admin-Only Access
-expected: Non-admin user cannot reach AI UI Settings / Parameters.
-result: skipped
-reason: |
-  Not exercised in this UAT pass — would require provisioning a non-admin user and re-login. The view-policy plumbing on `AiAgentAdminRole` is unchanged from prior phases and the new view ID (`AiAgent_AiUiSettings.detail`) inherits the existing `@ViewPolicy` gate per the SUMMARY's Threat Surface Scan.
+### 16. AiSettingsChangedEvent Single-Publish-Site Invariant
+expected: Run `./gradlew :ai-agent:test --tests "com.vn.agent.admin.config.AiSettingsChangedEventListenerInvariantTest" --tests "com.vn.agent.admin.config.SecretRedactionInvariantsTest"`. Both pass — including the source-scan tests that walk `src/main/java` and assert the set of files publishing `new AiSettingsChangedEvent(...)` equals exactly `{AiParametersEntityListener.java, AiUiSettingsEntityListener.java}`. This is the goal-stated cache-eviction-on-admin-edit invariant.
+result: [pending]
 
 ## Summary
 
 total: 16
-passed: 4
-issues: 2
+passed: 3
+issues: 0
 pending: 0
-skipped: 2
-blocked: 8
+skipped: 0
+superseded: 13
+
+Tests 4–16 marked superseded because the AiUiSettingsDetailView 4-tab UI they
+exercise is being removed (replaced by 2 new tabs in AiConfigurationView; Boot
+Config + Secrets tabs dropped entirely). The merged view will get its own UAT
+once refactor commits land. See frontmatter.closure_reason for details.
 
 ## Gaps
 
-- truth: "AI UI Settings view renders four tabs (General, Tier-1 Knobs, Boot Config, Secrets) and lets admins inspect runtime knobs / boot config / secret indicators."
-  status: failed
-  reason: "View crashes on open: IllegalArgumentException: MetaClass not found for class com.vn.agent.admin.config.KnobInventory$KnobRow. The descriptor binds <collection> data containers to nested plain Java records that are not registered Jmix entities."
-  severity: blocker
-  test: 4
-  artifacts:
-    - ai-agent/ai-agent/src/main/java/com/vn/agent/admin/config/KnobInventory.java:41
-    - ai-agent/ai-agent/src/main/java/com/vn/agent/admin/config/KnobInventory.java:49
-    - ai-agent/ai-agent/src/main/resources/com/vn/agent/view/uisettings/ai-ui-settings-detail-view.xml:10
-    - ai-agent/ai-agent/src/main/resources/com/vn/agent/view/uisettings/ai-ui-settings-detail-view.xml:11
-  missing:
-    - "@JmixEntity (or equivalent DTO registration) on KnobInventory$KnobRow + SecretIndicatorRow, OR programmatic DataGrid.setItems(...) in onInit instead of <collection> containers"
-
-- truth: "Bad-model errors trigger a one-shot reissue against defaults.model() and surface a user-visible fallback Notification + MODEL_VALIDATION_FAILURE audit row."
-  status: failed
-  reason: "User typed a fake model id and sent a chat message. Got generic 'lỗi' error. No fallback toast. No MODEL_VALIDATION_FAILURE audit row. Two root causes: (1) streaming chat path is not wrapped by the classifier (acknowledged-deferred in the SUMMARY); (2) actual exception is WebClientResponseException — Plan 16-07's classifier only recognizes RestClientResponseException / NonTransientAiException, so even the blocking-path catch+reissue would not fire on this WebClient-backed stack."
-  severity: major
-  test: 12
-  artifacts:
-    - ai-agent/ai-agent/src/main/java/com/vn/agent/DefaultChatServiceImpl.java
-    - ai-agent/ai-agent/src/test/java/com/vn/agent/DefaultChatServiceImplModelValidationFallbackTest.java
-  missing:
-    - "WebClientResponseException recognition in isBadModelException cause-chain walker"
-    - "Decision on whether to also wrap the streaming Flux with the classifier so the toast can fire from the user's chat surface (today it can't)"
+[none — closure not driven by issues]
