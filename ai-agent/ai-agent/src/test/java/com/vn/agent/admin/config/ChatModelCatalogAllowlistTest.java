@@ -39,11 +39,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * catalog and the {@code default-params.yaml} model — at build time — fails the
  * test. Any drift at boot time fails {@code @PostConstruct}.
  *
- * <p>TEST-20 covers — per project memory {@code project_self_hostable_models_only.md}
- * and SPEC criterion 4:
+ * <p>TEST-20 covers — per SPEC criterion 4 (curated multi-vendor catalog;
+ * host-app deployment determines online/offline reachability):
  * <ul>
  *   <li>{@link #catalogSubsetOfAllowlist()} — every catalog entry id is in
- *       {@link ChatModelCatalog#SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST}.</li>
+ *       {@link ChatModelCatalog#CURATED_MODEL_ALLOWLIST}.</li>
  *   <li>{@link #exactlyOneDefault()} — exactly one catalog entry has
  *       {@code is-default=true}.</li>
  *   <li>{@link #defaultMatchesDefaultParamsYaml()} — the marked-default id equals
@@ -62,17 +62,16 @@ class ChatModelCatalogAllowlistTest {
 
     /**
      * Every {@code ChatModelCatalog.entries().get(i).id()} is contained in
-     * {@link ChatModelCatalog#SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST}.
-     * Fail if any id is missing — see project memory
-     * {@code project_self_hostable_models_only.md} (SPEC criterion 4).
+     * {@link ChatModelCatalog#CURATED_MODEL_ALLOWLIST}.
+     * Fail if any id is missing (SPEC criterion 4 — curated catalog gate).
      */
     @Test
     void catalogSubsetOfAllowlist() {
         ChatModelCatalog catalog = boot();
         for (ChatModelCatalog.Entry entry : catalog.entries()) {
-            assertThat(ChatModelCatalog.SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST)
-                    .as("catalog entry '%s' must be in the open-weights allowlist " +
-                            "(project_self_hostable_models_only.md)", entry.id())
+            assertThat(ChatModelCatalog.CURATED_MODEL_ALLOWLIST)
+                    .as("catalog entry '%s' must be in the curated multi-vendor allowlist",
+                            entry.id())
                     .contains(entry.id());
         }
     }

@@ -8,7 +8,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Phase 16 D-06 — curated open-weights chat-model catalog, validated at boot.
+ * Phase 16 D-06 — curated multi-vendor chat-model catalog, validated at boot.
+ *
+ * <p>The ai-agent is shipped as an addon to Jmix host applications with mixed
+ * deployment constraints: some host apps run fully offline (Qwen self-host),
+ * others run online with managed providers via OpenRouter (Claude). The catalog
+ * mixes both flavors — the host app's deployment determines which entries are
+ * actually reachable at runtime; the addon does not gate by license.</p>
  *
  * <p>Consumed by:</p>
  * <ul>
@@ -16,15 +22,14 @@ import java.util.Set;
  *       populated via {@link #entries()} with default-marked rendering via
  *       {@code setItemLabelGenerator}.</li>
  *   <li>{@code ChatModelCatalogAllowlistTest} (TEST-20, Plan 16-03 Task 3) —
- *       catalog ⊆ {@link #SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST}, exactly-one-
- *       default, drift gate against {@code default-params.yaml.model}.</li>
+ *       catalog ⊆ {@link #CURATED_MODEL_ALLOWLIST}, exactly-one-default, drift
+ *       gate against {@code default-params.yaml.model}.</li>
  * </ul>
  *
  * <p>Boot validation ({@link #validate()}) fails fast on:</p>
  * <ul>
- *   <li>Empty / null catalog ({@code module.properties} always seeds 4 entries).</li>
- *   <li>Any entry whose {@code id} is outside the allowlist (unless the host
- *       opts out via {@code jmix.ai-agent.models.allow-out-of-allowlist=true}).</li>
+ *   <li>Empty / null catalog ({@code module.properties} always seeds the curated set).</li>
+ *   <li>Any entry whose {@code id} is outside the allowlist.</li>
  *   <li>Default-entry count not equal to 1.</li>
  *   <li>Drift between the marked-default id and {@code default-params.yaml.model}
  *       (consulted via {@link AiAgentDefaultsProperties#model()}).</li>
@@ -38,16 +43,15 @@ import java.util.Set;
 @Component
 public class ChatModelCatalog {
 
-    // Self-hostable open-weights allowlist per project memory
-    // project_self_hostable_models_only. Apache 2.0 / MIT / Llama 3.x Community
-    // License only. Proprietary models (Claude, GPT-4o, Gemini Pro) reachable
-    // ONLY via the custom-entry escape hatch (SPEC criterion 4). TEST-20
-    // enforces catalog ⊆ allowlist.
-    public static final Set<String> SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST = Set.of(
+    // Curated multi-vendor allowlist. The addon is deployed to both offline
+    // (Qwen self-host) and online (Claude via OpenRouter) host apps; the
+    // catalog mixes both flavors. Models outside this set are reachable only
+    // via the ComboBox's allow-custom-value escape hatch (SPEC criterion 4).
+    public static final Set<String> CURATED_MODEL_ALLOWLIST = Set.of(
             "qwen/qwen3.6-35b-a3b",
-            "meta-llama/llama-3.3-70b-instruct",
-            "mistralai/mistral-small-3.1-24b-instruct",
-            "deepseek/deepseek-v3.1"
+            "qwen/qwen3-32b",
+            "anthropic/claude-sonnet-4-6",
+            "anthropic/claude-opus-4-7"
     );
 
     private final ChatModelCatalogProperties properties;
@@ -82,13 +86,12 @@ public class ChatModelCatalog {
                 throw new IllegalStateException(
                         "ChatModelCatalog entry has null or blank id");
             }
-            if (!SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST.contains(entry.id())) {
+            if (!CURATED_MODEL_ALLOWLIST.contains(entry.id())) {
                 throw new IllegalStateException(
                         "ChatModelCatalog entry '" + entry.id() + "' is not in " +
-                                "SELF_HOSTABLE_OPEN_WEIGHTS_ALLOWLIST — open-weights " +
-                                "Apache-2.0/MIT/Llama-3.x-Community only per project memory " +
-                                "project_self_hostable_models_only. Proprietary models are " +
-                                "reachable only via the custom-entry escape hatch in the UI.");
+                                "CURATED_MODEL_ALLOWLIST. Models outside the curated set " +
+                                "are reachable only via the ComboBox allow-custom-value " +
+                                "escape hatch in the admin UI.");
             }
         }
 
