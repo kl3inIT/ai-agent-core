@@ -99,6 +99,30 @@
                                 minHeight="42em"/>
                 </vbox>
             </tab>
+            <tab id="generalTab" label="msg:///aiUiSettings.tab.general">
+                <vbox id="generalContent" padding="true" spacing="true" width="100%">
+                    <checkboxGroup id="enabledSurfacesField"
+                                   label="msg:///aiUiSettingsDetail.field.enabledSurfaces"
+                                   helperText="msg:///aiUiSettingsDetail.field.enabledSurfaces.helper"
+                                   required="true"
+                                   requiredMessage="msg:///aiUiSettingsDetail.validation.enabledSurfacesRequired"
+                                   width="100%"/>
+                    <radioButtonGroup id="defaultSurfaceField"
+                                      label="msg:///aiUiSettingsDetail.field.defaultSurface"
+                                      helperText="msg:///aiUiSettingsDetail.field.defaultSurface.helper"
+                                      required="true"
+                                      requiredMessage="msg:///aiUiSettingsDetail.validation.defaultSurfaceRequired"
+                                      themeNames="vertical"
+                                      width="100%"/>
+                    <hbox id="generalButtonsPanel" classNames="buttons-panel">
+                        <button id="saveGeneralButton"
+                                text="msg:///aiUiSettingsDetail.action.save"
+                                themeNames="primary"/>
+                        <button id="resetGeneralButton"
+                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                    </hbox>
+                </vbox>
+            </tab>
         </tabSheet>
     </layout>
 </view>

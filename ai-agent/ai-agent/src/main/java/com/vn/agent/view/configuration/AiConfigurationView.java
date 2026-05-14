@@ -2,11 +2,14 @@ package com.vn.agent.view.configuration;
 
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.router.Route;
+import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.entity.AiParameters;
+import com.vn.agent.entity.AiUiSettings;
 import com.vn.agent.exposure.AiExposureRuleAdminService;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
@@ -17,6 +20,7 @@ import com.vn.agent.parameters.ParametersService;
 import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.utils.NotificationUtils;
+import com.vn.agent.view.chat.AiUiSettingsService;
 import com.vn.agent.view.exposure.MetaclassComboBoxHelper;
 import com.vn.agent.view.parameters.ParametersDetailView;
 import io.jmix.core.MessageTools;
@@ -28,9 +32,11 @@ import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.list.CreateAction;
 import io.jmix.flowui.action.list.EditAction;
 import io.jmix.flowui.action.list.RemoveAction;
+import io.jmix.flowui.component.checkboxgroup.JmixCheckboxGroup;
 import io.jmix.flowui.component.codeeditor.CodeEditor;
 import io.jmix.flowui.component.grid.DataGrid;
 import io.jmix.flowui.component.multiselectcombobox.JmixMultiSelectComboBox;
+import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.kit.action.ActionPerformedEvent;
 import io.jmix.flowui.model.CollectionLoader;
@@ -91,6 +97,10 @@ public class AiConfigurationView extends StandardView {
     private CodeEditor baselinePreviewField;
     @ViewComponent
     private CodeEditor composedPromptPreviewField;
+    @ViewComponent
+    private JmixCheckboxGroup<AiChatSurface> enabledSurfacesField;
+    @ViewComponent
+    private JmixRadioButtonGroup<AiChatSurface> defaultSurfaceField;
 
     @Autowired
     private ParametersService parametersService;
@@ -107,6 +117,8 @@ public class AiConfigurationView extends StandardView {
     @Autowired
     private MetaclassComboBoxHelper metaclassComboBoxHelper;
     @Autowired
+    private AiUiSettingsService uiSettingsService;
+    @Autowired
     private MessageTools messageTools;
     @Autowired
     private Notifications notifications;
@@ -117,6 +129,7 @@ public class AiConfigurationView extends StandardView {
 
     private final Map<UUID, AiParametersBody> parsedCache = new HashMap<>();
     private List<MetaClass> selectableEntities = Collections.emptyList();
+    private AiUiSettings currentUiSettings;
 
     @Subscribe
     public void onInit(final InitEvent event) {
@@ -128,12 +141,18 @@ public class AiConfigurationView extends StandardView {
         selectableEntities = metaclassComboBoxHelper.buildFilteredList();
         hiddenEntitiesField.setItems(selectableEntities);
         hiddenEntitiesField.setItemLabelGenerator(this::entityLabel);
+
+        enabledSurfacesField.setItems(AiChatSurface.class);
+        enabledSurfacesField.setItemLabelGenerator(messages::getMessage);
+        defaultSurfaceField.setItems(AiChatSurface.class);
+        defaultSurfaceField.setItemLabelGenerator(messages::getMessage);
     }
 
     @Subscribe
     public void onBeforeShow(final BeforeShowEvent event) {
         refreshExposureSelection();
         refreshBaselinePreview();
+        refreshGeneralSelection();
     }
 
     @Subscribe(id = "parametersDl", target = Target.DATA_LOADER)
@@ -217,6 +236,39 @@ public class AiConfigurationView extends StandardView {
         refreshBaselinePreview();
     }
 
+    @Subscribe("saveGeneralButton")
+    public void onSaveGeneralButtonClick(final ClickEvent<Button> event) {
+        Set<AiChatSurface> enabledSurfaces = enabledSurfacesField.getValue();
+        AiChatSurface defaultSurface = defaultSurfaceField.getValue();
+
+        if (enabledSurfaces == null || enabledSurfaces.isEmpty()) {
+            notifyGeneralError("aiUiSettingsDetail.validation.enabledSurfacesRequired");
+            return;
+        }
+        if (defaultSurface == null || !enabledSurfaces.contains(defaultSurface)) {
+            notifyGeneralError("aiUiSettingsDetail.validation.defaultSurfaceEnabled");
+            return;
+        }
+        try {
+            currentUiSettings.setEnabledSurfaceSet(enabledSurfaces);
+            currentUiSettings.setDefaultSurface(defaultSurface);
+            currentUiSettings = uiSettingsService.save(currentUiSettings);
+            refreshGeneralSelection();
+            notifications.create(messages.getMessage("aiUiSettingsDetail.notification.saved"))
+                    .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
+                    .show();
+        } catch (Exception ex) {
+            log.warn("Unable to save AI UI Settings", ex);
+            NotificationUtils.errorWithDetail(notifications, messages,
+                    "aiUiSettingsDetail.notification.saveError", ex);
+        }
+    }
+
+    @Subscribe("resetGeneralButton")
+    public void onResetGeneralButtonClick(final ClickEvent<Button> event) {
+        refreshGeneralSelection();
+    }
+
     private void onParameterRowAction(AiParameters row, ActionColumnType type) {
         parametersDataGrid.select(row);
         switch (type) {
@@ -282,6 +334,23 @@ public class AiConfigurationView extends StandardView {
         activeProfileField.setValue(activeParameters.getProfileName());
         previewConversationIdField.setValue(previewConversationId.toString());
         generatedAtField.setValue(OffsetDateTime.now().toString());
+    }
+
+    private void refreshGeneralSelection() {
+        currentUiSettings = uiSettingsService.loadCurrent();
+        Set<AiChatSurface> enabled = currentUiSettings.getEnabledSurfaceSet();
+        enabledSurfacesField.setValue(enabled == null || enabled.isEmpty()
+                ? EnumSet.noneOf(AiChatSurface.class)
+                : EnumSet.copyOf(enabled));
+        defaultSurfaceField.setValue(currentUiSettings.getDefaultSurface());
+    }
+
+    private void notifyGeneralError(String messageKey) {
+        notifications.create(messages.getMessage(messageKey))
+                .withThemeVariant(NotificationVariant.LUMO_ERROR)
+                .withPosition(Notification.Position.MIDDLE)
+                .withDuration(5000)
+                .show();
     }
 
     private String currentUsername() {
