@@ -24,9 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -129,33 +127,33 @@ class AiUiSettingsKnobInventoryMetamodelTest {
     }
 
     @Test
-    void viewDescriptorBindsTopLevelJmixEntityClassesOnly() throws IOException {
-        // Use Files.walk for file-discovery consistency with SecretRedactionInvariantsTest
-        // (Plan 16-06 sibling — keeps the two tests structurally identical for future
-        // maintainer recognition).
-        Path target = null;
-        if (Files.exists(VIEWS_ROOT)) {
-            try (Stream<Path> walk = Files.walk(VIEWS_ROOT)) {
-                target = walk.filter(p -> p.getFileName().toString().equals("ai-ui-settings-detail-view.xml"))
-                        .findFirst()
-                        .orElse(null);
-            }
+    void noViewDescriptorBindsAnInnerClassCollection() throws IOException {
+        // Phase 16 consolidation note: the original Plan 16-08 test pinned this
+        // invariant on ai-ui-settings-detail-view.xml specifically, because that
+        // descriptor carried the two <collection class=...> bindings (bootConfigDc /
+        // secretsDc) that the Plan 16-06 inner-class bug had broken. After the
+        // admin-surface consolidation, that view is deleted and its Boot Config +
+        // Secrets tabs are dropped entirely — no descriptor in this module binds a
+        // <collection class=...> to either AiKnobRow or AiSecretIndicatorRow.
+        // Widen the gate to ALL view descriptors so the inner-class anti-pattern
+        // remains caught syntactically even if a future descriptor reintroduces a
+        // <collection class=...> binding pointing at the DTOs.
+        if (!Files.exists(VIEWS_ROOT)) {
+            return; // module path missing — locate() returned a probe candidate, nothing to scan.
         }
-        assertNotNull(target,
-                "ai-ui-settings-detail-view.xml MUST be discoverable under " + VIEWS_ROOT);
 
-        String body = Files.readString(target, StandardCharsets.UTF_8);
         Pattern collectionClass = Pattern.compile(
                 "<collection\\s+[^>]*class\\s*=\\s*\"([^\"]+)\"");
-        Matcher m = collectionClass.matcher(body);
-
         Set<String> bound = new HashSet<>();
-        while (m.find()) {
-            bound.add(m.group(1));
+        try (Stream<Path> walk = Files.walk(VIEWS_ROOT)) {
+            for (Path xml : (Iterable<Path>) walk.filter(p -> p.getFileName().toString().endsWith(".xml"))::iterator) {
+                String body = Files.readString(xml, StandardCharsets.UTF_8);
+                Matcher m = collectionClass.matcher(body);
+                while (m.find()) {
+                    bound.add(m.group(1));
+                }
+            }
         }
-
-        assertFalse(bound.isEmpty(),
-                "Expected at least one <collection class=...> binding in " + target);
 
         for (String fqcn : bound) {
             // (c) — inner-class binding gate: no $ separator.
@@ -163,10 +161,10 @@ class AiUiSettingsKnobInventoryMetamodelTest {
             // the syntactic level — the nested record was bound as
             // "com.vn.agent.admin.config.KnobInventory$KnobRow".
             assertFalse(fqcn.contains("$"),
-                    "View descriptor <collection class=\"" + fqcn + "\"> binds to an inner " +
-                            "class. Inner classes are not registered Jmix metaclasses and the view " +
-                            "will crash at open with IllegalArgumentException: MetaClass not found. " +
-                            "Promote to a top-level @JmixEntity DTO.");
+                    "A view descriptor under " + VIEWS_ROOT + " binds <collection class=\"" + fqcn +
+                            "\"> to an inner class. Inner classes are not registered Jmix metaclasses " +
+                            "and the view will crash at open with IllegalArgumentException: MetaClass " +
+                            "not found. Promote to a top-level @JmixEntity DTO.");
 
             // (a) — class is loadable on the classpath.
             Class<?> resolved;
@@ -184,14 +182,6 @@ class AiUiSettingsKnobInventoryMetamodelTest {
                             "does NOT carry @JmixEntity. The Jmix metamodel cannot resolve it and " +
                             "the view will crash at open.");
         }
-
-        // For the current descriptor: exactly the two new DTO classes.
-        Set<String> expected = Set.of(
-                "com.vn.agent.admin.config.dto.AiKnobRow",
-                "com.vn.agent.admin.config.dto.AiSecretIndicatorRow");
-        assertEquals(expected, bound,
-                "AI UI Settings descriptor <collection> bindings must be exactly the two new " +
-                        "top-level Jmix DTO classes shipped in Plan 16-08.");
     }
 
     /**

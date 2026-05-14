@@ -218,11 +218,14 @@ class SecretRedactionInvariantsTest {
         assertTrue(offenders.isEmpty(),
                 "AiSecretIndicatorRow MUST NOT declare any field whose name " +
                         "matches (?i).*(value|raw|secret).* — SEC-08 invariant. Offenders: " + offenders);
-        // Also assert the configured boolean is present (positive invariant —
-        // the indicator surface itself must exist).
+        // Also assert the configured field is present (positive invariant —
+        // the indicator surface itself must exist). The Jmix DTO enhancer
+        // rejects primitive boolean fields, so the declared type is the
+        // boxed Boolean — accept either form.
         boolean hasConfigured = false;
         for (Field f : AiSecretIndicatorRow.class.getDeclaredFields()) {
-            if ("configured".equals(f.getName()) && f.getType() == boolean.class) {
+            if ("configured".equals(f.getName())
+                    && (f.getType() == boolean.class || f.getType() == Boolean.class)) {
                 hasConfigured = true;
                 break;
             }
