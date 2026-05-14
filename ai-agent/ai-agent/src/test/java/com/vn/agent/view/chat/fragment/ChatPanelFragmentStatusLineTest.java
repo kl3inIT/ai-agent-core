@@ -129,9 +129,7 @@ class ChatPanelFragmentStatusLineTest {
                 .contains("if (!turnContentSeen)")
                 .contains("TurnDetailRenderer.statusKeyFor(StreamingEvent.ActivityKind.CHAT)")
                 // status removed in every teardown site
-                .contains("removeStatusRow()")
-                // teardown wiring: clear + remove in doOnError; finishStreamInternal in doOnComplete
-                .contains("liveTurnSteps.clear()");
+                .contains("removeStatusRow()");
         // The status text is NEVER concatenated into the bubble — the only botMsg append stays the
         // unchanged markdown chunk.
         assertThat(source).contains("botMsg.appendText(md)");

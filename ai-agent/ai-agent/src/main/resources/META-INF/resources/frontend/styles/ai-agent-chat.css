@@ -344,11 +344,20 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
  * "working" without grabbing attention; the prefers-reduced-motion guard stills it.
  */
 .ai-agent-status {
-    display: block;
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--lumo-space-xs);
+    margin: var(--lumo-space-s) auto;
+    padding: var(--lumo-space-xs) var(--lumo-space-m);
+    width: fit-content;
+    max-width: 60%;
     font-size: var(--lumo-font-size-s);
+    font-style: italic;
     color: var(--lumo-secondary-text-color);
-    padding: var(--lumo-space-xs) 0;
+    background: var(--lumo-contrast-5pct);
+    border-radius: var(--lumo-border-radius-l);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .ai-agent-status::after {
@@ -357,6 +366,15 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     width: 1.2em;
     text-align: left;
     animation: ai-agent-status-pulse 1.2s steps(4, end) infinite;
+}
+
+/* Stream-progress bar lives in the messageInputSlot. Narrow it and center to match
+ * the polished streaming-status pill above so the two surfaces feel like one indicator. */
+.ai-agent-chat-panel__stream-progress {
+    width: 60% !important;
+    max-width: 360px;
+    margin: 0 auto var(--lumo-space-xs);
+    --vaadin-progress-bar-height: 3px;
 }
 
 @keyframes ai-agent-status-pulse {
