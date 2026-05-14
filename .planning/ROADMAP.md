@@ -90,7 +90,7 @@ Plans:
   6. Boot-time / wiring knobs (`@ConditionalOnProperty` toggles such as `ai-agent.tools.mutation.enabled`) are shown in the admin UI read-only with a clear "property only — requires restart" marker; secrets (`*.api-key`) are never editable or displayed — at most a "configured: yes/no" indicator; a documented three-tier taxonomy classifies every audited knob. (When STT ships in Phase 19, its `ai-agent.stt.enabled` / `ai-agent.stt.provider` boot toggles are added under this same Tier-2 read-only treatment.)
   7. New editable settings are persisted as fields on `AiParameters`/`AiUiSettings` with an `agentstore` Liquibase changelog (included in `agentstore-changelog.xml`), bean-validation with sensible bounds, and labels in all locale bundles; an `AiParameters`/`AiUiSettings` change event is published so any cache around settings (see Phase 18) evicts — an admin edit is visible within one turn.
   8. SEC-08 — a test asserts no `*.api-key` (or other secret) property is surfaced as an editable or displayed admin setting, and boot-time `@ConditionalOnProperty` toggles are not presented as runtime-editable.
-**Plans**: 7 plans
+**Plans**: 9 plans (7 original + 2 gap-closure plans from UAT)
 Plans:
 **Wave 0**
 - [x] 16-01-PLAN.md — Foundation: AiSettingsChangedEvent + KnobMetadata annotation + AuditKind.MODEL_VALIDATION_FAILURE + 7 Wave-0 test scaffolds
@@ -106,6 +106,10 @@ Plans:
 **Wave 3** *(blocked on Wave 2)*
 - [x] 16-06-PLAN.md — @KnobMetadata annotation pass on 10 records + KnobInventoryScanner (starter) + AiUiSettingsDetailView tier1/bootConfig/secrets tabs + SEC-08 + KnobInventoryClassificationTest
 - [x] 16-07-PLAN.md — DefaultChatServiceImpl catch+reissue at executeBlockingTurn + AuditKind.MODEL_VALIDATION_FAILURE audit emission + fallbackModel() accessor + locale notification keys
+
+**Wave 4 — gap closure** *(UAT 2026-05-14; plans 08 + 09 run in parallel — no shared files)*
+- [ ] 16-08-PLAN.md — UAT gap 1 (test 4 blocker): promote KnobInventory nested records to top-level @JmixEntity DTO classes under admin/config/dto + descriptor metamodel-resolution regression test (SEC-08 preserved)
+- [ ] 16-09-PLAN.md — UAT gap 2 (test 12 major): extend isBadModelException classifier triad for WebClientResponseException + wrap streaming Flux with bad-model catch+reissue (P-22 / T-16-04 / Twin-publisher R2 preserved)
 **UI hint**: yes
 
 ### Phase 17: Mutation-Internals Hardening (Phase 11 follow-up)
@@ -174,4 +178,29 @@ Plans:
 
 ## Backlog
 
-_(empty — Backlog Phase 999.1 (mutation-internals hardening) and Phase 999.2 (Chat Voice Input — Soniox STT) were promoted into v1.2 as Phases 18 and 20 respectively on 2026-05-11, then renumbered to Phases 17 and 19 on 2026-05-13 after the Phase 16+17 merge. See "v1.2 — Operator Experience, Voice Input & Runtime Performance" above.)_
+_(Phase 999.1 (mutation-internals hardening) and Phase 999.2 (Chat Voice Input — Soniox STT) were promoted into v1.2 as Phases 18 and 20 respectively on 2026-05-11, then renumbered to Phases 17 and 19 on 2026-05-13 after the Phase 16+17 merge. See "v1.2 — Operator Experience, Voice Input & Runtime Performance" above.)_
+
+### Phase 999.1: Admin-rotated provider credentials (API key + base URL) (BACKLOG)
+
+**Goal:** [Captured for future planning] Give admins an in-app UI to rotate AI provider credentials (API key + base URL) without redeploying. Currently keys/URLs live in `application.yml` + env vars only.
+
+**Requirements:** TBD
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
+**Context (captured 2026-05-14 from Phase 16 UAT conversation):**
+- Pain: provider key/url rotation requires redeploy
+- Multi-provider: OpenRouter Claude needs key + url; Qwen self-hosted needs url only — UI must handle both shapes
+- Hard constraint: must NOT violate Phase 16 SEC-08 invariants. The `SecretRedactionInvariantsTest.noSecretBoundEditable` and `noConditionalOnPropertyToggleBoundEditable` source-scans WILL fail the build if an editable `property=` binding to `*.api-key / *.password / *.secret / *.token` is added to any view. Plan 16-06's `SecretIndicatorRow` deliberately has no `value` field. Discuss-phase MUST resolve how a new credentials view side-steps these scans without weakening them
+- Open design questions to resolve in discuss-phase:
+  1. New entity `AiProviderCredential(providerId, apiKey, baseUrl, active)` vs extend `AiUiSettings`
+  2. Encryption-at-rest mechanism: Jmix `EncryptedFieldType` / Jasypt / DB-level (pgcrypto)
+  3. Write-only "Replace key" UX with masked `••••last4` display after save; never readback value to DOM
+  4. New audit kind `PROVIDER_CREDENTIAL_ROTATED` on every write (no value logged)
+  5. Runtime `ChatClient` rebuild via new `AiSettingsChangedEvent.Kind.PROVIDER_CREDENTIAL` (Plan 10-06 R2 single-publish-site invariant still applies — use the existing entity-listener twin pattern)
+  6. Multi-provider UI shape: single grid with rows per-provider vs tabbed sub-views
+  7. Attribute-level policy hiding `apiKey` readback even from admin — `@EntityAttributePolicy(operations={MODIFY}, attributes="apiKey")` denies READ
+- Estimated scope: 4–6 plan phase
