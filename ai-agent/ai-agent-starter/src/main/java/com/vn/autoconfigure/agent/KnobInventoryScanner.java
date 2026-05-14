@@ -3,6 +3,8 @@ package com.vn.autoconfigure.agent;
 import com.vn.agent.admin.config.AdminSecretPatternProperties;
 import com.vn.agent.admin.config.KnobInventory;
 import com.vn.agent.admin.config.KnobMetadata;
+import com.vn.agent.admin.config.dto.AiKnobRow;
+import com.vn.agent.admin.config.dto.AiSecretIndicatorRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -95,9 +97,9 @@ public class KnobInventoryScanner {
                     filtered.size(), allBeans.size());
         }
 
-        List<KnobInventory.KnobRow> tier1 = new ArrayList<>();
-        List<KnobInventory.KnobRow> tier2 = new ArrayList<>();
-        List<KnobInventory.SecretIndicatorRow> tier3 = new ArrayList<>();
+        List<AiKnobRow> tier1 = new ArrayList<>();
+        List<AiKnobRow> tier2 = new ArrayList<>();
+        List<AiSecretIndicatorRow> tier3 = new ArrayList<>();
 
         for (ConfigurationPropertiesBean bean : filtered.values()) {
             String rawPrefix = bean.getAnnotation() == null ? "" : bean.getAnnotation().prefix();
@@ -184,8 +186,8 @@ public class KnobInventoryScanner {
      * type, classifying each component by {@code @KnobMetadata#tier()}.
      */
     private void walkType(Class<?> type, ConfigurationPropertyName base,
-                          List<KnobInventory.KnobRow> tier1,
-                          List<KnobInventory.KnobRow> tier2) {
+                          List<AiKnobRow> tier1,
+                          List<AiKnobRow> tier2) {
         if (type == null) {
             return;
         }
@@ -219,8 +221,8 @@ public class KnobInventoryScanner {
 
     private void addComponent(ConfigurationPropertyName name, Class<?> componentType,
                               KnobMetadata metadata,
-                              List<KnobInventory.KnobRow> tier1,
-                              List<KnobInventory.KnobRow> tier2) {
+                              List<AiKnobRow> tier1,
+                              List<AiKnobRow> tier2) {
         String key = name.toString();
         // CR-01 defense-in-depth (SPEC criterion 4): if the property key matches a
         // Tier-3 secret glob, suppress the Tier-2 row entirely — regardless of
@@ -251,7 +253,7 @@ public class KnobInventoryScanner {
                     : metadata.displayMessageKey();
         }
 
-        KnobInventory.KnobRow row = new KnobInventory.KnobRow(
+        AiKnobRow row = new AiKnobRow(
                 key, resolvedValue, displayMessageKey, requiresRestart);
         switch (tier) {
             case TIER_1 -> tier1.add(row);
@@ -281,7 +283,7 @@ public class KnobInventoryScanner {
      * raw value is NEVER read into the indicator — only the {@code configured}
      * boolean (non-null + non-blank) is computed (SEC-08).
      */
-    private List<KnobInventory.SecretIndicatorRow> scanEnvironmentForSecrets() {
+    private List<AiSecretIndicatorRow> scanEnvironmentForSecrets() {
         if (!(environment instanceof ConfigurableEnvironment configurable)) {
             return List.of();
         }
@@ -291,7 +293,7 @@ public class KnobInventoryScanner {
         }
 
         Set<String> seen = new HashSet<>();
-        List<KnobInventory.SecretIndicatorRow> rows = new ArrayList<>();
+        List<AiSecretIndicatorRow> rows = new ArrayList<>();
         for (PropertySource<?> source : configurable.getPropertySources()) {
             if (!(source instanceof EnumerablePropertySource<?> enumerable)) {
                 continue;
@@ -303,14 +305,14 @@ public class KnobInventoryScanner {
                 if (matchesAny(name, patterns)) {
                     boolean configured = isConfigured(name);
                     String sanitised = name.replaceAll("[^a-zA-Z0-9]", "_");
-                    rows.add(new KnobInventory.SecretIndicatorRow(
+                    rows.add(new AiSecretIndicatorRow(
                             name,
                             "bootConfig.knob.secret." + sanitised,
                             configured));
                 }
             }
         }
-        rows.sort(java.util.Comparator.comparing(KnobInventory.SecretIndicatorRow::key));
+        rows.sort(java.util.Comparator.comparing(AiSecretIndicatorRow::getKey));
         return rows;
     }
 

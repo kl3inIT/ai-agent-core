@@ -1,5 +1,7 @@
 package com.vn.agent.admin.config;
 
+import com.vn.agent.admin.config.dto.AiKnobRow;
+import com.vn.agent.admin.config.dto.AiSecretIndicatorRow;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -10,6 +12,14 @@ import java.util.concurrent.atomic.AtomicReference;
  * {@code ApplicationReadyEvent} by {@code KnobInventoryScanner} (Pitfall 4 — beans
  * are not eagerly initialised before the ApplicationReady gate, so the scan runs
  * once after full context refresh).
+ *
+ * <p>Plan 16-08 gap-closure: the row shapes have been promoted to top-level
+ * {@link AiKnobRow} and {@link AiSecretIndicatorRow} non-persistent
+ * {@code @JmixEntity} DTOs under {@code com.vn.agent.admin.config.dto}. The
+ * previous nested-record bindings (KnobInventory$KnobRow,
+ * KnobInventory$SecretIndicatorRow) were not registered Jmix metaclasses and
+ * crashed the AI UI Settings detail view at open with
+ * {@code IllegalArgumentException: MetaClass not found ...}.</p>
  *
  * <p>Consumers (Plan 16-06 {@code AiUiSettingsDetailView}):</p>
  * <ul>
@@ -22,8 +32,8 @@ import java.util.concurrent.atomic.AtomicReference;
  *       badge column.</li>
  *   <li>{@link #tier3()} — secret material; surfaced on the {@code secretsTab}
  *       {@code dataGrid} as a {@code configured: yes/no} indicator only —
- *       the {@code SecretIndicatorRow} record intentionally does NOT carry a
- *       value field (defense-in-depth — SEC-08).</li>
+ *       {@link AiSecretIndicatorRow} intentionally does NOT carry a value field
+ *       (defense-in-depth — SEC-08).</li>
  * </ul>
  *
  * <p>All three accessors return immutable empty lists before the scanner has run
@@ -32,25 +42,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class KnobInventory {
 
-    /**
-     * One Tier-1 / Tier-2 knob row. {@code resolvedValue} is the value resolved
-     * from {@code Environment} at scan time (snapshot — operator edits via the
-     * Tier-1 form do NOT change this until the next boot, matching CFG-02 boot-
-     * config semantics).
-     */
-    public record KnobRow(String key, String resolvedValue, String displayMessageKey, boolean requiresRestart) {
-    }
-
-    /**
-     * One Tier-3 secret-indicator row. Carries the {@link #configured} boolean
-     * only — never the raw secret value (SEC-08 invariant — see Plan 06 Task 3
-     * {@code SecretRedactionInvariantsTest#noRawSecretValueReachesRenderedDom}).
-     */
-    public record SecretIndicatorRow(String key, String displayMessageKey, boolean configured) {
-    }
-
     /** Internal snapshot state — atomically swapped by the scanner. */
-    public record State(List<KnobRow> tier1, List<KnobRow> tier2, List<SecretIndicatorRow> tier3) {
+    public record State(List<AiKnobRow> tier1, List<AiKnobRow> tier2, List<AiSecretIndicatorRow> tier3) {
         public State {
             tier1 = tier1 == null ? List.of() : List.copyOf(tier1);
             tier2 = tier2 == null ? List.of() : List.copyOf(tier2);
@@ -62,15 +55,15 @@ public class KnobInventory {
 
     private final AtomicReference<State> state = new AtomicReference<>(EMPTY);
 
-    public List<KnobRow> tier1() {
+    public List<AiKnobRow> tier1() {
         return state.get().tier1();
     }
 
-    public List<KnobRow> tier2() {
+    public List<AiKnobRow> tier2() {
         return state.get().tier2();
     }
 
-    public List<SecretIndicatorRow> tier3() {
+    public List<AiSecretIndicatorRow> tier3() {
         return state.get().tier3();
     }
 

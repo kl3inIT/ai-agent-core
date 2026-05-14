@@ -1,9 +1,11 @@
 package com.vn.agent.admin.config;
 
+import com.vn.agent.admin.config.dto.AiSecretIndicatorRow;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,6 +18,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -185,6 +188,47 @@ class SecretRedactionInvariantsTest {
         assertTrue(offenders.isEmpty(),
                 "No editable XML property= binding may match a @ConditionalOnProperty " +
                         "toggle key. Offenders:\n" + String.join("\n", offenders));
+    }
+
+    /**
+     * Plan 16-08 gap-closure — defense-in-depth invariant for the new
+     * {@link AiSecretIndicatorRow} DTO. The previous nested record
+     * {@code KnobInventory$SecretIndicatorRow} had this invariant implicitly
+     * (records cannot carry hidden fields); migration to a top-level class
+     * with explicit declared fields requires an explicit assertion that NO
+     * field name suggests a raw-secret payload.
+     *
+     * <p>The {@code configured} boolean is the indicator itself; field-name
+     * regex {@code (?i).*(value|raw|secret).*} catches accidental additions
+     * such as {@code rawSecret}, {@code secretValue}, {@code value} that would
+     * cross SEC-08's redaction boundary.</p>
+     */
+    @Test
+    void noValueFieldOnSecretIndicatorRow() {
+        Pattern forbidden = Pattern.compile("(?i).*(value|raw|secret).*");
+        List<String> offenders = new ArrayList<>();
+        for (Field field : AiSecretIndicatorRow.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                continue;
+            }
+            if (forbidden.matcher(field.getName()).matches()) {
+                offenders.add(field.getName());
+            }
+        }
+        assertTrue(offenders.isEmpty(),
+                "AiSecretIndicatorRow MUST NOT declare any field whose name " +
+                        "matches (?i).*(value|raw|secret).* — SEC-08 invariant. Offenders: " + offenders);
+        // Also assert the configured boolean is present (positive invariant —
+        // the indicator surface itself must exist).
+        boolean hasConfigured = false;
+        for (Field f : AiSecretIndicatorRow.class.getDeclaredFields()) {
+            if ("configured".equals(f.getName()) && f.getType() == boolean.class) {
+                hasConfigured = true;
+                break;
+            }
+        }
+        assertFalse(!hasConfigured,
+                "AiSecretIndicatorRow MUST declare 'configured' boolean — that is the indicator surface.");
     }
 
     @Test

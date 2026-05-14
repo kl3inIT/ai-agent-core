@@ -9,6 +9,8 @@ import com.vaadin.flow.data.renderer.Renderer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.Route;
 import com.vn.agent.admin.config.KnobInventory;
+import com.vn.agent.admin.config.dto.AiKnobRow;
+import com.vn.agent.admin.config.dto.AiSecretIndicatorRow;
 import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.entity.AiUiSettings;
 import com.vn.agent.view.chat.AiUiSettingsService;
@@ -44,9 +46,9 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
     private JmixRadioButtonGroup<AiChatSurface> defaultSurfaceField;
 
     @ViewComponent
-    private CollectionContainer<KnobInventory.KnobRow> bootConfigDc;
+    private CollectionContainer<AiKnobRow> bootConfigDc;
     @ViewComponent
-    private CollectionContainer<KnobInventory.SecretIndicatorRow> secretsDc;
+    private CollectionContainer<AiSecretIndicatorRow> secretsDc;
 
     @Autowired
     private AiUiSettingsService uiSettingsService;
@@ -132,7 +134,7 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
      * receives the {@code badge} theme so Lumo styles it as a pill.
      */
     @Supply(to = "bootConfigGrid.badge", subject = "renderer")
-    private Renderer<KnobInventory.KnobRow> bootConfigBadgeRenderer() {
+    private Renderer<AiKnobRow> bootConfigBadgeRenderer() {
         return new ComponentRenderer<>(row -> {
             Span badge = uiComponents.create(Span.class);
             badge.setText(messages.getMessage(row.requiresRestart()
@@ -153,10 +155,10 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
      * on a Tier-3 key.
      */
     @Supply(to = "secretsGrid.configured", subject = "renderer")
-    private Renderer<KnobInventory.SecretIndicatorRow> secretsConfiguredRenderer() {
+    private Renderer<AiSecretIndicatorRow> secretsConfiguredRenderer() {
         return new ComponentRenderer<>(row -> {
             Span span = uiComponents.create(Span.class);
-            span.setText(messages.getMessage(row.configured()
+            span.setText(messages.getMessage(row.isConfigured()
                     ? "aiUiSettings.secrets.indicator.yes"
                     : "aiUiSettings.secrets.indicator.no"));
             return span;

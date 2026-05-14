@@ -7,8 +7,8 @@
             <fetchPlan extends="_base"/>
             <loader id="uiSettingsDl"/>
         </instance>
-        <collection id="bootConfigDc" class="com.vn.agent.admin.config.KnobInventory$KnobRow"/>
-        <collection id="secretsDc" class="com.vn.agent.admin.config.KnobInventory$SecretIndicatorRow"/>
+        <collection id="bootConfigDc" class="com.vn.agent.admin.config.dto.AiKnobRow"/>
+        <collection id="secretsDc" class="com.vn.agent.admin.config.dto.AiSecretIndicatorRow"/>
     </data>
     <actions>
         <action id="saveAction" type="detail_saveClose"/>
