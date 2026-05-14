@@ -23,14 +23,19 @@ import java.util.UUID;
 @JmixEntity(name = "ai_AiKnobRow")
 public class AiKnobRow {
 
+    // Self-initialised: scanner constructs rows with `new AiKnobRow(...)` rather
+    // than `metadata.create(...)`, so @JmixGeneratedValue never fires. Without
+    // a non-null id the Jmix metamodel throws "Generated ID is null" when the
+    // DTO is bound to a CollectionContainer.
     @JmixId
     @JmixGeneratedValue
-    private UUID id;
+    private UUID id = UUID.randomUUID();
 
     private String key;
     private String resolvedValue;
     private String displayMessageKey;
-    private boolean requiresRestart;
+    // Jmix DTO enhancer rejects primitive boolean fields ("Use type Boolean").
+    private Boolean requiresRestart;
 
     public AiKnobRow() {
     }
@@ -39,7 +44,7 @@ public class AiKnobRow {
      * Convenience all-args constructor mirroring the previous record signature
      * for scanner call sites that pre-date the id field.
      */
-    public AiKnobRow(String key, String resolvedValue, String displayMessageKey, boolean requiresRestart) {
+    public AiKnobRow(String key, String resolvedValue, String displayMessageKey, Boolean requiresRestart) {
         this.key = key;
         this.resolvedValue = resolvedValue;
         this.displayMessageKey = displayMessageKey;
@@ -50,7 +55,7 @@ public class AiKnobRow {
      * Full constructor including the synthetic id (for tests / cloning paths
      * that want a deterministic id).
      */
-    public AiKnobRow(UUID id, String key, String resolvedValue, String displayMessageKey, boolean requiresRestart) {
+    public AiKnobRow(UUID id, String key, String resolvedValue, String displayMessageKey, Boolean requiresRestart) {
         this.id = id;
         this.key = key;
         this.resolvedValue = resolvedValue;
@@ -90,11 +95,11 @@ public class AiKnobRow {
         this.displayMessageKey = displayMessageKey;
     }
 
-    public boolean isRequiresRestart() {
+    public Boolean getRequiresRestart() {
         return requiresRestart;
     }
 
-    public void setRequiresRestart(boolean requiresRestart) {
+    public void setRequiresRestart(Boolean requiresRestart) {
         this.requiresRestart = requiresRestart;
     }
 
@@ -107,6 +112,6 @@ public class AiKnobRow {
      * registration warnings.
      */
     public boolean requiresRestart() {
-        return requiresRestart;
+        return Boolean.TRUE.equals(requiresRestart);
     }
 }

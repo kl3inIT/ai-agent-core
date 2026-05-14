@@ -158,7 +158,7 @@ public class AiUiSettingsDetailView extends StandardDetailView<AiUiSettings> {
     private Renderer<AiSecretIndicatorRow> secretsConfiguredRenderer() {
         return new ComponentRenderer<>(row -> {
             Span span = uiComponents.create(Span.class);
-            span.setText(messages.getMessage(row.isConfigured()
+            span.setText(messages.getMessage(row.configured()
                     ? "aiUiSettings.secrets.indicator.yes"
                     : "aiUiSettings.secrets.indicator.no"));
             return span;

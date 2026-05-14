@@ -30,13 +30,18 @@ import java.util.UUID;
 @JmixEntity(name = "ai_AiSecretIndicatorRow")
 public class AiSecretIndicatorRow {
 
+    // Self-initialised: scanner constructs rows with `new AiSecretIndicatorRow(...)`
+    // rather than `metadata.create(...)`, so @JmixGeneratedValue never fires.
+    // Without a non-null id the Jmix metamodel throws "Generated ID is null"
+    // when the DTO is bound to a CollectionContainer.
     @JmixId
     @JmixGeneratedValue
-    private UUID id;
+    private UUID id = UUID.randomUUID();
 
     private String key;
     private String displayMessageKey;
-    private boolean configured;
+    // Jmix DTO enhancer rejects primitive boolean fields ("Use type Boolean").
+    private Boolean configured;
 
     public AiSecretIndicatorRow() {
     }
@@ -45,7 +50,7 @@ public class AiSecretIndicatorRow {
      * Convenience all-args constructor mirroring the previous record signature
      * for scanner call sites that pre-date the id field.
      */
-    public AiSecretIndicatorRow(String key, String displayMessageKey, boolean configured) {
+    public AiSecretIndicatorRow(String key, String displayMessageKey, Boolean configured) {
         this.key = key;
         this.displayMessageKey = displayMessageKey;
         this.configured = configured;
@@ -55,7 +60,7 @@ public class AiSecretIndicatorRow {
      * Full constructor including the synthetic id (for tests / cloning paths
      * that want a deterministic id).
      */
-    public AiSecretIndicatorRow(UUID id, String key, String displayMessageKey, boolean configured) {
+    public AiSecretIndicatorRow(UUID id, String key, String displayMessageKey, Boolean configured) {
         this.id = id;
         this.key = key;
         this.displayMessageKey = displayMessageKey;
@@ -86,11 +91,19 @@ public class AiSecretIndicatorRow {
         this.displayMessageKey = displayMessageKey;
     }
 
-    public boolean isConfigured() {
+    public Boolean getConfigured() {
         return configured;
     }
 
-    public void setConfigured(boolean configured) {
+    public void setConfigured(Boolean configured) {
         this.configured = configured;
+    }
+
+    /**
+     * Non-bean convenience predicate (no {@code is}/{@code get} prefix to avoid
+     * Jmix duplicate-property scan). Returns {@code false} for {@code null}.
+     */
+    public boolean configured() {
+        return Boolean.TRUE.equals(configured);
     }
 }
