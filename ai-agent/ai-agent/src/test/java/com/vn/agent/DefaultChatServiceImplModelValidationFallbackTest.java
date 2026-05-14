@@ -36,6 +36,7 @@ import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
@@ -233,6 +234,49 @@ class DefaultChatServiceImplModelValidationFallbackTest {
                 "{\"error\":\"prompt too long\"}");
 
         assertThat(DefaultChatServiceImpl.isBadModelException(rcre)).isFalse();
+    }
+
+    // ---------- Plan 16-09 classifier extensions for WebClientResponseException ----------
+    // The Spring AI 1.x WebClient-backed provider stack (OpenRouter via spring-ai-openai)
+    // throws WebClientResponseException — a SIBLING of RestClientResponseException (different
+    // package root, both extend the RestClientException abstract superclass), NOT a subclass.
+    // The classifier triad must recognise both. Without these tests the WCRE shape would
+    // silently bypass the bad-model fallback on production.
+
+    @Test
+    void classifierAcceptsDirectWebClientResponseExceptionWithBadModelShape() {
+        WebClientResponseException wcre = WebClientResponseException.create(
+                400, "Bad Request",
+                new HttpHeaders(),
+                "{\"error\":{\"message\":\"Model openai/foo is not available\"}}"
+                        .getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8);
+
+        assertThat(DefaultChatServiceImpl.isBadModelException(wcre)).isTrue();
+    }
+
+    @Test
+    void classifierAcceptsNonTransientAiExceptionWrappingWebClientResponseException() {
+        WebClientResponseException wcre = WebClientResponseException.create(
+                404, "Not Found",
+                new HttpHeaders(),
+                "{\"error\":\"unknown model id\"}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8);
+        NonTransientAiException wrapped = new NonTransientAiException("provider rejected", wcre);
+
+        assertThat(DefaultChatServiceImpl.isBadModelException(wrapped)).isTrue();
+    }
+
+    @Test
+    void classifierRejects5xxWebClientResponseExceptionEvenWhenBodyMentionsModel() {
+        // Pitfall 6: status-code structural filter wins over substring even for WCRE.
+        WebClientResponseException wcre = WebClientResponseException.create(
+                503, "Service Unavailable",
+                new HttpHeaders(),
+                "{\"error\":\"model upstream timeout\"}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8);
+
+        assertThat(DefaultChatServiceImpl.isBadModelException(wcre)).isFalse();
     }
 
     // ---------- End-to-end contract tests ----------
