@@ -1,13 +1,24 @@
 package com.vn.agent.conversation;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("ai-agent.conversation-title")
 public record AiAgentTitleProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.title.enabled")
         Boolean enabled,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.title.modelId")
         String modelId,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.title.maxContextMessages")
         Integer maxContextMessages,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.title.minAssistantMessagesTrigger")
         Integer minAssistantMessagesTrigger,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.title.executor")
         Executor executor) {
 
     private static final int DEFAULT_MAX_CONTEXT_MESSAGES = 6;

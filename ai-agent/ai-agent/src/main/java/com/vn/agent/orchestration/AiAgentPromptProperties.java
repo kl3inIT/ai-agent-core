@@ -1,5 +1,6 @@
 package com.vn.agent.orchestration;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -20,7 +21,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * {@code MessageTools.getEntityCaption}.
  */
 @ConfigurationProperties("jmix.ai-agent.prompt")
-public record AiAgentPromptProperties(EntityInventory entityInventory) {
+public record AiAgentPromptProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.prompt.entityInventory")
+        EntityInventory entityInventory) {
 
     /** D-03: entity-inventory truncation config. */
     public record EntityInventory(Integer limit) {

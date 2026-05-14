@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.orchestration.RunContext;
 import io.jmix.core.DataManager;
 import io.jmix.core.FileRef;
@@ -117,17 +118,20 @@ public class AiTaskFileMediaResolver {
     private final AiTaskFileProperties taskFileProperties;
     private final AuditWriter auditWriter;
     private final CurrentAuthentication currentAuthentication;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
 
     public AiTaskFileMediaResolver(DataManager dataManager,
                                    FileStorageLocator fileStorageLocator,
                                    AiTaskFileProperties taskFileProperties,
                                    AuditWriter auditWriter,
-                                   CurrentAuthentication currentAuthentication) {
+                                   CurrentAuthentication currentAuthentication,
+                                   AiUiSettingsResolver aiUiSettingsResolver) {
         this.dataManager = dataManager;
         this.fileStorageLocator = fileStorageLocator;
         this.taskFileProperties = taskFileProperties;
         this.auditWriter = auditWriter;
         this.currentAuthentication = currentAuthentication;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
     }
 
     /**
@@ -152,7 +156,10 @@ public class AiTaskFileMediaResolver {
         if (conversationId == null) {
             return Resolved.empty();
         }
-        boolean ttlDisabled = taskFileProperties.getTtlSeconds() == -1L;
+        // Phase 16 CFG-01 — TTL + per-turn caps read via AiUiSettingsResolver so admin
+        // edits on the AiUiSettings singleton take effect without a restart. Null columns
+        // fall through to taskFileProperties. Sentinel -1 still disables (Phase 13.1).
+        boolean ttlDisabled = aiUiSettingsResolver.resolveTaskFileTtlSeconds() == -1L;
         var loader = dataManager.load(AiTaskFile.class)
                 .query(ttlDisabled
                         ? "select e from ai_AiTaskFile e " +
@@ -169,8 +176,8 @@ public class AiTaskFileMediaResolver {
             return Resolved.empty();
         }
 
-        int maxFiles = taskFileProperties.getPerTurnMaxFiles();          // -1 disables file cap
-        long maxBytes = taskFileProperties.getPerTurnMaxTotalBytes();    // -1 disables byte cap
+        int maxFiles = aiUiSettingsResolver.resolveTaskFilePerTurnMaxFiles();          // -1 disables file cap
+        long maxBytes = aiUiSettingsResolver.resolveTaskFilePerTurnMaxTotalBytes();    // -1 disables byte cap
 
         List<AiTaskFile> kept = new ArrayList<>();
         long keptBytes = 0L;

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+      Phase 16 D-01 — additive schema lock for the 12 Tier-1 runtime knobs on AiUiSettings.
+      All columns are nullable by contract: null = fall through to module.properties default
+      (resolved by AiUiSettingsResolver in Plan 03). TASK_FILE_MAX_FILE_SIZE_BYTES is a
+      distinct knob from UPLOAD_MAX_FILE_SIZE_BYTES per codex HIGH Concern #4 — chat task-file
+      per-file upload cap vs RAG/KB upload cap.
+
+      Companion changeSet 2 widens AI_AGENT_AUDIT_EVENT.KIND from varchar(16) to varchar(32)
+      per RESEARCH Pitfall 5 — Plan 01 added the 24-character constant
+      AuditKind.MODEL_VALIDATION_FAILURE which needs the wider column. Precedent:
+      071-widen-ai-audit-outcome.xml does the same modifyDataType for the OUTCOME column.
+      The Phase 12 D-15 invariant on 080-ai-ui-settings.xml is preserved — that file is NOT
+      modified. The parent agentstore-changelog.xml uses <includeAll> and is also NOT
+      modified (D-08 invariant).
+    -->
+
+    <changeSet id="1" author="ai-agent">
+        <addColumn tableName="AI_UI_SETTINGS">
+            <column name="TASK_FILE_TTL_SECONDS" type="bigint"/>
+            <column name="TASK_FILE_PER_TURN_MAX_FILES" type="int"/>
+            <column name="TASK_FILE_PER_TURN_MAX_TOTAL_BYTES" type="bigint"/>
+            <column name="TASK_FILE_MAX_FILE_SIZE_BYTES" type="bigint"/>
+            <column name="MUTATION_CONFIRMATION_REQUIRED" type="boolean"/>
+            <column name="MUTATION_IDEMPOTENCY_TTL_SECONDS" type="bigint"/>
+            <column name="MUTATION_BULK_MAX_ROWS" type="int"/>
+            <column name="PROMPT_ENTITY_INVENTORY_LIMIT" type="int"/>
+            <column name="TOOLS_MAX_FILTER_DEPTH" type="int"/>
+            <column name="TITLE_MAX_CONTEXT_MESSAGES" type="int"/>
+            <column name="TITLE_MIN_ASSISTANT_MESSAGES_TRIGGER" type="int"/>
+            <column name="UPLOAD_MAX_FILE_SIZE_BYTES" type="bigint"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent">
+        <modifyDataType tableName="AI_AGENT_AUDIT_EVENT"
+                        columnName="KIND"
+                        newDataType="varchar(32)"/>
+    </changeSet>
+
+</databaseChangeLog>

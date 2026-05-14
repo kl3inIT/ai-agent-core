@@ -150,7 +150,7 @@ class ChatPanelFragmentConversationIdTest {
                 .contains("if (activeRunId != null && conversationId == null)")
                 .contains("resolveConversationIdForRun(activeRunId)")
                 .contains("initializeConversationFromFinalEvent(serverConversationId)")
-                // the resolve helper reuses the loadTurnSteps security pattern (mandatory filter)
+                // mandatory user + run filter against the unconstrained store
                 .contains("where e.userUsername = :me and e.runId = :rid and e.parent is null")
                 .contains(".store(\"agentstore\")");
     }

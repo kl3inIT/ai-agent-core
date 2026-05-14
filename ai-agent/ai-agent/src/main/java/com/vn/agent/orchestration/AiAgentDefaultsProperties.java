@@ -1,5 +1,6 @@
 package com.vn.agent.orchestration;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -15,10 +16,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties("jmix.ai-agent.defaults")
 public record AiAgentDefaultsProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.defaults.model")
         String model,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.defaults.temperature")
         Double temperature,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.defaults.topP")
         Double topP,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.defaults.maxTokens")
         Integer maxTokens,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.defaults.systemPrompt")
         String systemPrompt) {
 
     /**

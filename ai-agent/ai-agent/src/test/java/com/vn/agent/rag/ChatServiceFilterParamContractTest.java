@@ -168,7 +168,8 @@ class ChatServiceFilterParamContractTest {
                 mock(IntentRegistry.class),
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
-                mock(com.vn.agent.taskfile.AiTaskFileRepository.class));
+                mock(com.vn.agent.taskfile.AiTaskFileRepository.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     @Test

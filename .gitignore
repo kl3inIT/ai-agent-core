@@ -31,6 +31,7 @@ gradle-local.properties
 
 # Playwright MCP scratch output and ad-hoc UAT artifacts.
 .playwright-mcp/
+.playwright-uat/
 /output/
 phase14-dom.json
 

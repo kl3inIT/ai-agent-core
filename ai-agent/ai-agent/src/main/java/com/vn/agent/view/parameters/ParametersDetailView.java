@@ -4,8 +4,11 @@ import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.ClickEvent;
 import com.vaadin.flow.component.HasValue;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.combobox.ComboBoxBase;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.router.Route;
+import com.vn.agent.admin.config.ChatModelCatalog;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.parameters.AiParametersBody;
 import com.vn.agent.parameters.AiParametersBodyYamlMapper;
@@ -16,6 +19,7 @@ import io.jmix.core.EntityStates;
 import io.jmix.core.Messages;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.component.codeeditor.CodeEditor;
+import io.jmix.flowui.component.combobox.JmixComboBox;
 import io.jmix.flowui.component.multiselectcombobox.JmixMultiSelectComboBox;
 import io.jmix.flowui.component.textarea.JmixTextArea;
 import io.jmix.flowui.component.textfield.JmixBigDecimalField;
@@ -73,7 +77,7 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     @ViewComponent
     private TypedTextField<String> profileNameField;
     @ViewComponent
-    private TypedTextField<String> modelField;
+    private JmixComboBox<String> modelField;
     @ViewComponent
     private JmixBigDecimalField temperatureField;
     @ViewComponent
@@ -105,6 +109,8 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     private AgentToolCallbacks agentToolCallbacks;
     @Autowired
     private EntityStates entityStates;
+    @Autowired
+    private ChatModelCatalog chatModelCatalog;
 
     private List<String> registryToolNames = Collections.emptyList();
 
@@ -122,6 +128,32 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
         registryToolNames = List.copyOf(toolNames);
         enabledToolsField.setItems(registryToolNames);
 
+        // ---- Curated open-weights model catalog (Phase 16 D-06 / RESEARCH Pattern 4) ----
+        // ComboBox is allowCustomValue=true (see view XML), so the catalog seeds the dropdown
+        // and any admin can still type a proprietary or experimental model id verbatim. The
+        // label generator appends "(default)" to the marked-default entry so the admin sees
+        // at-a-glance which choice mirrors default-params.yaml.model.
+        List<String> catalogIds = chatModelCatalog.entries().stream()
+                .map(ChatModelCatalog.Entry::id)
+                .toList();
+        modelField.setItems(catalogIds);
+        modelField.setItemLabelGenerator(id -> {
+            if (id == null) {
+                return "";
+            }
+            ChatModelCatalog.Entry entry = chatModelCatalog.findById(id);
+            if (entry == null) {
+                // Custom-entered id — render verbatim (escape hatch per SPEC criterion 4).
+                return id;
+            }
+            String label = entry.labelMessageKey() == null
+                    ? id
+                    : messages.getMessage(entry.labelMessageKey());
+            return entry.isDefault()
+                    ? label + " " + messages.getMessage("parametersDetail.modelField.defaultSuffix")
+                    : label;
+        });
+
         // Pin decimal fields to ENGLISH locale so "." is the decimal separator regardless of
         // the user's Jmix locale. Under "vi" locale the default NumberFormat uses "," as the
         // decimal separator, which rejects "0.1" / "0.3" with a parse error — a UX bug for
@@ -138,6 +170,18 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     @Subscribe("modelField")
     public void onModelFieldChange(final AbstractField.ComponentValueChangeEvent<?, ?> event) {
         refreshYamlPreview();
+    }
+
+    /**
+     * RESEARCH Pattern 4 — when the admin types a model id that is NOT in the curated
+     * catalog and presses Enter, Vaadin's {@code ComboBox} fires a {@code CustomValueSetEvent}
+     * but does NOT call {@code setValue} unless we do it explicitly. Without this wire, the
+     * typed value is dropped on blur and never reaches the YAML body.
+     */
+    @Subscribe("modelField")
+    public void onModelFieldCustomValueSet(
+            final ComboBoxBase.CustomValueSetEvent<ComboBox<String>> event) {
+        modelField.setValue(event.getDetail());
     }
 
     @Subscribe("temperatureField")
@@ -287,7 +331,13 @@ public class ParametersDetailView extends StandardDetailView<AiParameters> {
     }
 
     private void populateFormFromBody(AiParametersBody body) {
-        modelField.setValue(nullToBlank(body.model()));
+        // WR-06 — ComboBox (Plan 16-05) handles null as "no selection" cleanly. The previous
+        // nullToBlank wrapper produced an empty-string selection that the value-change handler
+        // treated as a custom value (allowCustomValue=true), surfacing `model: ''` in the YAML
+        // preview. Pass the raw body.model() so a fresh AiParameters with model=null lands in
+        // the form as "no selection" — required=true validation then asks the operator to pick
+        // one rather than failing on an empty custom value.
+        modelField.setValue(body.model());
         temperatureField.setValue(body.temperature());
         topPField.setValue(body.topP());
         maxTokensField.setValue(body.maxTokens());

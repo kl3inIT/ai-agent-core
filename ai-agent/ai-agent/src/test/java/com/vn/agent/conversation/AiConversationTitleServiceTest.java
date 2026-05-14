@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import io.jmix.core.UnconstrainedDataManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -351,11 +352,23 @@ class AiConversationTitleServiceTest {
         }
 
         TestTitleService build() {
+            // Phase 16 D-03 — title knobs read via resolver. The resolver mock falls
+            // through to the property bean's resolved values so existing test
+            // assertions stay byte-identical.
+            AiAgentTitleProperties properties = new AiAgentTitleProperties(true, "title-model", 6, 1,
+                    new AiAgentTitleProperties.Executor(1, 2, 32, 60));
+            AiUiSettingsResolver aiUiSettingsResolver = mock(AiUiSettingsResolver.class);
+            org.mockito.Mockito.lenient()
+                    .when(aiUiSettingsResolver.resolveTitleMaxContextMessages())
+                    .thenReturn(properties.resolvedMaxContextMessages());
+            org.mockito.Mockito.lenient()
+                    .when(aiUiSettingsResolver.resolveTitleMinAssistantMessagesTrigger())
+                    .thenReturn(properties.resolvedMinAssistantMessagesTrigger());
             return new TestTitleService(mock(UnconstrainedDataManager.class),
                     mock(ChatClient.Builder.class),
-                    new AiAgentTitleProperties(true, "title-model", 6, 1,
-                            new AiAgentTitleProperties.Executor(1, 2, 32, 60)),
+                    properties,
                     mock(AuditWriter.class),
+                    aiUiSettingsResolver,
                     loadedConversations,
                     messages,
                     modelTitle,
@@ -378,11 +391,12 @@ class AiConversationTitleServiceTest {
                                  ChatClient.Builder chatClientBuilder,
                                  AiAgentTitleProperties properties,
                                  AuditWriter auditWriter,
+                                 AiUiSettingsResolver aiUiSettingsResolver,
                                  List<AiConversation> loadedConversations,
                                  List<AiMessage> messages,
                                  String modelTitle,
                                  RuntimeException modelFailure) {
-            super(dataManager, chatClientBuilder, properties, auditWriter);
+            super(dataManager, chatClientBuilder, properties, auditWriter, aiUiSettingsResolver);
             this.auditWriter = auditWriter;
             this.loadedConversations = new ArrayList<>(loadedConversations);
             this.messages = List.copyOf(messages);

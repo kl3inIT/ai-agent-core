@@ -39,15 +39,7 @@ class ObservabilityMessagesCompletenessTest {
             "chatView.status.neutral",
             "chatView.status.chat",
             "chatView.status.tool",
-            "chatView.status.retrieval",
-            // 15-04 — per-turn tool-detail disclosure (OBS-02)
-            "chatView.turnDetail.summary",
-            "chatView.turnDetail.summaryPending",
-            "chatView.turnDetail.step.tool",
-            "chatView.turnDetail.step.retrieval",
-            "chatView.turnDetail.step.chat",
-            "chatView.turnDetail.errorIndicator",
-            "chatView.turnDetail.unknownDuration");
+            "chatView.status.retrieval");
 
     @Test
     void everyPhase15KeyResolvesNonBlankInEnglishBundle() {

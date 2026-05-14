@@ -2,6 +2,7 @@ package com.vn.agent;
 
 import com.vn.agent.action.ActionIntentId;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
@@ -22,12 +23,14 @@ import com.vn.agent.guard.TokenBudgetExhaustedException;
 import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
+import com.vn.agent.orchestration.ChatModelFallbackAppliedEvent;
 import com.vn.agent.orchestration.ChatResponseDto;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.orchestration.StreamingEvent;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.orchestration.SystemPromptComposer;
+import com.vn.agent.spi.AuditKind;
 import com.vn.agent.parameters.Overrides;
 import com.vn.agent.rag.CancellationRegistry;
 import com.vn.agent.rag.RetrievalFilterBuilder;
@@ -52,8 +55,11 @@ import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
@@ -63,6 +69,7 @@ import com.vn.agent.orchestration.ConversationNotFoundException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -123,6 +130,34 @@ public class DefaultChatServiceImpl implements ChatService {
     private static final Logger log = LoggerFactory.getLogger(DefaultChatServiceImpl.class);
     private static final String AUTO_INTENT_ID = "auto";
 
+    /**
+     * Phase 16 D-05 / MODEL-02 — HTTP status filter for the bad-model classifier. ONLY 4xx
+     * statuses that semantically signal "the requested model is invalid" trigger the one-shot
+     * fallback reissue:
+     * <ul>
+     *   <li>{@code 400 Bad Request} — provider rejected the model param shape outright</li>
+     *   <li>{@code 404 Not Found} — provider does not know the model id</li>
+     *   <li>{@code 422 Unprocessable Entity} — model accepted lexically but semantically
+     *       rejected (e.g. context window mismatch)</li>
+     * </ul>
+     *
+     * <p>5xx and 429 are intentionally EXCLUDED (RESEARCH Pitfall 6) — they signal transient
+     * provider issues that the {@code spring-ai-retry} advisor already handles; treating them
+     * as bad-model would create reissue loops on flaky upstream networks.
+     */
+    private static final Set<Integer> BAD_MODEL_STATUS_CODES = Set.of(400, 404, 422);
+
+    /**
+     * Phase 16 CR-02 — Jackson mapper for serializing {@code argumentsJson} payloads in
+     * {@code MODEL_VALIDATION_FAILURE} audit rows. The offending model id is admin-input via a
+     * ComboBox with {@code allowCustomValue=true} (Plan 16-05), so a value containing {@code "},
+     * {@code \}, or a newline must be properly escaped — string concatenation produces malformed
+     * JSON which downstream audit consumers cannot parse. Mirrors the
+     * {@code STRUCTURED_PAYLOAD_OBJECT_MAPPER} constant pattern in
+     * {@code com.vn.agent.audit.ToolCallbackAuditDecorator}.
+     */
+    private static final ObjectMapper AUDIT_ARGUMENTS_OBJECT_MAPPER = new ObjectMapper();
+
     private final ChatClient chatClient;
     private final ConversationGateway conversationGateway;
     private final AgentToolCallbacks toolCallbacks;
@@ -147,6 +182,14 @@ public class DefaultChatServiceImpl implements ChatService {
     // persistence path (RES-01 + project memory feedback_jmix_unconstrained_for_system_writes).
     private final AiTaskFileMediaResolver taskFileMediaResolver;
     private final AiTaskFileRepository taskFileRepository;
+    /**
+     * Phase 16 D-05 / MODEL-02 — publisher for {@link ChatModelFallbackAppliedEvent} after a
+     * successful bad-model-catch + one-shot reissue. NOT used for {@code AiSettingsChangedEvent}
+     * (that single-publish-site invariant is owned by Plan 16-05's two entity listeners, which
+     * the SecretRedactionInvariantsTest source-scan locks down at build time). This publisher is
+     * a fresh injection for the new MODEL-02 notification surface only.
+     */
+    private final ApplicationEventPublisher eventPublisher;
 
     public DefaultChatServiceImpl(ChatClient chatClient,
                                   ConversationGateway conversationGateway,
@@ -167,7 +210,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                   IntentRegistry intentRegistry,
                                   ConversationTitleEligibilityPublisher titleEligibilityPublisher,
                                   AiTaskFileMediaResolver taskFileMediaResolver,
-                                  AiTaskFileRepository taskFileRepository) {
+                                  AiTaskFileRepository taskFileRepository,
+                                  ApplicationEventPublisher eventPublisher) {
         this.chatClient = chatClient;
         this.conversationGateway = conversationGateway;
         this.toolCallbacks = toolCallbacks;
@@ -188,6 +232,7 @@ public class DefaultChatServiceImpl implements ChatService {
         this.titleEligibilityPublisher = titleEligibilityPublisher;
         this.taskFileMediaResolver = taskFileMediaResolver;
         this.taskFileRepository = taskFileRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -380,36 +425,40 @@ public class DefaultChatServiceImpl implements ChatService {
         RunContext.setExtractionTurn(extractionIntentId, convId, message,
                 resolvedMedia.taskFileIds(), resolvedMedia.media(),
                 sourceTexts(resolvedMedia.documentTexts()));
-        ChatClientResponse clientResp = chatClient.prompt()
-                .system(systemPromptWithDocs)
-                .user(u -> {
-                    // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
-                    u.text(message);
-                    if (!resolvedMedia.media().isEmpty()) {
-                        u.media(resolvedMedia.media().toArray(new Media[0]));
-                    }
-                })
-                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId))
-                .toolContext(auditToolContext(runId, convId))
-                .advisors(advisorSpec -> {
-                    advisorSpec
-                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
-                            .param("audit.runId", runId)
-                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
-                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
-                                    retrievalSimilarityThreshold);
-                    if (ragFilter != null) {
-                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
-                    }
-                })
-                .options(ChatOptions.builder()
-                        .model(model)
-                        .temperature(parametersResolver.effectiveTemperature(active))
-                        .topP(parametersResolver.effectiveTopP(active))
-                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
-                        .build())
-                .call()
-                .chatClientResponse();
+
+        // Phase 16 D-05 / MODEL-02 — bad-model catch + one-shot reissue. Catches
+        // RuntimeException (broadest viable type — codex HIGH Concern #8) and applies the
+        // classifier to the cause chain; non-bad-model RuntimeExceptions are rethrown
+        // unchanged. The saved AiParameters.bodyYaml.model is NEVER mutated by this path.
+        ChatClientResponse clientResp;
+        String effectiveModel = model;
+        try {
+            clientResp = invokeBlockingChatClient(systemPromptWithDocs, message, resolvedMedia,
+                    userId, convId, toolSurfaceIntentId, runId,
+                    retrievalTopK, retrievalSimilarityThreshold, ragFilter,
+                    model, active);
+        } catch (RuntimeException providerEx) {
+            if (!isBadModelException(providerEx)) {
+                throw providerEx;
+            }
+            String fallback = parametersResolver.fallbackModel();
+            // Defensive guard: if the configured fallback IS the offending model (admin set
+            // defaults.model = same bad id), do NOT loop — rethrow the original exception so
+            // the streaming/blocking caller surfaces it via the existing error path.
+            if (fallback == null || fallback.equals(model)) {
+                throw providerEx;
+            }
+            // Phase 16 Plan 09 — single canonical audit + publish surface shared with the
+            // streaming-path onErrorResume below (single-publish-site invariant). The helper
+            // preserves the writeAuditEvent + publishEvent call shapes byte-for-byte; only
+            // the enclosing method changes.
+            applyFallbackAuditAndPublish(runId, userId, convId, model, fallback, providerEx);
+            clientResp = invokeBlockingChatClient(systemPromptWithDocs, message, resolvedMedia,
+                    userId, convId, toolSurfaceIntentId, runId,
+                    retrievalTopK, retrievalSimilarityThreshold, ragFilter,
+                    fallback, active);
+            effectiveModel = fallback;
+        }
 
         ChatResponse springResponse = clientResp.chatResponse();
         String content = springResponse != null
@@ -441,10 +490,12 @@ public class DefaultChatServiceImpl implements ChatService {
         boolean flagged = flaggedKey != null;
 
         long latencyMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        // Phase 16 D-05 — the model id reported on the DTO is the one the successful response
+        // came from: original on the happy path, fallback after a bad-model reissue.
         log.debug("ChatService.executeBlockingTurn convId={} runId={} model={} latencyMs={} flagged={}",
-                convId, runId, model, latencyMs, flagged);
+                convId, runId, effectiveModel, latencyMs, flagged);
         publishTitleEligibilityIfAssistantReply(convId, userId, runId, content);
-        return new ChatResponseDto(convId, runId, content, model, latencyMs,
+        return new ChatResponseDto(convId, runId, content, effectiveModel, latencyMs,
                 flagged, flaggedKey, null, resolvedMedia.budgetExceeded());
     }
 
@@ -631,6 +682,56 @@ public class DefaultChatServiceImpl implements ChatService {
                         content = Flux.just(
                                 new StreamingEvent.Content(blocking.content() == null ? "" : blocking.content()));
                     }
+
+                    // Phase 16 Plan 09 — MODEL-02 streaming-path bad-model catch+reissue. The
+                    // WebClient-backed OpenRouter stack throws WebClientResponseException during
+                    // streaming emission (NOT a subclass of RestClientResponseException). The
+                    // extended classifier triad (isBadModelException + matchesBadModelShape +
+                    // findCausalRcre) now recognises both sibling provider-response types.
+                    //
+                    // Call-first / audit-on-success ordering: if executeBlockingTurn itself throws
+                    // (e.g. the configured fallback model also returns 5xx), no MODEL_VALIDATION_FAILURE
+                    // audit row is written and no ChatModelFallbackAppliedEvent is published —
+                    // recovery never succeeded, so the misleading pre-write is avoided. The fallback's
+                    // exception propagates out of Flux.defer through the outer .onErrorResume at
+                    // line ~719 which maps it to chatView.error.generic.
+                    //
+                    // Effectively-final capture: composedSystemPrompt was reassigned a few lines
+                    // above (appendPrivateSystemAppendix) so the compiler rejects direct lambda
+                    // capture. Alias to a final local for the lambda.
+                    final String streamingComposedSystemPrompt = composedSystemPrompt;
+                    content = content.onErrorResume(streamEx -> {
+                        if (!DefaultChatServiceImpl.isBadModelException(streamEx)) {
+                            // Not a bad-model failure — let the outer .onErrorResume(mapToStreamingError)
+                            // handle it (5xx, RateLimitExceeded, non-model 4xx, etc.).
+                            return Flux.error(streamEx);
+                        }
+                        String fallback = parametersResolver.fallbackModel();
+                        if (fallback == null || fallback.equals(model)) {
+                            // Defensive self-loop guard — propagate the original exception so the
+                            // outer mapToStreamingError surfaces it via chatView.error.generic.
+                            return Flux.error(streamEx);
+                        }
+                        return Flux.defer(() -> {
+                            // 1) Re-issue against the fallback model FIRST. If this throws, propagate
+                            //    without writing the recovery audit row / publishing the event —
+                            //    the recovery never succeeded.
+                            ChatResponseDto recovered = executeBlockingTurn(userId, convId, message,
+                                    effectiveOverrides, resolvedMedia, streamingComposedSystemPrompt,
+                                    fallback, active, ragFilter, retrievalTopK,
+                                    retrievalSimilarityThreshold,
+                                    extractionIntentId(normalizedIntentId), normalizedIntentId, runId,
+                                    startNanos);
+                            // 2) Recovery succeeded — write the audit row + publish the event via the
+                            //    canonical helper (single-publish-site invariant shared with the
+                            //    blocking-path catch above).
+                            applyFallbackAuditAndPublish(runId, userId, convId, model, fallback, streamEx);
+                            titlePublicationHandled.set(true);
+                            toolSink.tryEmitComplete();
+                            return Flux.<StreamingEvent>just(new StreamingEvent.Content(
+                                    recovered.content() == null ? "" : recovered.content()));
+                        });
+                    });
 
                     Flux<StreamingEvent> merged = toolSink.asFlux().mergeWith(content);
                     return merged
@@ -960,5 +1061,327 @@ public class DefaultChatServiceImpl implements ChatService {
                 .map(document -> new ExtractionSourceText(
                         document.filename(), document.text(), document.truncated()))
                 .toList();
+    }
+
+    // ====================================================================
+    // Phase 16 D-05 / MODEL-02 — bad-model catch + one-shot reissue helpers
+    // ====================================================================
+
+    /**
+     * Builds and invokes the {@code chatClient.prompt()...call().chatClientResponse()} chain
+     * with the supplied {@code chosenModel} as the {@link ChatOptions} model id. Extracted from
+     * {@code executeBlockingTurn} so the bad-model reissue can hit the same code path with a
+     * different model id without duplicating the prompt-shape builder.
+     */
+    private ChatClientResponse invokeBlockingChatClient(String systemPromptWithDocs,
+                                                        String message,
+                                                        AiTaskFileMediaResolver.Resolved resolvedMedia,
+                                                        String userId,
+                                                        UUID convId,
+                                                        String toolSurfaceIntentId,
+                                                        UUID runId,
+                                                        int retrievalTopK,
+                                                        double retrievalSimilarityThreshold,
+                                                        Filter.Expression ragFilter,
+                                                        String chosenModel,
+                                                        AiParameters active) {
+        return chatClient.prompt()
+                .system(systemPromptWithDocs)
+                .user(u -> {
+                    // AI-SPEC pitfall 6: lambda form is REQUIRED when injecting Media.
+                    u.text(message);
+                    if (!resolvedMedia.media().isEmpty()) {
+                        u.media(resolvedMedia.media().toArray(new Media[0]));
+                    }
+                })
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId))
+                .toolContext(auditToolContext(runId, convId))
+                .advisors(advisorSpec -> {
+                    advisorSpec
+                            .param(ChatMemory.CONVERSATION_ID, convId.toString())
+                            .param("audit.runId", runId)
+                            .param(AuditingDocumentRetriever.TOP_K_CONTEXT_KEY, retrievalTopK)
+                            .param(AuditingDocumentRetriever.SIMILARITY_THRESHOLD_CONTEXT_KEY,
+                                    retrievalSimilarityThreshold);
+                    if (ragFilter != null) {
+                        advisorSpec.param(VectorStoreDocumentRetriever.FILTER_EXPRESSION, ragFilter);
+                    }
+                })
+                .options(ChatOptions.builder()
+                        .model(chosenModel)
+                        .temperature(parametersResolver.effectiveTemperature(active))
+                        .topP(parametersResolver.effectiveTopP(active))
+                        .maxTokens(parametersResolver.effectiveMaxTokens(active))
+                        .build())
+                .call()
+                .chatClientResponse();
+    }
+
+    /**
+     * Phase 16 D-05 / MODEL-02 — classifier for the bad-model catch + reissue path. Walks the
+     * cause chain (depth-bounded at 5) and returns {@code true} IFF the chain contains either:
+     * <ul>
+     *   <li>A direct {@link RestClientResponseException} whose status matches
+     *       {@link #BAD_MODEL_STATUS_CODES} AND whose body/message contains the substring
+     *       {@code "model"} (case-insensitive), OR</li>
+     *   <li>A {@link org.springframework.ai.retry.NonTransientAiException} wrapping a
+     *       {@link RestClientResponseException} that matches the same shape.</li>
+     * </ul>
+     *
+     * <p>Package-private + static for unit-test isolation (opencode Suggestion #4): the suite
+     * can construct synthetic exceptions and exercise the classifier without booting the chat
+     * pipeline. Catches BOTH the direct {@link RestClientResponseException} (Spring AI 1.x
+     * bare-bones provider path) AND the NonTransientAiException wrapping (Spring AI 1.x
+     * normalized error path) per codex HIGH Concern #8.
+     *
+     * <p>Phase 16 Plan 09 — Spring AI 1.x WebClient-backed provider stacks (OpenRouter via
+     * spring-ai-openai reactive client) throw
+     * {@link org.springframework.web.reactive.function.client.WebClientResponseException}
+     * rather than {@link RestClientResponseException} for HTTP error responses — the
+     * classifier handles both. The two exception types are siblings (both extend
+     * {@code RestClientException} via different package roots), not subclasses, so an
+     * {@code instanceof} check on one does not match the other.
+     *
+     * <p>5xx is intentionally excluded — those are transient provider failures that
+     * {@code spring-ai-retry} handles via the retry advisor. Substring-only matches without a
+     * trusted structural status code are ALSO excluded (Pitfall 6 — the message "model
+     * unavailable" on a generic 500 is not a bad-model signal).
+     */
+    static boolean isBadModelException(Throwable t) {
+        Throwable cursor = t;
+        for (int depth = 0; cursor != null && depth < 5; depth++, cursor = cursor.getCause()) {
+            // Case A1: direct RestClientResponseException (Spring AI 1.x bare-bones provider path)
+            if (cursor instanceof RestClientResponseException rcre) {
+                if (matchesBadModelShape(rcre)) {
+                    return true;
+                }
+                continue;
+            }
+            // Case A2: direct WebClientResponseException (Spring AI 1.x WebClient-backed
+            // provider path — OpenRouter via spring-ai-openai). Sibling type, NOT a subclass
+            // of RestClientResponseException — needs its own instanceof branch.
+            if (cursor instanceof WebClientResponseException wcre) {
+                if (matchesBadModelShape(wcre)) {
+                    return true;
+                }
+                continue;
+            }
+            // Case B: NonTransientAiException wrapping a RestClientResponseException OR a
+            // WebClientResponseException (Spring AI 1.x normalized provider error path).
+            // Walk the wrapped cause.
+            if (cursor instanceof org.springframework.ai.retry.NonTransientAiException) {
+                Throwable inner = cursor.getCause();
+                int innerDepth = 0;
+                while (inner != null && innerDepth < 5) {
+                    if (inner instanceof RestClientResponseException rcre) {
+                        if (matchesBadModelShape(rcre)) {
+                            return true;
+                        }
+                        break;
+                    }
+                    if (inner instanceof WebClientResponseException wcre) {
+                        if (matchesBadModelShape(wcre)) {
+                            return true;
+                        }
+                        break;
+                    }
+                    inner = inner.getCause();
+                    innerDepth++;
+                }
+                // If NonTransientAiException has no RCRE/WCRE cause but its own message
+                // mentions "model" — still NOT a bad-model signal without a status code we
+                // can structurally trust (Pitfall 6 false-positive guard).
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Phase 16 Plan 09 — instanceof-agnostic shape predicate. The two sibling provider-response
+     * exception types ({@link RestClientResponseException} and
+     * {@link WebClientResponseException}) expose identical shape readers
+     * ({@code getStatusCode().value()}, {@code getResponseBodyAsString()},
+     * {@code getMessage()}); the 1-arg overloads below extract those three values and delegate
+     * here so the shape rule (status filter + body/message "model" substring) lives in exactly
+     * one place.
+     */
+    private static boolean matchesBadModelShape(int status, String body, String message) {
+        if (!BAD_MODEL_STATUS_CODES.contains(status)) {
+            return false;
+        }
+        if (body != null && body.toLowerCase(Locale.ROOT).contains("model")) {
+            return true;
+        }
+        return message != null && message.toLowerCase(Locale.ROOT).contains("model");
+    }
+
+    private static boolean matchesBadModelShape(RestClientResponseException rcre) {
+        return matchesBadModelShape(rcre.getStatusCode().value(),
+                rcre.getResponseBodyAsString(), rcre.getMessage());
+    }
+
+    private static boolean matchesBadModelShape(WebClientResponseException wcre) {
+        return matchesBadModelShape(wcre.getStatusCode().value(),
+                wcre.getResponseBodyAsString(), wcre.getMessage());
+    }
+
+    /**
+     * Extracts the HTTP status from the cause chain for audit-row stamping; returns {@code -1}
+     * if no provider-response exception ({@link RestClientResponseException} or
+     * {@link WebClientResponseException}) is found (defensive — callers only invoke this after
+     * {@link #isBadModelException} returned true, so a status WILL be present).
+     *
+     * <p>WR-04: mirrors {@link #isBadModelException}'s traversal — including the descent into
+     * {@link org.springframework.ai.retry.NonTransientAiException#getCause()} for the Case B
+     * (wrapped RCRE/WCRE) shape. The previous linear-outer-walk-only implementation returned
+     * {@code -1} for chains where the RCRE was nested inside a NonTransientAiException, so the
+     * audit row recorded a misleading {@code status=-1} even though the classifier had matched.</p>
+     *
+     * <p>Phase 16 Plan 09: also extracts status from {@link WebClientResponseException} cause
+     * chains (WebClient-backed provider stack — OpenRouter via spring-ai-openai).</p>
+     */
+    private static int extractBadModelStatus(Throwable cause) {
+        Throwable found = findCausalRcre(cause);
+        if (found instanceof RestClientResponseException rcre) {
+            return rcre.getStatusCode().value();
+        }
+        if (found instanceof WebClientResponseException wcre) {
+            return wcre.getStatusCode().value();
+        }
+        return -1;
+    }
+
+    /**
+     * WR-04 — shared cause-chain walker used by {@link #extractBadModelStatus} (and tested in
+     * parallel with {@link #isBadModelException}). Returns the first
+     * {@link RestClientResponseException} OR {@link WebClientResponseException} (sibling
+     * provider-response exception types) reachable in the depth-bounded (≤ 5) outer chain OR,
+     * when the cursor is a {@link org.springframework.ai.retry.NonTransientAiException}, the
+     * depth-bounded inner-chain walk underneath it. Returns {@code null} if neither type is
+     * found.
+     *
+     * <p>The return type is {@link Throwable} (rather than the more specific
+     * {@code RestClientException} abstract superclass) so callers can plain-{@code instanceof}
+     * branch on the two concrete sibling types — see {@link #extractBadModelStatus}.</p>
+     *
+     * <p>Note: the classifier {@link #isBadModelException} additionally filters by
+     * {@link #matchesBadModelShape(int, String, String)}; this helper deliberately does NOT —
+     * its job is to surface the status code for the audit row even if the body/message-substring
+     * check would have failed (the audit row records what the classifier saw, including the
+     * status of a shape-matched RCRE/WCRE; callers only invoke it after the classifier returned
+     * true).</p>
+     *
+     * <p>Method name retained as {@code findCausalRcre} (no rename to
+     * {@code findCausalProviderResponseException}) per Plan 16-09 Warning #8 — no test call
+     * sites would benefit from the rename, and any external reference by name stays stable.</p>
+     */
+    private static Throwable findCausalRcre(Throwable t) {
+        Throwable cursor = t;
+        for (int depth = 0; cursor != null && depth < 5; depth++, cursor = cursor.getCause()) {
+            if (cursor instanceof RestClientResponseException rcre) {
+                return rcre;
+            }
+            if (cursor instanceof WebClientResponseException wcre) {
+                return wcre;
+            }
+            if (cursor instanceof org.springframework.ai.retry.NonTransientAiException) {
+                Throwable inner = cursor.getCause();
+                int innerDepth = 0;
+                while (inner != null && innerDepth < 5) {
+                    if (inner instanceof RestClientResponseException rcre) {
+                        return rcre;
+                    }
+                    if (inner instanceof WebClientResponseException wcre) {
+                        return wcre;
+                    }
+                    inner = inner.getCause();
+                    innerDepth++;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Writes the {@code MODEL_VALIDATION_FAILURE} audit row. Uses the
+     * {@link AuditWriter#writeAuditEvent(String, UUID, UUID, String, UUID, String, String, String, long, AiToolCallOutcome, String, String)}
+     * overload added by Plan 16-01 (consensus HIGH Concern #1 resolved at Wave 0). The body
+     * carries HTTP status + sanitised exception class name only — P-22 / T-16-04 mitigation:
+     * the raw provider response body NEVER touches the audit row. The offending model id is
+     * admin-input (not user-input) and is included verbatim.
+     */
+    private void writeModelValidationFailureAudit(UUID runId, String userUsername, UUID convId,
+                                                  String offendingModel, Throwable cause) {
+        try {
+            int status = extractBadModelStatus(cause);
+            String errorClass = cause.getClass().getSimpleName();
+            String resultSummary = String.format(Locale.ROOT,
+                    "model=%s status=%d error=%s", offendingModel, status, errorClass);
+            // CR-02 (P-22 sanitisation precedent): serialize the {model: offendingModel} payload
+            // via Jackson so a custom-entry model id containing `"`, `\`, or newline produces
+            // valid JSON. Raw string concatenation accepted admin-input verbatim and could write
+            // a malformed audit row that downstream JSON parsers reject — losing forensic context.
+            String argumentsJson;
+            try {
+                argumentsJson = AUDIT_ARGUMENTS_OBJECT_MAPPER.writeValueAsString(
+                        Map.of("model", offendingModel == null ? "" : offendingModel));
+            } catch (JsonProcessingException jpe) {
+                argumentsJson = "{}";
+            }
+            auditWriter.writeAuditEvent(
+                    AuditKind.MODEL_VALIDATION_FAILURE,
+                    RunContext.getRootAuditId(),
+                    runId,
+                    userUsername,
+                    convId,
+                    /* toolName = sentinel — not a real @Tool method */ "model_validation",
+                    argumentsJson,
+                    resultSummary,
+                    /* latencyMs */ 0L,
+                    AiToolCallOutcome.FAILED,
+                    /* denialReason */ null,
+                    errorClass);
+        } catch (Throwable t) {
+            // Audit-row failure must NOT break the user-facing reissue path. The recovered turn
+            // still ships; the operator just loses the correlated MODEL_VALIDATION_FAILURE row.
+            log.warn("MODEL_VALIDATION_FAILURE audit row failed runId={} model={}",
+                    runId, offendingModel, t);
+        }
+    }
+
+    /**
+     * Phase 16 Plan 09 — single canonical audit + publish surface for the MODEL-02 bad-model
+     * recovery path. Shared by:
+     * <ul>
+     *   <li>the blocking-path catch block in {@link #executeBlockingTurn} (Plan 16-07
+     *       behavior — audit before the fallback invocation, publish after), AND</li>
+     *   <li>the streaming-path {@code Flux.onErrorResume} wrap inside {@link #stream}
+     *       (Plan 16-09 — invoked AFTER the recovery succeeded; the streaming-path call site
+     *       does the executeBlockingTurn re-issue first and only invokes this helper on
+     *       success, so a failing fallback never writes a misleading audit row).</li>
+     * </ul>
+     *
+     * <p>The {@code writeAuditEvent} and {@code publishEvent} call shapes are preserved
+     * byte-for-byte from the pre-Plan-16-09 inline Plan 16-07 implementation so the 11
+     * blocking-path tests in {@link DefaultChatServiceImplModelValidationFallbackTest} stay
+     * green against this single seam (call-shape preservation gate).
+     */
+    private void applyFallbackAuditAndPublish(UUID runId, String userUsername, UUID convId,
+                                              String offendingModel, String fallback,
+                                              Throwable providerEx) {
+        writeModelValidationFailureAudit(runId, userUsername, convId, offendingModel, providerEx);
+        log.warn("MODEL_VALIDATION_FAILURE convId={} runId={} offendingModel={} fallback={} status={}",
+                convId, runId, offendingModel, fallback, extractBadModelStatus(providerEx));
+        // MODEL-02 user-visible fallback notification surface (codex HIGH Concern #9 —
+        // wired in this phase, not deferred). ChatPanelFragment subscribes via
+        // @EventListener and filters by conversationId before rendering the toast.
+        try {
+            eventPublisher.publishEvent(new ChatModelFallbackAppliedEvent(
+                    this, runId, convId, offendingModel, fallback));
+        } catch (RuntimeException publishFailure) {
+            // Notification surface failure must not break a successfully-recovered turn.
+            log.warn("ChatModelFallbackAppliedEvent publication failed runId={}", runId,
+                    publishFailure);
+        }
     }
 }

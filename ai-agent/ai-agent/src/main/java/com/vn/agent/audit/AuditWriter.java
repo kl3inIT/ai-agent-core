@@ -149,9 +149,57 @@ public class AuditWriter {
     public UUID writeToolCall(UUID parentId, UUID runId, String userUsername, UUID conversationId,
                               String toolName, String argumentsJson, String resultSummary, long latencyMs,
                               AiToolCallOutcome outcome, String denialReason, String errorClass) {
+        return writeAuditRow(AuditKind.TOOL, parentId, runId, userUsername, conversationId,
+                toolName, argumentsJson, resultSummary, latencyMs, outcome, denialReason, errorClass);
+    }
+
+    /**
+     * Phase 16 D-05 — writes an audit row stamped with the caller-supplied {@code kind} constant
+     * (e.g. {@link AuditKind#MODEL_VALIDATION_FAILURE}). Reuses the same row-build path as
+     * {@link #writeToolCall} but does not assume {@code kind == TOOL}.
+     *
+     * <p>Plan 07's {@code DefaultChatServiceImpl.writeModelValidationFailureAudit} calls this
+     * overload with {@code kind = AuditKind.MODEL_VALIDATION_FAILURE} so the failed-then-recovered
+     * turn emits two correlated audit rows under the same {@code runId} — a
+     * {@code MODEL_VALIDATION_FAILURE} row from this method plus the recovered CHAT/TOOL row from
+     * the existing post-call audit code.
+     *
+     * <p>Additive only: existing {@link #writeToolCall} callers are unchanged. The shared
+     * {@link #writeAuditRow} helper sanitises identically — no new redaction surface is
+     * introduced (T-16-04 mitigation preserved).
+     *
+     * <p>Note: the column {@code AI_AUDIT_EVENT.KIND} is widened from {@code varchar(16)} to
+     * {@code varchar(32)} by Plan 02's changelog (Pitfall 5 — {@code MODEL_VALIDATION_FAILURE}
+     * is 24 chars). This method does not validate {@code kind} against the {@link AuditKind}
+     * constants — host extensions may emit custom kinds within the widened column constraint.
+     *
+     * @return the newly-allocated audit row id
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public UUID writeAuditEvent(String kind, UUID parentId, UUID runId, String userUsername, UUID conversationId,
+                                String toolName, String argumentsJson, String resultSummary, long latencyMs,
+                                AiToolCallOutcome outcome, String denialReason, String errorClass) {
+        return writeAuditRow(kind, parentId, runId, userUsername, conversationId,
+                toolName, argumentsJson, resultSummary, latencyMs, outcome, denialReason, errorClass);
+    }
+
+    /**
+     * Shared private row-build helper for {@link #writeToolCall} (kind = {@link AuditKind#TOOL})
+     * and {@link #writeAuditEvent} (caller-supplied kind). Mirrors the original
+     * {@code writeToolCall} body verbatim — same {@link io.jmix.core.UnconstrainedDataManager}
+     * path, same JPA flush semantics, same redaction guarantees — differing ONLY in the kind
+     * stamped on the row.
+     *
+     * <p>Callers MUST be {@code @Transactional(propagation = REQUIRES_NEW)} so this helper
+     * inherits the audit-pipeline transactional invariant (D-11). Both public entry points
+     * already are.
+     */
+    private UUID writeAuditRow(String kind, UUID parentId, UUID runId, String userUsername, UUID conversationId,
+                               String toolName, String argumentsJson, String resultSummary, long latencyMs,
+                               AiToolCallOutcome outcome, String denialReason, String errorClass) {
         AiAuditEvent row = metadata.create(AiAuditEvent.class);
         row.setRunId(runId);
-        row.setKind(AuditKind.TOOL);
+        row.setKind(kind);
         row.setEventName(toolName);                        // no more <chat> sentinel — eventName = tool name
         row.setUserUsername(userUsername);
         row.setArgumentsJson(argumentsJson);
@@ -175,8 +223,8 @@ public class AuditWriter {
             if (parent != null) {
                 row.setParent(parent);
             } else {
-                log.warn("writeToolCall: parent {} not found; tool row will be orphan (runId={}, tool={})",
-                        effectiveParentId, runId, toolName);
+                log.warn("writeAuditRow: parent {} not found; row will be orphan (runId={}, kind={}, tool={})",
+                        effectiveParentId, runId, kind, toolName);
             }
         }
         OffsetDateTime now = OffsetDateTime.now();
@@ -184,7 +232,7 @@ public class AuditWriter {
         row.setFinishedAt(now);
         dataManager.save(row);
         final UUID auditId = row.getId();
-        registerAfterCommit(auditId, AuditKind.TOOL);
+        registerAfterCommit(auditId, kind);
         return auditId;
     }
 

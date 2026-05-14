@@ -20,6 +20,7 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.streams.UploadHandler;
 import com.vn.agent.entity.AiKnowledgeDocument;
 import com.vn.agent.entity.AiKnowledgeDocumentStatus;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.push.DocumentStatusChangedEvent;
 import com.vn.agent.rag.KnowledgeDocumentService;
 import com.vn.agent.rag.KnowledgeDocumentUploadService;
@@ -139,6 +140,11 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
   @Autowired private MetaclassComboBoxHelper metaclassComboBoxHelper;
   @Autowired private ResourceRoleRepository resourceRoleRepository;
   @Autowired private AiAgentRagProperties ragProperties;
+  // Phase 16 CFG-01 — read KB/RAG upload cap via resolver (codex HIGH Concern #5:
+  // resolveRagUploadMaxFileSizeBytes is DISTINCT from resolveTaskFileMaxFileSizeBytes
+  // — KB upload path, not chat task-file path). Null column falls through to
+  // ragProperties.resolvedUploadMaxFileSizeBytes().
+  @Autowired private AiUiSettingsResolver aiUiSettingsResolver;
 
   /** Captured onAttach so the push listener can UI.access() the correct UI per-browser-tab. */
   private volatile UI ownerUi;
@@ -163,7 +169,8 @@ public class KnowledgeBaseView extends StandardListView<AiKnowledgeDocument> {
             .toList();
     uploadAllowedRolesField.setItems(uploadRoleCodes);
 
-    documentUpload.setMaxFileSize(ragProperties.resolvedUploadMaxFileSizeBytes());
+    documentUpload.setMaxFileSize((int) Math.min(
+        aiUiSettingsResolver.resolveRagUploadMaxFileSizeBytes(), Integer.MAX_VALUE));
     documentUpload.setUploadHandler(
         UploadHandler.toFile(
             (metadata, stagedFile) -> {

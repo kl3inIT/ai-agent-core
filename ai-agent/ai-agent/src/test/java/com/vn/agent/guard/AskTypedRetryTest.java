@@ -145,7 +145,8 @@ class AskTypedRetryTest {
                 // exercises only the typed-retry path with no attached files, so the resolver is
                 // stubbed to return an empty Resolved record and the repository is unused.
                 stubEmptyTaskFileResolver(),
-                mock(com.vn.agent.taskfile.AiTaskFileRepository.class));
+                mock(com.vn.agent.taskfile.AiTaskFileRepository.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     /**

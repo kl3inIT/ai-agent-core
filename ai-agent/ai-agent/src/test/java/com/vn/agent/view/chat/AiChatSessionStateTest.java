@@ -74,13 +74,12 @@ class AiChatSessionStateTest {
         assertThat(state.getCurrentConversationId()).isNull();
     }
 
-    // ---- Phase 15 OBS-04: no per-turn accumulation in session/UI-scoped state (15-REVIEWS #10) ----
+    // ---- No per-turn accumulation in session/UI-scoped state -----------------------------------
 
     /**
      * {@code AiChatSessionState} must still hold exactly {@code {currentConversationId,
-     * listenerRegistrations}} — Phase 15 added no field and no per-turn-growing collection. The
-     * per-turn step list ({@code liveTurnSteps}, capped 50) lives on the {@code ChatPanelFragment}
-     * INSTANCE, not here.
+     * listenerRegistrations}} — no per-turn-growing collection lives here. Per-turn observability
+     * buffers (when any exist) belong on the {@code ChatPanelFragment} INSTANCE, not here.
      */
     @Test
     void sessionStateHoldsExactlyConversationIdAndListeners_noPerTurnAccumulation() {

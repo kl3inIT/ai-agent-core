@@ -1,5 +1,6 @@
 package com.vn.agent.tools.mutation;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -31,10 +32,20 @@ import java.time.Duration;
  */
 @ConfigurationProperties("ai-agent.tools.mutation")
 public record AiAgentMutationProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.mutation.enabled")
         Boolean enabled,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.mutation.allowDelete")
         Boolean allowDelete,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.mutation.confirmationRequired")
         Boolean confirmationRequired,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.mutation.idempotencyTtl")
         Duration idempotencyTtl,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_1, requiresRestart = false,
+                displayMessageKey = "bootConfig.knob.mutation.bulkMaxRows")
         Integer bulkMaxRows) {
 
     /** Phase 13 D-02 DoS guard — default cap on rows per {@code bulk_save_records} call. */

@@ -5,6 +5,7 @@ import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiMessage;
 import com.vn.agent.entity.AiMessageRole;
 import com.vn.agent.entity.AiToolCallOutcome;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import io.jmix.core.UnconstrainedDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +41,18 @@ public class AiConversationTitleService {
     private final ChatClient.Builder chatClientBuilder;
     private final AiAgentTitleProperties properties;
     private final AuditWriter auditWriter;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
 
     public AiConversationTitleService(UnconstrainedDataManager dataManager,
                                       ChatClient.Builder chatClientBuilder,
                                       AiAgentTitleProperties properties,
-                                      AuditWriter auditWriter) {
+                                      AuditWriter auditWriter,
+                                      AiUiSettingsResolver aiUiSettingsResolver) {
         this.dataManager = dataManager;
         this.chatClientBuilder = chatClientBuilder;
         this.properties = properties;
         this.auditWriter = auditWriter;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
     }
 
     /**
@@ -198,7 +202,9 @@ public class AiConversationTitleService {
         long assistantMessages = visibleMessages.stream()
                 .filter(message -> message.getRole() == AiMessageRole.ASSISTANT)
                 .count();
-        return assistantMessages == properties.resolvedMinAssistantMessagesTrigger();
+        // Phase 16 CFG-01 — read via resolver so admin edits on AiUiSettings take
+        // effect without a restart. Null column falls through to property default.
+        return assistantMessages == aiUiSettingsResolver.resolveTitleMinAssistantMessagesTrigger();
     }
 
     private Optional<String> defaultTitle(List<AiMessage> visibleMessages) {
@@ -230,7 +236,8 @@ public class AiConversationTitleService {
                 .append('\n');
         prompt.append("messages:\n");
         visibleMessages.stream()
-                .limit(properties.resolvedMaxContextMessages())
+                // Phase 16 CFG-01 — resolver fall-through; null column → property default.
+                .limit(aiUiSettingsResolver.resolveTitleMaxContextMessages())
                 .forEach(message -> prompt
                         .append(message.getRole() == AiMessageRole.USER ? "USER: " : "ASSISTANT: ")
                         .append(cleanPromptText(message.getContent()))
@@ -328,7 +335,7 @@ public class AiConversationTitleService {
         String locale = event.localeHint() == null ? Locale.getDefault().toLanguageTag()
                 : event.localeHint().toLanguageTag();
         return "{\"model\":\"" + jsonEscape(model)
-                + "\",\"maxContextMessages\":" + properties.resolvedMaxContextMessages()
+                + "\",\"maxContextMessages\":" + aiUiSettingsResolver.resolveTitleMaxContextMessages()
                 + ",\"locale\":\"" + jsonEscape(locale) + "\"}";
     }
 

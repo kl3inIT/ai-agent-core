@@ -1,5 +1,6 @@
 package com.vn.agent.rag.config;
 
+import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -22,7 +23,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * is log-safe. Do not add secret-bearing fields without a redaction review.</p>
  */
 @ConfigurationProperties("jmix.ai-agent.embedding")
-public record AiAgentEmbeddingProperties(String model, Integer dimensions, String providerBaseUrl) {
+public record AiAgentEmbeddingProperties(
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.embedding.model")
+        String model,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.embedding.dimensions")
+        Integer dimensions,
+        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
+                displayMessageKey = "bootConfig.knob.embedding.providerBaseUrl")
+        String providerBaseUrl) {
 
     /** D-01 default model slug (OpenRouter-compatible). */
     public static final String DEFAULT_MODEL = "qwen/qwen3-embedding-4b";

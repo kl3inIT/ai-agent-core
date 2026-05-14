@@ -455,9 +455,15 @@ class BaselineContextProviderTest {
 
         ObjectMapper objectMapper = new ObjectMapper();
         AiAgentPromptProperties promptProperties = new AiAgentPromptProperties(null);
+        // Phase 16 D-03 — resolver consulted per turn for the entity-inventory cap.
+        // The test fixture uses the property bean's default (100) — the resolver mock
+        // falls through to that value so existing assertions remain byte-identical.
+        AiUiSettingsResolver aiUiSettingsResolver = mock(AiUiSettingsResolver.class);
+        when(aiUiSettingsResolver.resolvePromptEntityInventoryLimit())
+                .thenReturn(promptProperties.resolvedEntityInventoryLimit());
 
         return new BaselineContextProvider(ca, schemaAccess, accessManager, messageTools,
-                objectMapper, promptProperties);
+                objectMapper, promptProperties, aiUiSettingsResolver);
     }
 
     private record CrudBits(boolean read, boolean update, boolean create, boolean delete) {

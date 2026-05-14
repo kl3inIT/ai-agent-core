@@ -1,6 +1,7 @@
 package com.vn.agent.filter;
 
 import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.QueryUtils;
 import io.jmix.core.metamodel.datatype.Datatype;
@@ -49,7 +50,9 @@ class StructuredFilterConditionMapperTest {
         lenient().when(llmExposurePolicy.canReadEntity(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(true);
 
-        mapper = new StructuredFilterConditionMapper(filterLiteralValueConverter, llmExposurePolicy, 3);
+        AiUiSettingsResolver aiUiSettingsResolver = mock(AiUiSettingsResolver.class);
+        lenient().when(aiUiSettingsResolver.resolveToolsMaxFilterDepth()).thenReturn(3);
+        mapper = new StructuredFilterConditionMapper(filterLiteralValueConverter, llmExposurePolicy, aiUiSettingsResolver);
 
         orderMc = mock(MetaClass.class);
         lenient().when(orderMc.getName()).thenReturn("Order");

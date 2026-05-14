@@ -173,7 +173,8 @@ class DefaultChatServiceIntentRoutingTest {
                 intentRegistry,
                 titleEligibilityPublisher,
                 taskFileMediaResolver,
-                taskFileRepository);
+                taskFileRepository,
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     @Test

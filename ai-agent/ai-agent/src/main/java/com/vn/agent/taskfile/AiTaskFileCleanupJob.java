@@ -1,5 +1,6 @@
 package com.vn.agent.taskfile;
 
+import com.vn.agent.orchestration.AiUiSettingsResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,17 +39,24 @@ public class AiTaskFileCleanupJob {
 
     private final AiTaskFileRepository repository;
     private final AiTaskFileProperties taskFileProperties;
+    private final AiUiSettingsResolver aiUiSettingsResolver;
     private final AtomicBoolean sentinelLoggedOnce = new AtomicBoolean(false);
 
     public AiTaskFileCleanupJob(AiTaskFileRepository repository,
-                                AiTaskFileProperties taskFileProperties) {
+                                AiTaskFileProperties taskFileProperties,
+                                AiUiSettingsResolver aiUiSettingsResolver) {
         this.repository = repository;
         this.taskFileProperties = taskFileProperties;
+        this.aiUiSettingsResolver = aiUiSettingsResolver;
     }
 
     @Scheduled(cron = "0 0 * * * *")  // hourly at minute 0 — same cadence as MutationIntentCleanupJob
     public void deleteExpiredTaskFiles() {
-        long ttl = taskFileProperties.getTtlSeconds();
+        // Phase 16 CFG-01 — read TTL via AiUiSettingsResolver so admin edits on the
+        // AiUiSettings singleton column take effect without a restart. Null column
+        // falls through to taskFileProperties.getTtlSeconds(). Sentinel -1 still
+        // disables cleanup (Phase 13.1 invariant preserved).
+        long ttl = aiUiSettingsResolver.resolveTaskFileTtlSeconds();
         if (ttl == -1L) {
             if (sentinelLoggedOnce.compareAndSet(false, true)) {
                 log.info("AiTaskFile TTL disabled (ttl-seconds=-1); cleanup job skipping TTL purge");

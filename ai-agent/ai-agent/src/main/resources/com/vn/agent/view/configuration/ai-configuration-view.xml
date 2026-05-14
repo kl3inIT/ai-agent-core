@@ -99,6 +99,75 @@
                                 minHeight="42em"/>
                 </vbox>
             </tab>
+            <tab id="tier1KnobsTab" label="msg:///aiUiSettings.tab.tier1Knobs">
+                <vbox id="tier1Content" padding="true" spacing="true" width="100%">
+                    <h4 id="tier1TaskFileHeader" text="msg:///aiUiSettings.tier1.section.taskFile"/>
+                    <textField id="taskFileTtlSecondsField"
+                               label="msg:///aiUiSettings.field.taskFileTtlSeconds"/>
+                    <integerField id="taskFilePerTurnMaxFilesField"
+                                  label="msg:///aiUiSettings.field.taskFilePerTurnMaxFiles"/>
+                    <textField id="taskFilePerTurnMaxTotalBytesField"
+                               label="msg:///aiUiSettings.field.taskFilePerTurnMaxTotalBytes"/>
+                    <textField id="taskFileMaxFileSizeBytesField"
+                               label="msg:///aiUiSettings.field.taskFileMaxFileSizeBytes"/>
+
+                    <h4 id="tier1MutationHeader" text="msg:///aiUiSettings.tier1.section.mutation"/>
+                    <checkbox id="mutationConfirmationRequiredField"
+                              label="msg:///aiUiSettings.field.mutationConfirmationRequired"/>
+                    <textField id="mutationIdempotencyTtlSecondsField"
+                               label="msg:///aiUiSettings.field.mutationIdempotencyTtlSeconds"/>
+                    <integerField id="mutationBulkMaxRowsField"
+                                  label="msg:///aiUiSettings.field.mutationBulkMaxRows"/>
+
+                    <h4 id="tier1PromptToolsHeader" text="msg:///aiUiSettings.tier1.section.promptTools"/>
+                    <integerField id="promptEntityInventoryLimitField"
+                                  label="msg:///aiUiSettings.field.promptEntityInventoryLimit"/>
+                    <integerField id="toolsMaxFilterDepthField"
+                                  label="msg:///aiUiSettings.field.toolsMaxFilterDepth"/>
+
+                    <h4 id="tier1TitleHeader" text="msg:///aiUiSettings.tier1.section.title"/>
+                    <integerField id="titleMaxContextMessagesField"
+                                  label="msg:///aiUiSettings.field.titleMaxContextMessages"/>
+                    <integerField id="titleMinAssistantMessagesTriggerField"
+                                  label="msg:///aiUiSettings.field.titleMinAssistantMessagesTrigger"/>
+
+                    <h4 id="tier1UploadHeader" text="msg:///aiUiSettings.tier1.section.upload"/>
+                    <textField id="uploadMaxFileSizeBytesField"
+                               label="msg:///aiUiSettings.field.uploadMaxFileSizeBytes"/>
+
+                    <hbox id="tier1ButtonsPanel" classNames="buttons-panel">
+                        <button id="saveTier1Button"
+                                text="msg:///aiUiSettingsDetail.action.save"
+                                themeNames="primary"/>
+                        <button id="resetTier1Button"
+                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                    </hbox>
+                </vbox>
+            </tab>
+            <tab id="generalTab" label="msg:///aiUiSettings.tab.general">
+                <vbox id="generalContent" padding="true" spacing="true" width="100%">
+                    <checkboxGroup id="enabledSurfacesField"
+                                   label="msg:///aiUiSettingsDetail.field.enabledSurfaces"
+                                   helperText="msg:///aiUiSettingsDetail.field.enabledSurfaces.helper"
+                                   required="true"
+                                   requiredMessage="msg:///aiUiSettingsDetail.validation.enabledSurfacesRequired"
+                                   width="100%"/>
+                    <radioButtonGroup id="defaultSurfaceField"
+                                      label="msg:///aiUiSettingsDetail.field.defaultSurface"
+                                      helperText="msg:///aiUiSettingsDetail.field.defaultSurface.helper"
+                                      required="true"
+                                      requiredMessage="msg:///aiUiSettingsDetail.validation.defaultSurfaceRequired"
+                                      themeNames="vertical"
+                                      width="100%"/>
+                    <hbox id="generalButtonsPanel" classNames="buttons-panel">
+                        <button id="saveGeneralButton"
+                                text="msg:///aiUiSettingsDetail.action.save"
+                                themeNames="primary"/>
+                        <button id="resetGeneralButton"
+                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                    </hbox>
+                </vbox>
+            </tab>
         </tabSheet>
     </layout>
 </view>

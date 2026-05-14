@@ -27,6 +27,16 @@ public class AiUiSettingsService {
                 .orElseGet(this::createDefaultSettings);
     }
 
+    /**
+     * Admin-edit save path — routes through the regular {@link DataManager} so role
+     * policies apply. {@link com.vn.agent.admin.config.AiUiSettingsEntityListener}
+     * fires {@code AiSettingsChangedEvent(UI_SETTINGS)} from the resulting
+     * {@code EntityChangedEvent}; never publish that event directly.
+     */
+    public AiUiSettings save(AiUiSettings settings) {
+        return dataManager.save(settings);
+    }
+
     private AiUiSettings createDefaultSettings() {
         AiUiSettings settings = dataManager.create(AiUiSettings.class);
         settings.setId(AiUiSettings.SINGLETON_ID);
