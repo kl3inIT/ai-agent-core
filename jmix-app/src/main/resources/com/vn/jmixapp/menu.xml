@@ -8,7 +8,6 @@
         <item view="Order.list" title="msg://com.vn.jmixapp.view.order/OrderListView.title"/>
     </menu>
     <menu opened="true" id="AI" title="msg://com.vn.agent/menu.addon">
-        <item view="AiAgent_AiUiSettings.detail" id="aiAgent.uiSettings" title="msg://com.vn.agent/menu.uiSettings"/>
         <item view="AiAgent_Chat" id="aiAgent.chat" title="msg://com.vn.agent/menu.chat"/>
         <item view="AiAgent_Conversation.list" id="aiAgent.conversations"
               title="msg://com.vn.agent/menu.conversations"/>
