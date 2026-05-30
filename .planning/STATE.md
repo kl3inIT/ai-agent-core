@@ -3,14 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-stopped_at: Phase 16 closed mid-UAT (3/16 PASSED, 13 superseded) — proceeding with in-place UI Settings → AI Configuration consolidation refactor
-last_updated: "2026-05-14T16:30:00+07:00"
+last_updated: "2026-05-30T16:47:30.205Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 2
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_plans: 15
+  completed_plans: 15
+  percent: 33
 ---
 
 # Project State
@@ -143,9 +142,9 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 | Todo | Disposition |
 |------|-------------|
-| `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` | v1.2 Phase 15 (OBS-01..04, TEST-19). Move to `done/` when Phase 15 ships. |
+| `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` | ✅ Resolved & archived to `done/` 2026-05-30 — Phase 15 shipped 2026-05-12 (OBS-01..04, TEST-19). |
 
-(The other 8 capture-note todos were resolved at v1.1.0 close — see `done/_INDEX.md`.)
+Pending todo queue is now empty — all capture notes resolved and archived (see `done/_INDEX.md`).
 
 ### Seeds Reviewed
 
@@ -159,6 +158,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | SEED-006 — Strict file-backed knowledge path | Dormant — no retrieval-drift trigger. NOT activated in v1.2. |
 | SEED-007 — AI-specific LLM exposure policy | **IMPLEMENTED** — Phase 10 (v1.1.0). |
 | SEED-008 — JPQL analytics tool with attribute-level ACL | Dormant — future tool surface. NOT activated in v1.2. |
+| SEED-009 — Multi-turn RAG query-compression + reranking | Dormant — planted 2026-05-30. Activate on retrieval-drift signal (follow-up questions retrieve wrong context, or precision@k/recall@k regress). NOT in v1.2 scope. |
 
 ### Roadmap Evolution Notes (carried)
 
@@ -353,9 +353,9 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T15:20:11.990Z
-**Stopped at:** Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
-**Resume file:** None
+**Last session:** 2026-05-30T16:47:30.177Z
+**Stopped at:** Phase 17 context gathered
+**Resume file:** .planning/phases/17-mutation-internals-hardening-phase-11-follow-up/17-CONTEXT.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** Pop stash → continue Phase 16 Plan 04 wiring + tests → Plan 05+.
