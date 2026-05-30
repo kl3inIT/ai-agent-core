@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-last_updated: "2026-05-30T16:47:30.205Z"
+last_updated: "2026-05-30T17:21:02.881Z"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 15
+  total_plans: 20
   completed_plans: 15
   percent: 33
 ---
