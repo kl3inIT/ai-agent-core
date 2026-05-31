@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
 stopped_at: Phase 17 context gathered
-last_updated: "2026-05-31T09:08:18.985Z"
+last_updated: "2026-05-31T09:19:25.271Z"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 20
-  completed_plans: 19
-  percent: 33
+  completed_plans: 20
+  percent: 50
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 ## Current Position
 
-Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — EXECUTING
-Plan: 5 of 5
+Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — COMPLETE (5/5)
+Plan: 5 of 5 — done (MUT-18 parity gate GREEN; behavior parity HOLDS)
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
-Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
+Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
 | Field | Value |
 |-------|-------|
 | Milestone | v1.2 (executing) |
@@ -51,9 +51,9 @@ Next: complete in-place UI Settings consolidation refactor, then start Phase 17 
 | 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | Phase complete — ready for verification | 5/5 | 2026-05-11 | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration | Complete — ready for verification | 7/7 | 2026-05-13 | 2026-05-13 |
-| 18. Mutation-Internals Hardening (Phase 11 follow-up) | Not started | 0/? | - | - |
-| 19. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
-| 20. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
+| 17. Mutation-Internals Hardening (Phase 11 follow-up) | Complete — MUT-18 parity HOLDS, ready for verification | 5/5 | 2026-05-31 | 2026-05-31 |
+| 18. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
+| 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
 
 ## Hard Build-Order
 
@@ -275,6 +275,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase 17]: Plan 17-02 (MUT-17): Memoized RelatedWriteMetadataResolver via ConcurrentHashMap<Key,Result> over the immutable Jmix metamodel (no eviction). Kept computeSupported's throwing signature (returns SupportedRelatedRelationship, throws ToolUserError on rejection) instead of changing it to return Result as the plan body literally instructed — the Plan 01 CountingResolver test seam overrides that exact signature, so the test is the binding contract; memoization + fresh-rethrow live in the public wrapper's computeIfAbsent, which catches ToolUserError -> Result.reject() (rejection cached as a marker, NEVER a Throwable, D-12). Factory renamed reject() to dodge the record-component/accessor collision with the boolean rejected. RelatedWriteMetadataMemoTest walkCount==1 assertions GREEN; ResolverTest + all Phase 9/10/11 mutation suites byte-for-byte parity — only the 3 MUT-15 Plan-04 MutationGateChain seams remain RED (93 green / 3 RED).
 - [Phase ?]: Plan 17-03: MutationAttributeBinder batch-loads to-one FK refs via one constrained .ids() per target class (two-pass prefetchReferences + coerceAttributes(prefetched) overload, no new collaborator D-06; single-arg delegates for create/update dedup D-07). MUT-16 forbidden-token scan GREEN; BulkSavePartialFailure 4/4 GREEN (MUT-18 parity). Fk SELECT-count test blocked by pre-existing agentstore-fixture @SpringBootTest boot regression at seedParent (test-harness, not implementation).
 - [Phase ?]: [Phase 17] Plan 17-04: extracted MutationGateChain canonical fail-closed spine (8 ordered gates enforceRole/resolve/authorize/reserve/coerce/guard/save/finalize, no @Transactional); five @Tool methods are thin adapters over execute(MutationRequest) on a sealed MutationRequest hierarchy; related-write id-parse/ensureInverseClearable moved to authorize (pre-reserve) + parent/child loads+guard in guard gate to preserve inline gate order; MUT-16 batch-FK prefetch + setDiscardSaved bulk path preserved verbatim; 106 mutation+perf tests green (MUT-18 parity), 3 MUT-15 invariants GREEN.
+- [Phase ?]: [Phase 17]: Plan 17-05 MUT-18 gate — behavior parity HOLDS; 106/0/0/2skip GREEN + 3 structural proxies GREEN + zero test-body edits. Phase 17 complete (5/5).
 
 ### Performance Metrics
 
@@ -363,7 +364,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-05-31T09:08:04.845Z
+**Last session:** 2026-05-31T09:18:56.174Z
 **Stopped at:** Phase 17 context gathered
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
