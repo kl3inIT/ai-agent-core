@@ -4,12 +4,12 @@ milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
 stopped_at: Phase 17 context gathered
-last_updated: "2026-05-31T07:53:42.565Z"
+last_updated: "2026-05-31T09:08:18.985Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 33
 ---
 
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
 | Field | Value |
@@ -274,6 +274,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase 17]: Plan 17-01: Rule 3 auto-fix — extracted package-private computeSupported(MetaClass,String) seam on RelatedWriteMetadataResolver (behavior-identical; resolveSupportedRelatedWriteRelationship delegates) so the pure-JUnit MUT-17 memo test compiles; Plan 02 adds the memoization. Four MUT structural seams written RED, each naming its implementing plan (02 memo, 03 batch FK, 04 gate chain). MUT-15 @Transactional-absence via Class.forName reflection (D-14). FK SELECT-count test boots clean (no boot regression); observed slope K=10->51, K=100->411 selects (per-row FK path) RED until Plan 03. Full mutation suite: only the 3 MUT-15 + 2 MUT-17 intended-RED seams fail; zero Phase 9/10/11 parity regression.
 - [Phase 17]: Plan 17-02 (MUT-17): Memoized RelatedWriteMetadataResolver via ConcurrentHashMap<Key,Result> over the immutable Jmix metamodel (no eviction). Kept computeSupported's throwing signature (returns SupportedRelatedRelationship, throws ToolUserError on rejection) instead of changing it to return Result as the plan body literally instructed — the Plan 01 CountingResolver test seam overrides that exact signature, so the test is the binding contract; memoization + fresh-rethrow live in the public wrapper's computeIfAbsent, which catches ToolUserError -> Result.reject() (rejection cached as a marker, NEVER a Throwable, D-12). Factory renamed reject() to dodge the record-component/accessor collision with the boolean rejected. RelatedWriteMetadataMemoTest walkCount==1 assertions GREEN; ResolverTest + all Phase 9/10/11 mutation suites byte-for-byte parity — only the 3 MUT-15 Plan-04 MutationGateChain seams remain RED (93 green / 3 RED).
 - [Phase ?]: Plan 17-03: MutationAttributeBinder batch-loads to-one FK refs via one constrained .ids() per target class (two-pass prefetchReferences + coerceAttributes(prefetched) overload, no new collaborator D-06; single-arg delegates for create/update dedup D-07). MUT-16 forbidden-token scan GREEN; BulkSavePartialFailure 4/4 GREEN (MUT-18 parity). Fk SELECT-count test blocked by pre-existing agentstore-fixture @SpringBootTest boot regression at seedParent (test-harness, not implementation).
+- [Phase ?]: [Phase 17] Plan 17-04: extracted MutationGateChain canonical fail-closed spine (8 ordered gates enforceRole/resolve/authorize/reserve/coerce/guard/save/finalize, no @Transactional); five @Tool methods are thin adapters over execute(MutationRequest) on a sealed MutationRequest hierarchy; related-write id-parse/ensureInverseClearable moved to authorize (pre-reserve) + parent/child loads+guard in guard gate to preserve inline gate order; MUT-16 batch-FK prefetch + setDiscardSaved bulk path preserved verbatim; 106 mutation+perf tests green (MUT-18 parity), 3 MUT-15 invariants GREEN.
 
 ### Performance Metrics
 
@@ -352,6 +353,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 17 P01 | ~20 min | 3 tasks | 9 files |
 | Phase 17 P02 | ~8 min | 1 tasks | 1 files | 2026-05-31
 | Phase 17 P03 | ~25 min | 1 tasks | 1 files |
+| Phase 17 P04 | ~40 min | 3 tasks | 3 files |
 
 ### Quick Tasks Completed
 
@@ -361,7 +363,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-05-31T07:53:24.898Z
+**Last session:** 2026-05-31T09:08:04.845Z
 **Stopped at:** Phase 17 context gathered
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.

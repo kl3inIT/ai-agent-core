@@ -133,7 +133,7 @@ Plans:
 - [x] 17-03-PLAN.md — MUT-16: two-pass FK batch-load in MutationAttributeBinder (prefetchReferences + coerceAttributes(prefetched) overload, one constrained .ids() per target class; single-call dedup for create/update; byte-identical error parity)
 
 **Wave 2** *(blocked on Wave 1; highest parity risk, isolated)*
-- [ ] 17-04-PLAN.md — MUT-15: extract canonical MutationGateChain @Component (sealed MutationRequest + ordered named gates, no @Transactional) + reduce the five @Tool methods to thin adapters; preserve bulk-only AccessDeniedException arm
+- [x] 17-04-PLAN.md — MUT-15: extract canonical MutationGateChain @Component (sealed MutationRequest + ordered named gates, no @Transactional) + reduce the five @Tool methods to thin adapters; preserve bulk-only AccessDeniedException arm
 
 **Wave 3 — parity gate** *(blocked on Waves 1+2)*
 - [ ] 17-05-PLAN.md — [BLOCKING] MUT-18: full Phase 9/10/11 mutation suite + AgentToolCallbacksDefaultConfigTest pass with zero test-body edits + git-diff audit of the test tree
@@ -179,7 +179,7 @@ Plans:
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 7/7 | Complete   | 2026-05-13 |
-| 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 3/5 | In Progress|  |
+| 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 4/5 | In Progress|  |
 | 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 0/? | Not started | - |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |
 
