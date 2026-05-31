@@ -3,6 +3,7 @@ package com.vn.agent.tools.mutation;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
  * Plan 11-07C Task 2 — source-level grep-style invariants for the mutation tool surface.
@@ -50,6 +52,25 @@ class MutationToolInvariantsTest {
 
     private static final Path BUILT_IN_MUTATION_TOOLS_FILE = MUTATION_PACKAGE
             .resolve("BuiltInMutationTools.java");
+
+    /**
+     * Plan 17-01 (MUT-15): the canonical fail-closed gate sequence is extracted into
+     * {@code MutationGateChain} by Plan 04. This file does not yet exist — the gate-order /
+     * save-after-all-gates / no-{@code @Transactional} assertions below are intentionally RED
+     * until Plan 04 commits it.
+     */
+    private static final Path MUTATION_GATE_CHAIN_FILE = MUTATION_PACKAGE
+            .resolve("MutationGateChain.java");
+
+    /**
+     * Plan 17-01 (MUT-16): the to-one FK batch-load path lives in
+     * {@code MutationAttributeBinder}. The forbidden-token scan below proves the FK path uses
+     * only the constrained {@code dataManager.load(class).ids(...)} / {@code .id(...)} API —
+     * never {@code UnconstrainedDataManager} and never raw JPQL — so row-level security is
+     * preserved (D-09). This assertion is GREEN today and must STAY green after Plan 03.
+     */
+    private static final Path MUTATION_ATTRIBUTE_BINDER_FILE = MUTATION_PACKAGE
+            .resolve("MutationAttributeBinder.java");
 
     private static final Path MESSAGES_EN = MODULE_ROOT
             .resolve("src/main/resources/com/vn/agent/messages_en.properties");
@@ -156,6 +177,172 @@ class MutationToolInvariantsTest {
         assertThat(viBundle)
                 .as("messages_vi.properties must keep the localized 'Commit outcome unknown' caption for COMMIT_FAILED")
                 .contains("com.vn.agent.entity/AiToolCallOutcome.COMMIT_FAILED=Chưa rõ kết quả commit");
+    }
+
+    // ------------------------------------------------------------------------
+    // Plan 17-01 (MUT-15) — MutationGateChain gate-order + save-after-all-gates +
+    // no-@Transactional reflection invariants. Intentionally RED until Plan 04.
+    // ------------------------------------------------------------------------
+
+    /**
+     * The eight distinct gate-method invocation tokens in canonical fail-closed order, as the
+     * {@code MutationGateChain.execute(...)} dispatch spine must invoke them (Plan 04). The
+     * order encodes the security contract: role marker → exposure/entity resolution →
+     * AccessManager entity+attribute authorization → idempotency reservation → literal
+     * coercion → MutationGuard SPI → host save → finalize. A reordering that lets a save occur
+     * before any authorization gate is a fail-closed regression (T-17-01).
+     *
+     * <p>Tokens are matched as the leading substring of each private-method invocation (the
+     * trailing {@code (} anchors them to a call site rather than a comment/Javadoc mention).
+     */
+    private static final List<String> GATE_TOKENS_IN_CANONICAL_ORDER = List.of(
+            "enforceRole(",
+            "resolve(",
+            "authorize(",
+            "reserve(",
+            "coerce(",
+            "guard(",
+            "save(",
+            "finalize(");
+
+    /** The transactional save delegate the chain crosses AFTER every gate (fail-closed). */
+    private static final String SAVE_DELEGATE_TOKEN = "mutationSaveExecutor.";
+
+    private static final String MUTATION_GATE_CHAIN_CLASS = "com.vn.agent.tools.mutation.MutationGateChain";
+
+    /**
+     * Plan 17-01 (MUT-15): the gate tokens must appear in strictly-increasing source order in
+     * {@code MutationGateChain.execute}. Strictly-increasing {@code indexOf} is the structural
+     * proxy for "the canonical fail-closed sequence is preserved" (D-14). RED until Plan 04
+     * commits {@code MutationGateChain.java}.
+     */
+    @Test
+    void mutationGateChain_gatesAppearInCanonicalOrder() throws IOException {
+        assertThat(Files.exists(MUTATION_GATE_CHAIN_FILE))
+                .as("MUT-15: MutationGateChain.java must exist — produced by Plan 04 "
+                        + "(intentional RED until then). Expected at %s",
+                        MODULE_ROOT.relativize(MUTATION_GATE_CHAIN_FILE))
+                .isTrue();
+
+        String src = Files.readString(MUTATION_GATE_CHAIN_FILE, StandardCharsets.UTF_8);
+
+        int previousIndex = -1;
+        String previousToken = "<start>";
+        for (String token : GATE_TOKENS_IN_CANONICAL_ORDER) {
+            int index = src.indexOf(token);
+            assertThat(index)
+                    .as("MUT-15: gate token '%s' must appear in MutationGateChain (Plan 04)", token)
+                    .isGreaterThanOrEqualTo(0);
+            assertThat(index)
+                    .as("MUT-15: gate token '%s' (index %d) must appear AFTER '%s' (index %d) — "
+                            + "the canonical fail-closed gate order is structurally enforced (D-14)",
+                            token, index, previousToken, previousIndex)
+                    .isGreaterThan(previousIndex);
+            previousIndex = index;
+            previousToken = token;
+        }
+    }
+
+    /**
+     * Plan 17-01 (MUT-15): the transactional save delegate ({@code mutationSaveExecutor.}) must
+     * appear AFTER every gate token — proving "every gate throws before the transactional save
+     * crosses the boundary" (fail-closed; T-17-01). RED until Plan 04.
+     */
+    @Test
+    void mutationGateChain_saveTokenAppearsAfterAllGateTokens() throws IOException {
+        assertThat(Files.exists(MUTATION_GATE_CHAIN_FILE))
+                .as("MUT-15: MutationGateChain.java must exist — produced by Plan 04 "
+                        + "(intentional RED until then). Expected at %s",
+                        MODULE_ROOT.relativize(MUTATION_GATE_CHAIN_FILE))
+                .isTrue();
+
+        String src = Files.readString(MUTATION_GATE_CHAIN_FILE, StandardCharsets.UTF_8);
+
+        int saveDelegateIndex = src.indexOf(SAVE_DELEGATE_TOKEN);
+        assertThat(saveDelegateIndex)
+                .as("MUT-15: the transactional save delegate '%s' must appear in MutationGateChain "
+                        + "(Plan 04)", SAVE_DELEGATE_TOKEN)
+                .isGreaterThanOrEqualTo(0);
+
+        // Every gate token EXCEPT the save/finalize spine tokens must precede the delegate
+        // crossing. The gate tokens up to (and including) "guard(" are the authorization gates;
+        // "save(" / "finalize(" are the spine itself. We assert the delegate sits after the last
+        // authorization gate, i.e. after "guard(".
+        int lastGateIndex = src.indexOf("guard(");
+        assertThat(lastGateIndex)
+                .as("MUT-15: final authorization gate 'guard(' must exist in MutationGateChain (Plan 04)")
+                .isGreaterThanOrEqualTo(0);
+        assertThat(saveDelegateIndex)
+                .as("MUT-15: the transactional save delegate '%s' (index %d) must appear AFTER the "
+                        + "last authorization gate 'guard(' (index %d) — fail-closed: every gate "
+                        + "throws before the save crosses the @Transactional boundary",
+                        SAVE_DELEGATE_TOKEN, saveDelegateIndex, lastGateIndex)
+                .isGreaterThan(lastGateIndex);
+    }
+
+    /**
+     * Plan 17-01 (MUT-15): {@code MutationGateChain} must carry NO {@code @Transactional} — not
+     * on the class and not on any declared method (D-14: by REFLECTION, never a regex of the
+     * source). The single transactional boundary is {@code MutationSaveExecutor.save}; the chain
+     * is a non-transactional orchestrator so every gate throws OUTSIDE the transaction. RED until
+     * Plan 04 (class does not exist yet → {@link ClassNotFoundException}).
+     */
+    @Test
+    void mutationGateChain_carriesNoTransactionalAnnotation() {
+        Class<?> chainClass;
+        try {
+            chainClass = Class.forName(MUTATION_GATE_CHAIN_CLASS);
+        } catch (ClassNotFoundException e) {
+            fail("MUT-15: %s must exist — produced by Plan 04 (intentional RED until then). "
+                    + "Reflection-based @Transactional-absence check cannot run until the class "
+                    + "is on the classpath.", MUTATION_GATE_CHAIN_CLASS);
+            return; // unreachable — fail(...) throws
+        }
+
+        Class<? extends java.lang.annotation.Annotation> transactional =
+                org.springframework.transaction.annotation.Transactional.class;
+
+        assertThat(chainClass.isAnnotationPresent(transactional))
+                .as("MUT-15: MutationGateChain must NOT be @Transactional at the class level — "
+                        + "the only transactional boundary is MutationSaveExecutor.save (D-14)")
+                .isFalse();
+
+        for (Method method : chainClass.getDeclaredMethods()) {
+            assertThat(method.isAnnotationPresent(transactional))
+                    .as("MUT-15: MutationGateChain method '%s' must NOT be @Transactional — gates "
+                            + "must throw outside the transaction (D-14)", method.getName())
+                    .isFalse();
+        }
+    }
+
+    /**
+     * Plan 17-01 (MUT-16): the to-one FK batch-load path in {@code MutationAttributeBinder} must
+     * use ONLY the constrained {@code dataManager.load(class).ids(...)} / {@code .id(...)} API.
+     * It must NOT switch to {@code UnconstrainedDataManager} or raw JPQL
+     * ({@code loadValue}/{@code loadValues}/{@code .query(}) — either would bypass row-level
+     * security (D-09, T-17-02). GREEN today; must STAY green after Plan 03's batch-load refactor.
+     */
+    @Test
+    void mutationAttributeBinder_fkPathUsesNoUnconstrainedDataManagerOrRawJpql() throws IOException {
+        assertThat(MUTATION_ATTRIBUTE_BINDER_FILE)
+                .as("MUT-16: MutationAttributeBinder.java must exist on the FK-binding path")
+                .exists();
+
+        String src = Files.readString(MUTATION_ATTRIBUTE_BINDER_FILE, StandardCharsets.UTF_8);
+
+        assertThat(src)
+                .as("MUT-16: MutationAttributeBinder FK path must NOT use UnconstrainedDataManager "
+                        + "(row-level security must still apply — D-09)")
+                .doesNotContain("UnconstrainedDataManager");
+        assertThat(src)
+                .as("MUT-16: MutationAttributeBinder FK path must NOT use raw JPQL loadValues(...)")
+                .doesNotContain("loadValues(");
+        assertThat(src)
+                .as("MUT-16: MutationAttributeBinder FK path must NOT use raw JPQL loadValue(...)")
+                .doesNotContain("loadValue(");
+        assertThat(src)
+                .as("MUT-16: MutationAttributeBinder FK path must NOT use raw JPQL .query(...)")
+                .doesNotContain(".query(");
     }
 
     private static long countOccurrences(String haystack, String needle) {
