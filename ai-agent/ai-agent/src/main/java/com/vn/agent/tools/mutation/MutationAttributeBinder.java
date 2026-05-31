@@ -122,6 +122,15 @@ public class MutationAttributeBinder {
      * row-level-filtered id is simply absent from the returned map and the bind pass collapses it
      * to {@code not_found} (never {@code access_denied}), preserving the opacity contract.
      *
+     * <p><b>Prefetch-phase failures are NOT attributed to a specific row (WR-04).</b> This pass
+     * runs in gate 5 (coerce), BEFORE the per-row save loop. Per-row attribute-name validation
+     * ({@link #validateWritableProperty} — unknown / read-only / PK attribute) and FK-UUID parsing
+     * ({@code requireUuidId(parseEntityId(...))} — malformed FK id) throw here, where the failing
+     * row ordinal is not tracked. Because the batch is all-or-nothing (the whole submission rolls
+     * back on any failure), the contract does NOT expose a per-row index in the error result; the
+     * LLM resubmits ALL corrected rows with a fresh idempotency key. This is intentional — see the
+     * {@code bulk_save_records} tool description's ERROR HANDLING section.
+     *
      * @param ownerMetaClass the entity class every {@code row} belongs to
      * @param rows the LLM-supplied attribute maps (one per record in the batch; single-element
      *             for create/update)
@@ -182,9 +191,10 @@ public class MutationAttributeBinder {
      * issuing its own per-reference load — so no FK SELECT is issued here. For a to-one attribute:
      * re-parse the id, look it up in {@code prefetched.get(targetMetaClass)}; if ABSENT (genuinely
      * missing OR row-level-security-filtered) throw
-     * {@link MutationErrorTranslator#notFound(MetaClass, String)} so the bulk caller's row-order
-     * loop attributes the correct {@code failedRowIndex} (Pitfall 4); if PRESENT bind the loaded
-     * entity INSTANCE, not the id (D-09, Pitfall 6). Read exposure / read permission are NOT
+     * {@link MutationErrorTranslator#notFound(MetaClass, String)} (the whole all-or-nothing batch
+     * then rolls back — no per-row index is reported, see {@link #prefetchReferences}); if PRESENT
+     * bind the loaded entity INSTANCE, not the id (D-09, Pitfall 6). Read exposure / read permission
+     * are NOT
      * re-checked here — they ran once per target class in the prefetch pass.
      */
     public Map<String, Object> coerceAttributes(MetaClass metaClass,
@@ -349,8 +359,8 @@ public class MutationAttributeBinder {
      * Bind a single to-one FK attribute from the prefetched per-class map. null clears the
      * reference; a present id binds the LOADED ENTITY INSTANCE (D-09, Pitfall 6); an absent id
      * (genuinely missing OR row-level-security-filtered) throws
-     * {@link MutationErrorTranslator#notFound(MetaClass, String)} so the bulk caller's row-order
-     * loop attributes the correct {@code failedRowIndex} (Pitfall 4).
+     * {@link MutationErrorTranslator#notFound(MetaClass, String)}, which rolls back the whole
+     * all-or-nothing batch (no per-row index is reported, see {@link #prefetchReferences}).
      */
     private Object bindPrefetchedReference(MetaProperty property,
                                            Object rawValue,
