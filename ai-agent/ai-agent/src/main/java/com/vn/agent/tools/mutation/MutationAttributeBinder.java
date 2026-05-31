@@ -10,7 +10,9 @@ import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,17 +90,117 @@ public class MutationAttributeBinder {
     }
 
     /**
-     * Validate every attribute name and coerce every value. The returned map preserves
-     * caller iteration order, allows null values (so guards can see optional-field clears),
-     * and contains POST-coercion typed values: loaded entity instances for to-ones, typed
-     * Integer/UUID/Enum/etc. for scalars.
+     * Validate every attribute name and coerce every value for a SINGLE row (create/update).
+     * Delegates through the two-pass batch path with a one-element row list so create/update
+     * get the same single-call to-one FK dedup as {@code bulk_save_records} — one constrained
+     * {@code .ids(...)} load per distinct target class, not one load per to-one attribute
+     * (D-07). The returned map preserves caller iteration order, allows null values (so guards
+     * can see optional-field clears), and contains POST-coercion typed values: loaded entity
+     * instances for to-ones, typed Integer/UUID/Enum/etc. for scalars.
      */
     public Map<String, Object> coerceAttributes(MetaClass metaClass, Map<String, Object> attributes) {
+        Map<MetaClass, Map<UUID, Object>> prefetched =
+                prefetchReferences(metaClass, List.of(attributes));
+        return coerceAttributes(metaClass, attributes, prefetched);
+    }
+
+    /**
+     * Pass 1 (cross-row to-one FK prefetch). Iterate ALL {@code rows}; for each writable to-one
+     * relationship attribute collect the parsed UUID id per target {@link MetaClass} into a
+     * per-class id set (deduped, submission-order via {@link LinkedHashSet}; null FK values =
+     * clear and are skipped). Then for EACH distinct target class EXACTLY ONCE — same order/timing
+     * as the per-reference baseline — enforce
+     * {@link MutationAuthorizationService#enforceLlmRelationshipTargetExposure(MetaClass, boolean)}
+     * then {@link MutationAuthorizationService#enforceReadPermission(MetaClass)} (the ONLY
+     * {@code access_denied} source), then issue ONE constrained
+     * {@code dataManager.load(targetClass).ids(idCollection).list()} (the
+     * {@code FluentLoader.ids(java.util.Collection<?>)} overload, jmix-core 2.8.1) so a K-row
+     * batch referencing one parent costs ONE FK SELECT regardless of K (MUT-16; slope ~0).
+     *
+     * <p><b>Security (D-09, T-17-02):</b> uses the CONSTRAINED {@link DataManager} only — never the
+     * unconstrained variant, never raw JPQL — so row-level security still filters the result. A
+     * row-level-filtered id is simply absent from the returned map and the bind pass collapses it
+     * to {@code not_found} (never {@code access_denied}), preserving the opacity contract.
+     *
+     * @param ownerMetaClass the entity class every {@code row} belongs to
+     * @param rows the LLM-supplied attribute maps (one per record in the batch; single-element
+     *             for create/update)
+     * @return per-target-class map of {@code id -> loaded entity instance} for every distinct
+     *         readable to-one FK id referenced across {@code rows}
+     */
+    public Map<MetaClass, Map<UUID, Object>> prefetchReferences(MetaClass ownerMetaClass,
+                                                                List<Map<String, Object>> rows) {
+        // Collect distinct to-one FK ids per target class across ALL rows (submission order).
+        Map<MetaClass, LinkedHashSet<UUID>> idsByTarget = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                MetaProperty property = validateWritableProperty(ownerMetaClass, entry.getKey());
+                if (!isToOneRelationship(property)) {
+                    continue;
+                }
+                Object rawValue = entry.getValue();
+                if (rawValue == null) {
+                    // null clears the reference — no FK to load.
+                    continue;
+                }
+                MetaClass targetMetaClass = property.getRange().asClass();
+                UUID targetId = requireUuidId(
+                        toolEntityResolver.parseEntityId(rawValue.toString(), targetMetaClass));
+                idsByTarget.computeIfAbsent(targetMetaClass, k -> new LinkedHashSet<>())
+                        .add(targetId);
+            }
+        }
+
+        // One constrained .ids() load per distinct target class (after the per-class gate pair).
+        Map<MetaClass, Map<UUID, Object>> prefetched = new LinkedHashMap<>();
+        for (Map.Entry<MetaClass, LinkedHashSet<UUID>> entry : idsByTarget.entrySet()) {
+            MetaClass targetMetaClass = entry.getKey();
+            Collection<UUID> idSet = entry.getValue();
+
+            mutationAuthorizationService.enforceLlmRelationshipTargetExposure(targetMetaClass, false);
+            mutationAuthorizationService.enforceReadPermission(targetMetaClass);
+
+            List<?> loaded = dataManager.load(targetMetaClass.getJavaClass())
+                    .ids(idSet)
+                    .list();
+
+            Map<UUID, Object> byId = new LinkedHashMap<>();
+            for (Object instance : loaded) {
+                Object id = EntityValues.getId(instance);
+                if (id instanceof UUID uuid) {
+                    byId.put(uuid, instance);
+                }
+            }
+            prefetched.put(targetMetaClass, byId);
+        }
+        return prefetched;
+    }
+
+    /**
+     * Pass 2 (prefetched bind). Identical to {@link #coerceAttributes(MetaClass, Map)} except the
+     * to-one branch binds from {@code prefetched} (built by {@link #prefetchReferences}) instead of
+     * issuing its own per-reference load — so no FK SELECT is issued here. For a to-one attribute:
+     * re-parse the id, look it up in {@code prefetched.get(targetMetaClass)}; if ABSENT (genuinely
+     * missing OR row-level-security-filtered) throw
+     * {@link MutationErrorTranslator#notFound(MetaClass, String)} so the bulk caller's row-order
+     * loop attributes the correct {@code failedRowIndex} (Pitfall 4); if PRESENT bind the loaded
+     * entity INSTANCE, not the id (D-09, Pitfall 6). Read exposure / read permission are NOT
+     * re-checked here — they ran once per target class in the prefetch pass.
+     */
+    public Map<String, Object> coerceAttributes(MetaClass metaClass,
+                                               Map<String, Object> attributes,
+                                               Map<MetaClass, Map<UUID, Object>> prefetched) {
         Map<String, Object> coerced = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : attributes.entrySet()) {
             String attributeName = entry.getKey();
             MetaProperty property = validateWritableProperty(metaClass, attributeName);
-            Object coercedValue = coerceAttributeValue(metaClass, property, entry.getValue());
+            Object rawValue = entry.getValue();
+            Object coercedValue;
+            if (isToOneRelationship(property)) {
+                coercedValue = bindPrefetchedReference(property, rawValue, prefetched);
+            } else {
+                coercedValue = coerceScalarValue(property, rawValue);
+            }
             coerced.put(attributeName, coercedValue);
         }
         return coerced;
@@ -220,21 +322,62 @@ public class MutationAttributeBinder {
                 // null clears the reference; preserved by coerceAttributes via LinkedHashMap.
                 return null;
             }
+            // Single-attribute to-one coercion: route through the same two-pass batch path with
+            // a one-element row so behavior (gate order, error parity, bound-instance) is
+            // identical to the bulk path. No separate per-reference load survives here.
             MetaClass targetMetaClass = property.getRange().asClass();
-            mutationAuthorizationService.enforceLlmRelationshipTargetExposure(targetMetaClass, false);
-            UUID targetId = requireUuidId(
-                    toolEntityResolver.parseEntityId(rawValue.toString(), targetMetaClass));
-            mutationAuthorizationService.enforceReadPermission(targetMetaClass);
-            return dataManager.load(targetMetaClass.getJavaClass())
-                    .id(targetId)
-                    .optional()
-                    .orElseThrow(() -> mutationErrorTranslator.notFound(targetMetaClass, rawValue.toString()));
+            Map<MetaClass, Map<UUID, Object>> prefetched =
+                    prefetchReferences(ownerMetaClass, List.of(Map.of(property.getName(), rawValue)));
+            return bindPrefetchedReference(property, rawValue, prefetched);
         }
-        // scalar/datatype/enum — delegate to existing structured filter converter.
-        // Rule 1 fix (Plan 11-10 Task 3): scalar null is a legitimate optional-field clear in
-        // mutation context (MUT-03 / Plan 11-03 contract). FilterLiteralValueConverter is a
-        // structured-filter converter and rejects null with "value must not be null"; that
-        // semantic does not apply to attribute writes where null = clear-to-null.
+        return coerceScalarValue(property, rawValue);
+    }
+
+    /**
+     * True for a to-one (non-collection) relationship attribute. Mirrors the to-one detection
+     * in {@code coerceAttributeValue}: a class-range property whose cardinality is not "many".
+     */
+    private boolean isToOneRelationship(MetaProperty property) {
+        if (!property.getRange().isClass()) {
+            return false;
+        }
+        return property.getRange().getCardinality() == null
+                || !property.getRange().getCardinality().isMany();
+    }
+
+    /**
+     * Bind a single to-one FK attribute from the prefetched per-class map. null clears the
+     * reference; a present id binds the LOADED ENTITY INSTANCE (D-09, Pitfall 6); an absent id
+     * (genuinely missing OR row-level-security-filtered) throws
+     * {@link MutationErrorTranslator#notFound(MetaClass, String)} so the bulk caller's row-order
+     * loop attributes the correct {@code failedRowIndex} (Pitfall 4).
+     */
+    private Object bindPrefetchedReference(MetaProperty property,
+                                           Object rawValue,
+                                           Map<MetaClass, Map<UUID, Object>> prefetched) {
+        if (rawValue == null) {
+            return null;
+        }
+        MetaClass targetMetaClass = property.getRange().asClass();
+        UUID targetId = requireUuidId(
+                toolEntityResolver.parseEntityId(rawValue.toString(), targetMetaClass));
+        Map<UUID, Object> byId = prefetched.get(targetMetaClass);
+        Object instance = byId == null ? null : byId.get(targetId);
+        if (instance == null) {
+            throw mutationErrorTranslator.notFound(targetMetaClass, rawValue.toString());
+        }
+        return instance;
+    }
+
+    /**
+     * Coerce a scalar/datatype/enum value via {@link FilterLiteralValueConverter}.
+     *
+     * <p>Rule 1 fix (Plan 11-10 Task 3): scalar null is a legitimate optional-field clear in
+     * mutation context (MUT-03 / Plan 11-03 contract). {@code FilterLiteralValueConverter} is a
+     * structured-filter converter and rejects null with "value must not be null"; that semantic
+     * does not apply to attribute writes where null = clear-to-null.
+     */
+    private Object coerceScalarValue(MetaProperty property, Object rawValue) {
         if (rawValue == null) {
             return null;
         }
