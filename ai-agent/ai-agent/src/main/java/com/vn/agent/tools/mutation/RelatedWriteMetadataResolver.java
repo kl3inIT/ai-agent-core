@@ -109,8 +109,23 @@ public class RelatedWriteMetadataResolver {
      */
     public SupportedRelatedRelationship resolveSupportedRelatedWriteRelationship(
             MetaClass parentMetaClass, String relationshipName) {
-
         Objects.requireNonNull(parentMetaClass, "parentMetaClass");
+        return computeSupported(parentMetaClass, relationshipName);
+    }
+
+    /**
+     * Package-private metamodel-walk seam (Plan 17-01 / MUT-17). This is the single method that
+     * performs the relationship-support metamodel walk; {@link #resolveSupportedRelatedWriteRelationship}
+     * delegates to it. Plan 02 memoizes the {@code (parentEntityName, relationshipName)} key over
+     * the IMMUTABLE Jmix metamodel so a repeated key walks exactly ONCE (no eviction; the memo is
+     * security-independent — relationship support is a pure metamodel fact, T-17-03).
+     *
+     * <p>The {@code RelatedWriteMetadataMemoTest} counting seam overrides this method to assert
+     * walk-once. Today (pre-Plan-02) there is NO memoization, so a repeated key walks twice and
+     * the memo test is intentionally RED on its {@code walkCount == 1} assertion.
+     */
+    SupportedRelatedRelationship computeSupported(MetaClass parentMetaClass, String relationshipName) {
+
         if (relationshipName == null || relationshipName.isBlank()) {
             throw unsupportedRelationship();
         }
