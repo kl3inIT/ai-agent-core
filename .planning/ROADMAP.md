@@ -129,7 +129,7 @@ Plans:
 - [x] 17-01-PLAN.md — Wave-0 structural test seams: extend MutationToolInvariantsTest (gate-order/reflection + MUT-16 forbidden-token scan), new RelatedWriteMetadataMemoTest (MUT-17 walk-once), new MutationFkBatchLoadQueryCountTest + agentstore FK fixture (MUT-16 SELECT-count, Open Q1 option a) — DONE 2026-05-31; four seams RED naming Plans 02/03/04, zero Phase 9/10/11 parity regression
 
 **Wave 1** *(parallel — blocked on Wave 0; disjoint files)*
-- [ ] 17-02-PLAN.md — MUT-17: memoize RelatedWriteMetadataResolver via ConcurrentHashMap + record Key + Result holder + package-private computeSupported seam (no eviction)
+- [x] 17-02-PLAN.md — MUT-17: memoize RelatedWriteMetadataResolver via ConcurrentHashMap + record Key + Result holder + package-private computeSupported seam (no eviction)
 - [ ] 17-03-PLAN.md — MUT-16: two-pass FK batch-load in MutationAttributeBinder (prefetchReferences + coerceAttributes(prefetched) overload, one constrained .ids() per target class; single-call dedup for create/update; byte-identical error parity)
 
 **Wave 2** *(blocked on Wave 1; highest parity risk, isolated)*
@@ -179,7 +179,7 @@ Plans:
 | 14. Intent-Driven Extraction → Form Prefill | v1.1.0 | 10/10 | Shipped (PR #28; UAT passed 2026-05-11) | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 7/7 | Complete   | 2026-05-13 |
-| 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 1/5 | In progress | - |
+| 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 2/5 | In Progress|  |
 | 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 0/? | Not started | - |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |
 

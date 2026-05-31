@@ -3,12 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-last_updated: "2026-05-31T07:23:30.763Z"
+stopped_at: Phase 17 context gathered
+last_updated: "2026-05-31T07:40:35.178Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 20
-  completed_plans: 16
+  completed_plans: 17
   percent: 33
 ---
 
@@ -27,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
 | Field | Value |
@@ -271,6 +272,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase ?]: Phase 16 complete — MODEL-02 catch+reissue lands user-visible notification surface; ChatModelFallbackAppliedEvent is distinct from AiSettingsChangedEvent so the single-publish-site invariant remains intact
 - [Phase 17]: Plan 17-01: Open Question 1 resolved as option (a) — agentstore @Store FK fixture pair (MutationStoreLinkedParent/ChildFixture) so the existing agentstore-wrapping QueryCountingDataSourceConfiguration counts the batch FK SELECT without widening the shared counting config; per-test agentstore changelog override (includes prod changelog + FK fixture tables) keeps global test-app.properties wiring untouched.
 - [Phase 17]: Plan 17-01: Rule 3 auto-fix — extracted package-private computeSupported(MetaClass,String) seam on RelatedWriteMetadataResolver (behavior-identical; resolveSupportedRelatedWriteRelationship delegates) so the pure-JUnit MUT-17 memo test compiles; Plan 02 adds the memoization. Four MUT structural seams written RED, each naming its implementing plan (02 memo, 03 batch FK, 04 gate chain). MUT-15 @Transactional-absence via Class.forName reflection (D-14). FK SELECT-count test boots clean (no boot regression); observed slope K=10->51, K=100->411 selects (per-row FK path) RED until Plan 03. Full mutation suite: only the 3 MUT-15 + 2 MUT-17 intended-RED seams fail; zero Phase 9/10/11 parity regression.
+- [Phase 17]: Plan 17-02 (MUT-17): Memoized RelatedWriteMetadataResolver via ConcurrentHashMap<Key,Result> over the immutable Jmix metamodel (no eviction). Kept computeSupported's throwing signature (returns SupportedRelatedRelationship, throws ToolUserError on rejection) instead of changing it to return Result as the plan body literally instructed — the Plan 01 CountingResolver test seam overrides that exact signature, so the test is the binding contract; memoization + fresh-rethrow live in the public wrapper's computeIfAbsent, which catches ToolUserError -> Result.reject() (rejection cached as a marker, NEVER a Throwable, D-12). Factory renamed reject() to dodge the record-component/accessor collision with the boolean rejected. RelatedWriteMetadataMemoTest walkCount==1 assertions GREEN; ResolverTest + all Phase 9/10/11 mutation suites byte-for-byte parity — only the 3 MUT-15 Plan-04 MutationGateChain seams remain RED (93 green / 3 RED).
 
 ### Performance Metrics
 
@@ -347,6 +349,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 16 P06 | 45min | 3 tasks | 20 files |
 | Phase 16 P07 | ~50 min | 2 tasks | 11 files |
 | Phase 17 P01 | ~20 min | 3 tasks | 9 files |
+| Phase 17 P02 | ~8 min | 1 tasks | 1 files | 2026-05-31
 
 ### Quick Tasks Completed
 
@@ -356,7 +359,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-05-31T07:23:30.748Z
+**Last session:** 2026-05-31T07:40:35.157Z
 **Stopped at:** Phase 17 context gathered
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
