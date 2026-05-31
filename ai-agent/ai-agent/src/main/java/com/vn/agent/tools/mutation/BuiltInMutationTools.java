@@ -12,7 +12,6 @@ import com.vn.agent.tools.ToolResultFormatter;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.AccessManager;
 import io.jmix.core.DataManager;
-import io.jmix.core.EntitySet;
 import io.jmix.core.FetchPlan;
 import io.jmix.core.MetadataTools;
 import io.jmix.core.SaveContext;
@@ -951,6 +950,22 @@ public class BuiltInMutationTools {
                         diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey));
             }
 
+            // MUT-16 — strip 'id' from every row's attribute map ONCE (submission order), then
+            // run a SINGLE cross-row to-one FK prefetch so a K-row batch pointing at one parent
+            // costs ONE constrained .ids(...) SELECT per distinct target class regardless of K
+            // (slope ~0), NOT one FK load per row. The per-row bind pass below reads from this
+            // map instead of issuing its own load.
+            List<Map<String, Object>> rowAttrsInOrder = new ArrayList<>(safeRecords.size());
+            for (Map<String, Object> row : safeRecords) {
+                rowAttrsInOrder.add(row.entrySet().stream()
+                        .filter(e -> !"id".equals(e.getKey()))
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey, Map.Entry::getValue,
+                                (a, b) -> b, LinkedHashMap::new)));
+            }
+            Map<MetaClass, Map<UUID, Object>> prefetchedReferences =
+                    mutationAttributeBinder.prefetchReferences(metaClass, rowAttrsInOrder);
+
             // Per-row coerce + per-row CrudEntityContext + guard + build SaveContext.
             SaveContext saveContext = new SaveContext();
             List<Object> entitiesInOrder = new ArrayList<>(safeRecords.size());
@@ -959,12 +974,9 @@ public class BuiltInMutationTools {
                 Map<String, Object> row = safeRecords.get(i);
                 boolean isUpdate = row.containsKey("id");
                 Object rowId = isUpdate ? row.get("id") : null;
-                Map<String, Object> rowAttrs = row.entrySet().stream()
-                        .filter(e -> !"id".equals(e.getKey()))
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey, Map.Entry::getValue,
-                                (a, b) -> b, LinkedHashMap::new));
-                Map<String, Object> coerced = mutationAttributeBinder.coerceAttributes(metaClass, rowAttrs);
+                Map<String, Object> rowAttrs = rowAttrsInOrder.get(i);
+                Map<String, Object> coerced =
+                        mutationAttributeBinder.coerceAttributes(metaClass, rowAttrs, prefetchedReferences);
 
                 Object entity;
                 if (!isUpdate) {
@@ -1007,21 +1019,20 @@ public class BuiltInMutationTools {
             failedRowIndex = null; // all rows passed pre-save validation
 
             // Single proxy-crossed @Transactional save — rollback-all on RuntimeException.
-            EntitySet saved = mutationSaveExecutor.bulkSave(saveContext);
+            // bulkSave sets SaveContext.discardSaved(true), so the returned EntitySet is empty
+            // (no per-row post-save reload — MUT-16 O(1) batch contract). Row-drop detection is
+            // therefore provided by the rollback-all transaction invariant: any host policy /
+            // listener that removes an entity from the save set fails the whole batch rather than
+            // silently dropping a row.
+            mutationSaveExecutor.bulkSave(saveContext);
             commitState = MutationCommitState.HOST_SAVE_RETURNED;
             // Use entitiesInOrder (input order is the contract), not the unordered EntitySet
-            // iterator, so savedIds[i] aligns with records[i] for the LLM.
+            // iterator, so savedIds[i] aligns with records[i] for the LLM. The @JmixGeneratedValue
+            // UUID ids are populated on the in-memory entities at create time, so no reload is
+            // needed to read them back.
             List<UUID> savedIds = entitiesInOrder.stream()
                     .map(e -> (UUID) EntityValues.getId(e))
                     .toList();
-            // Defensive: ensure all entities are present in the saved EntitySet (host policy /
-            // listener cannot drop a row silently).
-            for (Object e : entitiesInOrder) {
-                if (!saved.optional(e).isPresent()) {
-                    throw new IllegalStateException(
-                            "DataManager.save dropped entity for row in bulk batch");
-                }
-            }
 
             String argumentsJson = diffSerializer.serializeBulkArgumentsJson(
                     entityName, safeRecords, idempotencyKey);

@@ -63,6 +63,14 @@ public class MutationSaveExecutor {
      */
     @Transactional
     public EntitySet bulkSave(SaveContext saveContext) {
+        // MUT-16 — discard the post-save reload. Jmix's DataManager.save reloads every saved
+        // entity by id after commit (AbstractDataStore#loadAllAfterSave) to return managed,
+        // fetch-plan-complete instances. For bulk_save_records that reload is pure overhead and
+        // scales O(N) (one SELECT ... WHERE id=? per row): the caller only needs the assigned
+        // UUID ids, which are already populated on the in-memory @JmixGeneratedValue entities
+        // BEFORE the save. Discarding the reload keeps the batch FK-load path at O(1) total
+        // SELECTs regardless of K (MUT-16 slope ~0) instead of O(N) reload queries.
+        saveContext.setDiscardSaved(true);
         return dataManager.save(saveContext);
     }
 }
