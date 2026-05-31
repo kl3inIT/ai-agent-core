@@ -43,7 +43,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 ### Mutation Internals Hardening (Phase 11 follow-up)
 
 - [ ] **MUT-15**: The fail-closed mutation gate sequence (`AiAgentMutationRole` → exposure → `AccessManager` entity+attribute → `AiMutationIntent` idempotency → `MutationGuard` SPI → `@Transactional` save) is extracted into one canonical `MutationGateChain` component; `create_record` / `update_record` / `add_related_record` / `remove_related_record` and `bulk_save_records` become thin adapters over it. The gate order is locked by a source-level invariant test — every gate throws before the transactional save (the chain itself carries no `@Transactional`; only `MutationSaveExecutor.save` does).
-- [ ] **MUT-16**: To-one FK references are batch-loaded during mutation attribute binding — one **constrained** `DataManager.load(...).ids(...)` per target class (never `UnconstrainedDataManager`, never raw JPQL, so row-level security still applies) — replacing per-reference loads.
+- [x] **MUT-16**: To-one FK references are batch-loaded during mutation attribute binding — one **constrained** `DataManager.load(...).ids(...)` per target class (never `UnconstrainedDataManager`, never raw JPQL, so row-level security still applies) — replacing per-reference loads.
 - [x] **MUT-17**: Related-write metadata resolution (`(parentMetaClass, relationshipName)` → supported-relationship descriptor) is memoized (immutable Jmix metamodel; no eviction needed).
 - [ ] **MUT-18**: Behavior is byte-for-byte identical to v1.1 — same gating outcomes and order, same exception classification and `MutationErrorTranslator` outputs, same audit rows (including rollback rows), same idempotency semantics, same `MutationGuard` SPI contract. The Phase 9/10/11 mutation test suites (`MutationToolInvariantsTest`, gating-order, audit-row, error-translator, host-guard-veto tests) pass unchanged, and the default-config zero-mutation-callback boot test still passes.
 
@@ -125,7 +125,7 @@ Which phases cover which requirements.
 | CFG-03 | Phase 16 | Complete |
 | SEC-08 | Phase 16 | Complete |
 | MUT-15 | Phase 17 | Pending |
-| MUT-16 | Phase 17 | Pending |
+| MUT-16 | Phase 17 | Complete |
 | MUT-17 | Phase 17 | Complete |
 | MUT-18 | Phase 17 | Pending |
 | PERF-01 | Phase 18 | Pending |
