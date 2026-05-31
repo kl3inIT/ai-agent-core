@@ -107,3 +107,7 @@ None. The seams are intentionally RED (not stubs) — each names its implementin
 ## No new threat surface
 
 This plan adds test-only code (test source tree, never shipped in the addon jar) plus one behavior-identical production seam extraction. No new network endpoints, auth paths, file access, or schema changes at trust boundaries.
+
+## Self-Check: PASSED
+
+All 6 created files + the SUMMARY exist on disk; all four commits (60e38d2, 817fb20, f27d23d, 3f2e412) present in git history.

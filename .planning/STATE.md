@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-last_updated: "2026-05-30T17:21:02.881Z"
+last_updated: "2026-05-31T07:23:30.763Z"
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 16
   percent: 33
 ---
 
@@ -22,12 +22,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 16 CLOSED (7 plans shipped 2026-05-13; UAT closed mid-run 2026-05-14 with 3/16 PASSED + 13 superseded). In-place UI Settings → AI Configuration consolidation refactor in progress (no separate phase issued). Next: Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass).
+**Current focus:** Phase 17 — mutation-internals-hardening-phase-11-follow-up
 
 ## Current Position
 
-Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — CLOSED (7/7 plans shipped; UAT 3/16 PASSED + 13 superseded)
-Plan: 7 of 7 shipped 2026-05-13
+Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — EXECUTING
+Plan: 2 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
 | Field | Value |
@@ -269,6 +269,8 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase ?]: Plan 16-06: KnobInventoryScanner uses bean.asBindTarget().getType().resolve() since getType() is package-private
 - [Phase ?]: Plan 16-06: Long-typed Tier-1 form fields bind via <textField property=...> (Jmix 2.8 typed-text coerces String<->Long); avoid bigDecimalField/numberField/integerField type mismatch
 - [Phase ?]: Phase 16 complete — MODEL-02 catch+reissue lands user-visible notification surface; ChatModelFallbackAppliedEvent is distinct from AiSettingsChangedEvent so the single-publish-site invariant remains intact
+- [Phase 17]: Plan 17-01: Open Question 1 resolved as option (a) — agentstore @Store FK fixture pair (MutationStoreLinkedParent/ChildFixture) so the existing agentstore-wrapping QueryCountingDataSourceConfiguration counts the batch FK SELECT without widening the shared counting config; per-test agentstore changelog override (includes prod changelog + FK fixture tables) keeps global test-app.properties wiring untouched.
+- [Phase 17]: Plan 17-01: Rule 3 auto-fix — extracted package-private computeSupported(MetaClass,String) seam on RelatedWriteMetadataResolver (behavior-identical; resolveSupportedRelatedWriteRelationship delegates) so the pure-JUnit MUT-17 memo test compiles; Plan 02 adds the memoization. Four MUT structural seams written RED, each naming its implementing plan (02 memo, 03 batch FK, 04 gate chain). MUT-15 @Transactional-absence via Class.forName reflection (D-14). FK SELECT-count test boots clean (no boot regression); observed slope K=10->51, K=100->411 selects (per-row FK path) RED until Plan 03. Full mutation suite: only the 3 MUT-15 + 2 MUT-17 intended-RED seams fail; zero Phase 9/10/11 parity regression.
 
 ### Performance Metrics
 
@@ -344,6 +346,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 16 P05 | 25min | 3 tasks | 7 files |
 | Phase 16 P06 | 45min | 3 tasks | 20 files |
 | Phase 16 P07 | ~50 min | 2 tasks | 11 files |
+| Phase 17 P01 | ~20 min | 3 tasks | 9 files |
 
 ### Quick Tasks Completed
 
@@ -353,9 +356,9 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-05-30T16:47:30.177Z
+**Last session:** 2026-05-31T07:23:30.748Z
 **Stopped at:** Phase 17 context gathered
-**Resume file:** .planning/phases/17-mutation-internals-hardening-phase-11-follow-up/17-CONTEXT.md
+**Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** Pop stash → continue Phase 16 Plan 04 wiring + tests → Plan 05+.
