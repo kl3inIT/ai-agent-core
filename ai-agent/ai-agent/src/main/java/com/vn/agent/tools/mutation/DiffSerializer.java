@@ -200,22 +200,6 @@ public class DiffSerializer {
     }
 
     /**
-     * Phase 13 — resultSummary for {@code bulk_save_records} failure audit rows. Emits ONLY
-     * the failed row index, the stable error code, and the per-row operation kind ("create"
-     * for rows missing an id; "update" for rows carrying an id). NEVER echoes the failed
-     * attribute name or the failed value (P-22 — Phase 11 mutation invariant).
-     */
-    public String serializeBulkFailureSummary(int failedRowIndex,
-                                              String stableErrorCode,
-                                              String operation) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("failedRowIndex", failedRowIndex);
-        summary.put("errorCode", stableErrorCode);
-        summary.put("operation", operation);
-        return writeJson(summary);
-    }
-
-    /**
      * Replace LLM-supplied values with SHA-256 hashes for any attribute whose simple name
      * is configured sensitive. Non-sensitive values pass through to Jackson which handles
      * JSON-escape; raw strings never leak into the LLM result path because this is only

@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
  * fails the build if {@code @Transactional} is ever added here (D-04, T-17-07).
  *
  * <p><b>Per-execute state is never an instance field (T-17-08).</b> {@code commitState},
- * {@code reservation}, {@code failedRowIndex}, {@code startedAt}, {@code userUsername}, and
+ * {@code reservation}, {@code startedAt}, {@code userUsername}, and
  * {@code metaClass} live in a per-call {@link Context} so concurrent invocations of this
  * singleton cannot corrupt each other's commit classification or rollback decision.
  *
@@ -140,7 +140,6 @@ public class MutationGateChain {
         MetaClass metaClass;
         MutationIntentRepository.ReservationResult reservation;
         MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
-        Integer failedRowIndex;
 
         // Stage hand-off state populated by coerce/save/finalize (per-variant).
         Map<String, Object> coercedAttributes;
@@ -315,7 +314,6 @@ public class MutationGateChain {
         for (int i = 0; i < safeRecords.size(); i++) {
             Map<String, Object> row = safeRecords.get(i);
             if (row != null && row.containsKey("id") && row.get("id") == null) {
-                ctx.failedRowIndex = i;
                 throw new ToolUserError("validation_failed",
                         "row " + i + ": explicit id:null is not allowed; omit the id key entirely to create",
                         List.of("either omit the 'id' key for a CREATE, or supply a UUID id for an UPDATE"));
@@ -480,6 +478,10 @@ public class MutationGateChain {
                             (a, b) -> b, LinkedHashMap::new)));
         }
         ctx.coercedAttributes = null; // not used for bulk — per-row coercion happens in save
+        // WR-04: prefetchReferences runs the cross-row attribute-name + FK-UUID validation HERE,
+        // in gate 5, BEFORE the per-row save loop. A failure (unknown/read-only/PK attribute name,
+        // malformed FK UUID) is thrown WITHOUT a per-row index — the batch is all-or-nothing, so
+        // the offending row is not individually attributed; the LLM resubmits all corrected rows.
         ctx.prefetchedReferences = mutationAttributeBinder.prefetchReferences(ctx.metaClass, rowAttrsInOrder);
         ctx.entitiesInOrder = new ArrayList<>(safeRecords.size());
         // Stash the stripped row attrs for the per-row save loop via a context field.
@@ -620,7 +622,6 @@ public class MutationGateChain {
         // Per-row coerce + per-row CrudEntityContext + guard + build SaveContext.
         SaveContext saveContext = new SaveContext();
         for (int i = 0; i < safeRecords.size(); i++) {
-            ctx.failedRowIndex = i;
             Map<String, Object> row = safeRecords.get(i);
             boolean isUpdate = row.containsKey("id");
             Object rowId = isUpdate ? row.get("id") : null;
@@ -666,14 +667,25 @@ public class MutationGateChain {
             saveContext.saving(entity);
             ctx.entitiesInOrder.add(entity);
         }
-        ctx.failedRowIndex = null; // all rows passed pre-save validation
 
         // Single proxy-crossed @Transactional save — rollback-all on RuntimeException.
         // bulkSave sets SaveContext.discardSaved(true), so the returned EntitySet is empty
-        // (no per-row post-save reload — MUT-16 O(1) batch contract). Row-drop detection is
-        // therefore provided by the rollback-all transaction invariant: any host policy /
-        // listener that removes an entity from the save set fails the whole batch rather than
-        // silently dropping a row.
+        // (no per-row post-save reload — MUT-16 O(1) batch contract). savedIds is therefore
+        // derived from the in-memory entitiesInOrder, not the returned EntitySet.
+        //
+        // WR-01 — rollback-all invariant, precise scope:
+        //   COVERED (in contract): any host policy, Bean Validation rule, or entity listener
+        //     (BeforeInsert/BeforeUpdate/BeforeDelete) that THROWS a RuntimeException aborts the
+        //     single @Transactional span and rolls back the ENTIRE batch — zero rows persisted,
+        //     no partial commit. This is the documented and tested guarantee (see
+        //     BuiltInMutationToolsBulkSaveListenerRollbackTest).
+        //   NOT COVERED (explicitly OUT of contract): a listener that returns NORMALLY but
+        //     arranges for a row to be silently skipped (e.g. removes it from the save set, or a
+        //     data store that filters the batch without raising). With discardSaved(true) there is
+        //     no returned EntitySet to cross-check, so savedIds[i] would report a generated UUID
+        //     for a row that never hit the database. Such non-throwing silent drops are uncommon
+        //     and considered out of the bulk_save_records contract; the host must signal a refusal
+        //     by throwing, not by silently dropping.
         mutationSaveExecutor.bulkSave(saveContext);
         ctx.commitState = MutationCommitState.HOST_SAVE_RETURNED;
         // Use entitiesInOrder (input order is the contract), not the unordered EntitySet

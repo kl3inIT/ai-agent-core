@@ -307,13 +307,15 @@ public class BuiltInMutationTools {
               remove_related_record instead.
 
             ERROR HANDLING:
-            - Per-row failure rolls back the ENTIRE batch (zero rows persisted).
-              Result carries: {outcome: ERROR | BLOCKED | COMMIT_FAILED, failedRowIndex: N,
-              errorCode: <one-of-6-stable-codes>}.
-            - Stable error codes: unknown_entity, access_denied, validation_failed,
-              parameter_conversion_error, idempotency_violation, concurrent_modification.
+            - Any failure rolls back the ENTIRE batch (zero rows persisted).
+              The result is a structured error object: {error: <stable-code>, reason: <message>,
+              expected: [<corrective hints>]}. There is NO per-row index in the result — the
+              batch is all-or-nothing, so a failure means EVERY row must be resubmitted.
+            - Stable error codes (the "error" field): unknown_entity, access_denied,
+              validation_failed, parameter_conversion_error, idempotency_violation,
+              concurrent_modification.
             - Do NOT retry on access_denied or idempotency_violation — surface to the user.
-            - For a corrected retry after a row-level failure, generate a FRESH idempotencyKey.
+            - For a corrected retry after a failure, generate a FRESH idempotencyKey.
 
             STRICTNESS:
             - Use bulk_save_records ONLY when records >= 2 of the SAME entity. For one record,
@@ -342,9 +344,10 @@ public class BuiltInMutationTools {
                   {"email":"e@x.com","fullName":"Em Vu","phone":"..."}
                 ]
                 idempotencyKey="<fresh UUID v4>"
-                Result on row-2 validation failure:
-                {"outcome":"ERROR","failedRowIndex":1,"errorCode":"validation_failed"}
-                — entire batch rolled back; row 0 update NOT applied.
+                Result when one row fails validation:
+                {"error":"validation_failed","reason":"<message>","expected":[<hints>]}
+                — entire batch rolled back; the row-0 update was NOT applied. Resubmit ALL
+                rows with a FRESH idempotencyKey after correcting the offending value.
             """)
     public String bulkSaveRecords(
             @ToolParam(description = "Exact internal entity name from list_entities (e.g. 'Customer'). NEVER a label.")
