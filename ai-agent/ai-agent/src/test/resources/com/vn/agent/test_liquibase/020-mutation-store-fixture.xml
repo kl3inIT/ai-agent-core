@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Plan 17-01 Task 3 (MUT-16, Open Question 1 option a) — agentstore-backed FK fixture
+        tables. These mirror MUTATION_LINKED_PARENT/CHILD_FIXTURE but live in the AGENTSTORE so
+        the existing agentstore-wrapping QueryCountingDataSourceConfiguration counts the batch
+        FK .ids(...) SELECT (MutationFkBatchLoadQueryCountTest). Test-only — never shipped in the
+        addon jar. The uuid.type property is supplied by the including test agentstore changelog
+        (test-agentstore-changelog.xml).
+    -->
+
+    <changeSet id="1" author="ai-agent-test">
+        <createTable tableName="MUTATION_STORE_LINKED_PARENT_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME_" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="ai-agent-test">
+        <createTable tableName="MUTATION_STORE_LINKED_CHILD_FIXTURE">
+            <column name="ID" type="${uuid.type}">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="VERSION" type="int" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="LABEL_" type="varchar(255)"/>
+            <column name="STORE_LINKED_PARENT_ID" type="${uuid.type}"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="MUTATION_STORE_LINKED_CHILD_FIXTURE" baseColumnNames="STORE_LINKED_PARENT_ID"
+                constraintName="FK_MUT_STORE_LINKED_CHILD_PARENT"
+                referencedTableName="MUTATION_STORE_LINKED_PARENT_FIXTURE" referencedColumnNames="ID"/>
+    </changeSet>
+
+</databaseChangeLog>

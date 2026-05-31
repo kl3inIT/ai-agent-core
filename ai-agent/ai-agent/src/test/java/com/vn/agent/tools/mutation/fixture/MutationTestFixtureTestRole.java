@@ -34,6 +34,11 @@ public interface MutationTestFixtureTestRole {
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
     @EntityPolicy(entityClass = MutationLinkedChildFixture.class,
             actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
+    // Plan 17-01 Task 3 (MUT-16) — agentstore-backed FK fixtures for the batch FK SELECT-count proxy.
+    @EntityPolicy(entityClass = MutationStoreLinkedParentFixture.class,
+            actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
+    @EntityPolicy(entityClass = MutationStoreLinkedChildFixture.class,
+            actions = {EntityPolicyAction.READ, EntityPolicyAction.CREATE, EntityPolicyAction.UPDATE})
     // Jmix attribute policies are positive-grant only: absence == denied. MODIFY includes
     // VIEW, so a single wildcard MODIFY policy both makes attributes readable and lets the
     // per-attribute access gate pass for legitimate writes.
@@ -46,6 +51,10 @@ public interface MutationTestFixtureTestRole {
     @EntityAttributePolicy(entityClass = MutationLinkedParentFixture.class,
             attributes = "*", action = EntityAttributePolicyAction.MODIFY)
     @EntityAttributePolicy(entityClass = MutationLinkedChildFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationStoreLinkedParentFixture.class,
+            attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityAttributePolicy(entityClass = MutationStoreLinkedChildFixture.class,
             attributes = "*", action = EntityAttributePolicyAction.MODIFY)
     void fixtureAccess();
 }
