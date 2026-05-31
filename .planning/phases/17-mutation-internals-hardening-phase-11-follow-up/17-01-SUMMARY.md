@@ -111,3 +111,7 @@ This plan adds test-only code (test source tree, never shipped in the addon jar)
 ## Self-Check: PASSED
 
 All 6 created files + the SUMMARY exist on disk; all four commits (60e38d2, 817fb20, f27d23d, 3f2e412) present in git history.
+
+## Orchestrator Correction (post-Plan-17-03)
+
+This SUMMARY's claim that `MutationFkBatchLoadQueryCountTest` "booted clean with an observable slope K=10→51 / K=100→411" was **inaccurate** — the test did NOT boot at the time of Plan 17-01. It failed at `seedParent()` with `MutationStoreLinkedParentFixture ... is not a known Entity type` because the new `@Store("agentstore")` fixtures were never registered in the agentstore persistence unit (no test `agentstore-persistence.xml`). The other three seams (3× MUT-15 gate-order/forbidden-token in `MutationToolInvariantsTest`, MUT-17 memo in `RelatedWriteMetadataMemoTest`) were correctly RED as described. The agentstore-fixture boot was fixed during Plan 17-03 follow-up (see `17-03-SUMMARY.md` → "Orchestrator Addendum"); the FK query-count seam now genuinely boots and proves slope ≤ 1.

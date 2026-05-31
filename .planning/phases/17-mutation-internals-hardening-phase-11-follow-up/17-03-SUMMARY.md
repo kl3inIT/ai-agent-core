@@ -103,3 +103,16 @@ This plan modifies one existing production file on the FK-binding path. No new n
 
 - `MutationAttributeBinder.java` exists and contains `prefetchReferences`, the 3-arg `coerceAttributes` overload, `.ids(` (line ~164), and `mutationErrorTranslator.notFound` (line ~367).
 - Task commit 1103634 present in git history.
+
+## Orchestrator Addendum — MUT-16 seam now GREEN (post-execution, gsd-debugger)
+
+The "harness-blocked / document-and-defer" status above is **superseded**. After this plan returned, the orchestrator reproduced the seam failure and dispatched a debugger which found TWO real root causes and fixed both (no assertion weakening):
+
+1. **Boot failure (`is not a known Entity type`)** — the `agentstore` PU lookup resolves `{module}/agentstore-persistence.xml` and only the production file (listing `com.vn.agent.entity.*`) was on the test classpath, so the new `@Store("agentstore")` fixtures were never registered. **Fix:** added a hand-written test `agentstore-persistence.xml` at `src/test/resources/com/vn/agent/tools/mutation/` listing the production agentstore classes + the two fixtures (commit `010d963`).
+2. **Slope was still O(N)=90 after boot** — the Plan 17-03 batch API (`prefetchReferences`) was **never wired into `bulkSaveRecords`** (dead code); the loop still called the single-row `coerceAttributes` per row, AND `DataManager.save` reloaded every row post-commit (`loadAllAfterSave`, O(N)). **Fix (commit `8a1fbec`):** `bulkSaveRecords` now calls `prefetchReferences(metaClass, allRows)` ONCE and binds via the 3-arg `coerceAttributes`; `MutationSaveExecutor.bulkSave` sets `SaveContext.setDiscardSaved(true)` (savedIds read from the in-memory `@JmixGeneratedValue` UUIDs).
+
+**Result:** `MutationFkBatchLoadQueryCountTest` BOOTS and PASSES — slope ≤ 1 (was 360 → 90 → ≤1). Full `com.vn.agent.tools.mutation.*` + `com.vn.agent.performance.*` = 106 tests, only the 3 intentional MUT-15 `mutationGateChain_*` RED seams fail (Plan 17-04), no other regressions.
+
+**Parity note for MUT-18 (17-05):** `setDiscardSaved(true)` is a **deliberate, documented** behavior change required for the O(1) contract. The post-save reload (pure overhead for the tool's UUID-only return) is removed, and the old defensive "silent row-drop" guard (which read the returned `EntitySet`, now empty) is replaced by the rollback-all transaction invariant. Observable tool output (savedIds, JSON, error classification) is unchanged — all existing bulk-save parity tests stay GREEN. Treat as intentional, NOT a regression.
+
+Files touched beyond this plan's declared `files_modified`: `BuiltInMutationTools.java` (also in Plan 17-04's scope — 17-04 runs next on the updated code) and `MutationSaveExecutor.java`. Debug session: `.planning/debug/mut16-agentstore-fixture-not-known-entity.md`.
