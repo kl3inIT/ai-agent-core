@@ -1,5 +1,5 @@
 ---
-status: investigating
+status: awaiting_human_verify
 trigger: "LIVE UAT on :8088 (Claude Sonnet 4.6): confirming a bulk create throws; chat shows generic 'Đã xảy ra lỗi'. Iteration 2 of bulk-save-tool-not-exposed."
 created: 2026-06-02
 updated: 2026-06-02
@@ -121,7 +121,7 @@ verification: |
     + DefaultChatService* : all pass (no tool-name leak; prompt substrings intact).
   - Mutation + performance constraint: 107 tests, 2 skipped, 0 failures, 0 errors (baseline preserved;
     Phase 17 internals untouched).
-  - Full :ai-agent:test : (see final report).
+  - Full :ai-agent:test : 846 tests, 3 skipped, 0 failures, 0 errors. BUILD SUCCESSFUL.
 
 files_changed:
   - ai-agent/ai-agent/src/main/java/com/vn/agent/action/SingleRecordValues.java (new)
