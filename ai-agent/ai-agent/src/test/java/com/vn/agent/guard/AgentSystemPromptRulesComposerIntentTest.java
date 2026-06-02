@@ -52,6 +52,25 @@ class AgentSystemPromptRulesComposerIntentTest {
     }
 
     @Test
+    void planningRulesMakeBulkTheUnambiguousMandatoryPathAndForbidArraysInSingleTool() {
+        AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
+                new AiAgentMutationProperties(true, null, null, null, null));
+
+        String rules = composer.effectiveRules();
+
+        assertThat(rules)
+                // single tool is explicitly single-record and forbids arrays in values
+                .contains("EXACTLY ONE record -> call propose_action_choices")
+                .contains("NEVER pass an array/list to values")
+                // bulk is the mandatory path for >=2 records
+                .contains("you MUST call propose_bulk_action_choices ONCE")
+                .contains("the ONLY correct path for multiple records")
+                // self-correction guidance when the model slips
+                .contains("WRONG_TOOL_FOR_BULK")
+                .contains("re-issue the request via propose_bulk_action_choices");
+    }
+
+    @Test
     void bulkCreateNowActionRulesInstructBulkSaveRecordsExactlyOnce() {
         AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
                 new AiAgentMutationProperties(true, null, null, null, null));

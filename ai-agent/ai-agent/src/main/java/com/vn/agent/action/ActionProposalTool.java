@@ -28,12 +28,13 @@ public class ActionProposalTool {
             2. This tool is safe: it does not create records, update records, open views, or create drafts.
             3. If status=MISSING_FIELDS, ask the user for those fields. Do not show action choices.
             4. If status=READY, the UI will render the returned action choices. Wait for the user to choose one.
-            5. This tool validates ONE record per call. Do not pass an array as values.
+            5. STRICTLY ONE RECORD per call. The values argument MUST be a single JSON object, NEVER an array.
+               To create TWO OR MORE records of the same entity in one request, call propose_bulk_action_choices instead.
 
             INPUT CONTRACT:
             - operation: currently "create".
             - targetEntityName: exact internal entity name from list_entities, never a label.
-            - values: collected writable attribute-name to value object.
+            - values: collected writable attribute-name to value object for ONE record. Do NOT pass a list/array here.
             - missingFields: required fields you know are still missing, or an empty list.
             - choices: optional requested choices. Supported ids are "create-now" and "prefill-form".
             """)
@@ -41,13 +42,24 @@ public class ActionProposalTool {
             @ToolParam(description = "Operation, currently create") String operation,
             @ToolParam(description = "Exact target entity name from list_entities") String targetEntityName,
             @ToolParam(description = "Short human-readable instance summary", required = false) String instanceName,
-            @ToolParam(description = "Writable attribute-name to value object. Must be an object, not an array.", required = false) Map<String, Object> values,
+            @ToolParam(description = "Writable attribute-name to value object for ONE record. Must be a single object, NEVER an array; for multiple records call propose_bulk_action_choices.", required = false) SingleRecordValues values,
             @ToolParam(description = "Known missing required fields", required = false) List<String> missingFields,
             @ToolParam(description = "Requested choice ids: create-now, prefill-form", required = false) List<String> choices) {
 
+        // Defensive boundary (iteration 2): if the model reached for this single-record tool but
+        // supplied multiple rows, the array-tolerant SingleRecordValues deserializer captured them
+        // without throwing. Return a structured corrective result that routes the model to the bulk
+        // tool, instead of letting Jackson throw a ToolExecutionException during argument binding.
+        if (values != null && values.multiRecord()) {
+            return ActionProposalResult.useBulkTool(
+                    new ActionProposal(null, operation, targetEntityName, instanceName,
+                            Map.of(), values.rows(), missingFields, List.of()));
+        }
+
+        Map<String, Object> singleRecord = values == null ? Map.of() : values.map();
         return actionProposalService.validate(new ActionProposal(
                 null, operation, targetEntityName, instanceName,
-                values == null ? Map.of() : values,
+                singleRecord,
                 missingFields, choices));
     }
 

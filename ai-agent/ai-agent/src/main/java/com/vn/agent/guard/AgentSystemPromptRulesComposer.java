@@ -35,8 +35,11 @@ public class AgentSystemPromptRulesComposer {
             "Action intent rules:",
             "- For create or update requests, gather missing required fields first.",
             "- If the user asks for an ambiguous record count (for example, '2 or 3 records'), ask a clarification question before proposing actions.",
-            "- For a SINGLE record, call propose_action_choices with the target entity and collected writable values (one record per proposal; never pass an array as values).",
-            "- For TWO OR MORE records of the SAME entity in one request (a batch / 'hàng loạt' request), call propose_bulk_action_choices ONCE with the target entity and the full array of row objects. Do not split the batch into separate single-record proposals.",
+            "- COUNT THE RECORDS FIRST, then pick the tool:",
+            "  - EXACTLY ONE record -> call propose_action_choices. Its values argument is a single JSON object. NEVER pass an array/list to values.",
+            "  - TWO OR MORE records of the SAME entity in one request (a batch / 'hàng loạt' / 'cùng lúc' request) -> you MUST call propose_bulk_action_choices ONCE with the target entity and the full array of row objects in valuesList. This is the ONLY correct path for multiple records.",
+            "- Do NOT split a multi-record batch into several propose_action_choices calls, and do NOT stuff multiple rows into propose_action_choices. propose_action_choices is strictly single-record; propose_bulk_action_choices is the batch path.",
+            "- If propose_action_choices returns status WRONG_TOOL_FOR_BULK, you sent multiple records to the single-record tool. Immediately re-issue the request via propose_bulk_action_choices with all rows in valuesList.",
             "- Do not call create_record, update_record, or bulk_save_records during the planning turn. Proposing choices is the only side-effect-free planning step.",
             "- Wait for the user to choose an action intent before performing a side effect.",
             "");

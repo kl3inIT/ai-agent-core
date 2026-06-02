@@ -86,6 +86,38 @@ class AgentToolCallbacksIntentGatingTest {
     }
 
     @Test
+    void singleProposalToolInputSchemaKeepsValuesAsObjectAfterArrayTolerantTypeChange() {
+        // Iteration-2 guard: swapping `values` to the array-tolerant SingleRecordValues must NOT
+        // degrade the advertised schema. The model must still see `values` as a JSON object so the
+        // single-record happy path is unchanged; the array tolerance is a runtime safety net only.
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+        ToolCallback[] planning = callbacks.callbacksFor("alice", UUID.randomUUID(), null);
+
+        ToolDefinition single = Arrays.stream(planning)
+                .map(ToolCallback::getToolDefinition)
+                .filter(def -> "propose_action_choices".equals(def.name()))
+                .findFirst()
+                .orElseThrow();
+
+        String schema = single.inputSchema();
+        assertThat(schema).isNotBlank();
+        // The whole input schema must be a JSON object (parses) and declare a `values` property that
+        // is typed as an object, never an array.
+        com.fasterxml.jackson.databind.JsonNode root;
+        try {
+            root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(schema);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new AssertionError("propose_action_choices input schema is not valid JSON: " + schema, e);
+        }
+        com.fasterxml.jackson.databind.JsonNode valuesNode = root.path("properties").path("values");
+        assertThat(valuesNode.isMissingNode()).isFalse();
+        String valuesType = valuesNode.path("type").asText("");
+        // Must be an object schema (or at least not an array) so the model is steered to a single
+        // object for one record.
+        assertThat(valuesType).isNotEqualTo("array");
+    }
+
+    @Test
     void enabledToolsAllowlistRestrictsPlanningTurnToIntersection() {
         AgentToolCallbacks callbacks = callbacksWithContributorTools();
 
