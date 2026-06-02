@@ -201,8 +201,29 @@ public class AgentToolCallbacks {
      * Named-intent turns fail closed to exactly the audited prepare_form_draft callback.
      */
     public ToolCallback[] callbacksFor(String userId, java.util.UUID conversationId, String intentId) {
+        return callbacksFor(userId, conversationId, intentId, null);
+    }
+
+    /**
+     * Per-turn assembly with the active profile's {@code enabledTools} allowlist applied
+     * (Workstream B). The allowlist composes with the per-turn intent routing as an
+     * <b>intersection</b>: a tool is exposed only if the intent routing would include it AND it is
+     * in the allowlist. When {@code enabledTools} is {@code null}/empty the per-turn routing is
+     * returned unchanged (default behavior).
+     *
+     * <p>This is a security control — mutation tools are filtered identically, and because the
+     * allowlist can only remove names it can never widen the surface beyond the built-in/contributed
+     * set assembled by the intent routing.</p>
+     *
+     * <p>The structural {@code prepare_form_draft} fail-closed path (named extraction intents) is
+     * NOT subject to the allowlist: that turn requires exactly one specific callback to function,
+     * and silently hiding it via an admin allowlist would break the named-intent contract rather
+     * than enforce a tool policy.</p>
+     */
+    public ToolCallback[] callbacksFor(String userId, java.util.UUID conversationId, String intentId,
+                                       List<String> enabledTools) {
         if (intentId == null || intentId.isBlank()) {
-            return auditedNonMutationCallbacks(false, true);
+            return applyAllowlist(auditedNonMutationCallbacks(false, true), enabledTools);
         }
         String actionIntentId = ActionIntentId.fromSelectionParameter(intentId);
         if (ActionIntentId.CREATE_NOW.equals(actionIntentId)
@@ -214,12 +235,31 @@ public class AgentToolCallbacks {
             ToolCallback[] mutationBoundaryWrapped = mutationCallbacks();
             ToolCallback[] out = Arrays.copyOf(audited, audited.length + mutationBoundaryWrapped.length);
             System.arraycopy(mutationBoundaryWrapped, 0, out, audited.length, mutationBoundaryWrapped.length);
-            return out;
+            return applyAllowlist(out, enabledTools);
         }
         if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {
             return singlePrepareFormDraftCallback();
         }
         return singlePrepareFormDraftCallback();
+    }
+
+    /**
+     * Intersect the assembled callbacks with the active profile's {@code enabledTools} allowlist.
+     * A {@code null}/empty allowlist preserves the input unchanged. Otherwise only callbacks whose
+     * tool name is present in the allowlist survive. The allowlist can only narrow the surface.
+     */
+    private static ToolCallback[] applyAllowlist(ToolCallback[] callbacks, List<String> enabledTools) {
+        if (enabledTools == null || enabledTools.isEmpty()) {
+            return callbacks;
+        }
+        java.util.Set<String> allowed = new java.util.LinkedHashSet<>(enabledTools);
+        List<ToolCallback> filtered = new ArrayList<>(callbacks.length);
+        for (ToolCallback callback : callbacks) {
+            if (allowed.contains(callback.getToolDefinition().name())) {
+                filtered.add(callback);
+            }
+        }
+        return filtered.toArray(new ToolCallback[0]);
     }
 
     private ToolCallback[] singlePrepareFormDraftCallback() {

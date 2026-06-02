@@ -63,4 +63,38 @@ class AiParametersResolverTest {
         assertThat(resolver.effectiveTemperature(p)).isEqualTo(0.7);
         assertThat(resolver.effectiveSystemPrompt(p)).isEqualTo("You are an assistant.");  // fallback
     }
+
+    @Test
+    void enabledTools_null_when_body_absent() {
+        AiParameters p = new AiParameters();
+        assertThat(resolver.effectiveEnabledTools(p)).isNull();
+    }
+
+    @Test
+    void enabledTools_null_when_key_absent_or_empty() {
+        AiParameters noKey = new AiParameters();
+        noKey.setBodyYaml("model: anthropic/claude-3.5-sonnet\n");
+        assertThat(resolver.effectiveEnabledTools(noKey)).isNull();
+
+        AiParameters emptyList = new AiParameters();
+        emptyList.setBodyYaml("model: anthropic/claude-3.5-sonnet\nenabledTools: []\n");
+        assertThat(resolver.effectiveEnabledTools(emptyList)).isNull();
+    }
+
+    @Test
+    void enabledTools_returns_selected_tool_names() {
+        AiParameters p = new AiParameters();
+        p.setBodyYaml("model: anthropic/claude-3.5-sonnet\n"
+                + "enabledTools:\n  - find_records\n  - create_record\n");
+        assertThat(resolver.effectiveEnabledTools(p))
+                .containsExactly("find_records", "create_record");
+    }
+
+    @Test
+    void enabledTools_drops_blank_entries() {
+        AiParameters p = new AiParameters();
+        p.setBodyYaml("model: anthropic/claude-3.5-sonnet\n"
+                + "enabledTools:\n  - find_records\n  - '  '\n");
+        assertThat(resolver.effectiveEnabledTools(p)).containsExactly("find_records");
+    }
 }

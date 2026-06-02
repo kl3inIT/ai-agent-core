@@ -207,6 +207,44 @@ public class AiParametersResolver {
         return threshold >= 0.0 && threshold <= 1.0 ? threshold : defaultValue;
     }
 
+    /**
+     * Workstream B — the active profile's {@code enabledTools} allowlist for the runtime tool
+     * surface. Reads the {@code enabledTools} list from the profile body YAML.
+     *
+     * <p>Semantics (matches {@code AiParametersBody.enabledTools} documentation and the
+     * {@code ParametersDetailView} read path):
+     * <ul>
+     *   <li>{@code null} / absent / empty list → {@code null} is returned, meaning "all tools
+     *       allowed" (no runtime restriction; preserves pre-Workstream-B behavior).</li>
+     *   <li>non-empty list → the exact list of tool names the admin selected. The tool surface is
+     *       intersected with this list (a tool is exposed only if it is both selected by the
+     *       per-turn intent routing AND present here).</li>
+     * </ul>
+     * Blank entries are dropped. The allowlist can only narrow the built-in/contributed tool set;
+     * it never widens it.</p>
+     */
+    public List<String> effectiveEnabledTools(AiParameters params) {
+        String body = params.getBodyYaml();
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        Object value = parseBody(params).get("enabledTools");
+        if (!(value instanceof List<?> rawList) || rawList.isEmpty()) {
+            return null;
+        }
+        List<String> tools = new ArrayList<>(rawList.size());
+        for (Object element : rawList) {
+            if (element == null) {
+                continue;
+            }
+            String name = String.valueOf(element).trim();
+            if (!name.isEmpty()) {
+                tools.add(name);
+            }
+        }
+        return tools.isEmpty() ? null : List.copyOf(tools);
+    }
+
     public String effectiveSystemPrompt(AiParameters params) {
         String body = params.getBodyYaml();
         if (body != null && !body.isBlank()) {

@@ -86,6 +86,57 @@ class AgentToolCallbacksIntentGatingTest {
     }
 
     @Test
+    void enabledToolsAllowlistRestrictsPlanningTurnToIntersection() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> restricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null,
+                List.of("propose_action_choices")));
+
+        assertThat(restricted).containsExactly("propose_action_choices");
+        assertThat(restricted).doesNotContain("find_records", "propose_bulk_action_choices");
+    }
+
+    @Test
+    void enabledToolsAllowlistRestrictsMutationSurfaceOnActionTurn() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> unrestricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(),
+                ActionIntentId.selectionParameter(ActionIntentId.BULK_CREATE_NOW)));
+        // Allowlist that omits bulk_save_records must hide it even on the bulk-create-now turn.
+        List<String> restricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(),
+                ActionIntentId.selectionParameter(ActionIntentId.BULK_CREATE_NOW),
+                List.of("find_records")));
+
+        assertThat(unrestricted).contains("bulk_save_records");
+        assertThat(restricted).doesNotContain("bulk_save_records");
+        assertThat(restricted).isNotEmpty();
+        assertThat(restricted).allMatch("find_records"::equals);
+    }
+
+    @Test
+    void enabledToolsAllowlistCannotWidenBeyondIntentRouting() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        // Listing a tool that the planning routing does not assemble must not introduce it.
+        List<String> restricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null,
+                List.of("propose_action_choices", "delete_record", "not_a_real_tool")));
+
+        assertThat(restricted).containsExactly("propose_action_choices");
+    }
+
+    @Test
+    void nullAllowlistPreservesDefaultBehavior() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> withNull = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null, null));
+        List<String> withEmpty = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null, List.of()));
+        List<String> unfiltered = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null));
+
+        assertThat(withNull).isEqualTo(unfiltered);
+        assertThat(withEmpty).isEqualTo(unfiltered);
+    }
+
+    @Test
     void prefillActionReturnsOnlyPrepareFormDraft() {
         AgentToolCallbacks callbacks = callbacksWithContributorTools();
 
