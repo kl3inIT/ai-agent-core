@@ -182,11 +182,60 @@ class ActionProposalServiceTest {
                 .hasMessageContaining("source conversation id");
     }
 
+    @Test
+    void bulkProposalWithTwoValidRowsReturnsOnlyBulkCreateNowChoice() {
+        ActionProposalResult result = service.validate(bulkProposal(List.of(
+                Map.of("name", "Desk"),
+                Map.of("name", "Chair"))));
+
+        assertThat(result.status()).isEqualTo(ActionProposalResult.STATUS_READY);
+        assertThat(result.choices()).containsExactly(ActionIntentId.BULK_CREATE_NOW);
+        assertThat(result.proposal().isBulk()).isTrue();
+        assertThat(result.proposal().valuesList()).hasSize(2);
+        assertThat(result.proposal().targetEntityName()).isEqualTo(ENTITY_NAME);
+    }
+
+    @Test
+    void bulkProposalWithSingleRowIsInvalid() {
+        ActionProposalResult result = service.validate(bulkProposal(List.of(Map.of("name", "Desk"))));
+
+        assertThat(result.status()).isEqualTo(ActionProposalResult.STATUS_INVALID);
+        assertThat(result.messageKey()).isEqualTo("chatView.actionChoice.invalidProposal");
+    }
+
+    @Test
+    void bulkProposalReportsMissingRequiredFieldAcrossRows() {
+        ActionProposalResult result = service.validate(bulkProposal(List.of(
+                Map.of("name", "Desk"),
+                Map.of("externalCode", "X-1"))));
+
+        assertThat(result.status()).isEqualTo(ActionProposalResult.STATUS_MISSING_FIELDS);
+        assertThat(result.missingFields()).containsExactly("name");
+    }
+
+    @Test
+    void bulkProposalDeniedWhenCreatePermissionMissing() {
+        doThrow(new ToolUserError("access_denied", "missing mutation role"))
+                .when(mutationAuthorizationService).enforceMutationRole(AiAgentMutationRole.CODE);
+
+        ActionProposalResult result = service.validate(bulkProposal(List.of(
+                Map.of("name", "Desk"),
+                Map.of("name", "Chair"))));
+
+        assertThat(result.status()).isEqualTo(ActionProposalResult.STATUS_ACCESS_DENIED);
+        assertThat(result.choices()).isEmpty();
+    }
+
     private static ActionProposal proposal(Map<String, Object> values,
                                            List<String> missingFields,
                                            List<String> choices) {
         return new ActionProposal(null, "create", ENTITY_NAME, "Desk",
                 values, missingFields, choices);
+    }
+
+    private static ActionProposal bulkProposal(List<Map<String, Object>> rows) {
+        return new ActionProposal(null, "create", ENTITY_NAME, null,
+                Map.of(), rows, List.of(), List.of());
     }
 
     private static final class TestProductDetailView extends View<Div> {

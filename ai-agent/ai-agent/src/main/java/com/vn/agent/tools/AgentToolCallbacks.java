@@ -205,7 +205,11 @@ public class AgentToolCallbacks {
             return auditedNonMutationCallbacks(false, true);
         }
         String actionIntentId = ActionIntentId.fromSelectionParameter(intentId);
-        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
+        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)
+                || ActionIntentId.BULK_CREATE_NOW.equals(actionIntentId)) {
+            // create-now and bulk-create-now both attach the full mutation tool surface. The
+            // composer's per-intent rules decide which mutation tool the model is told to call
+            // (create_record for the single-record gate, bulk_save_records for the batch gate).
             ToolCallback[] audited = auditedNonMutationCallbacks(false, false, true);
             ToolCallback[] mutationBoundaryWrapped = mutationCallbacks();
             ToolCallback[] out = Arrays.copyOf(audited, audited.length + mutationBoundaryWrapped.length);

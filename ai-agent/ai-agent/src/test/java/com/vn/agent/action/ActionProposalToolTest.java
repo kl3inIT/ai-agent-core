@@ -36,6 +36,49 @@ class ActionProposalToolTest {
     }
 
     @Test
+    void bulkToolForwardsRowsAsBulkProposal() {
+        ActionProposalService service = mock(ActionProposalService.class);
+        when(service.validate(any(ActionProposal.class))).thenReturn(
+                ActionProposalResult.ready(new ActionProposal(
+                        "proposal-3", "create", "jmixapp_Product", "2 Product",
+                        Map.of(), List.of(Map.of("name", "Desk"), Map.of("name", "Chair")),
+                        List.of(), List.of(ActionIntentId.BULK_CREATE_NOW)),
+                        List.of(ActionIntentId.BULK_CREATE_NOW)));
+        ActionProposalTool tool = new ActionProposalTool(service);
+
+        tool.proposeBulkActionChoices(
+                "create", "jmixapp_Product", null,
+                List.of(Map.of("name", "Desk"), Map.of("name", "Chair")), List.of());
+
+        org.mockito.ArgumentCaptor<ActionProposal> proposalCaptor =
+                org.mockito.ArgumentCaptor.forClass(ActionProposal.class);
+        verify(service).validate(proposalCaptor.capture());
+        ActionProposal forwarded = proposalCaptor.getValue();
+        assertThat(forwarded.isBulk()).isTrue();
+        assertThat(forwarded.valuesList()).hasSize(2);
+        assertThat(forwarded.values()).isEmpty();
+    }
+
+    @Test
+    void bulkToolHandlesNullRowsAsEmptyList() {
+        ActionProposalService service = mock(ActionProposalService.class);
+        when(service.validate(any(ActionProposal.class))).thenReturn(
+                ActionProposalResult.invalid(new ActionProposal(
+                        "proposal-4", "create", "jmixapp_Product", "Product",
+                        Map.of(), List.of(), List.of(), List.of()),
+                        "chatView.actionChoice.invalidProposal"));
+        ActionProposalTool tool = new ActionProposalTool(service);
+
+        tool.proposeBulkActionChoices("create", "jmixapp_Product", null, null, List.of());
+
+        org.mockito.ArgumentCaptor<ActionProposal> proposalCaptor =
+                org.mockito.ArgumentCaptor.forClass(ActionProposal.class);
+        verify(service).validate(proposalCaptor.capture());
+        assertThat(proposalCaptor.getValue().valuesList()).isEmpty();
+        assertThat(proposalCaptor.getValue().isBulk()).isFalse();
+    }
+
+    @Test
     void toolHandlesNullValuesAsEmptyMap() {
         ActionProposalService service = mock(ActionProposalService.class);
         ActionProposalResult missing = ActionProposalResult.missingFields(new ActionProposal(

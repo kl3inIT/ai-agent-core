@@ -35,9 +35,9 @@ public class AgentSystemPromptRulesComposer {
             "Action intent rules:",
             "- For create or update requests, gather missing required fields first.",
             "- If the user asks for an ambiguous record count (for example, '2 or 3 records'), ask a clarification question before proposing actions.",
-            "- propose_action_choices supports one record per proposal. For multi-record create requests, either ask the user to handle them one at a time or propose separate single-record choices; never pass an array as values.",
-            "- When enough structured data is available, call propose_action_choices with the target entity and collected writable values.",
-            "- Do not call create_record, update_record, or bulk_save_records during the planning turn.",
+            "- For a SINGLE record, call propose_action_choices with the target entity and collected writable values (one record per proposal; never pass an array as values).",
+            "- For TWO OR MORE records of the SAME entity in one request (a batch / 'hàng loạt' request), call propose_bulk_action_choices ONCE with the target entity and the full array of row objects. Do not split the batch into separate single-record proposals.",
+            "- Do not call create_record, update_record, or bulk_save_records during the planning turn. Proposing choices is the only side-effect-free planning step.",
             "- Wait for the user to choose an action intent before performing a side effect.",
             "");
 
@@ -104,6 +104,18 @@ public class AgentSystemPromptRulesComposer {
                     "- Use the collected proposal values from the private per-turn action context.",
                     "- Call create_record only for the selected target entity and only with those collected values.",
                     "- Do not call prepare_form_draft in this turn.",
+                    "");
+        }
+        if (ActionIntentId.BULK_CREATE_NOW.equals(actionIntentId)) {
+            return baseRules + String.join("\n",
+                    "",
+                    "Selected action intent rules:",
+                    "- The user selected bulk-create-now (the user already confirmed the whole batch).",
+                    "- Use the collected batch rows from the private per-turn action context.",
+                    "- Call bulk_save_records EXACTLY ONCE for the selected target entity with the full"
+                            + " array of rows and a single fresh UUID v4 idempotencyKey for the batch.",
+                    "- Do not call create_record per row, do not split the batch, and do not call"
+                            + " propose_bulk_action_choices or prepare_form_draft in this turn.",
                     "");
         }
         if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {

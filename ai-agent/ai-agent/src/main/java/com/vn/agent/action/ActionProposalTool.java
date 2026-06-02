@@ -14,6 +14,7 @@ import java.util.Map;
 public class ActionProposalTool {
 
     public static final String TOOL_NAME = "propose_action_choices";
+    public static final String BULK_TOOL_NAME = "propose_bulk_action_choices";
 
     private final ActionProposalService actionProposalService;
 
@@ -48,5 +49,34 @@ public class ActionProposalTool {
                 null, operation, targetEntityName, instanceName,
                 values == null ? Map.of() : values,
                 missingFields, choices));
+    }
+
+    @Tool(name = BULK_TOOL_NAME, description = """
+            MANDATORY WORKFLOW (batch create of the SAME entity):
+            1. Use this tool ONLY when the user asks to create TWO OR MORE records of the SAME entity in one request (for example 'create 5 orders', 'thao tác hàng loạt').
+            2. For a single record, use propose_action_choices instead.
+            3. This tool is safe: it does not create records, update records, open views, or create drafts. It validates the batch server-side and renders ONE confirmation choice for all rows.
+            4. If status=MISSING_FIELDS, ask the user for those fields across the affected rows. Do not show the bulk choice.
+            5. If status=READY, the UI renders a single 'create all' confirmation. Wait for the user to confirm before any side effect.
+
+            INPUT CONTRACT:
+            - operation: currently "create".
+            - targetEntityName: exact internal entity name from list_entities, never a label. ALL rows are the same entity.
+            - rows: array of objects. Each object maps writable attribute names to values for one record. Provide at least 2 rows.
+            - missingFields: required fields you know are still missing across the rows, or an empty list.
+            """)
+    public ActionProposalResult proposeBulkActionChoices(
+            @ToolParam(description = "Operation, currently create") String operation,
+            @ToolParam(description = "Exact target entity name from list_entities; all rows share this entity") String targetEntityName,
+            @ToolParam(description = "Short human-readable batch summary", required = false) String instanceName,
+            @ToolParam(description = "Array of row objects. Each object maps writable attribute names to values for one record. At least 2 rows.")
+            List<Map<String, Object>> rows,
+            @ToolParam(description = "Known missing required fields across the rows", required = false) List<String> missingFields) {
+
+        return actionProposalService.validate(new ActionProposal(
+                null, operation, targetEntityName, instanceName,
+                Map.of(),
+                rows == null ? List.of() : rows,
+                missingFields, List.of()));
     }
 }

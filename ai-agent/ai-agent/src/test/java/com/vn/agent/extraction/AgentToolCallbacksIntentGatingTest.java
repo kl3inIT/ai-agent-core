@@ -66,6 +66,26 @@ class AgentToolCallbacksIntentGatingTest {
     }
 
     @Test
+    void bulkCreateNowActionAddsMutationCallbacksIncludingBulkSaveRecords() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> bulkCreateNowNames = names(callbacks.callbacksFor("alice", UUID.randomUUID(),
+                ActionIntentId.selectionParameter(ActionIntentId.BULK_CREATE_NOW)));
+
+        assertThat(bulkCreateNowNames).contains("bulk_save_records");
+    }
+
+    @Test
+    void planningTurnExposesBothSingleAndBulkActionProposalTools() {
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        List<String> planningNames = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null));
+
+        assertThat(planningNames)
+                .contains("propose_action_choices", "propose_bulk_action_choices");
+    }
+
+    @Test
     void prefillActionReturnsOnlyPrepareFormDraft() {
         AgentToolCallbacks callbacks = callbacksWithContributorTools();
 

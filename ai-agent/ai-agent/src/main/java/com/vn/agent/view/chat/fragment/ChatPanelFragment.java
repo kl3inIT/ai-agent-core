@@ -1290,6 +1290,18 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                     submitActionChoice(row, proposalPayload, ActionIntentId.CREATE_NOW));
             row.add(createNowButton);
         }
+        if (proposalPayload.choices().contains(ActionIntentId.BULK_CREATE_NOW)) {
+            // Single confirmation gate for the whole batch (N rows, ONE button).
+            String bulkLabel = MessageFormat.format(
+                    messages.getMessage("chatView.actionChoice.bulkCreateNow"),
+                    proposalPayload.valuesList().size());
+            Button bulkCreateNowButton = new Button(bulkLabel, VaadinIcon.RECORDS.create());
+            bulkCreateNowButton.addThemeNames("primary", "small");
+            bulkCreateNowButton.setAriaLabel(bulkLabel);
+            bulkCreateNowButton.addClickListener(event ->
+                    submitActionChoice(row, proposalPayload, ActionIntentId.BULK_CREATE_NOW));
+            row.add(bulkCreateNowButton);
+        }
         if (proposalPayload.choices().contains(ActionIntentId.PREFILL_FORM)) {
             Button prefillButton = new Button(
                     messages.getMessage("chatView.actionChoice.prefillForm"),
@@ -1324,8 +1336,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                                     StreamEventRenderer.ActionProposalPayload proposalPayload,
                                     String actionIntentId) {
         disableActionChoiceRow(actionChoiceRow);
-        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)) {
-            String label = messages.getMessage("chatView.actionChoice.createNow");
+        if (ActionIntentId.CREATE_NOW.equals(actionIntentId)
+                || ActionIntentId.BULK_CREATE_NOW.equals(actionIntentId)) {
+            String label = ActionIntentId.BULK_CREATE_NOW.equals(actionIntentId)
+                    ? MessageFormat.format(
+                            messages.getMessage("chatView.actionChoice.bulkCreateNow"),
+                            proposalPayload.valuesList().size())
+                    : messages.getMessage("chatView.actionChoice.createNow");
             try {
                 submitChatTurn(label, label,
                         ActionIntentId.selectionParameter(actionIntentId),
@@ -1366,6 +1383,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private String actionSelectionPrompt(StreamEventRenderer.ActionProposalPayload proposalPayload,
                                          String actionIntentId) {
+        if (ActionIntentId.BULK_CREATE_NOW.equals(actionIntentId)) {
+            return "Selected action intent: " + actionIntentId + "\n"
+                    + "Proposal id: " + proposalPayload.proposalId() + "\n"
+                    + "Target entity: " + proposalPayload.targetEntityName() + "\n"
+                    + "Row count: " + proposalPayload.valuesList().size() + "\n"
+                    + "Collected rows JSON: " + rowsJson(proposalPayload.valuesList());
+        }
         return "Selected action intent: " + actionIntentId + "\n"
                 + "Proposal id: " + proposalPayload.proposalId() + "\n"
                 + "Target entity: " + proposalPayload.targetEntityName() + "\n"
@@ -1377,6 +1401,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
             return objectMapper.writeValueAsString(values == null ? Map.of() : values);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize action proposal values", e);
+        }
+    }
+
+    private String rowsJson(List<Map<String, Object>> rows) {
+        try {
+            return objectMapper.writeValueAsString(rows == null ? List.of() : rows);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize action proposal rows", e);
         }
     }
 
