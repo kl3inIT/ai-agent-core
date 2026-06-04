@@ -2,19 +2,13 @@ package com.vn.agent.tools.mutation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.test_support.StubChatModelConfiguration;
-import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import com.vn.agent.tools.mutation.fixture.MutationTestFixture;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,14 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code "error":"idempotency_violation"}; no second fixture row may be written; the dedup
  * row count remains exactly 1; correction guidance must mention a fresh idempotency key.
  */
-@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
-        properties = {"ai-agent.tools.mutation.enabled=true"})
-@ImportAutoConfiguration({
-        com.vn.autoconfigure.agent.AIAutoConfiguration.class,
-        com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
-})
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
-        MutationToolTestUsersConfiguration.class})
+@MutationIntegrationTest
 class BuiltInMutationToolsIdempotencyViolationTest {
 
     private static final String FIXTURE_ENTITY = "mutationTest_MutationTestFixture";
