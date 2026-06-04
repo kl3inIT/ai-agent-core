@@ -2,20 +2,14 @@ package com.vn.agent.tools.mutation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.AITestConfiguration;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.test_support.StubChatModelConfiguration;
-import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import com.vn.agent.tools.mutation.fixture.MutationTestFixture;
 import io.jmix.core.UnconstrainedDataManager;
 import io.jmix.core.security.SystemAuthenticator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,14 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * REQUIRES_NEW reservation must commit) before the second invocation runs; otherwise the
  * second invocation would still see the row as PENDING in its own transaction snapshot.
  */
-@SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
-        properties = {"ai-agent.tools.mutation.enabled=true"})
-@ImportAutoConfiguration({
-        com.vn.autoconfigure.agent.AIAutoConfiguration.class,
-        com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
-})
-@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class,
-        MutationToolTestUsersConfiguration.class})
+@MutationIntegrationTest
 class BuiltInMutationToolsIdempotencyReplayTest {
 
     private static final String FIXTURE_ENTITY = "mutationTest_MutationTestFixture";

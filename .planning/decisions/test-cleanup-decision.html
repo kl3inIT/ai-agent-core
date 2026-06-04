@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quyết định: Clean Test — ai-agent-core</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --line:#2a2f3a;
+    --ink:#e6e9ef; --dim:#9aa3b2; --green:#3fb950; --amber:#d29922; --red:#f85149;
+    --blue:#58a6ff; --violet:#bc8cff; --chip:#222834;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.3px}
+  h2{font-size:19px;margin:38px 0 14px;letter-spacing:-.2px}
+  .sub{color:var(--dim);margin:0 0 26px}
+  .verdict{background:linear-gradient(135deg,#13251a,#15201c);border:1px solid #1f5e34;
+    border-radius:14px;padding:22px 24px;margin:22px 0}
+  .verdict .big{font-size:20px;font-weight:650;color:#7ee2a0}
+  .verdict p{margin:8px 0 0;color:#bfe9cd}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .n{font-size:26px;font-weight:700;letter-spacing:-.5px}
+  .stat .l{color:var(--dim);font-size:12.5px;margin-top:3px}
+  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)} .info{color:var(--blue)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  .myth td:nth-child(1){color:var(--dim);text-decoration:line-through}
+  .myth td:nth-child(2){color:#cfe9d6}
+  .opt{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin:14px 0}
+  .opt.rec{border-color:#2f6f45;background:linear-gradient(180deg,#15201a,#171a21)}
+  .opt h3{margin:0 0 2px;font-size:16.5px}
+  .opt .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;
+    background:var(--chip);color:var(--dim);margin-left:8px;vertical-align:middle}
+  .tag.rec{background:#1f5e34;color:#9ff0b8}
+  .meta{display:flex;gap:18px;margin:10px 0 6px;flex-wrap:wrap}
+  .meta span{font-size:12.5px;color:var(--dim)}
+  .meta b{color:var(--ink);font-weight:600}
+  .opt p{margin:6px 0 0;color:#c7cdd8;font-size:14px}
+  code{background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#d6deea}
+  pre{background:#0b0d11;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+    overflow:auto;font:12.5px/1.5 ui-monospace,Menlo,monospace;color:#cdd6e3}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:14px}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Clean Test — quyết định hướng đi</h1>
+  <p class="sub">ai-agent-core · đo thực tế ngày 2026-06-04 (chạy full <code>:ai-agent:ai-agent:test</code>, không tin doc cũ)</p>
+
+  <div class="verdict">
+    <div class="big">✅ Test suite đang KHỎE. Boot regression đã được giải quyết.</div>
+    <p>Không có "đám cháy" nào để dập. Cảm giác "test bất ổn / mất kiểm soát" đến từ <b>tài liệu cũ (v1.1) nói dối về trạng thái hiện tại</b>, không phải từ code. Việc cần làm là dọn dẹp nhẹ + cập nhật doc cho đúng sự thật.</p>
+  </div>
+
+  <div class="grid">
+    <div class="stat"><div class="n ok">847</div><div class="l">testcases chạy</div></div>
+    <div class="stat"><div class="n ok">0</div><div class="l">failures</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">skipped (đều có lý do hợp lệ)</div></div>
+    <div class="stat"><div class="n info">90</div><div class="l">@SpringBootTest boot LIVE (kể cả agentstore + 8 @UiTest)</div></div>
+  </div>
+
+  <h2>Lầm tưởng (doc cũ) vs Sự thật (đo hôm nay)</h2>
+  <table class="myth">
+    <thead><tr><th>CONCERNS.md / deferred-items nói (v1.1)</th><th>Thực tế 2026-06-04</th></tr></thead>
+    <tbody>
+      <tr><td>"93/213 test không boot được Spring context"</td><td>90 @SpringBootTest <b>boot live thành công</b>; full suite xanh 12 phút</td></tr>
+      <tr><td>"MetaClass not found AiAuditEvent — metamodel race"</td><td>Không tái hiện. <code>BuiltInMutationToolsAuditArgumentsTest</code> (chính nó) <b>PASS</b></td></tr>
+      <tr><td>"@UiTest hỏng vì atmosphere-runtime IndexOutOfBounds"</td><td>8 @UiTest trong <code>view/chat/</code> <b>chạy trong suite xanh</b></td></tr>
+      <tr><td>"coverage thật chạy bằng pure-JUnit shim né boot"</td><td>Không còn shim né-boot; các source-scan còn lại là <b>invariant/leak/secret scanner cố ý</b></td></tr>
+      <tr><td>"deferred 6+ plan, không owner — HIGH"</td><td>Đã được sửa đâu đó ở Phase 16/17; chỉ còn <b>doc chưa cập nhật</b></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Còn lại gì thật sự đáng làm — chọn phạm vi</h2>
+  <p class="sub" style="margin-bottom:8px">Tất cả đều low-risk, không cái nào khẩn. Khác nhau ở phạm vi/công sức.</p>
+
+  <div class="opt rec">
+    <h3>A · Truth-up tài liệu <span class="tag rec">KHUYẾN NGHỊ — làm tối thiểu</span></h3>
+    <div class="meta"><span>Giá trị <b class="ok">CAO</b></span><span>Công sức <b class="ok">THẤP</b></span><span>Rủi ro <b class="ok">~0</b></span><span>~20 phút</span></div>
+    <p>Cập nhật <code>CONCERNS.md</code> + <code>deferred-items.md</code> (v1.1) + bất kỳ SUMMARY nào ghi "boot regression open" → đánh dấu <b>RESOLVED</b>, ghi số đo thật (847/0, 90 live boot). Đây là thứ chữa "cảm giác mất kiểm soát" nhiều nhất vì doc đang nói dối về chính nó. Không đụng 1 dòng code test.</p>
+  </div>
+
+  <div class="opt">
+    <h3>B · Gom recipe boot trùng lặp vào 1 meta-annotation <span class="tag">tốt cho maintainability</span></h3>
+    <div class="meta"><span>Giá trị <b class="warn">TRUNG BÌNH</b></span><span>Công sức <b class="warn">TRUNG BÌNH</b></span><span>Rủi ro <b class="ok">THẤP</b></span><span>~1–2 giờ</span></div>
+    <p>69 test lặp y hệt <code>@SpringBootTest(classes={AITestConfiguration,…}) @ImportAutoConfiguration({AIAutoConfiguration, SpiDefaultsAutoConfiguration}) @Import({StubChatModel, StubVectorStore, …Users})</code>. Gom thành <b>một</b> composed annotation <code>@AiIntegrationTest</code>. Giảm drift, làm rõ ý định, sửa 1 chỗ thay vì 69. Behavior không đổi → suite phải vẫn 847/0.</p>
+  </div>
+
+  <div class="opt">
+    <h3>C · Dọn workspace hygiene <span class="tag">cosmetic nhưng giảm "noise"</span></h3>
+    <div class="meta"><span>Giá trị <b class="warn">TRUNG BÌNH</b></span><span>Công sức <b class="ok">THẤP</b></span><span>Rủi ro <b class="ok">~0</b></span><span>~15 phút</span></div>
+    <p><code>.gitignore</code> cho <code>*-snapshot.yml</code> / <code>bulk*.yml</code> / <code>.bootrun*.log</code>; xoá scratch yml ở root; xoá stray <code>ai-agent/.planning/</code>; dọn 2 orphan commit session trước. Working tree đang có 27 entry rác → góp phần lớn vào cảm giác lộn xộn.</p>
+  </div>
+
+  <div class="opt">
+    <h3>D · Nâng fidelity: đổi vài source-scan proxy sang assertion live-boot <span class="tag">đào sâu hơn</span></h3>
+    <div class="meta"><span>Giá trị <b class="warn">TRUNG BÌNH</b></span><span>Công sức <b class="bad">CAO</b></span><span>Rủi ro <b class="warn">TRUNG BÌNH</b></span><span>~nửa ngày+</span></div>
+    <p>Một số hành vi wiring (role-builder order, entity-listener twin-publish, UI mount) hiện được assert bằng source-string/XML-parse proxy. Giờ boot đã chạy → có thể nâng vài cái thành assertion chạy thật cho độ tin cậy cao hơn. <b>Lưu ý:</b> phần lớn source-scan (MutationToolInvariants, SecretRedaction, leak scanner) là <b>cố ý theo convention</b> — KHÔNG nên đổi. Chỉ làm nếu bạn muốn đi sâu.</p>
+  </div>
+
+  <div class="opt">
+    <h3>E · (ngoài "test") Vá lỗ hổng arg-binding Map còn lại <span class="tag">code-hardening, latent bug thật</span></h3>
+    <div class="meta"><span>Giá trị <b class="warn">TRUNG BÌNH</b></span><span>Công sức <b class="warn">TRUNG BÌNH</b></span><span>Rủi ro <b class="ok">THẤP</b></span><span>~1 giờ</span></div>
+    <p><code>create_record</code>/<code>update_record</code> có param <code>Map&lt;String,Object&gt; attributes</code> — cùng shape đã gây crash uncatchable ở bulk (Spring AI 1.1.4 bind trước khi vào method). Đã có pattern đúng (<code>SingleRecordValues</code>) nhưng chưa áp cho 2 tool này. Áp + thêm schema-stability test. Đây là bug tiềm ẩn thật, không phải dọn dẹp.</p>
+  </div>
+
+  <h2>Recipe chuẩn để tham chiếu (Context7 → Jmix docs)</h2>
+  <pre>// @UiTest canonical
+@UiTest
+@SpringBootTest(classes = {App.class, FlowuiTestAssistConfiguration.class})
+
+// Multi-store: đăng ký entity store-2 vào metamodel TRƯỚC role-builder
+@Component @Order(JmixOrder.HIGHEST_PRECEDENCE - 10)
+class ...Configurer implements MetadataPostProcessor {
+  public void process(Session s){ metadataMutationTools.setStore(mc,"agentstore"); }
+}
+// → recipe hiện tại của bạn (narrowed @ImportAutoConfiguration + test agentstore changelog)
+//   đã đạt hiệu quả tương đương; gom lại ở Option B.</pre>
+
+  <div class="foot">
+    <span class="dot" style="background:var(--green)"></span> Đề xuất của tôi: <b>A + C ngay</b> (rẻ, giá trị cao, gần như 0 rủi ro), rồi cân nhắc <b>B</b> nếu muốn maintainability tốt hơn. <b>D/E</b> chỉ làm nếu bạn muốn đi sâu.
+    <br><span class="pill">Nguồn: full suite run 2026-06-04 · git log Phase 17 · Context7 Jmix docs</span>
+  </div>
+
+</div>
+</body>
+</html>

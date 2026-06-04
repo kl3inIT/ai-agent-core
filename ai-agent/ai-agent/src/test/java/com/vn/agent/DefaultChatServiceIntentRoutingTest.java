@@ -139,6 +139,7 @@ class DefaultChatServiceIntentRoutingTest {
         when(parametersResolver.effectiveRagTopK(any(), anyInt())).thenReturn(4);
         when(parametersResolver.effectiveRagSimilarityThreshold(any(), anyDouble()))
                 .thenReturn(0.5);
+        when(parametersResolver.effectiveEnabledTools(any())).thenReturn(null);
 
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.context");
         when(retrievalFilterBuilder.buildFor(any())).thenReturn(null);
@@ -188,13 +189,13 @@ class DefaultChatServiceIntentRoutingTest {
         assertThat(response.guardDenial().messageKey())
                 .isEqualTo("chatView.intent.unknownIntent");
         verify(chatClient, never()).prompt();
-        verify(toolCallbacks, never()).callbacksFor(anyString(), any(), anyString());
+        verify(toolCallbacks, never()).callbacksFor(anyString(), any(), anyString(), any());
     }
 
     @Test
     void callbackMisconfigurationFailsClosedBeforeBlockingModelCall() {
         stubBlockingChatClient();
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any()))
                 .thenThrow(new AgentToolCallbacks.ToolConfigurationException(
                         AgentToolCallbacks.PREPARE_FORM_DRAFT_TOOL_NAME, 0));
 
@@ -224,7 +225,7 @@ class DefaultChatServiceIntentRoutingTest {
     @Test
     void streamingFirstTurnEmitsServiceCreatedConversationId() {
         stubStreamingChatClient("draft ready");
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any()))
                 .thenReturn(new ToolCallback[0]);
 
         List<StreamingEvent> events = service.stream(USER_ID, null, MESSAGE,
@@ -258,13 +259,13 @@ class DefaultChatServiceIntentRoutingTest {
     @Test
     void streamingFallbackPreservesNamedIntentForBothCallbackAssemblies() {
         stubStreamingFallbackChatClient();
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any()))
                 .thenReturn(new ToolCallback[0]);
 
         service.stream(USER_ID, conversationId, MESSAGE, Overrides.NONE, INTENT_ID)
                 .blockLast();
 
-        verify(toolCallbacks, times(2)).callbacksFor(USER_ID, conversationId, INTENT_ID);
+        verify(toolCallbacks, times(2)).callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any());
         verify(taskFileMediaResolver, times(1)).resolveActive(conversationId);
     }
 
@@ -278,7 +279,7 @@ class DefaultChatServiceIntentRoutingTest {
         when(conversationGateway.loadOrCreate(USER_ID, conversationId, actionMessage))
                 .thenReturn(conversation);
         String privateContext = "Proposal id: secret\nCollected values JSON: {\"name\":\"Acme\"}";
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, actionIntent))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(actionIntent), any()))
                 .thenReturn(new ToolCallback[0]);
 
         service.stream(USER_ID, conversationId, actionMessage, Overrides.NONE, actionIntent, privateContext)
@@ -304,7 +305,7 @@ class DefaultChatServiceIntentRoutingTest {
                 .thenReturn(new AiTaskFileMediaResolver.Resolved(
                         List.of(), List.of(documentText), false, List.of(taskFileId)));
         List<List<ExtractionSourceText>> capturedSourceTexts = new ArrayList<>();
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any()))
                 .thenAnswer(invocation -> {
                     capturedSourceTexts.add(RunContext.getSourceTexts());
                     return new ToolCallback[0];
@@ -327,7 +328,7 @@ class DefaultChatServiceIntentRoutingTest {
                 .thenReturn(new AiTaskFileMediaResolver.Resolved(
                         List.of(), List.of(documentText), false, List.of(taskFileId)));
         List<List<ExtractionSourceText>> capturedSourceTexts = new ArrayList<>();
-        when(toolCallbacks.callbacksFor(USER_ID, conversationId, INTENT_ID))
+        when(toolCallbacks.callbacksFor(eq(USER_ID), eq(conversationId), eq(INTENT_ID), any()))
                 .thenAnswer(invocation -> {
                     capturedSourceTexts.add(RunContext.getSourceTexts());
                     return new ToolCallback[0];

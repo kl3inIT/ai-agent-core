@@ -91,6 +91,10 @@ public class ActionProposalService {
             return ActionProposalResult.accessDenied(proposal);
         }
 
+        if (proposal.isBulk()) {
+            return validateBulk(proposal, metaClass);
+        }
+
         MetaClassDtoSynthesizer.SynthesizedSchema schema = schemaSynthesizer.buildSchema(metaClass);
         if (!schema.attributeNames().containsAll(proposal.values().keySet())) {
             return ActionProposalResult.invalid(proposal, "chatView.actionChoice.invalidProposal");
@@ -106,6 +110,44 @@ public class ActionProposalService {
             return ActionProposalResult.accessDenied(proposal);
         }
         return ActionProposalResult.ready(withChoices(proposal, allowedChoices, metaClass), allowedChoices);
+    }
+
+    /**
+     * Workstream A — bulk variant: validate ≥2 rows of the same entity and offer only the
+     * {@link ActionIntentId#BULK_CREATE_NOW} choice. Authorization mirrors the single-record
+     * create-now path (mutation role + create + per-row attribute write access). A single READY
+     * proposal carrying all rows preserves the one-confirmation-gate-for-N-rows model.
+     */
+    private ActionProposalResult validateBulk(ActionProposal proposal, MetaClass metaClass) {
+        if (proposal.valuesList().size() < 2) {
+            return ActionProposalResult.invalid(proposal, "chatView.actionChoice.invalidProposal");
+        }
+        MetaClassDtoSynthesizer.SynthesizedSchema schema = schemaSynthesizer.buildSchema(metaClass);
+
+        Set<String> allAttributeNames = new LinkedHashSet<>();
+        for (Map<String, Object> row : proposal.valuesList()) {
+            if (!schema.attributeNames().containsAll(row.keySet())) {
+                return ActionProposalResult.invalid(proposal, "chatView.actionChoice.invalidProposal");
+            }
+            allAttributeNames.addAll(row.keySet());
+        }
+
+        // Parity with the single-record path (see missingFields(...)): seed with the
+        // caller-provided missingFields so bulk validation cannot reach STATUS_READY while the
+        // caller has already flagged absent fields. Then union the schema-derived per-row gaps.
+        Set<String> missing = new LinkedHashSet<>(proposal.missingFields());
+        for (Map<String, Object> row : proposal.valuesList()) {
+            missing.addAll(missingFieldsForRow(row, schema));
+        }
+        if (!missing.isEmpty()) {
+            return ActionProposalResult.missingFields(proposal, List.copyOf(missing));
+        }
+
+        if (!canCreateNow(metaClass, allAttributeNames)) {
+            return ActionProposalResult.accessDenied(proposal);
+        }
+        List<String> bulkChoices = List.of(ActionIntentId.BULK_CREATE_NOW);
+        return ActionProposalResult.ready(withBulkChoices(proposal, bulkChoices, metaClass), bulkChoices);
     }
 
     private MetaClass resolveCreatableEntity(String targetEntityName) {
@@ -218,10 +260,18 @@ public class ActionProposalService {
     private List<String> missingFields(ActionProposal proposal,
                                        MetaClassDtoSynthesizer.SynthesizedSchema schema) {
         Set<String> missing = new LinkedHashSet<>(proposal.missingFields());
+        missing.addAll(missingFieldsForRow(proposal.values(), schema));
+        return List.copyOf(missing);
+    }
+
+    private List<String> missingFieldsForRow(Map<String, Object> row,
+                                             MetaClassDtoSynthesizer.SynthesizedSchema schema) {
+        Set<String> missing = new LinkedHashSet<>();
         for (String requiredAttributeName : schema.requiredAttributeNames()) {
-            if (!proposal.values().containsKey(requiredAttributeName)
-                    || proposal.values().get(requiredAttributeName) == null
-                    || (proposal.values().get(requiredAttributeName) instanceof String value && value.isBlank())) {
+            Object value = row.get(requiredAttributeName);
+            if (!row.containsKey(requiredAttributeName)
+                    || value == null
+                    || (value instanceof String stringValue && stringValue.isBlank())) {
                 missing.add(requiredAttributeName);
             }
         }
@@ -286,6 +336,27 @@ public class ActionProposalService {
         return new ActionProposal(proposal.proposalId(), proposal.operation(), metaClass.getName(),
                 instanceName(proposal, metaClass, UUID.randomUUID()),
                 proposal.values(), List.of(), choices);
+    }
+
+    private ActionProposal withBulkChoices(ActionProposal proposal, List<String> choices, MetaClass metaClass) {
+        return new ActionProposal(proposal.proposalId(), proposal.operation(), metaClass.getName(),
+                bulkInstanceName(proposal, metaClass),
+                Map.of(), proposal.valuesList(), List.of(), choices);
+    }
+
+    private String bulkInstanceName(ActionProposal proposal, MetaClass metaClass) {
+        if (StringUtils.hasText(proposal.instanceName())) {
+            return proposal.instanceName();
+        }
+        try {
+            String caption = messageTools.getEntityCaption(metaClass);
+            if (StringUtils.hasText(caption)) {
+                return proposal.valuesList().size() + " " + caption;
+            }
+        } catch (RuntimeException ignored) {
+            // fallback below
+        }
+        return proposal.valuesList().size() + " " + metaClass.getName();
     }
 
     private String instanceName(ActionProposal proposal, MetaClass metaClass, UUID draftId) {

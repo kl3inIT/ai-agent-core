@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-stopped_at: Phase 16 closed mid-UAT (3/16 PASSED, 13 superseded) — proceeding with in-place UI Settings → AI Configuration consolidation refactor
-last_updated: "2026-05-14T16:30:00+07:00"
+stopped_at: Phase 17 context gathered
+last_updated: "2026-05-31T09:19:25.271Z"
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 6
+  completed_phases: 3
+  total_plans: 20
+  completed_plans: 20
+  percent: 50
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 16 CLOSED (7 plans shipped 2026-05-13; UAT closed mid-run 2026-05-14 with 3/16 PASSED + 13 superseded). In-place UI Settings → AI Configuration consolidation refactor in progress (no separate phase issued). Next: Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass).
+**Current focus:** Phase 17 — mutation-internals-hardening-phase-11-follow-up
 
 ## Current Position
 
-Phase: 16 (Admin Settings Model Picker & Config Knob Migration) — CLOSED (7/7 plans shipped; UAT 3/16 PASSED + 13 superseded)
-Plan: 7 of 7 shipped 2026-05-13
+Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — COMPLETE (5/5)
+Plan: 5 of 5 — done (MUT-18 parity gate GREEN; behavior parity HOLDS)
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
-Next: complete in-place UI Settings consolidation refactor, then start Phase 17 (mutation-internals hardening) which MUST precede Phase 18 (perf pass)
+Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
 | Field | Value |
 |-------|-------|
 | Milestone | v1.2 (executing) |
@@ -51,9 +51,9 @@ Next: complete in-place UI Settings consolidation refactor, then start Phase 17 
 | 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
 | 15. Right-Sidebar Chat Surface & Observability UX | Phase complete — ready for verification | 5/5 | 2026-05-11 | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration | Complete — ready for verification | 7/7 | 2026-05-13 | 2026-05-13 |
-| 18. Mutation-Internals Hardening (Phase 11 follow-up) | Not started | 0/? | - | - |
-| 19. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
-| 20. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
+| 17. Mutation-Internals Hardening (Phase 11 follow-up) | Complete — MUT-18 parity HOLDS, ready for verification | 5/5 | 2026-05-31 | 2026-05-31 |
+| 18. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
+| 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
 
 ## Hard Build-Order
 
@@ -143,9 +143,9 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 | Todo | Disposition |
 |------|-------------|
-| `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` | v1.2 Phase 15 (OBS-01..04, TEST-19). Move to `done/` when Phase 15 ships. |
+| `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui.md` | ✅ Resolved & archived to `done/` 2026-05-30 — Phase 15 shipped 2026-05-12 (OBS-01..04, TEST-19). |
 
-(The other 8 capture-note todos were resolved at v1.1.0 close — see `done/_INDEX.md`.)
+Pending todo queue is now empty — all capture notes resolved and archived (see `done/_INDEX.md`).
 
 ### Seeds Reviewed
 
@@ -159,6 +159,7 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | SEED-006 — Strict file-backed knowledge path | Dormant — no retrieval-drift trigger. NOT activated in v1.2. |
 | SEED-007 — AI-specific LLM exposure policy | **IMPLEMENTED** — Phase 10 (v1.1.0). |
 | SEED-008 — JPQL analytics tool with attribute-level ACL | Dormant — future tool surface. NOT activated in v1.2. |
+| SEED-009 — Multi-turn RAG query-compression + reranking | Dormant — planted 2026-05-30. Activate on retrieval-drift signal (follow-up questions retrieve wrong context, or precision@k/recall@k regress). NOT in v1.2 scope. |
 
 ### Roadmap Evolution Notes (carried)
 
@@ -269,6 +270,12 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 - [Phase ?]: Plan 16-06: KnobInventoryScanner uses bean.asBindTarget().getType().resolve() since getType() is package-private
 - [Phase ?]: Plan 16-06: Long-typed Tier-1 form fields bind via <textField property=...> (Jmix 2.8 typed-text coerces String<->Long); avoid bigDecimalField/numberField/integerField type mismatch
 - [Phase ?]: Phase 16 complete — MODEL-02 catch+reissue lands user-visible notification surface; ChatModelFallbackAppliedEvent is distinct from AiSettingsChangedEvent so the single-publish-site invariant remains intact
+- [Phase 17]: Plan 17-01: Open Question 1 resolved as option (a) — agentstore @Store FK fixture pair (MutationStoreLinkedParent/ChildFixture) so the existing agentstore-wrapping QueryCountingDataSourceConfiguration counts the batch FK SELECT without widening the shared counting config; per-test agentstore changelog override (includes prod changelog + FK fixture tables) keeps global test-app.properties wiring untouched.
+- [Phase 17]: Plan 17-01: Rule 3 auto-fix — extracted package-private computeSupported(MetaClass,String) seam on RelatedWriteMetadataResolver (behavior-identical; resolveSupportedRelatedWriteRelationship delegates) so the pure-JUnit MUT-17 memo test compiles; Plan 02 adds the memoization. Four MUT structural seams written RED, each naming its implementing plan (02 memo, 03 batch FK, 04 gate chain). MUT-15 @Transactional-absence via Class.forName reflection (D-14). FK SELECT-count test boots clean (no boot regression); observed slope K=10->51, K=100->411 selects (per-row FK path) RED until Plan 03. Full mutation suite: only the 3 MUT-15 + 2 MUT-17 intended-RED seams fail; zero Phase 9/10/11 parity regression.
+- [Phase 17]: Plan 17-02 (MUT-17): Memoized RelatedWriteMetadataResolver via ConcurrentHashMap<Key,Result> over the immutable Jmix metamodel (no eviction). Kept computeSupported's throwing signature (returns SupportedRelatedRelationship, throws ToolUserError on rejection) instead of changing it to return Result as the plan body literally instructed — the Plan 01 CountingResolver test seam overrides that exact signature, so the test is the binding contract; memoization + fresh-rethrow live in the public wrapper's computeIfAbsent, which catches ToolUserError -> Result.reject() (rejection cached as a marker, NEVER a Throwable, D-12). Factory renamed reject() to dodge the record-component/accessor collision with the boolean rejected. RelatedWriteMetadataMemoTest walkCount==1 assertions GREEN; ResolverTest + all Phase 9/10/11 mutation suites byte-for-byte parity — only the 3 MUT-15 Plan-04 MutationGateChain seams remain RED (93 green / 3 RED).
+- [Phase ?]: Plan 17-03: MutationAttributeBinder batch-loads to-one FK refs via one constrained .ids() per target class (two-pass prefetchReferences + coerceAttributes(prefetched) overload, no new collaborator D-06; single-arg delegates for create/update dedup D-07). MUT-16 forbidden-token scan GREEN; BulkSavePartialFailure 4/4 GREEN (MUT-18 parity). Fk SELECT-count test blocked by pre-existing agentstore-fixture @SpringBootTest boot regression at seedParent (test-harness, not implementation).
+- [Phase ?]: [Phase 17] Plan 17-04: extracted MutationGateChain canonical fail-closed spine (8 ordered gates enforceRole/resolve/authorize/reserve/coerce/guard/save/finalize, no @Transactional); five @Tool methods are thin adapters over execute(MutationRequest) on a sealed MutationRequest hierarchy; related-write id-parse/ensureInverseClearable moved to authorize (pre-reserve) + parent/child loads+guard in guard gate to preserve inline gate order; MUT-16 batch-FK prefetch + setDiscardSaved bulk path preserved verbatim; 106 mutation+perf tests green (MUT-18 parity), 3 MUT-15 invariants GREEN.
+- [Phase ?]: [Phase 17]: Plan 17-05 MUT-18 gate — behavior parity HOLDS; 106/0/0/2skip GREEN + 3 structural proxies GREEN + zero test-body edits. Phase 17 complete (5/5).
 
 ### Performance Metrics
 
@@ -344,6 +351,10 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 | Phase 16 P05 | 25min | 3 tasks | 7 files |
 | Phase 16 P06 | 45min | 3 tasks | 20 files |
 | Phase 16 P07 | ~50 min | 2 tasks | 11 files |
+| Phase 17 P01 | ~20 min | 3 tasks | 9 files |
+| Phase 17 P02 | ~8 min | 1 tasks | 1 files | 2026-05-31
+| Phase 17 P03 | ~25 min | 1 tasks | 1 files |
+| Phase 17 P04 | ~40 min | 3 tasks | 3 files |
 
 ### Quick Tasks Completed
 
@@ -353,8 +364,8 @@ Resolved during v1.1.0 close (NOT deferred): 9 capture-note todos moved to `.pla
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T15:20:11.990Z
-**Stopped at:** Phase 16 Plan 05 complete — entity listeners + ComboBox model picker shipped
+**Last session:** 2026-05-31T09:18:56.174Z
+**Stopped at:** Phase 17 context gathered
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)

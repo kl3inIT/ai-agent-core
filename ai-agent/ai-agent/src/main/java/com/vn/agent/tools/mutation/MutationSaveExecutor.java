@@ -57,12 +57,35 @@ public class MutationSaveExecutor {
      * policies, lifecycle events, listeners, and Bean Validation run on every per-row save
      * (Phase 11 MUT-03 / SEC-07).
      *
+     * <p><b>Rollback-all invariant — precise scope (WR-01):</b>
+     * <ul>
+     *   <li><b>COVERED:</b> any host policy, Bean Validation rule, or entity listener
+     *       (BeforeInsert / BeforeUpdate / BeforeDelete) that THROWS a RuntimeException aborts
+     *       this single {@code @Transactional} span and rolls back EVERY row in the
+     *       {@link SaveContext} — there is no partial commit. This is the guarantee proven by
+     *       {@code BuiltInMutationToolsBulkSaveListenerRollbackTest}.</li>
+     *   <li><b>NOT COVERED (out of contract):</b> a listener that returns NORMALLY but causes a
+     *       row to be silently skipped (removes it from the save set, or a data store that filters
+     *       the batch without raising). Because {@link SaveContext#setDiscardSaved(boolean)} is
+     *       {@code true} (MUT-16), there is no returned {@link EntitySet} to cross-check against
+     *       the submitted set, so such a silent drop would not be detected. Hosts MUST signal a
+     *       refusal by THROWING, never by silently dropping a row.</li>
+     * </ul>
+     *
      * <p>This method MUST be called from {@code BuiltInMutationTools.bulkSaveRecords} via the
      * Spring proxy — NEVER add {@code @Transactional} to {@code bulkSaveRecords} itself
      * (self-invocation pitfall; see class JavaDoc).
      */
     @Transactional
     public EntitySet bulkSave(SaveContext saveContext) {
+        // MUT-16 — discard the post-save reload. Jmix's DataManager.save reloads every saved
+        // entity by id after commit (AbstractDataStore#loadAllAfterSave) to return managed,
+        // fetch-plan-complete instances. For bulk_save_records that reload is pure overhead and
+        // scales O(N) (one SELECT ... WHERE id=? per row): the caller only needs the assigned
+        // UUID ids, which are already populated on the in-memory @JmixGeneratedValue entities
+        // BEFORE the save. Discarding the reload keeps the batch FK-load path at O(1) total
+        // SELECTs regardless of K (MUT-16 slope ~0) instead of O(N) reload queries.
+        saveContext.setDiscardSaved(true);
         return dataManager.save(saveContext);
     }
 }

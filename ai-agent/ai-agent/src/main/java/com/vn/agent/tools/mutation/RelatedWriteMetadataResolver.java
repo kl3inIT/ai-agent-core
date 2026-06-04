@@ -14,7 +14,9 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.AnnotatedElement;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Verified relationship-metadata authority for {@code add_related_record} and
@@ -101,16 +103,91 @@ public class RelatedWriteMetadataResolver {
             MetaProperty childInverseProperty) { }
 
     /**
+     * Memo key (MUT-17 / D-11). Built from {@code parentMetaClass.getName()} — NEVER the raw
+     * {@link MetaClass} — paired with the LLM-supplied {@code relationshipName}. Both components
+     * are already-visible/validated facts, so the key carries no security-sensitive state
+     * (T-17-03).
+     */
+    record Key(String parentEntityName, String relationshipName) { }
+
+    /**
+     * Cached outcome holder (D-12). Carries EITHER the supported descriptor (non-null
+     * {@code relationship}, {@code rejected == false}) OR a rejection marker
+     * ({@code rejected == true}, {@code relationship == null}). It NEVER stores a
+     * {@link Throwable}: on a cached rejection the public method rethrows a FRESH
+     * {@link #unsupportedRelationship()} so no stale stack/suppressed state leaks across calls.
+     */
+    record Result(boolean rejected, SupportedRelatedRelationship relationship) {
+
+        static Result of(SupportedRelatedRelationship relationship) {
+            return new Result(false, Objects.requireNonNull(relationship, "relationship"));
+        }
+
+        static Result reject() {
+            return new Result(true, null);
+        }
+    }
+
+    /**
+     * Memoized {@code (parentEntityName, relationshipName)} -> outcome over the IMMUTABLE Jmix
+     * metamodel (D-10). No eviction: relationship support cannot change at runtime, and the memo
+     * is security-independent (T-17-03) so it is safe to share across security contexts.
+     */
+    private final Map<Key, Result> cache = new ConcurrentHashMap<>();
+
+    /**
      * Single entry point for {@code add_related_record} / {@code remove_related_record}.
      * Returns a {@link SupportedRelatedRelationship} when ALL gates pass; throws
      * {@link ToolUserError}({@code validation_failed}) otherwise. No host save can ever
      * occur on a {@code ToolUserError} because the tool methods call this method BEFORE
      * idempotency reservation.
+     *
+     * <p>The {@code (parentEntityName, relationshipName)} outcome is memoized (MUT-17): the
+     * metamodel walk in {@link #computeSupported} runs EXACTLY ONCE per distinct key, for both
+     * supported and rejected outcomes. On a cached rejection a FRESH {@code unsupportedRelationship()}
+     * is rebuilt and thrown (D-12) — byte-identical code/message/hints, never the cached throwable.
      */
     public SupportedRelatedRelationship resolveSupportedRelatedWriteRelationship(
             MetaClass parentMetaClass, String relationshipName) {
-
         Objects.requireNonNull(parentMetaClass, "parentMetaClass");
+        // Early-throw blank/null BEFORE key construction so a null/blank relationshipName never
+        // pollutes the cache with a degenerate key (the walk would reject it anyway).
+        if (relationshipName == null || relationshipName.isBlank()) {
+            throw unsupportedRelationship();
+        }
+
+        Key key = new Key(parentMetaClass.getName(), relationshipName);
+        Result result = cache.computeIfAbsent(key, k -> {
+            try {
+                return Result.of(computeSupported(parentMetaClass, relationshipName));
+            } catch (ToolUserError rejection) {
+                // Cache the rejection as a marker — never the throwable (D-12).
+                return Result.reject();
+            }
+        });
+
+        if (result.rejected()) {
+            // Rebuild a FRESH canned error each time (D-12); never hand back a cached throwable.
+            throw unsupportedRelationship();
+        }
+        return result.relationship();
+    }
+
+    /**
+     * Package-private metamodel-walk seam (Plan 17-01 / MUT-17). This is the single method that
+     * performs the relationship-support metamodel walk; {@link #resolveSupportedRelatedWriteRelationship}
+     * delegates to it. Plan 02 memoizes the {@code (parentEntityName, relationshipName)} key over
+     * the IMMUTABLE Jmix metamodel so a repeated key walks exactly ONCE (no eviction; the memo is
+     * security-independent — relationship support is a pure metamodel fact, T-17-03).
+     *
+     * <p>The {@code RelatedWriteMetadataMemoTest} counting seam overrides this method to assert
+     * walk-once. {@link #resolveSupportedRelatedWriteRelationship} now memoizes the outcome
+     * (Plan 02), so a repeated key invokes this seam EXACTLY ONCE; the rejection branch (this
+     * method throwing {@link ToolUserError}) is cached as a marker and rethrown fresh by the
+     * caller (D-12).
+     */
+    SupportedRelatedRelationship computeSupported(MetaClass parentMetaClass, String relationshipName) {
+
         if (relationshipName == null || relationshipName.isBlank()) {
             throw unsupportedRelationship();
         }

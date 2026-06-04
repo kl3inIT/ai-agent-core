@@ -49,9 +49,10 @@ class AgentToolCallbacksDefaultConfigTest {
                 .collect(Collectors.toList());
 
         // Diagnostic: when mutation is OFF and there are no host ToolContributors, exactly
-        // 6 read + 2 link + 1 extraction + 1 action-proposal callback should appear. If a future
-        // contributor is added, the name-based assertions below remain authoritative.
-        assertThat(names).hasSize(10);
+        // 6 read + 2 link + 1 extraction + 2 action-proposal (single + bulk) callbacks should
+        // appear. If a future contributor is added, the name-based assertions below remain
+        // authoritative.
+        assertThat(names).hasSize(11);
 
         // Read tools (D-09 default surface).
         assertThat(names).contains(
@@ -61,8 +62,9 @@ class AgentToolCallbacksDefaultConfigTest {
         // Link tools (Plan 11-08, always-on per D-05).
         assertThat(names).contains("generate_entity_list_link", "generate_entity_detail_link");
 
-        // Phase 14 safe planning and draft tools.
-        assertThat(names).contains("prepare_form_draft", "propose_action_choices");
+        // Phase 14 safe planning and draft tools + Workstream A bulk action proposal.
+        assertThat(names).contains(
+                "prepare_form_draft", "propose_action_choices", "propose_bulk_action_choices");
 
         // Mutation callbacks must NOT be present when ai-agent.tools.mutation.enabled is unset.
         assertThat(names).doesNotContain(

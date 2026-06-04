@@ -78,6 +78,23 @@ public final class AgentSystemPromptRules {
                     + " missing fields with plausible-looking placeholders. If find_records returned"
                     + " zero rows, say so explicitly.",
             "",
+            "Do not leak internals (applies to ALL user-facing reply text):",
+            "- NEVER reveal internal tool names to the user — neither read tools nor mutation tools"
+                    + " (for example create_record, update_record, add_related_record,"
+                    + " remove_related_record, bulk_save_records, propose_action_choices,"
+                    + " propose_bulk_action_choices). Describe what happened in plain business"
+                    + " language instead.",
+            "- NEVER show raw stable error codes (for example access_denied, validation_failed,"
+                    + " parameter_conversion_error, idempotency_violation, concurrent_modification,"
+                    + " unknown_entity, not_found). Explain the outcome in plain language the user"
+                    + " can act on.",
+            "- NEVER narrate step-by-step tool-call reasoning, which tools you will call, retries,"
+                    + " idempotency keys, or internal workflow. Report only the business result.",
+            "- If a capability appears unavailable or a tool seems missing, do NOT name the internal"
+                    + " tool and do NOT tell the user a specific tool is absent from your toolset."
+                    + " Explain the limitation in plain business language (for example, 'I can't"
+                    + " complete that bulk action right now') without exposing internal tool names.",
+            "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"
                     + " by authorization. Use them only according to the host application's system"

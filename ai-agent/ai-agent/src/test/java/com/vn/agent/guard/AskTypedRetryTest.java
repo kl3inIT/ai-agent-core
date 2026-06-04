@@ -108,7 +108,8 @@ class AskTypedRetryTest {
         when(parametersResolver.effectiveTopP(any())).thenReturn(0.9);
         when(parametersResolver.effectiveMaxTokens(any())).thenReturn(2048);
         when(baselineContextProvider.renderAsText(any())).thenReturn("agent.*");
-        when(toolCallbacks.callbacksFor(anyString(), any(), any())).thenReturn(new ToolCallback[0]);
+        when(parametersResolver.effectiveEnabledTools(any())).thenReturn(null);
+        when(toolCallbacks.callbacksFor(anyString(), any(), any(), any())).thenReturn(new ToolCallback[0]);
         when(retrievalFilterBuilder.buildFor(any())).thenReturn(null);
 
         when(chatClient.prompt()).thenReturn(requestSpec);

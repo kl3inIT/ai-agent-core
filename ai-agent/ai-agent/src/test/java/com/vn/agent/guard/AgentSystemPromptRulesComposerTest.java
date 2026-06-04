@@ -20,10 +20,15 @@ class AgentSystemPromptRulesComposerTest {
                 .contains("Action intent rules:")
                 .contains("propose_action_choices")
                 .contains("Wait for the user to choose an action intent before performing a side effect.");
+        // Mutation-only verbose handling rules must NOT be appended in read-only config. The
+        // error-code tokens (parameter_conversion_error, concurrent_modification) now appear in the
+        // always-on no-leak rule as examples the model must hide, so they are no longer mutation-
+        // only markers; idempotencyKey + the UUID-fabrication guidance remain mutation-only.
         assertThat(rules)
                 .doesNotContain("idempotencyKey")
-                .doesNotContain("parameter_conversion_error")
-                .doesNotContain("concurrent_modification")
+                .doesNotContain("fresh random UUID v4")
+                .doesNotContain("Never copy UUID-looking values")
+                .doesNotContain("On 'parameter_conversion_error' re-read describe_entity")
                 .contains("generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
     }
@@ -51,6 +56,37 @@ class AgentSystemPromptRulesComposerTest {
                 .contains("generate_entity_detail_link")
                 .contains("immediately call generate_entity_detail_link")
                 .doesNotContain("prepare_form_draft");
+    }
+
+    @Test
+    void composedRulesForbidLeakingToolNamesErrorCodesAndReasoning() {
+        AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
+                new AiAgentMutationProperties(true, null, null, null, null));
+
+        String rules = composer.effectiveRules();
+
+        assertThat(rules)
+                .contains("Do not leak internals")
+                .contains("NEVER reveal internal tool names")
+                .contains("create_record")
+                .contains("bulk_save_records")
+                .contains("NEVER show raw stable error codes")
+                .contains("access_denied")
+                .contains("idempotency_violation")
+                .contains("NEVER narrate step-by-step tool-call reasoning");
+    }
+
+    @Test
+    void noLeakRuleAppliesEvenWhenMutationToolsDisabled() {
+        AgentSystemPromptRulesComposer composer = new AgentSystemPromptRulesComposer(
+                new AiAgentMutationProperties(null, null, null, null, null));
+
+        String rules = composer.effectiveRules();
+
+        assertThat(rules)
+                .contains("Do not leak internals")
+                .contains("NEVER reveal internal tool names")
+                .contains("NEVER show raw stable error codes");
     }
 
     @Test

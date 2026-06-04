@@ -634,7 +634,8 @@ public class DefaultChatServiceImpl implements ChatService {
                                         u.media(resolvedMedia.media().toArray(new Media[0]));
                                     }
                                 })
-                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, normalizedIntentId))
+                                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, normalizedIntentId,
+                                        parametersResolver.effectiveEnabledTools(active)))
                                 .toolContext(auditToolContext(runId, convId))
                                 .advisors(advisorSpec -> {
                                     advisorSpec
@@ -1094,7 +1095,8 @@ public class DefaultChatServiceImpl implements ChatService {
                         u.media(resolvedMedia.media().toArray(new Media[0]));
                     }
                 })
-                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId))
+                .toolCallbacks(toolCallbacks.callbacksFor(userId, convId, toolSurfaceIntentId,
+                        parametersResolver.effectiveEnabledTools(active)))
                 .toolContext(auditToolContext(runId, convId))
                 .advisors(advisorSpec -> {
                     advisorSpec

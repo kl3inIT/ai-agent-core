@@ -51,8 +51,9 @@ class AgentToolCallbacksMutationEnabledTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        // Diagnostic — no host ToolContributor beans on the test classpath, exact 15.
-        assertThat(names).hasSize(15);
+        // Diagnostic — no host ToolContributor beans on the test classpath, exact 16
+        // (15 + Workstream A propose_bulk_action_choices).
+        assertThat(names).hasSize(16);
 
         assertThat(names).contains(
                 "list_entities", "describe_entity", "find_records",
@@ -62,7 +63,8 @@ class AgentToolCallbacksMutationEnabledTest {
         assertThat(names).contains(
                 "create_record", "update_record", "add_related_record", "remove_related_record",
                 "bulk_save_records");
-        assertThat(names).contains("prepare_form_draft", "propose_action_choices");
+        assertThat(names).contains(
+                "prepare_form_draft", "propose_action_choices", "propose_bulk_action_choices");
 
         // delete_record is reserved for v1.2; never shipped in v1.1 under any flag combination.
         assertThat(names).doesNotContain("delete_record");
@@ -96,9 +98,10 @@ class AgentToolCallbacksMutationEnabledAllowDeleteTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        assertThat(names).hasSize(15);
+        assertThat(names).hasSize(16);
         assertThat(names).contains("bulk_save_records");
-        assertThat(names).contains("prepare_form_draft", "propose_action_choices");
+        assertThat(names).contains(
+                "prepare_form_draft", "propose_action_choices", "propose_bulk_action_choices");
         assertThat(names).doesNotContain("delete_record");
     }
 }

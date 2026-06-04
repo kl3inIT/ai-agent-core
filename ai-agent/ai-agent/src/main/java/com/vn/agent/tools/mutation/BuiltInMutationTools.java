@@ -1,40 +1,13 @@
 package com.vn.agent.tools.mutation;
 
-import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.orchestration.AiUiSettingsResolver;
-import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.security.AiAgentMutationRole;
-import com.vn.agent.spi.MutationGuard;
-import com.vn.agent.spi.MutationIntent;
-import com.vn.agent.spi.ToolVetoedException;
-import com.vn.agent.tools.ToolEntityResolver;
-import com.vn.agent.tools.ToolResultFormatter;
-import com.vn.agent.tools.ToolUserError;
-import io.jmix.core.AccessManager;
-import io.jmix.core.DataManager;
-import io.jmix.core.EntitySet;
-import io.jmix.core.FetchPlan;
-import io.jmix.core.MetadataTools;
-import io.jmix.core.SaveContext;
-import io.jmix.core.accesscontext.CrudEntityContext;
-import io.jmix.core.entity.EntityValues;
-import io.jmix.core.metamodel.model.MetaClass;
-import io.jmix.core.security.CurrentAuthentication;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * LLM-mediated mutation tool surface (Phase 11). Conditional via
@@ -85,73 +58,10 @@ import java.util.stream.Collectors;
         name = "enabled", havingValue = "true")
 public class BuiltInMutationTools {
 
-    private final ToolEntityResolver toolEntityResolver;
-    private final MutationAuthorizationService mutationAuthorizationService;
-    private final MutationAttributeBinder mutationAttributeBinder;
-    private final MutationRequestHasher mutationRequestHasher;
-    private final MutationGuard mutationGuard;
-    private final MutationSaveExecutor mutationSaveExecutor;
-    private final MutationCommitCoordinator mutationCommitCoordinator;
-    private final MutationIntentRepository mutationIntentRepository;
-    private final MutationErrorTranslator mutationErrorTranslator;
-    private final RelatedWriteMetadataResolver relatedWriteMetadataResolver;
-    private final DiffSerializer diffSerializer;
-    private final ToolResultFormatter toolResultFormatter;
-    private final DataManager dataManager;
-    private final MetadataTools metadataTools;
-    private final CurrentAuthentication currentAuthentication;
-    private final AiAgentMutationProperties mutationProperties;
-    private final AccessManager accessManager;
-    private final AiUiSettingsResolver aiUiSettingsResolver;
+    private final MutationGateChain mutationGateChain;
 
-    public BuiltInMutationTools(ToolEntityResolver toolEntityResolver,
-                                MutationAuthorizationService mutationAuthorizationService,
-                                MutationAttributeBinder mutationAttributeBinder,
-                                MutationRequestHasher mutationRequestHasher,
-                                MutationGuard mutationGuard,
-                                MutationSaveExecutor mutationSaveExecutor,
-                                MutationCommitCoordinator mutationCommitCoordinator,
-                                MutationIntentRepository mutationIntentRepository,
-                                MutationErrorTranslator mutationErrorTranslator,
-                                RelatedWriteMetadataResolver relatedWriteMetadataResolver,
-                                DiffSerializer diffSerializer,
-                                ToolResultFormatter toolResultFormatter,
-                                DataManager dataManager,
-                                MetadataTools metadataTools,
-                                CurrentAuthentication currentAuthentication,
-                                AiAgentMutationProperties mutationProperties,
-                                AccessManager accessManager,
-                                AiUiSettingsResolver aiUiSettingsResolver) {
-        this.toolEntityResolver = toolEntityResolver;
-        this.mutationAuthorizationService = mutationAuthorizationService;
-        this.mutationAttributeBinder = mutationAttributeBinder;
-        this.mutationRequestHasher = mutationRequestHasher;
-        this.mutationGuard = mutationGuard;
-        this.mutationSaveExecutor = mutationSaveExecutor;
-        this.mutationCommitCoordinator = mutationCommitCoordinator;
-        this.mutationIntentRepository = mutationIntentRepository;
-        this.mutationErrorTranslator = mutationErrorTranslator;
-        this.relatedWriteMetadataResolver = relatedWriteMetadataResolver;
-        this.diffSerializer = diffSerializer;
-        this.toolResultFormatter = toolResultFormatter;
-        this.dataManager = dataManager;
-        this.metadataTools = metadataTools;
-        this.currentAuthentication = currentAuthentication;
-        this.mutationProperties = mutationProperties;
-        this.accessManager = accessManager;
-        this.aiUiSettingsResolver = aiUiSettingsResolver;
-    }
-
-    /**
-     * Phase 16 D-01 + opencode MEDIUM Concern #4 — AiUiSettings persists the idempotency
-     * TTL as seconds (Long column) to avoid JPA Duration mapping. Resolver coerces to
-     * Duration for the existing MutationIntentRepository.reserveOrReplay(... Duration ttl)
-     * comparison logic (the repository computes {@code OffsetDateTime.now().plus(ttl)} to
-     * derive expires_at). Null column falls through to
-     * {@code mutationProperties.resolvedIdempotencyTtl()}.
-     */
-    private Duration resolveIdempotencyTtl() {
-        return Duration.ofSeconds(aiUiSettingsResolver.resolveMutationIdempotencyTtlSeconds());
+    public BuiltInMutationTools(MutationGateChain mutationGateChain) {
+        this.mutationGateChain = mutationGateChain;
     }
 
     // ----------------------------------------------------------------------
@@ -205,102 +115,8 @@ public class BuiltInMutationTools {
             @ToolParam(description = "Attribute name -> value object; FK relationships by UUID string") Map<String, Object> attributes,
             @ToolParam(description = "Fresh random UUID v4 for this exact call shape; use a fresh key if values change") String idempotencyKey) {
 
-        long startedAt = System.currentTimeMillis();
-        MetaClass metaClass = null;
-        String userUsername = currentAuthentication.getUser().getUsername();
-        Map<String, Object> safeAttributes = attributes == null ? Map.of() : attributes;
-        MutationIntentRepository.ReservationResult reservation = null;
-        MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
-
-        try {
-            mutationAuthorizationService.enforceMutationRole(AiAgentMutationRole.CODE);
-
-            // Resolve entity (Phase 10 R4 unknown-entity opacity preserved + create-side gate).
-            metaClass = toolEntityResolver.resolveCreatableEntityOrThrow(entityName);
-
-            // Jmix per-CRUD + per-attribute checks BEFORE reservation/save.
-            mutationAuthorizationService.enforceCreatePermission(metaClass);
-            mutationAuthorizationService.enforceAttributeWriteAccess(metaClass, safeAttributes.keySet());
-
-            // Canonical raw-call-shape request hash + pre-save reservation/replay.
-            String requestHash = mutationRequestHasher.hash(
-                    "create_record", entityName, null, null, null, safeAttributes);
-            reservation = mutationIntentRepository.reserveOrReplay(
-                    "create_record", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, resolveIdempotencyTtl());
-            if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
-                return mutationCommitCoordinator.handleReservationResult(
-                        reservation, "create_record", startedAt, userUsername,
-                        diffSerializer.serializeEntityArgumentsJson(entityName, null, safeAttributes, idempotencyKey));
-            }
-
-            // Coerce + validate BEFORE the guard so guards see typed values.
-            Map<String, Object> coercedAttributes = mutationAttributeBinder.coerceAttributes(metaClass, safeAttributes);
-
-            // Host MutationGuard SPI veto point.
-            mutationGuard.check(new MutationIntent(
-                    "create_record", metaClass, null, coercedAttributes));
-
-            // Build entity in-memory; SAVE via separate @Component (proxy crossed -> real @Transactional).
-            Object entity = dataManager.create(metaClass.getJavaClass());
-            Map<String, Object> postImage = mutationAttributeBinder.applyAttributes(metaClass, entity, coercedAttributes);
-            Object saved = mutationSaveExecutor.save(entity);
-            commitState = MutationCommitState.HOST_SAVE_RETURNED;
-            UUID savedId = mutationAttributeBinder.requireUuidId(EntityValues.getId(saved));
-            String instanceName = metadataTools.getInstanceName(saved);
-
-            String argumentsJson = diffSerializer.serializeEntityArgumentsJson(
-                    entityName, null, safeAttributes, idempotencyKey);
-            String diffJson = diffSerializer.serializeCreatePostImage(postImage);
-
-            // Finalize idempotency BEFORE externally reporting success.
-            mutationIntentRepository.markCommitted(reservation.intent(), savedId, metaClass.getName());
-            commitState = MutationCommitState.INTENT_COMMITTED;
-
-            mutationCommitCoordinator.safeWriteAudit("create_record", argumentsJson, diffJson,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.SUCCESS, null, null, userUsername);
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("outcome", AiToolCallOutcome.SUCCESS.getId());
-            result.put("entityId", savedId);
-            result.put("instanceName", instanceName);
-            return toolResultFormatter.toJson(result);
-
-        } catch (ToolVetoedException ve) {
-            ToolUserError translated = mutationErrorTranslator.translate(new ToolUserError("access_denied",
-                    "operation blocked by host policy",
-                    List.of("do not retry; surface to user")), "create_record", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            // P-22 / AUD-07: do NOT echo or audit ve.getMessage(); host veto text may carry PII.
-            mutationCommitCoordinator.safeWriteErrorAudit("create_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, null, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.BLOCKED, "mutation_guard_vetoed", ve.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (ToolUserError tue) {
-            ToolUserError translated = mutationErrorTranslator.translate(tue, "create_record", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("create_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, null, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.ERROR, null, tue.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (Throwable t) {
-            ToolUserError translated = mutationCommitCoordinator
-                    .translateThrowableAfterReservation(t, commitState, "create_record", metaClass);
-            AiToolCallOutcome outcome = mutationCommitCoordinator.auditOutcome(commitState);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.logUnexpectedThrowable("create_record", t, translated, outcome, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("create_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, null, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    outcome, null, t.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        }
+        return mutationGateChain.execute(
+                new MutationRequest.Create(entityName, attributes, idempotencyKey));
     }
 
     // ----------------------------------------------------------------------
@@ -344,120 +160,8 @@ public class BuiltInMutationTools {
             @ToolParam(description = "Attribute name -> new value; ONLY changed attributes") Map<String, Object> attributes,
             @ToolParam(description = "Fresh random UUID v4 for this exact call shape; use a fresh key if values change") String idempotencyKey) {
 
-        long startedAt = System.currentTimeMillis();
-        MetaClass metaClass = null;
-        String userUsername = currentAuthentication.getUser().getUsername();
-        Map<String, Object> safeAttributes = attributes == null ? Map.of() : attributes;
-        MutationIntentRepository.ReservationResult reservation = null;
-        MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
-
-        try {
-            mutationAuthorizationService.enforceMutationRole(AiAgentMutationRole.CODE);
-
-            // Resolve entity update-side. Phase 10 R4 opacity for unknown; access_denied for visible-but-update-denied.
-            metaClass = toolEntityResolver.resolveUpdatableEntityOrThrow(entityName);
-
-            // id parse — distinguishes parameter_conversion_error vs not_found.
-            UUID parsedId = mutationAttributeBinder.requireUuidId(
-                    toolEntityResolver.parseEntityId(id, metaClass));
-
-            // Jmix per-CRUD + per-attribute checks.
-            mutationAuthorizationService.enforceUpdatePermission(metaClass);
-            mutationAuthorizationService.enforceAttributeWriteAccess(metaClass, safeAttributes.keySet());
-
-            // Canonical raw-call-shape request hash + pre-save reservation/replay.
-            String requestHash = mutationRequestHasher.hash(
-                    "update_record", entityName, id, null, null, safeAttributes);
-            reservation = mutationIntentRepository.reserveOrReplay(
-                    "update_record", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, resolveIdempotencyTtl());
-            if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
-                return mutationCommitCoordinator.handleReservationResult(
-                        reservation, "update_record", startedAt, userUsername,
-                        diffSerializer.serializeEntityArgumentsJson(entityName, id, safeAttributes, idempotencyKey));
-            }
-
-            // Coerce + validate BEFORE the guard so guards see typed values.
-            Map<String, Object> coercedAttributes = mutationAttributeBinder.coerceAttributes(metaClass, safeAttributes);
-
-            // Host MutationGuard SPI veto point.
-            mutationGuard.check(new MutationIntent(
-                    "update_record", metaClass, parsedId, coercedAttributes));
-
-            // Load existing by id; no explicit fetch plan keeps the graph minimal.
-            final MetaClass loadedMetaClass = metaClass;
-            final String idForError = id;
-            Object existingEntity = dataManager.load(metaClass.getJavaClass())
-                    .id(parsedId)
-                    .optional()
-                    .orElseThrow(() -> mutationErrorTranslator.notFound(loadedMetaClass, idForError));
-
-            // Capture pre-image for the attribute keys the caller is changing.
-            Map<String, Object> preImage = mutationAttributeBinder.capturePreImage(
-                    existingEntity, coercedAttributes.keySet());
-
-            // Apply attributes.
-            Map<String, Object> postImage = mutationAttributeBinder.applyAttributes(
-                    metaClass, existingEntity, coercedAttributes);
-
-            // SAVE via separate @Component (proxy crossed -> real @Transactional).
-            Object saved = mutationSaveExecutor.save(existingEntity);
-            commitState = MutationCommitState.HOST_SAVE_RETURNED;
-            UUID savedId = mutationAttributeBinder.requireUuidId(EntityValues.getId(saved));
-            String instanceName = metadataTools.getInstanceName(saved);
-
-            String argumentsJson = diffSerializer.serializeEntityArgumentsJson(
-                    entityName, id, safeAttributes, idempotencyKey);
-            String diffJson = diffSerializer.serializeUpdateDiff(preImage, postImage);
-
-            // Finalize idempotency BEFORE externally reporting success.
-            mutationIntentRepository.markCommitted(reservation.intent(), savedId, metaClass.getName());
-            commitState = MutationCommitState.INTENT_COMMITTED;
-
-            mutationCommitCoordinator.safeWriteAudit("update_record", argumentsJson, diffJson,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.SUCCESS, null, null, userUsername);
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("outcome", AiToolCallOutcome.SUCCESS.getId());
-            result.put("entityId", savedId);
-            result.put("instanceName", instanceName);
-            result.put("diffSummary", diffJson);
-            return toolResultFormatter.toJson(result);
-
-        } catch (ToolVetoedException ve) {
-            ToolUserError translated = mutationErrorTranslator.translate(new ToolUserError("access_denied",
-                    "operation blocked by host policy",
-                    List.of("do not retry; surface to user")), "update_record", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("update_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, id, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.BLOCKED, "mutation_guard_vetoed", ve.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (ToolUserError tue) {
-            ToolUserError translated = mutationErrorTranslator.translate(tue, "update_record", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("update_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, id, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.ERROR, null, tue.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (Throwable t) {
-            ToolUserError translated = mutationCommitCoordinator
-                    .translateThrowableAfterReservation(t, commitState, "update_record", metaClass);
-            AiToolCallOutcome outcome = mutationCommitCoordinator.auditOutcome(commitState);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.logUnexpectedThrowable("update_record", t, translated, outcome, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("update_record",
-                    diffSerializer.serializeEntityArgumentsJson(entityName, id, safeAttributes, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    outcome, null, t.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        }
+        return mutationGateChain.execute(
+                new MutationRequest.Update(entityName, id, attributes, idempotencyKey));
     }
 
     // ----------------------------------------------------------------------
@@ -512,8 +216,8 @@ public class BuiltInMutationTools {
             @ToolParam(description = "Existing child entity UUID to link (hyphenated 36-char)") String relatedId,
             @ToolParam(description = "Fresh random UUID v4 for this exact call shape; use a fresh key if values change") String idempotencyKey) {
 
-        return executeRelatedWrite(
-                "add_related_record", entityName, id, relationship, relatedId, idempotencyKey, false);
+        return mutationGateChain.execute(
+                new MutationRequest.AddRelated(entityName, id, relationship, relatedId, idempotencyKey));
     }
 
     // ----------------------------------------------------------------------
@@ -561,220 +265,8 @@ public class BuiltInMutationTools {
             @ToolParam(description = "Currently-linked child entity UUID (hyphenated 36-char)") String relatedId,
             @ToolParam(description = "Fresh random UUID v4 for this exact call shape; use a fresh key if values change") String idempotencyKey) {
 
-        return executeRelatedWrite(
-                "remove_related_record", entityName, id, relationship, relatedId, idempotencyKey, true);
-    }
-
-    // ----------------------------------------------------------------------
-    // shared related-write orchestration
-    // ----------------------------------------------------------------------
-
-    /**
-     * Shared orchestration body for {@code add_related_record} and {@code remove_related_record}.
-     *
-     * <p>Gate sequence (fail-closed before host save):
-     * <ol>
-     *     <li>{@link AiAgentMutationRole#CODE} marker-role authority (exact equality).</li>
-     *     <li>Parent entity update-side resolution (LLM exposure + visible-but-denied → access_denied).</li>
-     *     <li>Parent id parse (parameter_conversion_error vs not_found).</li>
-     *     <li>Parent CRUD update + parent relationship attribute {@code canModify}.</li>
-     *     <li>{@link RelatedWriteMetadataResolver#resolveSupportedRelatedWriteRelationship} —
-     *         narrow v1.1 support matrix: non-composition parent {@code @OneToMany(mappedBy)} +
-     *         child-side single-valued {@code @ManyToOne}/{@code @OneToOne} inverse only.</li>
-     *     <li>Child LLM read+modify exposure + Jmix child read+update + child inverse attribute
-     *         {@code canModify}.</li>
-     *     <li>Child id parse (parameter_conversion_error vs not_found).</li>
-     *     <li>For remove: {@link RelatedWriteMetadataResolver#ensureInverseClearable} (validation_failed
-     *         when inverse is required / not-null).</li>
-     *     <li>Idempotency reserve/replay; on RESERVED: load parent (children-free fetch plan,
-     *         Pitfall #1) and child, MutationGuard veto point, mutate the child-side inverse only
-     *         (never rewrite parent collection), saveAll via {@link MutationSaveExecutor#saveAll},
-     *         finalize idempotency, audit success.</li>
-     * </ol>
-     *
-     * <p><b>Pitfall #1 — children-free parent fetch plan:</b> the parent is loaded with
-     * {@link FetchPlan#BASE} so its {@code @OneToMany} children are NOT pulled into the persistence
-     * context. Loading children would re-save them with bumped {@code @Version}, which is exactly
-     * what {@code AuditWriter} hit upstream. Mutating only the child-side inverse keeps the change
-     * narrow and avoids that footgun.
-     *
-     * <p><b>P-22:</b> No path here concatenates {@code relationship}, {@code id}, or
-     * {@code relatedId} into result/error prose; audit payloads flow through {@link DiffSerializer}.
-     */
-    private String executeRelatedWrite(String toolName,
-                                       String entityName,
-                                       String id,
-                                       String relationship,
-                                       String relatedId,
-                                       String idempotencyKey,
-                                       boolean isRemove) {
-
-        long startedAt = System.currentTimeMillis();
-        MetaClass parentMetaClass = null;
-        String userUsername = currentAuthentication.getUser().getUsername();
-        MutationIntentRepository.ReservationResult reservation = null;
-        MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
-
-        try {
-            mutationAuthorizationService.enforceMutationRole(AiAgentMutationRole.CODE);
-
-            // Resolve parent entity (Phase 10 R4 unknown-entity opacity preserved + update-side gate).
-            parentMetaClass = toolEntityResolver.resolveUpdatableEntityOrThrow(entityName);
-
-            // Parent id parse — distinguishes parameter_conversion_error vs not_found.
-            UUID parsedParentId = mutationAttributeBinder.requireUuidId(
-                    toolEntityResolver.parseEntityId(id, parentMetaClass));
-
-            // Jmix per-CRUD update on parent + per-attribute modify on the relationship.
-            mutationAuthorizationService.enforceUpdatePermission(parentMetaClass);
-            mutationAuthorizationService.enforceAttributeWriteAccess(
-                    parentMetaClass, java.util.Set.of(relationship));
-
-            // Verified relationship-metadata authority — narrow v1.1 support matrix.
-            RelatedWriteMetadataResolver.SupportedRelatedRelationship supported =
-                    relatedWriteMetadataResolver.resolveSupportedRelatedWriteRelationship(
-                            parentMetaClass, relationship);
-            MetaClass childMetaClass = supported.childMetaClass();
-
-            // Child-side LLM exposure read+modify (related writes mutate the child inverse).
-            mutationAuthorizationService.enforceLlmRelationshipTargetExposure(childMetaClass, true);
-            // Jmix child read+update + child-side inverse attribute canModify.
-            mutationAuthorizationService.enforceReadPermission(childMetaClass);
-            mutationAuthorizationService.enforceUpdatePermission(childMetaClass);
-            mutationAuthorizationService.enforceAttributeWriteAccess(
-                    childMetaClass, java.util.Set.of(supported.childInverseProperty().getName()));
-
-            // Child id parse (parameter_conversion_error vs not_found).
-            UUID parsedRelatedId = mutationAttributeBinder.requireUuidId(
-                    toolEntityResolver.parseEntityId(relatedId, childMetaClass));
-
-            // remove-time required-inverse check (validation_failed before reservation).
-            if (isRemove) {
-                relatedWriteMetadataResolver.ensureInverseClearable(supported);
-            }
-
-            // Canonical raw-call-shape request hash + pre-save reservation/replay.
-            String requestHash = mutationRequestHasher.hash(
-                    toolName, entityName, id, relationship, relatedId, java.util.Map.of());
-            reservation = mutationIntentRepository.reserveOrReplay(
-                    toolName, idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, resolveIdempotencyTtl());
-            if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
-                return mutationCommitCoordinator.handleReservationResult(
-                        reservation, toolName, startedAt, userUsername,
-                        diffSerializer.serializeRelatedArgumentsJson(
-                                entityName, id, relationship, relatedId, idempotencyKey));
-            }
-
-            // Pitfall #1 — load parent with the children-free FetchPlan.BASE; never pull the
-            // @OneToMany collection into the persistence context (would re-save children with
-            // bumped @Version). Related writes mutate ONLY the child-side inverse.
-            final MetaClass parentMetaClassFinal = parentMetaClass;
-            Object parent = dataManager.load(parentMetaClass.getJavaClass())
-                    .id(parsedParentId)
-                    .fetchPlan(FetchPlan.BASE)
-                    .optional()
-                    .orElseThrow(() -> mutationErrorTranslator.notFound(parentMetaClassFinal, id));
-
-            // Load child by id; the child carries the FK so the child is what we save.
-            final MetaClass childMetaClassFinal = childMetaClass;
-            final String relatedIdForError = relatedId;
-            Object child = dataManager.load(childMetaClass.getJavaClass())
-                    .id(parsedRelatedId)
-                    .optional()
-                    .orElseThrow(() -> mutationErrorTranslator.notFound(childMetaClassFinal, relatedIdForError));
-
-            if (!isRemove && relatedWriteMetadataResolver.childBelongsToDifferentParent(supported, parent, child)) {
-                throw new ToolUserError("validation_failed",
-                        "child is already linked to another parent",
-                        List.of("call get_record to verify the child relationship before retrying"));
-            }
-
-            // Host MutationGuard SPI veto point — guards see typed parent/child via attributes.
-            // attributes map carries the loaded entity references (not raw ids) per D-03 contract.
-            java.util.Map<String, Object> guardAttributes = new LinkedHashMap<>();
-            guardAttributes.put(relationship, child);
-            mutationGuard.check(new MutationIntent(
-                    toolName, parentMetaClass, parsedParentId, java.util.Map.copyOf(guardAttributes)));
-
-            // Mutate ONLY the child-side inverse — never rewrite the parent collection.
-            String action;
-            if (isRemove) {
-                // remove: child must currently belong to this parent; otherwise not_found
-                // (treat non-member like missing-row so the LLM re-reads via get_record).
-                if (!relatedWriteMetadataResolver.childBelongsToParent(supported, parent, child)) {
-                    throw mutationErrorTranslator.notFound(childMetaClass, relatedId);
-                }
-                relatedWriteMetadataResolver.clearInverseReference(supported, child);
-                action = "removed";
-            } else {
-                relatedWriteMetadataResolver.wireInverseReference(supported, parent, child);
-                action = "added";
-            }
-
-            // saveAll within MutationSaveExecutor's @Transactional boundary (proxy-crossed).
-            // Saving both parent and child keeps optimistic-lock parity with the parent.
-            mutationSaveExecutor.saveAll(parent, child);
-            commitState = MutationCommitState.HOST_SAVE_RETURNED;
-
-            String argumentsJson = diffSerializer.serializeRelatedArgumentsJson(
-                    entityName, id, relationship, relatedId, idempotencyKey);
-            String resultSummary = diffSerializer.serializeRelatedActionSummary(
-                    relationship, action, relatedId);
-
-            // Finalize idempotency BEFORE externally reporting success; persist parent id +
-            // parent metaClass so replay re-resolves parent instanceName.
-            mutationIntentRepository.markCommitted(reservation.intent(), parsedParentId, parentMetaClass.getName());
-            commitState = MutationCommitState.INTENT_COMMITTED;
-
-            mutationCommitCoordinator.safeWriteAudit(toolName, argumentsJson, resultSummary,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.SUCCESS, null, null, userUsername);
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("outcome", AiToolCallOutcome.SUCCESS.getId());
-            result.put("parentId", parsedParentId);
-            result.put("relationship", relationship);
-            result.put("relatedId", parsedRelatedId);
-            return toolResultFormatter.toJson(result);
-
-        } catch (ToolVetoedException ve) {
-            ToolUserError translated = mutationErrorTranslator.translate(new ToolUserError("access_denied",
-                    "operation blocked by host policy",
-                    List.of("do not retry; surface to user")), toolName, parentMetaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            // P-22 / AUD-07: do NOT echo or audit ve.getMessage().
-            mutationCommitCoordinator.safeWriteErrorAudit(toolName,
-                    diffSerializer.serializeRelatedArgumentsJson(
-                            entityName, id, relationship, relatedId, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.BLOCKED, "mutation_guard_vetoed", ve.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (ToolUserError tue) {
-            ToolUserError translated = mutationErrorTranslator.translate(tue, toolName, parentMetaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit(toolName,
-                    diffSerializer.serializeRelatedArgumentsJson(
-                            entityName, id, relationship, relatedId, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.ERROR, null, tue.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (Throwable t) {
-            ToolUserError translated = mutationCommitCoordinator
-                    .translateThrowableAfterReservation(t, commitState, toolName, parentMetaClass);
-            AiToolCallOutcome outcome = mutationCommitCoordinator.auditOutcome(commitState);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.logUnexpectedThrowable(toolName, t, translated, outcome, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit(toolName,
-                    diffSerializer.serializeRelatedArgumentsJson(
-                            entityName, id, relationship, relatedId, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    outcome, null, t.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        }
+        return mutationGateChain.execute(
+                new MutationRequest.RemoveRelated(entityName, id, relationship, relatedId, idempotencyKey));
     }
 
     // ----------------------------------------------------------------------
@@ -815,13 +307,15 @@ public class BuiltInMutationTools {
               remove_related_record instead.
 
             ERROR HANDLING:
-            - Per-row failure rolls back the ENTIRE batch (zero rows persisted).
-              Result carries: {outcome: ERROR | BLOCKED | COMMIT_FAILED, failedRowIndex: N,
-              errorCode: <one-of-6-stable-codes>}.
-            - Stable error codes: unknown_entity, access_denied, validation_failed,
-              parameter_conversion_error, idempotency_violation, concurrent_modification.
+            - Any failure rolls back the ENTIRE batch (zero rows persisted).
+              The result is a structured error object: {error: <stable-code>, reason: <message>,
+              expected: [<corrective hints>]}. There is NO per-row index in the result — the
+              batch is all-or-nothing, so a failure means EVERY row must be resubmitted.
+            - Stable error codes (the "error" field): unknown_entity, access_denied,
+              validation_failed, parameter_conversion_error, idempotency_violation,
+              concurrent_modification.
             - Do NOT retry on access_denied or idempotency_violation — surface to the user.
-            - For a corrected retry after a row-level failure, generate a FRESH idempotencyKey.
+            - For a corrected retry after a failure, generate a FRESH idempotencyKey.
 
             STRICTNESS:
             - Use bulk_save_records ONLY when records >= 2 of the SAME entity. For one record,
@@ -850,9 +344,10 @@ public class BuiltInMutationTools {
                   {"email":"e@x.com","fullName":"Em Vu","phone":"..."}
                 ]
                 idempotencyKey="<fresh UUID v4>"
-                Result on row-2 validation failure:
-                {"outcome":"ERROR","failedRowIndex":1,"errorCode":"validation_failed"}
-                — entire batch rolled back; row 0 update NOT applied.
+                Result when one row fails validation:
+                {"error":"validation_failed","reason":"<message>","expected":[<hints>]}
+                — entire batch rolled back; the row-0 update was NOT applied. Resubmit ALL
+                rows with a FRESH idempotencyKey after correcting the offending value.
             """)
     public String bulkSaveRecords(
             @ToolParam(description = "Exact internal entity name from list_entities (e.g. 'Customer'). NEVER a label.")
@@ -866,226 +361,7 @@ public class BuiltInMutationTools {
                     + "Same key + ANY changed bytes returns idempotency_violation — generate a fresh key.")
             String idempotencyKey) {
 
-        long startedAt = System.currentTimeMillis();
-        String userUsername = currentAuthentication.getUser().getUsername();
-        MetaClass metaClass = null;
-        MutationIntentRepository.ReservationResult reservation = null;
-        MutationCommitState commitState = MutationCommitState.NO_HOST_WRITE;
-        Integer failedRowIndex = null;
-        // Snapshot for argumentsJson + per-row dispatch detection. Treat null as empty so the
-        // serializer produces {count:0, sampleHashes:[]} rather than NPE.
-        final List<Map<String, Object>> safeRecords = records == null ? List.of() : records;
-
-        try {
-            mutationAuthorizationService.enforceMutationRole(AiAgentMutationRole.CODE);
-
-            // DoS guard — REVIEWS HIGH bulk-max-rows. Reject empty + oversized batches BEFORE any
-            // entity resolution, hash, or DB work.
-            // Phase 16 CFG-01 — read DoS-guard cap via AiUiSettingsResolver so admin
-            // edits take effect without a restart. Null column falls through to
-            // mutationProperties.resolvedBulkMaxRows().
-            int maxRows = aiUiSettingsResolver.resolveMutationBulkMaxRows();
-            if (safeRecords.isEmpty()) {
-                throw new ToolUserError("validation_failed",
-                        "records must be a non-empty array",
-                        List.of("supply at least one record object; for a single row use create_record or update_record"));
-            }
-            if (safeRecords.size() > maxRows) {
-                throw new ToolUserError("validation_failed",
-                        "batch size " + safeRecords.size() + " exceeds configured maximum " + maxRows,
-                        List.of("split the batch into smaller calls; each call needs its own fresh idempotencyKey"));
-            }
-
-            // REVIEWS HIGH-12: reject explicit id:null up front (distinct from key-omitted CREATE).
-            for (int i = 0; i < safeRecords.size(); i++) {
-                Map<String, Object> row = safeRecords.get(i);
-                if (row != null && row.containsKey("id") && row.get("id") == null) {
-                    failedRowIndex = i;
-                    throw new ToolUserError("validation_failed",
-                            "row " + i + ": explicit id:null is not allowed; omit the id key entirely to create",
-                            List.of("either omit the 'id' key for a CREATE, or supply a UUID id for an UPDATE"));
-                }
-            }
-
-            // Dispatch detection — REVIEWS HIGH-12 containsKey semantics.
-            boolean anyCreate = safeRecords.stream().anyMatch(r -> r != null && !r.containsKey("id"));
-            boolean anyUpdate = safeRecords.stream().anyMatch(r -> r != null && r.containsKey("id") && r.get("id") != null);
-
-            // Resolve metaClass — both checks must pass for mixed batches.
-            if (anyCreate) {
-                metaClass = toolEntityResolver.resolveCreatableEntityOrThrow(entityName);
-            }
-            if (anyUpdate) {
-                metaClass = toolEntityResolver.resolveUpdatableEntityOrThrow(entityName);
-            }
-
-            // Entity-level CRUD gate.
-            if (anyCreate) {
-                mutationAuthorizationService.enforceCreatePermission(metaClass);
-            }
-            if (anyUpdate) {
-                mutationAuthorizationService.enforceUpdatePermission(metaClass);
-            }
-
-            // Per-attribute write gate — UNION across rows, excluding id.
-            Set<String> writtenKeys = safeRecords.stream()
-                    .flatMap(r -> r.keySet().stream())
-                    .filter(k -> !"id".equals(k))
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            mutationAuthorizationService.enforceAttributeWriteAccess(metaClass, writtenKeys);
-
-            // Hash + reservation — Stripe-style byte-identical retry over records in submission order.
-            Map<String, Object> batchEnvelope = new LinkedHashMap<>();
-            batchEnvelope.put("records", safeRecords);
-            String requestHash = mutationRequestHasher.hash(
-                    "bulk_save_records", entityName, null, null, null, batchEnvelope);
-            reservation = mutationIntentRepository.reserveOrReplay(
-                    "bulk_save_records", idempotencyKey, userUsername, RunContext.getConversationId(),
-                    requestHash, resolveIdempotencyTtl());
-            if (reservation.state() != MutationIntentRepository.ReservationState.RESERVED) {
-                // REVIEWS HIGH-11: handleReservationResult reads AiMutationIntent.RESULT_SUMMARY
-                // and surfaces savedIds on IDEMPOTENT_REPLAY. Without this, bulk replay would
-                // only echo the first saved id, breaking the LLM's expectation of an array.
-                return mutationCommitCoordinator.handleReservationResult(
-                        reservation, "bulk_save_records", startedAt, userUsername,
-                        diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey));
-            }
-
-            // Per-row coerce + per-row CrudEntityContext + guard + build SaveContext.
-            SaveContext saveContext = new SaveContext();
-            List<Object> entitiesInOrder = new ArrayList<>(safeRecords.size());
-            for (int i = 0; i < safeRecords.size(); i++) {
-                failedRowIndex = i;
-                Map<String, Object> row = safeRecords.get(i);
-                boolean isUpdate = row.containsKey("id");
-                Object rowId = isUpdate ? row.get("id") : null;
-                Map<String, Object> rowAttrs = row.entrySet().stream()
-                        .filter(e -> !"id".equals(e.getKey()))
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey, Map.Entry::getValue,
-                                (a, b) -> b, LinkedHashMap::new));
-                Map<String, Object> coerced = mutationAttributeBinder.coerceAttributes(metaClass, rowAttrs);
-
-                Object entity;
-                if (!isUpdate) {
-                    entity = dataManager.create(metaClass.getJavaClass());
-                } else {
-                    final MetaClass loadedMetaClass = metaClass;
-                    final String idForError = rowId.toString();
-                    UUID parsed = mutationAttributeBinder.requireUuidId(
-                            toolEntityResolver.parseEntityId(idForError, metaClass));
-                    entity = dataManager.load(metaClass.getJavaClass())
-                            .id(parsed)
-                            .optional()
-                            .orElseThrow(() -> mutationErrorTranslator.notFound(loadedMetaClass, idForError));
-                }
-
-                // REVIEWS HIGH-13 — per-row CrudEntityContext AFTER entity load/create so any
-                // row-state-dependent constraints (row-level policies that gate on entity.status,
-                // tenant predicates, etc.) see live row state. Phase 11
-                // MutationAuthorizationService runs entity-level checks once per batch; this is
-                // the per-row evaluator MUT-14 calls for explicitly.
-                CrudEntityContext crudCtx = new CrudEntityContext(metaClass);
-                accessManager.applyRegisteredConstraints(crudCtx);
-                if (isUpdate && !crudCtx.isUpdatePermitted()) {
-                    throw new AccessDeniedException(
-                            "update denied for entity " + metaClass.getName() + " row " + i);
-                }
-                if (!isUpdate && !crudCtx.isCreatePermitted()) {
-                    throw new AccessDeniedException(
-                            "create denied for entity " + metaClass.getName() + " row " + i);
-                }
-
-                mutationGuard.check(new MutationIntent(
-                        "bulk_save_records", metaClass,
-                        isUpdate ? (UUID) EntityValues.getId(entity) : null,
-                        coerced));
-                mutationAttributeBinder.applyAttributes(metaClass, entity, coerced);
-                saveContext.saving(entity);
-                entitiesInOrder.add(entity);
-            }
-            failedRowIndex = null; // all rows passed pre-save validation
-
-            // Single proxy-crossed @Transactional save — rollback-all on RuntimeException.
-            EntitySet saved = mutationSaveExecutor.bulkSave(saveContext);
-            commitState = MutationCommitState.HOST_SAVE_RETURNED;
-            // Use entitiesInOrder (input order is the contract), not the unordered EntitySet
-            // iterator, so savedIds[i] aligns with records[i] for the LLM.
-            List<UUID> savedIds = entitiesInOrder.stream()
-                    .map(e -> (UUID) EntityValues.getId(e))
-                    .toList();
-            // Defensive: ensure all entities are present in the saved EntitySet (host policy /
-            // listener cannot drop a row silently).
-            for (Object e : entitiesInOrder) {
-                if (!saved.optional(e).isPresent()) {
-                    throw new IllegalStateException(
-                            "DataManager.save dropped entity for row in bulk batch");
-                }
-            }
-
-            String argumentsJson = diffSerializer.serializeBulkArgumentsJson(
-                    entityName, safeRecords, idempotencyKey);
-            String resultSummaryJson = diffSerializer.serializeBulkResultSummary(savedIds);
-
-            // Finalize idempotency BEFORE audit (REVIEWS HIGH-11 — persist savedIds for replay).
-            UUID firstId = savedIds.isEmpty() ? null : savedIds.get(0);
-            mutationIntentRepository.markCommitted(
-                    reservation.intent(), firstId, metaClass.getName(), resultSummaryJson);
-            commitState = MutationCommitState.INTENT_COMMITTED;
-
-            mutationCommitCoordinator.safeWriteAudit("bulk_save_records",
-                    argumentsJson, resultSummaryJson,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.SUCCESS, null, null, userUsername);
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("outcome", AiToolCallOutcome.SUCCESS.getId());
-            result.put("count", savedIds.size());
-            result.put("savedIds", savedIds);
-            return toolResultFormatter.toJson(result);
-
-        } catch (ToolVetoedException ve) {
-            ToolUserError translated = mutationErrorTranslator.translate(new ToolUserError("access_denied",
-                    "operation blocked by host policy",
-                    List.of("do not retry; surface to user")), "bulk_save_records", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("bulk_save_records",
-                    diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.BLOCKED, "mutation_guard_vetoed", ve.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (AccessDeniedException ade) {
-            // REVIEWS HIGH-13 row-level deny short-circuits to BLOCKED.
-            ToolUserError translated = mutationErrorTranslator.translate(ade, "bulk_save_records", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("bulk_save_records",
-                    diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.BLOCKED, "row_access_denied", ade.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (ToolUserError tue) {
-            ToolUserError translated = mutationErrorTranslator.translate(tue, "bulk_save_records", metaClass);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("bulk_save_records",
-                    diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    AiToolCallOutcome.ERROR, null, tue.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        } catch (Throwable t) {
-            ToolUserError translated = mutationCommitCoordinator
-                    .translateThrowableAfterReservation(t, commitState, "bulk_save_records", metaClass);
-            AiToolCallOutcome outcome = mutationCommitCoordinator.auditOutcome(commitState);
-            mutationCommitCoordinator.markFailedIfReserved(reservation, translated, commitState);
-            mutationCommitCoordinator.logUnexpectedThrowable("bulk_save_records", t, translated, outcome, commitState);
-            mutationCommitCoordinator.safeWriteErrorAudit("bulk_save_records",
-                    diffSerializer.serializeBulkArgumentsJson(entityName, safeRecords, idempotencyKey),
-                    translated,
-                    System.currentTimeMillis() - startedAt,
-                    outcome, null, t.getClass().getName(), userUsername);
-            return toolResultFormatter.error(translated);
-        }
+        return mutationGateChain.execute(
+                new MutationRequest.Bulk(entityName, records, idempotencyKey));
     }
 }

@@ -38,6 +38,7 @@ public final class StreamEventRenderer {
     private static final String PREPARE_FORM_DRAFT_TOOL = "prepare_form_draft";
     private static final String OPEN_FORM_WITH_DRAFT_ACTION = "open_form_with_draft";
     private static final String PROPOSE_ACTION_CHOICES_TOOL = "propose_action_choices";
+    private static final String PROPOSE_BULK_ACTION_CHOICES_TOOL = "propose_bulk_action_choices";
     private static final String SHOW_ACTION_CHOICES_ACTION = "show_action_choices";
 
     private StreamEventRenderer() {
@@ -51,7 +52,12 @@ public final class StreamEventRenderer {
                                         String targetEntityName,
                                         String instanceName,
                                         Map<String, Object> values,
+                                        java.util.List<Map<String, Object>> valuesList,
                                         java.util.List<String> choices) {
+
+        public boolean isBulk() {
+            return valuesList != null && !valuesList.isEmpty();
+        }
     }
 
     public record RenderedStreamEvent(String markdown,
@@ -153,7 +159,8 @@ public final class StreamEventRenderer {
 
     private static RenderedStreamEvent renderToolResult(StreamingEvent.ToolResult toolResult) {
         if (!PREPARE_FORM_DRAFT_TOOL.equals(toolResult.toolName())) {
-            if (PROPOSE_ACTION_CHOICES_TOOL.equals(toolResult.toolName())) {
+            if (PROPOSE_ACTION_CHOICES_TOOL.equals(toolResult.toolName())
+                    || PROPOSE_BULK_ACTION_CHOICES_TOOL.equals(toolResult.toolName())) {
                 ActionProposalPayload actionProposalPayload = parseActionProposalPayload(toolResult.payloadJson());
                 return actionProposalPayload == null
                         ? RenderedStreamEvent.markdown("")
@@ -188,14 +195,28 @@ public final class StreamEventRenderer {
                     proposal.path("values"),
                     new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
                     });
+            java.util.List<Map<String, Object>> valuesList = OBJECT_MAPPER.convertValue(
+                    proposal.path("valuesList"),
+                    new com.fasterxml.jackson.core.type.TypeReference<java.util.List<Map<String, Object>>>() {
+                    });
             java.util.List<String> choices = OBJECT_MAPPER.convertValue(
                     root.path("choices"),
                     new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
                     });
+            java.util.List<Map<String, Object>> safeValuesList =
+                    valuesList == null ? java.util.List.of() : valuesList;
+            java.util.List<String> safeChoices = choices == null ? java.util.List.of() : choices;
+            // Fail closed: a bulk-create-now choice with no rows would render a "Create all 0
+            // records" affordance and submit an empty batch context. Reject the payload entirely.
+            if (safeChoices.contains(com.vn.agent.action.ActionIntentId.BULK_CREATE_NOW)
+                    && safeValuesList.isEmpty()) {
+                return null;
+            }
             return new ActionProposalPayload(proposalId, targetEntityName,
                     instanceName == null ? targetEntityName : instanceName,
                     values == null ? Map.of() : values,
-                    choices == null ? java.util.List.of() : choices);
+                    safeValuesList,
+                    safeChoices);
         } catch (Exception failure) {
             return null;
         }
