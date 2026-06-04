@@ -38,3 +38,14 @@ phase14-dom.json
 # JVM crash / replay logs (occasionally dropped by the Gradle test worker).
 hs_err_pid*.log
 replay_pid*.log
+
+# Playwright / live-UAT accessibility-snapshot scratch dumped at repo root.
+/bulk*.yml
+/*-snapshot.yml
+/input-area.yml
+
+# Gradle bootRun scratch logs (jmix-app dev runs).
+/jmix-app/.bootrun*.log
+
+# Stray nested planning dir — canonical planning lives at repo-root /.planning/.
+/ai-agent/.planning/
