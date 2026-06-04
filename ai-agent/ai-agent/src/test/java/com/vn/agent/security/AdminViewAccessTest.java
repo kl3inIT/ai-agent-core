@@ -1,6 +1,8 @@
 package com.vn.agent.security;
 
 import com.vn.agent.AITestConfiguration;
+import com.vn.agent.test_support.StubChatModelConfiguration;
+import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.AccessManager;
 import io.jmix.core.security.SystemAuthenticator;
 import io.jmix.flowui.accesscontext.UiShowViewContext;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,6 +32,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
+// Import the same stub ChatModel/VectorStore beans the shared add-on integration context
+// already uses. This test does not exercise either, but matching the @Import set lets it
+// reuse the cached Spring context instead of booting a near-duplicate one (the stubs are
+// inert here).
+@Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
 class AdminViewAccessTest {
 
     @Autowired AccessManager accessManager;
