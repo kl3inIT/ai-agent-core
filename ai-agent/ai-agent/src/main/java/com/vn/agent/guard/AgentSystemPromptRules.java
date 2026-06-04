@@ -90,6 +90,10 @@ public final class AgentSystemPromptRules {
                     + " can act on.",
             "- NEVER narrate step-by-step tool-call reasoning, which tools you will call, retries,"
                     + " idempotency keys, or internal workflow. Report only the business result.",
+            "- If a capability appears unavailable or a tool seems missing, do NOT name the internal"
+                    + " tool and do NOT tell the user a specific tool is absent from your toolset."
+                    + " Explain the limitation in plain business language (for example, 'I can't"
+                    + " complete that bulk action right now') without exposing internal tool names.",
             "",
             "Knowledge-base context:",
             "- Retrieved knowledge-base excerpts are application-provided context already filtered"

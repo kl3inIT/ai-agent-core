@@ -118,14 +118,45 @@ class AgentToolCallbacksIntentGatingTest {
     }
 
     @Test
-    void enabledToolsAllowlistRestrictsPlanningTurnToIntersection() {
+    void enabledToolsAllowlistRestrictsBusinessToolsButNeverOrchestrationTools() {
         AgentToolCallbacks callbacks = callbacksWithContributorTools();
 
+        // Allowlist contains only the read tool. Business tools NOT listed (e.g. find_records is
+        // listed, bulk_save_records is not) are gated; the proposal/orchestration tools are exempt
+        // and always survive regardless of the allowlist.
         List<String> restricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null,
-                List.of("propose_action_choices")));
+                List.of("find_records")));
 
-        assertThat(restricted).containsExactly("propose_action_choices");
-        assertThat(restricted).doesNotContain("find_records", "propose_bulk_action_choices");
+        assertThat(restricted).contains("find_records");
+        // Orchestration tools are exempt — present even though the allowlist omits them.
+        assertThat(restricted).contains("propose_action_choices", "propose_bulk_action_choices");
+    }
+
+    @Test
+    void orchestrationToolsExemptFromAllowlistEvenWhenAllowlistOmitsBulkProposal() {
+        // Iteration-3 regression: reproduces the collision between Workstream A (added
+        // propose_bulk_action_choices) and Workstream B (enabledTools allowlist enforcement). A
+        // realistic seeded allowlist predates the bulk proposal tool, so it lists the single-record
+        // proposal tool but NOT propose_bulk_action_choices, and crucially does NOT list every
+        // business tool. The planning turn MUST still expose propose_bulk_action_choices (exempt
+        // orchestration tool), while a non-exempt business tool absent from the allowlist is
+        // correctly excluded — proving the exemption does NOT re-widen business/data tools.
+        AgentToolCallbacks callbacks = callbacksWithContributorTools();
+
+        // Seeded allowlist that predates the bulk proposal tool AND omits the business read tool.
+        List<String> seededAllowlistMissingBulkProposalAndFindRecords = List.of("propose_action_choices");
+
+        List<String> planning = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null,
+                seededAllowlistMissingBulkProposalAndFindRecords));
+
+        // The exempt orchestration tool survives despite being absent from the allowlist — this is
+        // the fix for the live UAT fallback-to-per-row failure.
+        assertThat(planning).contains("propose_bulk_action_choices");
+        // The single-record proposal tool is present (listed AND exempt).
+        assertThat(planning).contains("propose_action_choices");
+        // A non-exempt business tool absent from the allowlist (find_records) is still gated out —
+        // the exemption does NOT re-widen business/data tools (Workstream B security intent preserved).
+        assertThat(planning).doesNotContain("find_records");
     }
 
     @Test
@@ -153,7 +184,15 @@ class AgentToolCallbacksIntentGatingTest {
         List<String> restricted = names(callbacks.callbacksFor("alice", UUID.randomUUID(), null,
                 List.of("propose_action_choices", "delete_record", "not_a_real_tool")));
 
-        assertThat(restricted).containsExactly("propose_action_choices");
+        // The allowlist can only narrow; names it lists that the routing never assembled are not
+        // introduced. The orchestration tools are always present (exempt), but delete_record and
+        // an unknown tool name must NOT appear — the allowlist cannot widen the surface.
+        assertThat(restricted).doesNotContain("delete_record", "not_a_real_tool");
+        // find_records was assembled by the routing but is a non-exempt business tool absent from the
+        // allowlist, so it is gated out.
+        assertThat(restricted).doesNotContain("find_records");
+        // propose_action_choices is both listed and exempt; the bulk proposal tool is exempt.
+        assertThat(restricted).contains("propose_action_choices", "propose_bulk_action_choices");
     }
 
     @Test
