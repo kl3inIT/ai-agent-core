@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Giảm gánh nặng test — ai-agent-core</title>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--line:#2a2f3a;--ink:#e6e9ef;--dim:#9aa3b2;
+    --green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#58a6ff;--violet:#bc8cff;--chip:#222834}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 28px 80px}
+  h1{font-size:25px;margin:0 0 4px;letter-spacing:-.3px}
+  h2{font-size:18px;margin:34px 0 12px}
+  .sub{color:var(--dim);margin:0 0 22px}
+  .bottleneck{background:linear-gradient(135deg,#241a13,#20191c);border:1px solid #6e4b1f;border-radius:14px;padding:20px 22px;margin:18px 0}
+  .bottleneck b{color:#f0c674}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px}
+  .stat .n{font-size:24px;font-weight:700} .stat .l{color:var(--dim);font-size:12px;margin-top:3px}
+  .ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.info{color:var(--blue)}
+  table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:13.5px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.4px}
+  code{background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font:12px ui-monospace,Menlo,monospace;color:#d6deea}
+  .lever{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 19px;margin:13px 0}
+  .lever.a{border-left:4px solid var(--green)} .lever.b{border-left:4px solid var(--blue)} .lever.c{border-left:4px solid var(--amber)} .lever.d{border-left:4px solid var(--red)}
+  .lever h3{margin:0 0 6px;font-size:16px}
+  .lever .impact{font-size:12.5px;color:var(--dim);margin:2px 0 8px}
+  .lever .impact b{color:var(--ink)}
+  .lever p{margin:6px 0 0;color:#c7cdd8;font-size:13.5px}
+  .arrow{color:var(--green);font-weight:700}
+  .safe{background:#101a13;border:1px solid #1f5e34;border-radius:12px;padding:16px 18px;margin:20px 0}
+  .safe b{color:#7ee2a0}
+  ul{margin:6px 0 0;padding-left:20px} li{margin:3px 0;font-size:13.5px;color:#c7cdd8}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:14px}
+  .est{font-size:11px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Giảm gánh nặng test — kế hoạch thực thi</h1>
+  <p class="sub">ai-agent-core · 188 file · 905 <code>@Test</code> · 847 chạy · suite xanh 12 phút</p>
+
+  <div class="bottleneck">
+    🎯 <b>Thủ phạm không phải số test — mà là 24 Spring context bị boot lại.</b><br>
+    86 <code>@SpringBootTest</code> tạo <b>24 context khác nhau</b>, trong đó <b>15 context chỉ phục vụ 1 test</b> (mỗi cái boot full Jmix + 2 datastore + Liquibase chỉ cho 1 assertion). Đó là nơi 12 phút trôi đi. Xóa test methods <b>không</b> chạm tới chi phí này.
+  </div>
+
+  <div class="grid">
+    <div class="stat"><div class="n bad">24</div><div class="l">context bị build (≈24 lần boot)</div></div>
+    <div class="stat"><div class="n bad">15</div><div class="l">context chỉ chạy 1 test (lãng phí nhất)</div></div>
+    <div class="stat"><div class="n warn">188</div><div class="l">file (nhiều file 1-test)</div></div>
+    <div class="stat"><div class="n info">~5</div><div class="l">context là đủ nếu gộp config</div></div>
+  </div>
+
+  <h2>3 đòn bẩy (xếp theo hiệu quả / gánh nặng)</h2>
+
+  <div class="lever a">
+    <h3>① Gộp file phân mảnh → giảm cả file LẪN context <span class="ok">(đòn bẩy chính)</span></h3>
+    <div class="impact">Coverage <b class="ok">giữ 100%</b> · Rủi ro <b class="ok">thấp</b> · File <b>−~35</b> · Context <b>−~8</b></div>
+    <p>Gộp các test cùng chủ đề vào 1 file dùng 1 context. Ví dụ cụ thể đã tìm thấy:</p>
+    <table>
+      <tr><th>Gộp thành 1 file</th><th>Từ các file (số @Test)</th><th>Context</th></tr>
+      <tr><td><code>BuiltInMutationToolsBulkSaveTest</code></td><td>BulkSave(3) + BulkSaveIdempotency(3) + BulkSavePartialFailure(6) + BulkSaveListenerRollback(2) = 14 test</td><td>4 <span class="arrow">→</span> 1</td></tr>
+      <tr><td><code>BuiltInMutationToolsIdempotencyTest</code></td><td>IdempotencyReplay(1) + IdempotencyViolation(1) + CommitUnknown(1) + ReplayPermission(2)</td><td>nhiều <span class="arrow">→</span> 1</td></tr>
+      <tr><td><code>RelatedWriteMetadataResolverTest</code></td><td>+ RelatedWriteMetadataMemo(3)</td><td>2 <span class="arrow">→</span> 1</td></tr>
+    </table>
+    <p>Áp cùng pattern cho các cụm khác (rag, guard, extraction, view/chat). Mỗi @Test giữ nguyên — chỉ gom nhà.</p>
+  </div>
+
+  <div class="lever b">
+    <h3>② Gộp 15 singleton context → tái dùng context đã cache <span class="info">(đòn bẩy run-time)</span></h3>
+    <div class="impact">Coverage <b class="ok">giữ 100%</b> · Rủi ro <b class="ok">thấp</b> · Run-time <b class="ok est">ước tính 12min → ~5–7min</b></div>
+    <p>Đưa khác biệt nhỏ (1 dòng <code>properties</code>, 1 stub) về <code>@DynamicPropertySource</code> / <code>@MockitoBean</code> / 1 base config chung, để Spring <b>tái dùng 1 context đã cache</b> thay vì rebuild. Một <code>@AiIntegrationTest</code> composed annotation gom recipe lặp 69 chỗ.</p>
+    <p class="est">Lưu ý: vài singleton cần config riêng thật (vd <code>EmbeddingModelBeanCollisionTest</code>, <code>PromptContractMockTest</code>, <code>ChatSurfaceMounterTest</code>/FlowuiTestAssist) — giữ nguyên. Thực tế 24 <span class="arrow">→</span> ~10–12, không phải 5.</p>
+  </div>
+
+  <div class="lever c">
+    <h3>③ Xóa test "over-specified" hay vỡ oan <span class="warn">(tuỳ chọn)</span></h3>
+    <div class="impact">Coverage <b class="warn">giảm nhẹ có chủ đích</b> · Rủi ro <b class="warn">trung bình</b> · cần bạn duyệt từng cái</div>
+    <p>Vài source-scan assert chính xác chuỗi <code>.java</code> → vỡ mỗi lần refactor vô hại (đây có thể là "gánh nặng develop" thật của bạn). Có thể nới thành assertion mềm hơn hoặc bỏ cái nào trùng với live-boot test. <b>Không đụng</b> các guard giá trị cao: MutationToolInvariants, SecretRedaction (SEC-08), leak scanner.</p>
+  </div>
+
+  <div class="lever d">
+    <h3>④ Xóa test trùng THẬT <span class="bad">(bucket nhỏ — trung thực)</span></h3>
+    <div class="impact">Tôi <b class="bad">chưa tìm thấy</b> nhiều trùng assertion thật. Đừng kỳ vọng nhiều ở đây.</div>
+    <p>Nếu muốn, tôi audit assertion-level để tìm cái thật sự trùng. Nhưng dữ liệu cho thấy "thừa" của bạn là <b>phân mảnh + context</b>, không phải trùng. Đòn bẩy ①② giải quyết gánh nặng tốt hơn nhiều.</p>
+  </div>
+
+  <div class="safe">
+    🛡️ <b>An toàn — bắt buộc:</b>
+    <ul>
+      <li>Làm trên <b>branch riêng</b> (<code>chore/test-consolidation</code>), không đụng main.</li>
+      <li>Gộp theo <b>lô nhỏ</b>; sau mỗi lô chạy lại suite, phải vẫn <b>847/0</b> (so số @Test trước/sau để chứng minh không mất test).</li>
+      <li><b>Không xóa</b> gì ở ③④ nếu chưa bạn duyệt từng mục.</li>
+      <li>Commit atomic từng lô để dễ revert.</li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    <b>Đề xuất:</b> bắt đầu <b>①+② (giữ 100% coverage)</b> — đây là phần giảm gánh nặng thật. ③ làm sau khi bạn xem danh sách cụ thể. ④ gần như bỏ qua.
+    <br><span class="est">Số liệu đo từ source + full suite run 2026-06-04. Run-time sau gộp là ước tính, sẽ đo lại thật sau lô đầu.</span>
+  </div>
+
+</div>
+</body>
+</html>

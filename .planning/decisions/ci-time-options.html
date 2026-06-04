@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CI test time — options</title>
+<style>
+ :root{--bg:#0f1115;--panel:#171a21;--line:#2a2f3a;--ink:#e6e9ef;--dim:#9aa3b2;--green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#58a6ff}
+ *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+ .wrap{max-width:1000px;margin:0 auto;padding:38px 26px 70px} h1{font-size:24px;margin:0 0 4px} .sub{color:var(--dim);margin:0 0 22px}
+ h2{font-size:18px;margin:30px 0 12px}
+ .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:14px 0}
+ .stat{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px}.stat .n{font-size:22px;font-weight:700}.stat .l{color:var(--dim);font-size:12px;margin-top:3px}
+ .ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}.info{color:var(--blue)}
+ .box{background:linear-gradient(135deg,#241a13,#20191c);border:1px solid #6e4b1f;border-radius:13px;padding:18px 20px;margin:16px 0}.box b{color:#f0c674}
+ .opt{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 19px;margin:12px 0}
+ .opt.a{border-left:4px solid var(--green)}.opt.b{border-left:4px solid var(--amber)}.opt.c{border-left:4px solid var(--blue)}.opt.d{border-left:4px solid var(--dim)}
+ .opt h3{margin:0 0 6px;font-size:16px} .meta{font-size:12.5px;color:var(--dim);margin:2px 0 8px} .meta b{color:var(--ink)}
+ .opt p{margin:5px 0 0;color:#c7cdd8;font-size:13.5px} code{background:#0c0e12;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font:12px ui-monospace,Menlo,monospace;color:#d6deea}
+ .foot{color:var(--dim);font-size:12.5px;margin-top:26px;border-top:1px solid var(--line);padding-top:13px}
+</style></head><body><div class="wrap">
+
+<h1>CI test ~12 phút — vì sao & lựa chọn</h1>
+<p class="sub">Đo thực tế 2026-06-04. Đính chính: gánh nặng KHÔNG phải số test, cũng không sửa được bằng gộp annotation.</p>
+
+<div class="grid">
+ <div class="stat"><div class="n ok">98s</div><div class="l">thời gian CHẠY test thật (toàn bộ 847)</div></div>
+ <div class="stat"><div class="n bad">~10min</div><div class="l">là boot ~24 Spring/Jmix context (tuần tự)</div></div>
+ <div class="stat"><div class="n warn">14.7GB</div><div class="l">RAM máy (1.8GB free, app đang chạy)</div></div>
+ <div class="stat"><div class="n">3g×1</div><div class="l">heap/fork, maxParallelForks=1 (cố ý)</div></div>
+</div>
+
+<div class="box">
+ ⚠️ <b>maxParallelForks=1 là quyết định có chủ đích của team</b> (ghi rõ ở <code>ai-agent.gradle:128</code>): mỗi fork boot context Jmix 3g; chạy song song trên máy 15GB → <b>OOM</b>. Parallelism — đòn bẩy thường dùng — bị <b>chặn bởi RAM</b> ở máy này. Test thật chỉ 98s; phần còn lại là boot context tuần tự để vừa bộ nhớ.
+</div>
+
+<h2>Lựa chọn (xếp theo an toàn)</h2>
+
+<div class="opt a">
+ <h3>A · Giảm số context khác nhau (harmonize/fold) — AN TOÀN, KHÔNG OOM</h3>
+ <div class="meta">Win <b class="warn">vừa (~12→8-9 phút)</b> · Rủi ro <b class="ok">thấp</b> · Coverage <b class="ok">0 đổi</b> · Công <b class="warn">cao, tỉ mỉ</b></div>
+ <p>~24 config context riêng → gộp các config <i>gần giống</i> thành ~10-12 (vd nhóm imp[] thêm stub để nhập nhóm 17; fold các singleton khác biệt vặt). Ít boot hơn + vừa cache 8-slot (bớt evict/rebuild). Đây là chỗ "consolidation" THỰC SỰ cắt run-time — khác với gộp annotation (config giống nhau vốn đã share context, không cắt giờ). Phải verify từng merge an toàn (không đụng test @MockitoBean).</p>
+</div>
+
+<div class="opt b">
+ <h3>B · Parallel forks trên CI runner (KHÔNG phải máy này)</h3>
+ <div class="meta">Win <b class="ok">lớn (~12→3-5 phút)</b> · Rủi ro <b class="bad">OOM/flaky nếu thiếu RAM</b> · cần biết RAM máy CI</div>
+ <p>Nếu CI thật chạy trên runner ≥32GB: đặt <code>maxParallelForks=3-4</code> + giảm heap/fork (2-2.5g) <b>chỉ khi <code>-PciParallel</code></b>, giữ máy dev = 1 fork. Cần bạn cho biết RAM/cores của runner CI thật. Trên máy 15GB + app đang chạy thì KHÔNG nên.</p>
+</div>
+
+<div class="opt c">
+ <h3>C · Tách suite: "fast" (PR gate) vs "full" (nightly)</h3>
+ <div class="meta">Win <b class="ok">feedback PR nhanh</b> · Rủi ro <b class="ok">thấp</b> · Công <b class="warn">vừa</b></div>
+ <p>Gắn tag các context-heavy integration test; PR chỉ chạy tầng pure-JUnit + 1-2 context smoke (~1-2 phút); full suite chạy nightly/pre-merge. Giữ nguyên coverage tổng, chỉ đổi <i>khi nào</i> chạy gì. Phù hợp nếu nỗi đau là "đợi mỗi lần push".</p>
+</div>
+
+<div class="opt d">
+ <h3>D · Chấp nhận 12 phút — suite xanh & đã tinh chỉnh</h3>
+ <div class="meta">Win <b>0</b> · Rủi ro <b class="ok">0</b></div>
+ <p>Config hiện tại là compromise OOM/speed có chủ đích. 12 phút cho 847 integration test Jmix không bất thường. Tập trung công sức chỗ khác.</p>
+</div>
+
+<div class="foot">
+ <b>Khuyến nghị:</b> hỏi RAM/cores của <b>CI runner thật</b> trước. Nếu runner mạnh → <b>B</b> (win lớn nhất). Nếu chỉ máy 15GB này → <b>A</b> (an toàn, ~3-4 phút) ± <b>C</b> (PR nhanh). Không nên ép parallel trên 15GB.
+ <br>Nguồn: ai-agent.gradle:128-136 · full-suite runs 2026-06-04 · os RAM/cores probe.
+</div>
+</div></body></html>
