@@ -132,7 +132,10 @@ public class ActionProposalService {
             allAttributeNames.addAll(row.keySet());
         }
 
-        Set<String> missing = new LinkedHashSet<>();
+        // Parity with the single-record path (see missingFields(...)): seed with the
+        // caller-provided missingFields so bulk validation cannot reach STATUS_READY while the
+        // caller has already flagged absent fields. Then union the schema-derived per-row gaps.
+        Set<String> missing = new LinkedHashSet<>(proposal.missingFields());
         for (Map<String, Object> row : proposal.valuesList()) {
             missing.addAll(missingFieldsForRow(row, schema));
         }

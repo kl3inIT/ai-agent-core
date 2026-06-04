@@ -118,7 +118,8 @@ public class AgentSystemPromptRulesComposer {
                     "- Call bulk_save_records EXACTLY ONCE for the selected target entity with the full"
                             + " array of rows and a single fresh UUID v4 idempotencyKey for the batch.",
                     "- Do not call create_record per row, do not split the batch, and do not call"
-                            + " propose_bulk_action_choices or prepare_form_draft in this turn.",
+                            + " propose_action_choices, propose_bulk_action_choices or"
+                            + " prepare_form_draft in this turn.",
                     "");
         }
         if (ActionIntentId.PREFILL_FORM.equals(actionIntentId)) {

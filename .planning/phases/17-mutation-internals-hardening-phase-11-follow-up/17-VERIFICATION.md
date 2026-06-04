@@ -55,7 +55,7 @@ human_verification: []
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Full mutation + performance parity slice | `./gradlew :ai-agent:test --tests com.vn.agent.tools.mutation.* --tests com.vn.agent.performance.*` | BUILD SUCCESSFUL in 2m37s; 106 tests / 0 fail / 0 err / 2 skip (XML-aggregated) | ✓ PASS |
+| Full mutation + performance parity slice | `./gradlew :ai-agent:ai-agent:test --tests com.vn.agent.tools.mutation.* --tests com.vn.agent.performance.*` | BUILD SUCCESSFUL in 2m37s; 106 tests / 0 fail / 0 err / 2 skip (XML-aggregated) | ✓ PASS |
 | MUT-15 source invariants | `MutationToolInvariantsTest` | 8/8 | ✓ PASS |
 | MUT-16 SELECT slope ≤ 1 | `MutationFkBatchLoadQueryCountTest` | 1/1 | ✓ PASS |
 | MUT-17 walk-once | `RelatedWriteMetadataMemoTest` | 3/3 | ✓ PASS |

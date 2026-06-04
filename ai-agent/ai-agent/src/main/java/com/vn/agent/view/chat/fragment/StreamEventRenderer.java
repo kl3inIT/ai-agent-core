@@ -203,11 +203,20 @@ public final class StreamEventRenderer {
                     root.path("choices"),
                     new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
                     });
+            java.util.List<Map<String, Object>> safeValuesList =
+                    valuesList == null ? java.util.List.of() : valuesList;
+            java.util.List<String> safeChoices = choices == null ? java.util.List.of() : choices;
+            // Fail closed: a bulk-create-now choice with no rows would render a "Create all 0
+            // records" affordance and submit an empty batch context. Reject the payload entirely.
+            if (safeChoices.contains(com.vn.agent.action.ActionIntentId.BULK_CREATE_NOW)
+                    && safeValuesList.isEmpty()) {
+                return null;
+            }
             return new ActionProposalPayload(proposalId, targetEntityName,
                     instanceName == null ? targetEntityName : instanceName,
                     values == null ? Map.of() : values,
-                    valuesList == null ? java.util.List.of() : valuesList,
-                    choices == null ? java.util.List.of() : choices);
+                    safeValuesList,
+                    safeChoices);
         } catch (Exception failure) {
             return null;
         }
