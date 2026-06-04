@@ -62,8 +62,12 @@ jobs:
       # Default `test` still runs first via task dependency and excludes @Tag('live') +
       # @Tag('rag-it'); the integration tier is added on top, not in place of, the
       # default tier.
+      # -PciParallel forks the test runner across processes (2 by default) — the suite's
+      # wall-clock is dominated by serial Jmix context boots, and the clean ubuntu-latest
+      # runner (4 vCPU / 16GB, no app) has the RAM headroom that low-RAM dev boxes lack.
+      # --build-cache reuses task outputs across runs (compile/enhance) on cache hit.
       - name: Compile + check (default + Docker-gated integration tier)
-        run: ./gradlew :ai-agent:ai-agent:check --no-daemon
+        run: ./gradlew :ai-agent:ai-agent:check --no-daemon --build-cache -PciParallel
 
       - name: Publish ai-agent + ai-agent-starter to local maven (for downstream smoke)
         run: ./gradlew :ai-agent:ai-agent:publishToMavenLocal :ai-agent:ai-agent-starter:publishToMavenLocal --no-daemon

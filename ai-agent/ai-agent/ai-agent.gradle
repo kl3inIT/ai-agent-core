@@ -126,11 +126,25 @@ configurations.implementation {
 }
 
 tasks.withType(Test).configureEach {
-    // The suite boots many heavyweight Jmix @SpringBootTest contexts. Keep the Spring
-    // context cache bounded and periodically reset the worker JVM so CI does not OOM
-    // before late-suite mutation tests create their context.
-    maxHeapSize = '3g'
-    maxParallelForks = 1
+    // The suite boots many heavyweight Jmix @SpringBootTest contexts (~24 distinct contexts,
+    // ~26s each); test EXECUTION itself is only ~98s, so wall-clock is dominated by serial
+    // context boots. Keep the Spring context cache bounded and periodically reset the worker
+    // JVM so a run does not OOM before late-suite mutation tests create their context.
+    //
+    // Parallelism is OPT-IN via -PciParallel because each fork boots its own 2-3g Jmix
+    // context set: on a low-RAM dev box (or one already running the app on :8088) multiple
+    // forks OOM, which is why the default stays single-fork. A clean CI runner
+    // (GitHub ubuntu-latest = 4 vCPU / 16GB, no app) has the headroom to fork the runner
+    // across processes and roughly halve the boot wall-time at a lower per-fork heap.
+    //   CI:   ./gradlew ... -PciParallel            (2 forks, 2.5g each = ~5g < 16GB)
+    //   tune: ./gradlew ... -PciParallel -PciForks=3
+    if (project.hasProperty('ciParallel')) {
+        maxParallelForks = ((project.findProperty('ciForks') ?: '2') as Integer)
+        maxHeapSize = '2500m'
+    } else {
+        maxParallelForks = 1
+        maxHeapSize = '3g'
+    }
     forkEvery = 20
     systemProperty 'spring.test.context.cache.maxSize', '8'
 }
