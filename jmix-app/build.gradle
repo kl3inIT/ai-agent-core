@@ -43,7 +43,7 @@ dependencies {
     // jmix-app's compile classpath. Declaring it here is the correct host-side dependency —
     // any host wiring a ToolContributor needs Spring AI's tool annotations (Rule 3 deviation
     // recorded in 03-05-SUMMARY.md).
-    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
+    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.7'
 
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
