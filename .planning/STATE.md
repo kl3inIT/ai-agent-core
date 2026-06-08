@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: Operator Experience, Voice Input & Runtime Performance
+milestone_name: — Operator Experience, Voice Input & Runtime Performance
 status: phase_complete
-stopped_at: Phase 17 context gathered
-last_updated: "2026-05-31T09:19:25.271Z"
+stopped_at: Phase 18 context gathered
+last_updated: "2026-06-08T10:03:32.774Z"
 progress:
   total_phases: 6
   completed_phases: 3
@@ -364,9 +364,9 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-05-31T09:18:56.174Z
-**Stopped at:** Phase 17 context gathered
-**Resume file:** None
+**Last session:** 2026-06-08T10:03:32.722Z
+**Stopped at:** Phase 18 context gathered
+**Resume file:** .planning/phases/18-ai-runtime-performance-pass-targeted/18-CONTEXT.md
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** Pop stash → continue Phase 16 Plan 04 wiring + tests → Plan 05+.
