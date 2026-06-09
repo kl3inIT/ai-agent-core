@@ -1,307 +1,204 @@
 ---
 phase: 18
+cycle: 2
 reviewers: [codex]
-reviewed_at: 2026-06-09T03:26:20Z
+reviewed_at: 2026-06-09T03:48:10Z
 plans_reviewed: [18-01-PLAN.md, 18-02-PLAN.md, 18-03-PLAN.md, 18-04-PLAN.md, 18-05-PLAN.md]
 review_model: cx/gpt-5.5 (xhigh reasoning)
 source_grounding_pass: complete
+prior_cycle_high: 5
+current_high: 0
 ---
 
-# Cross-AI Plan Review — Phase 18
+# Cross-AI Plan Review — Phase 18 (Cycle 2)
 
-Phase 18 is "AI-Runtime Performance Pass (targeted)" — a targeted memoization pass over
-already-shipped Jmix AI-agent code (5 plans, PERF-01..05). The internal gsd-plan-checker passed
-with 0 blockers; this is an external Codex (`cx/gpt-5.5`, xhigh reasoning) second perspective plus a
-source-grounding pass over every existing-code symbol the plans cite.
+Phase 18 is "AI-Runtime Performance Pass (targeted)" — targeted memoization over already-shipped Jmix
+AI-agent code (5 plans, PERF-01..05). This is a **re-review (cycle 2)** after a `--reviews` replan that
+addressed the 5 HIGH concerns raised in cycle 1. The review mandate was to VERIFY each prior HIGH was
+actually fixed in the current PLAN.md files, assess whether any fix introduced a NEW HIGH, and re-run
+the source-grounding pass over every cited existing-code symbol.
+
+Only one external reviewer (Codex `cx/gpt-5.5`, xhigh reasoning) was available — `gemini` not installed;
+`claude` self-skipped as the executing CLI. Findings are cross-checked against the reviewer's own
+source-grounding pass against the live code.
+
+## Cycle-2 Verdict (headline)
+
+- **All 5 prior HIGH concerns: FULLY RESOLVED** (verified in current plan text + against live source).
+- **New HIGHs introduced by the replan: 0.**
+- **Remaining unresolved HIGHs: 0.**
+- Overall risk: **MEDIUM** (down from cycle-1 MEDIUM-HIGH). Residual items are MEDIUM/LOW polish, not
+  execution blockers.
+
+---
+
+## Prior-HIGH Verification
+
+| # | Cycle-1 HIGH | Cycle-2 verdict | Evidence in current plans |
+|---|--------------|-----------------|---------------------------|
+| 1 | Gradle task path `:ai-agent:ai-agent:test`/`compileJava` (nonexistent) | **FULLY RESOLVED** | Zero `:ai-agent:ai-agent:` occurrences across all 5 plans + `18-VALIDATION.md`; all verify/verification blocks use `:ai-agent:test` / `:ai-agent:compileJava`. Source-confirmed: `ai-agent/settings.gradle` (rootProject `ai-agent-addon`) includes only `:ai-agent` and `:ai-agent-starter`, so `:ai-agent:test` is the correct path. |
+| 2 | Mutable cached denylist (18-01) — caching the fresh `LinkedHashSet` app-wide lets callers poison the shared cache | **FULLY RESOLVED** | 18-01 Task 1 mandates the cache lambda wrap the result in `Set.copyOf(hidden)` / `Collections.unmodifiableSet(...)` BEFORE storing; acceptance criterion requires the immutable token present. Task 2(b) adds `assertThrows(UnsupportedOperationException.class, () -> returned.add(...))` plus an assertion the cache is not re-fetched/poisoned afterward (`times(1)` still holds). T-18-04 added to the threat register. |
+| 3 | `RunContext.perTurnCache()` no-active-turn / post-clear semantics (18-02) — always-store lazy-init makes "empty after clear" self-fulfilling and can leave a map on a pooled thread | **FULLY RESOLVED** | 18-02 Task 1 makes the accessor active-turn-gated: `CURRENT.get() == null` ⇒ return `Collections.emptyMap()` with NO `PER_TURN_CACHE.set(...)`; lazy-init a stored `HashMap` only within an active turn. Adds `perTurnMemoize(...)` (recompute-without-store off-turn) and a non-initializing `perTurnCacheSnapshotForTest()` returning the raw slot (may be null). Test asserts `perTurnCacheSnapshotForTest()` is null after `clear()` (meaningful, not self-fulfilling) and that a no-active-turn call recomputes-without-storing. |
+| 4 | `canReadEntity` not memoized (18-02) — D-08 names readable-entity verdicts, ~15 call sites | **FULLY RESOLVED** | 18-02 Task 2(a) routes `canReadEntity`, `canCreate`, `canUpdate`, AND `getReadableSchema()` through `RunContext.perTurnMemoize(...)` with a `CrudVerdictKey(metaClassName, operation)` using distinct `"read"`/`"create"`/`"update"` operations. Test asserts `delegate.canReadEntity(mc)` fires `times(1)` across N same-turn calls. |
+| 5 | 18-04 test feasibility + premature cache branch — no Mockito seam for private Tika path; Wave-1 cache cannot use Wave-2 `RunContext.perTurnCache()` | **FULLY RESOLVED** | 18-04 counts at the injectable `FileStorage` seam via `FileStorageLocator` → `FileStorage.openStream(FileRef)` (which gates both the image-bytes and Tika paths), explicitly forbidding direct counting of the private `readFileBytes()`/`extractDocumentText()`/inline `TikaDocumentReader`. The cache branch is a SELF-CONTAINED resolver-level `ConcurrentHashMap` with its OWN attach/delete/TTL + `@EventListener(AiSettingsChangedEvent)` (UI_SETTINGS) eviction and explicitly forbids `RunContext.perTurnCache`/`perTurnMemoize` (acceptance criterion: grep == 0). RESEARCH Open Q2 + Pitfall 5 predict the regression-lock branch (no cache, no Wave-2 dependency). |
+
+**Conclusion: 5/5 prior HIGHs FULLY RESOLVED; 0 introduced as new HIGH.**
+
+---
 
 ## Codex Review
 
-### Cross-Plan Findings
+### Prior-HIGH Verification (Codex)
 
-The main plan-quality issue is not the memoization direction; it is verification and cache-boundary
-precision.
+1. **Gradle task path — FULLY RESOLVED.** Current verify commands consistently use `:ai-agent:compileJava`
+   and `:ai-agent:test`; zero remaining `:ai-agent:ai-agent:` occurrences.
+2. **Mutable cached denylist (18-01) — FULLY RESOLVED.** Cache lambda returns `Set.copyOf`/
+   `unmodifiableSet` before storing; test asserts `UnsupportedOperationException` on mutation and no
+   re-fetch/poisoning. Closes the shared mutable-cache poisoning risk.
+3. **`perTurnCache()` no-active-turn / post-clear (18-02) — FULLY RESOLVED.** Returns `emptyMap()` with no
+   store when `CURRENT.get()==null`; `perTurnMemoize` recomputes-without-store off-turn;
+   `perTurnCacheSnapshotForTest()` proves the raw slot is null after `clear()`. Fixes both the
+   self-fulfilling test and the pooled-thread residue. (Stale wording in objective/threat-model mentions
+   `perTurnCache().isEmpty()`, but the task/action/acceptance text correctly uses the raw-snapshot seam.)
+4. **`canReadEntity` not memoized — FULLY RESOLVED.** `canReadEntity`/`canCreate`/`canUpdate`/
+   `getReadableSchema()` routed through `perTurnMemoize` with distinct `"read"`/`"create"`/`"update"` keys;
+   test verifies `delegate.canReadEntity(mc)` fires `times(1)` across same-turn calls.
+5. **18-04 test feasibility + premature cache branch — FULLY RESOLVED for the original HIGH.** Counts at
+   the injectable `FileStorage` seam via `FileStorageLocator`/`openStream`, forbids private-Tika counting;
+   cache branch is self-contained with attach/delete/TTL + `AiSettingsChangedEvent(UI_SETTINGS)` eviction
+   and forbids `RunContext.perTurnCache`. Residual: inconsistent `getDefault()` wording (see below).
 
-- **[HIGH]** All plan verification commands use `cd ai-agent && ./gradlew :ai-agent:ai-agent:test` /
-  `compileJava`, but the Gradle root at `ai-agent/` only has `:ai-agent` and `:ai-agent-starter`.
-  Use `./gradlew :ai-agent:test` and `./gradlew :ai-agent:compileJava`.
-- **[HIGH]** Cached public values must become immutable. `LlmExposurePolicy.getDenylistedEntityNames()`
-  currently returns a fresh mutable `Set`; caching that same mutable set app-wide would let any caller
-  accidentally poison the denylist cache.
-- **[HIGH]** `RunContext.perTurnCache()` should not create a stored ThreadLocal map when there is no
-  active run id. A foreign thread with `RunContext.get() == null` should bypass caching or use an
-  unstored local map, otherwise it can leave a pooled-thread ThreadLocal behind outside a turn.
+### New Issues Introduced by the Replan (Codex)
 
-### 18-01 (PERF-02 denylist memo)
+- **[MEDIUM] 18-04 cache branch is labelled "per-turn" but the resolver `ConcurrentHashMap<TaskFileMediaKey,
+  Media>` is keyed only by `(conversationId, taskFileId)` with no turn boundary.** If the cache branch is
+  taken it is not truly per-turn unless gated by a fresh constrained row load + reliable lifecycle removal.
+  Either add a real turn discriminator / turn-end clear, or stop calling it "per-turn" and document it as a
+  bounded app-level attachment cache evicted on attach/delete/TTL + settings change. (Fires only in the
+  residual cache branch; RESEARCH predicts the regression-lock branch.)
+- **[MEDIUM] 18-04 malformed plan structure:** acceptance-criteria bullets appear after `</verify>` without
+  an opening `<acceptance_criteria>` tag, then a closing `</acceptance_criteria>`. Constraints are still
+  readable, but a tag-driven executor/template may mishandle the section.
+- **[MEDIUM] 18-02 only requires top-level immutability for cached `getReadableSchema()`.** The shape is
+  `Map<MetaClass, Set<String>>` with mutable `LinkedHashSet` values; `Map.copyOf`/`unmodifiableMap` blocks
+  top-level mutation but not mutation of the cached attribute-name sets. Require copying each value to
+  `Set.copyOf(...)` before caching/returning.
 
-**Summary:** Strong foundation plan. Puts the denylist memo in the correct class, avoids Spring proxy
-caching, wires the intended eviction event, and adds both count and invariant proxies.
+### Other Concerns — per plan (Codex)
 
-**Strengths**
-- Correctly avoids `@Cacheable`; local source confirms `hiddenEntityNames()` is private and
-  self-invoked (`LlmExposurePolicy.java:121`).
-- Uses the already-shipped `LlmExposureChangedEvent` as a consumer-only eviction hook.
-- Call-count test plus event-subscription invariant is the right proxy mix.
+- **[LOW] 18-01** — artifact metadata claims an entity-name→`MetaClass` memo is provided, but the objective
+  makes that memo conditional on the proxy proving a metadata SELECT. Task text is correct; clean up the
+  metadata to match.
+- **[LOW] 18-02** — stale wording still says assert `RunContext.perTurnCache().isEmpty()` after clear; the
+  actionable task/acceptance correctly use `perTurnCacheSnapshotForTest()`. Remove the stale phrase to avoid
+  executor drift.
+- **[LOW/MEDIUM] 18-04** — `FileStorageLocator.getDefault()` remains in `must_haves`/acceptance text even
+  though the live path (`AiTaskFileMediaResolver:358`) calls `getByName(...)`. Action text correctly says to
+  stub `getByName(...)`; fix every remaining `getDefault()` reference since acceptance criteria are often
+  treated as authoritative.
+- **[LOW] 18-04** — one branch still says `verify(tika/...; times(1))` despite the plan correctly stating Tika
+  internals are not Mockito-countable. Remove or qualify (only if a deliberate package-private extraction
+  seam is added).
+- **[LOW] 18-05** — the admin-edit visibility test exercises raw denylist eviction, not the full memoized
+  LLM-facing schema/verdict path across `RunContext.clear()` / next `RunContext.set(...)`. Plan 02 covers
+  turn clearing separately, so not a HIGH; the PERF-05 test would be stronger asserting `canReadEntity` /
+  `getReadableSchema` reflects the edit on the next turn.
 
-**Concerns**
-- **[HIGH]** The cached denylist set must be immutable or defensively copied before returning.
-  Otherwise a public caller of `getDenylistedEntityNames()` can mutate the app-wide cached set.
-- **[MEDIUM]** `ConcurrentHashMap.computeIfAbsent()` plus `clear()` has a race: an in-flight old
-  computation can repopulate after an event clear. If "admin edit visible next turn" is strict, use
-  synchronized load/clear or a versioned/atomic snapshot.
-- **[MEDIUM]** The plan weakens D-06 by making entity-name→`MetaClass` memoization conditional. If no
-  such derivation exists in scope, prove that with a source invariant; otherwise implement the
-  `ConcurrentHashMap` memo explicitly.
-- **[MEDIUM]** Lowering `ToolQueryCountBaselineTest` from `5L` to `4L` is probably achievable, but it
-  is a weak SELECT proxy. The call-count test is doing the real proof.
+### Overall (Codex)
 
-**Suggestions**
-- Cache `Collections.unmodifiableSet(hidden)` or return `Set.copyOf(...)` consistently.
-- Add an eviction-race note or make cache load and clear mutually exclusive.
-- Replace all verification commands with `./gradlew :ai-agent:test ...`.
-
-**Risk Assessment:** MEDIUM. The design is right, but mutable cached state and eviction races are
-security-relevant enough to fix before execution.
-
-### 18-02 (PERF-01 per-turn RunContext cache)
-
-**Summary:** Correctly scopes user/role-sensitive memoization to `RunContext`, but misses
-`canReadEntity()` and needs a safer "no active turn" behavior for the ThreadLocal accessor.
-
-**Strengths**
-- Correctly rejects process-wide `runId` maps and Reactor context propagation.
-- Adds a source-boundary invariant keeping the cache out of `BuiltInDataTools`.
-- `clear()` wipe is placed at the correct lifecycle boundary (`RunContext.java:142`).
-
-**Concerns**
-- **[HIGH]** The plan does not cache `canReadEntity()`, even though PERF-01/D-08 include
-  readable-entity verdicts. Local grep shows many hot callers use `canReadEntity()` directly.
-- **[HIGH]** `perTurnCache()` lazy-init after `RunContext.clear()` makes the proposed "assert empty
-  after clear" test pass by creating a new stored empty map. That hides, rather than proves, cleanup.
-- **[HIGH]** Safe-miss should mean "recompute without storing" when no run is active, not "create a
-  new ThreadLocal map on an arbitrary worker thread."
-- **[MEDIUM]** Cached `getReadableSchema()` should also be immutable or defensively copied to avoid
-  persistent caller mutation.
-- **[MEDIUM]** The call-count test wording expects exactly one
-  `AccessManager.applyRegisteredConstraints` across create and update; with separate operation keys,
-  expected count is one per operation.
-
-**Suggestions**
-- Add `canReadEntity()` read-through with a `CrudVerdictKey` or `ReadVerdictKey`.
-- Add `RunContext.hasPerTurnCacheForTest()` / `perTurnCacheSnapshotForTest()` that does not
-  initialize the ThreadLocal.
-- Make `perTurnCache()` return `null`/optional when `RunContext.get() == null`, and have
-  `LlmExposurePolicy` compute directly on that path.
-
-**Risk Assessment:** HIGH. The plan's target is security-sensitive, and the current accessor/test
-shape could create exactly the kind of pooled-thread leakage the phase is trying to prevent.
-
-### 18-03 (PERF-03 RAG filter once-per-retrieval)
-
-**Summary:** Mostly a regression-lock plan. The current `RetrievalFilterBuilder.buildFor()` already
-reads the denylist once and builds the expression in one pass, so the plan's no-op production stance
-is reasonable.
-
-**Strengths**
-- Preserves role extraction per `Authentication`, avoiding cross-user role staleness.
-- Keeps the denylist cache centralized in `LlmExposurePolicy`.
-- Protects the existing denylist clause test from churn.
-
-**Concerns**
-- **[MEDIUM]** Verifying `getDenylistedEntityNames()` `times(1)` proves one denylist lookup, not
-  necessarily "filter expression built once." Acceptable only because the source is simple.
-- **[LOW]** `Filter.Expression.toString()` smoke assertions can be brittle; keep the existing
-  `RetrievalFilterBuilderDenylistTest` as the real clause-shape authority.
-- **[LOW]** The roadmap wording mentions `(source_entity IS NULL) OR NOT IN`; the current code
-  intentionally uses only `NIN` due to Spring AI converter limitations. The summary should explicitly
-  say the existing tested shape is preserved.
-
-**Suggestions**
-- Add a source invariant that `buildFor()` contains exactly one `getDenylistedEntityNames()` call.
-- Keep new tests focused on call count; avoid over-asserting Spring AI `toString()` formatting.
-
-**Risk Assessment:** LOW. The production path is already structurally correct; the plan mainly needs
-precise wording.
-
-### 18-04 (PERF-04 task-file Media encode)
-
-**Summary:** The proxy-first discipline is good, but the proposed pure-unit test is under-specified
-for the current private `FileStorage`/Tika path, and the conditional cache branch is dangerous if it
-runs before Plan 02.
-
-**Strengths**
-- Correctly avoids adding a cache when the path is already once per turn.
-- Keeps constrained `DataManager` as a hard acceptance criterion.
-- Preserves existing task-file budget/TTL tests.
-
-**Concerns**
-- **[HIGH]** The test plan assumes Mockito can count private `readFileBytes()` /
-  `extractDocumentText()` / `new TikaDocumentReader(...)` calls. The current class has no seam for
-  that.
-- **[HIGH]** If the cache branch is taken in Wave 1, `RunContext.perTurnCache()` is not available yet.
-  A resolver-level `ConcurrentHashMap<(conversationId, taskFileId), Media>` would risk stale/deleted
-  attachment reuse unless concrete add/delete/TTL invalidation hooks are implemented.
-- **[MEDIUM]** The plan may confuse "one turn invokes `resolveActive()` once" with "multiple
-  `resolveActive()` calls in a test." Repeated calls should not force a new production cache unless the
-  real service path repeats them.
-- **[MEDIUM]** Current `AiUiSettingsResolver` loads the singleton separately for each task-file
-  setting. Counting `resolveTaskFile*()` calls does not prove singleton DB reads are once per turn.
-
-**Suggestions**
-- Use a counting fake `FileStorage` and real small test files, or add a small package-private document
-  extraction seam before trying to count Tika.
-- If a real cache is needed, make 18-04's cache branch depend on 18-02 or split it into a Wave-2
-  follow-up.
-- Count `UnconstrainedDataManager.load(AiUiSettings.class)` if the settings-read claim is part of
-  PERF-04.
-
-**Risk Assessment:** HIGH. Regression-lock branch is safe; cache branch and test feasibility need
-tightening before autonomous execution.
-
-### 18-05 (PERF-05 closing gate)
-
-**Summary:** Good closing-gate concept: dependency invariant, proxy existence, event visibility, and
-full-suite validation. Main weakness is that some checks are structural or doc-coupled rather than
-behavior-coupled.
-
-**Strengths**
-- Explicitly forbids JMH/Gatling/Caffeine.
-- Adds a value-change eviction test, not only a call-count test.
-- Correctly makes this plan depend on all implementation plans.
-
-**Concerns**
-- **[MEDIUM]** Reading `18-04-SUMMARY.md` from a Java test couples source tests to planning artifacts.
-  Detect whether a settings memo exists from source instead.
-- **[MEDIUM]** Calling `policy.onExposureChanged(...)` directly proves the method works, not that
-  Spring event delivery is wired. Plan 01's source scan helps, but the wording should not overclaim
-  "published via event."
-- **[MEDIUM]** Proxy-existence checks prove files exist, not that they contain meaningful assertions.
-  Full suite helps, but the invariant itself is shallow.
-- **[LOW]** The dependency scan should walk all add-on Gradle scripts, not just two hardcoded files.
-
-**Suggestions**
-- Source-scan for `@EventListener(AiSettingsChangedEvent` instead of reading the plan summary.
-- Keep the direct-method eviction test, but pair it with the event-listener source invariant.
-- Make the "only existing test body edit" gate an explicit scripted diff check in the summary, since
-  it is not a JUnit invariant.
-
-**Risk Assessment:** MEDIUM. The gate is useful, but several checks can pass while missing the intended
-behavioral guarantee.
-
-**Codex Overall Risk:** MEDIUM-HIGH. The phase direction is sound and most dependencies are ordered
-correctly, but Codex "would not execute these plans unchanged." Fix the Gradle task paths, immutable
-cached values, `RunContext` no-active-turn behavior, missing `canReadEntity()` memoization, and the
-18-04 test/cache branch before starting implementation.
+**Risk: MEDIUM. Execute unchanged? No** — substantively all 5 prior HIGHs resolved, **0 remaining
+unresolved prior HIGHs, 0 new HIGHs**; the 18-04 cache-branch turn-boundary ambiguity and shallow schema
+immutability are meaningful MEDIUMs to correct first.
 
 ---
 
-## Source-Grounding Pass (reviewer-performed)
+## Source-Grounding Pass (reviewer-performed, cycle 2)
 
-For every existing-code symbol the plans cite (classes, methods, fields, file paths, test classes), I
-confirmed a real declaration in source via grep/Read. Symbols the plans declare under "Artifacts this
-phase produces" are EXCLUDED (created by this phase, not references).
+Re-confirmed every existing-code symbol the plans cite resolves to a real declaration via grep/Read.
+Symbols under each plan's "Artifacts this phase produces" are EXCLUDED (created by this phase).
 
-**Result: 100% VERIFIED. Zero MISSING / AMBIGUOUS / UNCHECKABLE symbols.** Every cited existing
-symbol resolves to a real declaration, and the line anchors are accurate (exact in the load-bearing
-cases).
+**Result: 100% VERIFIED. Zero MISSING symbols.** All cited source + test files exist; load-bearing line
+anchors are accurate.
 
-### Files (27/27 VERIFIED)
-All 27 cited source + test files exist at the cited paths under
-`ai-agent/ai-agent/src/{main,test}/java/com/vn/agent/...`.
+### Files (all VERIFIED)
+- Source: `exposure/LlmExposurePolicy.java`, `LlmExposureRuleRepository.java`, `AiExposureRuleEntityListener.java`,
+  `LlmExposureChangedEvent.java`, `AiInternalEntityNames.java`; `orchestration/RunContext.java`,
+  `BaselineContextProvider.java`, `AiUiSettingsResolver.java`; `tools/mutation/RelatedWriteMetadataResolver.java`,
+  `guard/IterationCounter.java`, `audit/AuditAdvisor.java`, `rag/RetrievalFilterBuilder.java`,
+  `taskfile/AiTaskFileMediaResolver.java`, `tools/BuiltInDataTools.java`, `admin/config/AiSettingsChangedEvent.java`.
+- Test analogs: `performance/ToolQueryCountBaselineTest.java`, `admin/config/AiUiSettingsResolverReadThroughTest.java`,
+  `admin/config/AiSettingsChangedEventListenerInvariantTest.java`, `tools/mutation/RelatedWriteMetadataMemoTest.java`,
+  `rag/RetrievalFilterBuilderDenylistTest.java`, `taskfile/PerTurnMediaInjectionTest.java`,
+  `performance/MutationFkBatchLoadQueryCountTest.java`, `performance/QueryCountingDataSourceConfiguration.java`.
 
-### Load-bearing symbols / line anchors (all VERIFIED)
-- `LlmExposurePolicy.getReadableSchema():47`, `canReadEntity():62`, `canReadAttribute():72`,
-  `canCreate():82`, `canUpdate():95`, `canModify()→canUpdate():107-108`,
-  `getDenylistedEntityNames():117`, private `hiddenEntityNames():121` — all exact.
+### Load-bearing symbols / anchors (VERIFIED)
+- `LlmExposurePolicy`: `getReadableSchema():47`, `canReadEntity():62`, `canReadAttribute():72`, `canCreate():82`,
+  `canUpdate():95`, `canModify()→canUpdate():107-108`, `getDenylistedEntityNames():117-119`, private
+  `hiddenEntityNames():121-125` — all exact; `hiddenEntityNames` confirmed private + self-invoked from 5 callers (D-07 premise holds).
 - `LlmExposureRuleRepository.findEnabledExcludedEntityNames():34` — exact.
-- `AiInternalEntityNames.all():30` — exact.
-- `RelatedWriteMetadataResolver` `ConcurrentHashMap` field `:136`, `computeIfAbsent` `:160` — exact.
-- `AiExposureRuleEntityListener` `@EventListener` `:31` + `publishEvent(new LlmExposureChangedEvent(this))`
-  `:33` (SINGLE publish site) — exact.
-- `LlmExposureChangedEvent(Object source)` — single-arg ctor; confirms the plans' `new
-  LlmExposureChangedEvent(this)` calls compile.
-- `RunContext` — exactly 12 `ThreadLocal` slots `:31-42`, `PREPARE_FORM_DRAFT_INVOKED:42`,
-  `clear():142-155` with all 12 `.remove()` calls including `PREPARE_FORM_DRAFT_INVOKED.remove():154` —
-  exact (matches plan 18-02's "existing 12 ThreadLocal slots" and ":154" anchor).
-- `AuditAdvisor.openEnvelope():94`, `closeEnvelope():108` → `RunContext.clear():121` — exact.
-- `GuardedToolCallingManager.executeToolCalls():96`, `RunContext.getRootAuditId():100`,
-  `RunContext.get():149`, `RunContext.getConversationId():154` — exact (D-03 streaming-visibility
-  evidence sites).
-- `IterationCounter` `ThreadLocal<Integer> COUNT:17`, `start():23`, `reset():41` — exact.
-- `RetrievalFilterBuilder.buildFor():77`, `getDenylistedEntityNames():99`,
-  `b.nin(ChunkMetadata.SOURCE_ENTITY,...):102` (NIN clause) — exact.
-- `AiTaskFileMediaResolver.resolveActive():155`, `extractDocumentText():320`, `readFileBytes():357`,
-  `resolveTaskFile*` calls `:162,179,180` — exact (the `resolveTaskFile*` glob resolves to
-  `resolveTaskFileTtlSeconds` / `resolveTaskFilePerTurnMaxFiles` / `resolveTaskFilePerTurnMaxTotalBytes`).
-- `AiUiSettingsResolver.loadSingleton():78`, `resolveTaskFile*` accessors `:97,106,115,128` — exact.
-- `AiSettingsChangedEvent` `enum Kind {PARAMETERS, UI_SETTINGS}:28-32`, ctor `(Object source, Kind kind)`,
-  `getKind():42` — exact.
-- `BuiltInDataTools.getReadableSchema():100`, `canReadEntity():371` — exact (D-09 boundary target).
-- `ToolQueryCountBaselineTest.java:151` reads EXACTLY `private static final long
-  METAMODEL_TOOL_POLICY_LOOKUP_CEILING = 5L;` — the single allowed edit point is verified byte-exact.
-  Assertion sites at `:163-164` (listEntities) and `:179-180` (describeEntity); the four
-  `*_STEADY_STATE_CEILING = 1000L` constants at `:192-195` — all confirmed.
-- `AiSettingsChangedEventListenerInvariantTest.singlePublishSiteSourceScan():229`,
-  `findMainJavaRoot():327` — present (plan anchors :228-260 / :322-343 are approximate but resolve).
-- `RelatedWriteMetadataMemoTest:45`, `AiUiSettingsResolverReadThroughTest` `@Tag("unit"):53`,
-  `RetrievalFilterBuilderDenylistTest`, `PerTurnMediaInjectionTest`,
-  `MutationFkBatchLoadQueryCountTest`, `QueryCountingDataSourceConfiguration` — all present.
+- `RunContext`: 12 ThreadLocal slots `:31-42` (`PREPARE_FORM_DRAFT_INVOKED:42`), `clear():142-155` with all 12
+  `.remove()` incl. `PREPARE_FORM_DRAFT_INVOKED.remove():154`, `CURRENT`/`get():50` — exact.
+- `RetrievalFilterBuilder.buildFor():77`, single `getDenylistedEntityNames():99`, `b.nin(ChunkMetadata.SOURCE_ENTITY,...):102` — exact.
+- `AiTaskFileMediaResolver`: `FileStorageLocator` ctor edge `:117/:124`, `resolveActive():155`, constrained
+  `dataManager.load(AiTaskFile.class):163`, `extractDocumentText():320`, `readFileBytes():357`,
+  `fileStorageLocator.getByName(...):358`, `fileStorage.openStream(...):359`, `new TikaDocumentReader(...):335` — exact.
+- `AiUiSettingsResolver`: `UnconstrainedDataManager.load(AiUiSettings.class):80`, `resolveTaskFile*` accessors `:97,106,115,128` — exact.
+- `AiSettingsChangedEvent` `enum Kind {PARAMETERS, UI_SETTINGS}:28-32`, `getKind():42`; `LlmExposureChangedEvent(Object source):16` — exact.
+- `ToolQueryCountBaselineTest.java:151` reads EXACTLY `private static final long METAMODEL_TOOL_POLICY_LOOKUP_CEILING = 5L;`;
+  four `*_STEADY_STATE_CEILING = 1000L` at `:192-195`; assertion sites `:160-164`/`:176-180` — exact.
+- `AiSettingsChangedEventListenerInvariantTest.singlePublishSiteSourceScan():229`, `findMainJavaRoot():327` — present.
 
 ### Build / dependency facts (VERIFIED)
-- `ai-agent/ai-agent/ai-agent.gradle:111` declares `net.ttddyy:datasource-proxy:1.11.0` (the ALLOWED
-  proxy harness) with the comment at `:107`.
-- NO `caffeine`, `jmh`, or `gatling` token in `ai-agent.gradle` or `ai-agent/build.gradle` — confirms
-  the PERF-05 dep-scan premise is satisfiable today.
-- `settings.gradle` (rootProject `ai-agent-addon`) includes only `:ai-agent` and `:ai-agent-starter`;
-  the `rootProject.children.each` block only sets `buildFileName`, it does NOT nest sub-projects.
+- `ai-agent/ai-agent/ai-agent.gradle:111` declares `net.ttddyy:datasource-proxy:1.11.0` (ALLOWED harness); comment `:107`.
+- NO `caffeine`/`jmh`/`gatling` token in `ai-agent.gradle` or `ai-agent/build.gradle` — PERF-05 dep-scan is satisfiable today.
+- `settings.gradle` (rootProject `ai-agent-addon`) includes only `:ai-agent` and `:ai-agent-starter`.
 
 ### needs-acknowledgement (from source-grounding)
-- **No MISSING symbols.** The plans are exceptionally well grounded — every cited existing symbol is
-  real and almost every line anchor is exact.
-- **CONFIRMED-DRIFT (not from source-grounding, but verified during it):** the Gradle task path
-  `:ai-agent:ai-agent:test` used in all 5 plans' `<verify>`/`<verification>` blocks does NOT exist.
-  The valid path is `:ai-agent:test`. This is the source-grounded confirmation of Codex's #1 HIGH and
-  is the single most important fix before execution. (Listed as a Current HIGH below.)
+- **No MISSING symbols.**
+- **MINOR INCONSISTENCY (not a missing symbol):** 18-04 `must_haves`/acceptance text references the counting
+  seam as `FileStorageLocator.getDefault()`, but the live encode path calls `fileStorageLocator.getByName(
+  fileRef.getStorageName())` at `:358` — there is no `getDefault()` in the path. The plan's `read_first`
+  correctly identifies `getByName(...):358` and hedges "add `getDefault()` only if the code path uses it,"
+  so this is a wording cleanup (LOW/MEDIUM), not a grounding failure or a HIGH.
 
 ---
 
 ## Consensus Summary
 
-Only one external reviewer (Codex) was available (`gemini` not installed; `claude` self-skipped as the
-executing CLI). The "consensus" here is Codex's findings cross-checked against the reviewer's
-source-grounding pass.
+Single external reviewer (Codex) cross-checked against the reviewer's source-grounding pass.
 
 ### Agreed Strengths
-- Memoization DIRECTION is correct: app-wide denylist memo inside `LlmExposurePolicy` (avoiding the
-  `@Cacheable` self-invocation trap, D-07), per-turn `RunContext` ThreadLocal for user/role-sensitive
-  verdicts, denylist reuse in the RAG path, proxy-first discipline for task-file encode.
-- Eviction wiring reuses the already-shipped single-publish-site events
-  (`LlmExposureChangedEvent` / `AiSettingsChangedEvent`) as consumers only.
-- The plans are extremely well source-grounded (verified: 100% of cited existing symbols real, anchors
-  exact).
-- Wave ordering (01 foundation → 02/03 reuse the denylist memo → 05 closing gate; 04 parallel in
-  Wave 1) is mostly correct.
+- All 5 cycle-1 HIGH concerns are FULLY RESOLVED in the current plan text and consistent with the live source.
+- Memoization direction remains correct: app-wide denylist memo inside `LlmExposurePolicy` (avoiding the
+  `@Cacheable` self-invocation trap, D-07), per-turn `RunContext` ThreadLocal for user/role-sensitive verdicts,
+  denylist reuse in the RAG path, proxy-first discipline for task-file encode.
+- Eviction wiring reuses already-shipped single-publish-site events (`LlmExposureChangedEvent` /
+  `AiSettingsChangedEvent`) as consumers only.
+- Plans are exceptionally well source-grounded (100% of cited existing symbols real; anchors exact).
 
-### Agreed Concerns (highest priority)
-1. **[HIGH] Wrong Gradle task path in every plan** (`:ai-agent:ai-agent:test` → `:ai-agent:test`).
-   Source-confirmed via `settings.gradle`. Would fail every `<verify>` step on first run.
-2. **[HIGH] Mutable cached denylist set** (18-01). `hiddenEntityNames()` returns a fresh mutable
-   `LinkedHashSet` today; once cached app-wide, the same instance is handed to 15+ external callers of
-   `getDenylistedEntityNames()` who could mutate the shared cache. Plan 18-01 does not mandate
-   `unmodifiableSet`/`Set.copyOf`.
-3. **[HIGH] `RunContext.perTurnCache()` no-active-turn / post-clear semantics** (18-02). Lazy-init that
-   always stores a new map (a) makes the "empty after clear()" test self-fulfilling and (b) risks
-   leaving a map on a pooled worker thread outside any turn — the exact cross-turn leakage PERF-01
-   tries to prevent.
-4. **[HIGH] `canReadEntity()` not routed through the per-turn cache** (18-02), despite D-08 naming
-   readable-entity verdicts and 15 external `canReadEntity` call sites.
-5. **[HIGH] 18-04 test feasibility + premature cache branch.** No Mockito seam exists for the private
-   `readFileBytes()` / `extractDocumentText()` / `new TikaDocumentReader(...)` path; and if the cache
-   branch fires in Wave 1, `RunContext.perTurnCache()` (Plan 02, Wave 2) is not yet available, so a
-   resolver-level `ConcurrentHashMap` would need its own attach/delete/TTL invalidation.
+### Agreed Concerns (highest priority — none HIGH)
+1. **[MEDIUM] 18-02 cached `getReadableSchema()` deep immutability** — top-level `Map.copyOf`/`unmodifiableMap`
+   does not protect the mutable `Set<String>` values; require per-value `Set.copyOf(...)`.
+2. **[MEDIUM] 18-04 cache-branch "per-turn" labeling** — the resolver `ConcurrentHashMap` keyed by
+   `(conversationId, taskFileId)` has no turn boundary; clarify it as an attach/delete/TTL + settings-evicted
+   app-level cache, or add a turn discriminator. Fires only in the residual cache branch.
+3. **[MEDIUM] 18-04 malformed `<acceptance_criteria>` tag block** — opening tag missing; risks tag-driven
+   executor mishandling.
+4. **[LOW/MEDIUM] 18-04 `getDefault()` wording** — fix remaining references to `getByName(...)` to match the
+   live path.
+5. **[LOW] 18-02 stale `perTurnCache().isEmpty()` phrase** and **[LOW] 18-01 metadata/objective mismatch on the
+   conditional `MetaClass` memo** — doc cleanups to avoid executor drift.
 
 ### Divergent Views
-- No second external reviewer to diverge. Where the reviewer's source-grounding pass partially
-  TEMPERS a Codex HIGH: the 18-04 cache-branch dependency risk is largely mitigated by the plan's
-  own proxy-first stance (RESEARCH Open Q2 + Pitfall 5 strongly predict the regression-lock branch,
-  which adds no cache). It remains a HIGH only for the residual case where the proxy forces the cache
-  branch — the plan should make that branch explicitly Wave-2 / 18-02-dependent rather than Wave 1.
+- No second external reviewer to diverge. The reviewer's source-grounding pass independently confirms Codex's
+  FULLY-RESOLVED verdicts on all 5 prior HIGHs and the MINOR `getDefault()` inconsistency.
+
+---
+
+## Current HIGH Concerns
+
+None.
+
+The replan fully resolved all 5 cycle-1 HIGH concerns and introduced no new HIGH. Remaining items are
+MEDIUM (deep schema immutability; 18-04 cache-branch turn-boundary labeling; malformed acceptance-tag block)
+and LOW (doc/wording cleanups). These are recommended tightening before execution but are not blockers.
