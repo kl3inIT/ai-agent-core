@@ -208,6 +208,22 @@ public class AuditWriter {
         row.setOutcome(outcome != null ? outcome : AiToolCallOutcome.SUCCESS);
         row.setDenialReason(denialReason);
         row.setErrorClass(errorClass);
+        applyConversationParentAndTimestamps(row, conversationId, parentId, runId, latencyMs);
+        dataManager.save(row);
+        final UUID auditId = row.getId();
+        registerAfterCommit(auditId, kind);
+        return auditId;
+    }
+
+    /**
+     * Shared row finalization for child audit rows (TOOL + RETRIEVAL): resolves the conversation
+     * FK, links the parent (explicit {@code parentId}, else the run's CHAT root) with a
+     * children-free fetch plan (Pitfall #1), and stamps both timestamps from a single {@code now}
+     * (D-01 — children carry {@code startedAt}+{@code finishedAt} at insert). {@code row.getKind()}
+     * must already be set by the caller.
+     */
+    private void applyConversationParentAndTimestamps(AiAuditEvent row, UUID conversationId,
+                                                      UUID parentId, UUID runId, long latencyMs) {
         if (conversationId != null) {
             AiConversation conv = dataManager.load(AiConversation.class).id(conversationId).optional().orElse(null);
             if (conv != null) {
@@ -223,17 +239,13 @@ public class AuditWriter {
             if (parent != null) {
                 row.setParent(parent);
             } else {
-                log.warn("writeAuditRow: parent {} not found; row will be orphan (runId={}, kind={}, tool={})",
-                        effectiveParentId, runId, kind, toolName);
+                log.warn("Audit parent {} not found; {} row will be orphan (runId={})",
+                        effectiveParentId, row.getKind(), runId);
             }
         }
         OffsetDateTime now = OffsetDateTime.now();
         row.setStartedAt(now.minusNanos(latencyMs * 1_000_000L));   // D-01: children carry both timestamps at insert
         row.setFinishedAt(now);
-        dataManager.save(row);
-        final UUID auditId = row.getId();
-        registerAfterCommit(auditId, kind);
-        return auditId;
     }
 
     /**
@@ -261,28 +273,7 @@ public class AuditWriter {
         row.setLatencyMs(latencyMs);
         row.setOutcomeRaw(outcome);
         row.setErrorClass(errorClass);
-        if (conversationId != null) {
-            AiConversation conv = dataManager.load(AiConversation.class).id(conversationId).optional().orElse(null);
-            if (conv != null) {
-                row.setConversation(conv);
-            }
-        }
-        UUID effectiveParentId = parentId != null ? parentId : findChatRootId(runId);
-        if (effectiveParentId != null) {
-            AiAuditEvent parent = dataManager.load(AiAuditEvent.class)
-                    .id(effectiveParentId)
-                    .fetchPlan(fp -> fp.add("id"))
-                    .optional().orElse(null);
-            if (parent != null) {
-                row.setParent(parent);
-            } else {
-                log.warn("writeRetrieval: parent {} not found; retrieval row will be orphan (runId={})",
-                        effectiveParentId, runId);
-            }
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        row.setStartedAt(now.minusNanos(latencyMs * 1_000_000L));
-        row.setFinishedAt(now);
+        applyConversationParentAndTimestamps(row, conversationId, parentId, runId, latencyMs);
         dataManager.save(row);
         final UUID auditId = row.getId();
         registerAfterCommit(auditId, AuditKind.RETRIEVAL);

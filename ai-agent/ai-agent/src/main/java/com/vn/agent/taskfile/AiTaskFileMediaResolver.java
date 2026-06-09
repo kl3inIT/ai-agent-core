@@ -58,6 +58,9 @@ public class AiTaskFileMediaResolver {
 
     private static final Logger log = LoggerFactory.getLogger(AiTaskFileMediaResolver.class);
 
+    /** Shared, thread-safe — avoids re-allocating a mapper on every budget-exceeded audit serialization. */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private static final int MAX_MEDIA_NAME_LENGTH = 96;
 
     /**
@@ -272,7 +275,7 @@ public class AiTaskFileMediaResolver {
         payload.put(BudgetExceededAuditKeys.PER_TURN_MAX_FILES, maxFiles);
         payload.put(BudgetExceededAuditKeys.PER_TURN_MAX_TOTAL_BYTES, maxBytes);
         try {
-            return new ObjectMapper().writeValueAsString(payload);
+            return OBJECT_MAPPER.writeValueAsString(payload);
         } catch (JsonProcessingException jsonEx) {
             log.warn("Failed to serialize task_file_budget_exceeded argumentsJson; falling back to literal",
                     jsonEx);
