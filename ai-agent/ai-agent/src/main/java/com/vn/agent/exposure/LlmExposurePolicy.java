@@ -1,6 +1,7 @@
 package com.vn.agent.exposure;
 
 import com.vn.agent.metadata.CurrentUserSchemaAccess;
+import com.vn.agent.orchestration.RunContext;
 import io.jmix.core.AccessManager;
 import io.jmix.core.accesscontext.CrudEntityContext;
 import io.jmix.core.metamodel.model.MetaClass;
@@ -39,6 +40,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Call sites that previously injected {@link CurrentUserSchemaAccess} switch to this class
  * mechanically (D-03): {@code BuiltInDataTools}, {@code BaselineContextProvider},
  * {@code FetchPlanIntersector}.</p>
+ *
+ * <p>Phase 18 (PERF-01 / D-08) adds a per-turn read-through on top of the app-wide denylist memo:
+ * the {@code canReadEntity} read verdict, the {@code canCreate}/{@code canUpdate} CRUD verdicts, and
+ * {@code getReadableSchema()} are resolved ONCE per turn via
+ * {@link RunContext#perTurnMemoize(Object, java.util.function.Supplier)} and shared across every
+ * tool call in that turn. Verdict keys are locale-INVARIANT (D-04): permissions/verdicts do not
+ * depend on locale, only the entity/schema labels rendered in {@code BaselineContextProvider} do.
+ * Within a turn the authenticated user, role set, and registered constraints are immutable, so a
+ * cached verdict can never go over-permissive mid-turn (D-08, threat T-18-07 accepted); the per-turn
+ * map is wiped each turn by {@link RunContext#clear()} and the only verdict-changing event is the
+ * across-turn {@link LlmExposureChangedEvent}. The per-turn cache symbol appears ONLY here and in
+ * {@link RunContext} — never in the constrained-{@code DataManager} row-data path
+ * ({@code BuiltInDataTools}), which stays authoritative for row access (D-09, T-18-06).</p>
  */
 @Component
 public class LlmExposurePolicy {
@@ -48,6 +62,21 @@ public class LlmExposurePolicy {
      * shared entry serves every caller; eviction is all-or-nothing via {@link #onExposureChanged}.
      */
     private static final String DENYLIST_KEY = "denylist";
+
+    /**
+     * Per-turn cache key for a CRUD/read verdict (PERF-01 / D-04). Locale-INVARIANT by
+     * construction — only {@code (metaClassName, operation)} identify the verdict; operations are
+     * the literals {@code "read"} / {@code "create"} / {@code "update"}. A {@code record} so its
+     * {@code equals}/{@code hashCode} make distinct gates distinct keys in the per-turn map.
+     */
+    record CrudVerdictKey(String metaClassName, String operation) { }
+
+    /**
+     * Single sentinel key for the per-turn memoized {@link #getReadableSchema()} value. The verdict
+     * portion of the schema is locale-invariant (D-04); the locale-bearing {@code agent.entities}
+     * label rendering lives in {@code BaselineContextProvider} and is NOT cached here.
+     */
+    private static final String READABLE_SCHEMA_KEY = "readableSchema";
 
     private final CurrentUserSchemaAccess delegate;
     private final LlmExposureRuleRepository ruleRepository;
@@ -71,27 +100,45 @@ public class LlmExposurePolicy {
 
     /**
      * Returns the Jmix-readable schema with denylisted entities removed entirely (EXP-02).
-     * Loads the denylist ONCE at the top of this method — never calls per-entity DB queries
-     * in the loop (avoids N-query hot-path per Pitfall #1 in RESEARCH.md).
+     * Loads the denylist ONCE at the top — never calls per-entity DB queries in the loop
+     * (avoids N-query hot-path per Pitfall #1 in RESEARCH.md).
+     *
+     * <p>Resolved ONCE per turn via {@link RunContext#perTurnMemoize} (PERF-01 / D-08) and shared
+     * across every tool call in the turn; off-turn it recomputes-without-storing (D-02 safe miss).
+     * The cached value is a DEEPLY-immutable view — both the outer map and every inner attribute
+     * {@link Set} are copied with {@link Map#copyOf}/{@link Set#copyOf} (review MEDIUM) so no caller
+     * can mutate the per-turn cached schema or its attribute sets.</p>
      */
     public Map<MetaClass, Set<String>> getReadableSchema() {
+        return RunContext.perTurnMemoize(READABLE_SCHEMA_KEY, this::computeReadableSchema);
+    }
+
+    private Map<MetaClass, Set<String>> computeReadableSchema() {
         Set<String> denied = hiddenEntityNames();
         Map<MetaClass, Set<String>> base = delegate.getReadableSchema();
-        if (denied.isEmpty()) {
-            return base;
+        Map<MetaClass, Set<String>> filtered = new LinkedHashMap<>(base);
+        if (!denied.isEmpty()) {
+            filtered.keySet().removeIf(mc -> denied.contains(mc.getName()));
         }
-        Map<MetaClass, Set<String>> result = new LinkedHashMap<>(base);
-        result.keySet().removeIf(mc -> denied.contains(mc.getName()));
-        return result;
+        // Deep-immutable defensive copy: outer map AND every inner attribute set (review MEDIUM —
+        // Map.copyOf alone leaves the inner Sets mutable, letting a caller mutate cached attributes).
+        Map<MetaClass, Set<String>> immutable = new LinkedHashMap<>(filtered.size());
+        for (Map.Entry<MetaClass, Set<String>> entry : filtered.entrySet()) {
+            immutable.put(entry.getKey(), Set.copyOf(entry.getValue()));
+        }
+        return Collections.unmodifiableMap(immutable);
     }
 
     /**
-     * Per-request entity read-access check. Fetches its own denylist copy (this method is
-     * called alone from BuiltInDataTools, not inside a loop over all entities).
+     * Per-request entity read-access check. Resolved ONCE per turn via
+     * {@link RunContext#perTurnMemoize} (PERF-01 / review HIGH #4 — {@code canReadEntity} is the
+     * hottest read gate with ~15 external call sites, so D-08 names it explicitly). Off-turn it
+     * recomputes-without-storing (D-02 safe miss). Locale-invariant verdict key (D-04).
      */
     public boolean canReadEntity(MetaClass mc) {
-        return delegate.canReadEntity(mc)
-                && !hiddenEntityNames().contains(mc.getName());
+        return RunContext.perTurnMemoize(
+                new CrudVerdictKey(mc.getName(), "read"),
+                () -> delegate.canReadEntity(mc) && !hiddenEntityNames().contains(mc.getName()));
     }
 
     /**
@@ -110,10 +157,14 @@ public class LlmExposurePolicy {
      * Wave 4+).
      */
     public boolean canCreate(MetaClass mc) {
-        CrudEntityContext ctx = new CrudEntityContext(mc);
-        accessManager.applyRegisteredConstraints(ctx);
-        return ctx.isCreatePermitted()
-                && !hiddenEntityNames().contains(mc.getName());
+        return RunContext.perTurnMemoize(
+                new CrudVerdictKey(mc.getName(), "create"),
+                () -> {
+                    CrudEntityContext ctx = new CrudEntityContext(mc);
+                    accessManager.applyRegisteredConstraints(ctx);
+                    return ctx.isCreatePermitted()
+                            && !hiddenEntityNames().contains(mc.getName());
+                });
     }
 
     /**
@@ -123,10 +174,14 @@ public class LlmExposurePolicy {
      * Wave 4+).
      */
     public boolean canUpdate(MetaClass mc) {
-        CrudEntityContext ctx = new CrudEntityContext(mc);
-        accessManager.applyRegisteredConstraints(ctx);
-        return ctx.isUpdatePermitted()
-                && !hiddenEntityNames().contains(mc.getName());
+        return RunContext.perTurnMemoize(
+                new CrudVerdictKey(mc.getName(), "update"),
+                () -> {
+                    CrudEntityContext ctx = new CrudEntityContext(mc);
+                    accessManager.applyRegisteredConstraints(ctx);
+                    return ctx.isUpdatePermitted()
+                            && !hiddenEntityNames().contains(mc.getName());
+                });
     }
 
     /**
