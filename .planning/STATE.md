@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: — Operator Experience, Voice Input & Runtime Performance
-status: phase_complete
-stopped_at: Phase 18 context gathered
-last_updated: "2026-06-09T02:37:07.343Z"
+status: Ready to execute
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-06-09T04:24:43.942Z"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 25
+  completed_plans: 21
   percent: 50
 ---
 
@@ -23,12 +23,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 17 — mutation-internals-hardening-phase-11-follow-up
+**Current focus:** Phase 18 — ai-runtime-performance-pass-targeted
 
 ## Current Position
 
-Phase: 17 (mutation-internals-hardening-phase-11-follow-up) — COMPLETE (5/5)
-Plan: 5 of 5 — done (MUT-18 parity gate GREEN; behavior parity HOLDS)
+Phase: 18 (ai-runtime-performance-pass-targeted) — EXECUTING
+Plan: 2 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
 | Field | Value |
@@ -276,6 +276,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase ?]: Plan 17-03: MutationAttributeBinder batch-loads to-one FK refs via one constrained .ids() per target class (two-pass prefetchReferences + coerceAttributes(prefetched) overload, no new collaborator D-06; single-arg delegates for create/update dedup D-07). MUT-16 forbidden-token scan GREEN; BulkSavePartialFailure 4/4 GREEN (MUT-18 parity). Fk SELECT-count test blocked by pre-existing agentstore-fixture @SpringBootTest boot regression at seedParent (test-harness, not implementation).
 - [Phase ?]: [Phase 17] Plan 17-04: extracted MutationGateChain canonical fail-closed spine (8 ordered gates enforceRole/resolve/authorize/reserve/coerce/guard/save/finalize, no @Transactional); five @Tool methods are thin adapters over execute(MutationRequest) on a sealed MutationRequest hierarchy; related-write id-parse/ensureInverseClearable moved to authorize (pre-reserve) + parent/child loads+guard in guard gate to preserve inline gate order; MUT-16 batch-FK prefetch + setDiscardSaved bulk path preserved verbatim; 106 mutation+perf tests green (MUT-18 parity), 3 MUT-15 invariants GREEN.
 - [Phase ?]: [Phase 17]: Plan 17-05 MUT-18 gate — behavior parity HOLDS; 106/0/0/2skip GREEN + 3 structural proxies GREEN + zero test-body edits. Phase 17 complete (5/5).
+- [Phase 18]: Plan 18-01: LlmExposurePolicy denylist memoized app-wide (single-sentinel-key ConcurrentHashMap + computeIfAbsent caching Collections.unmodifiableSet), evicted by new @EventListener(LlmExposureChangedEvent) onExposureChanged().clear() — eviction twin of RelatedWriteMetadataResolver. Immutable view (T-18-04) so the shared cache cannot be poisoned. NO @Cacheable (D-07 private self-invoked). D-06 branch: NO entity-name->MetaClass memo added (already off the immutable metamodel; D-10 scope discipline). ToolQueryCountBaselineTest:151 ceiling 5L->4L (line 151 only; assertions byte-for-byte). Two pure-JUnit proxies green (call-count + event-subscription invariant); the baseline @SpringBootTest cannot boot here due to the pre-existing Phase 11/13 AiAuditEvent metaclass regression (NOT this plan) — re-validate ceiling under D-11 isolated boot.
 
 ### Performance Metrics
 
@@ -355,6 +356,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 17 P02 | ~8 min | 1 tasks | 1 files | 2026-05-31
 | Phase 17 P03 | ~25 min | 1 tasks | 1 files |
 | Phase 17 P04 | ~40 min | 3 tasks | 3 files |
+| Phase 18 P18-01 | 14m | 2 tasks | 4 files |
 
 ### Quick Tasks Completed
 
@@ -364,9 +366,9 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-06-08T10:03:32.722Z
-**Stopped at:** Phase 18 context gathered
-**Resume file:** .planning/phases/18-ai-runtime-performance-pass-targeted/18-CONTEXT.md
+**Last session:** 2026-06-09T04:24:43.930Z
+**Stopped at:** Completed 18-01-PLAN.md
+**Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
 **Working-tree changes (uncommitted) carried:** docker-compose.yml + docker/postgres/init/01-init-databases.sh (local pgvector Postgres on host port 5432); jmix-app application-local.properties (new — `--spring.profiles.active=local` overrides datasource URLs to localhost:5432). Plus 16-04 test WIP (AiUiSettingsResolverReadThroughTest, TtlConfigSentinelSurvivesAiUiSettingsTest) stashed pre-merge. (Note: local dev runs on http://localhost:8088 — see memory project_local_dev_port; never auto-start bootRun.)
 **Next action:** Pop stash → continue Phase 16 Plan 04 wiring + tests → Plan 05+.

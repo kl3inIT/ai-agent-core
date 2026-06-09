@@ -182,7 +182,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 18-01-PLAN.md — PERF-02: memoize the exposure denylist app-wide inside LlmExposurePolicy (ConcurrentHashMap + @EventListener(LlmExposureChangedEvent) eviction); lower the ToolQueryCountBaselineTest SELECT ceiling (line 151 only) + call-count/event-subscription proxies
+- [x] 18-01-PLAN.md — PERF-02: memoize the exposure denylist app-wide inside LlmExposurePolicy (ConcurrentHashMap + @EventListener(LlmExposureChangedEvent) eviction); lower the ToolQueryCountBaselineTest SELECT ceiling (line 151 only) + call-count/event-subscription proxies
 - [ ] 18-04-PLAN.md — PERF-04: proxy-first characterization of the task-file Media encode/settings-read path; regression-lock if already once-per-(convId,taskFileId)-per-turn, else per-turn memo evicted on attach/delete/TTL + AiSettingsChangedEvent
 
 **Wave 2** *(blocked on Wave 1 completion — 18-02/18-03 reuse the Plan 01 denylist memo)*
@@ -226,7 +226,7 @@ Plans:
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 7/7 | Complete   | 2026-05-13 |
 | 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 5/5 | Complete   | 2026-05-31 |
-| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 0/? | Not started | - |
+| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 1/5 | In Progress|  |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |
 
 ## Notes
@@ -246,7 +246,7 @@ _(Phase 999.1 (mutation-internals hardening) and Phase 999.2 (Chat Voice Input �
 
 **Requirements:** TBD
 
-**Plans:** 5/5 plans complete
+**Plans:** 1/5 plans executed
 
 Plans:
 
