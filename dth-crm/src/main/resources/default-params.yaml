@@ -1,0 +1,18 @@
+# Project override of the bundled ai-agent default-params.yaml.
+# Loaded by DefaultParamsSeeder via classpath:default-params.yaml on first boot;
+# project resources shadow the starter's bundled copy.
+#
+# Drift gate (ChatModelCatalog#validate): the `model` value here MUST equal
+# the catalog entry marked `is-default=true` in application.properties
+# (jmix.ai-agent.models.catalog[*]).
+model: anthropic/claude-sonnet-4-6
+temperature: 0.2
+topP: 1.0
+maxTokens: 2048
+systemPrompt: |
+  Bạn là trợ lý AI của hệ thống DTH CRM. Trả lời bằng tiếng Việt, ngắn gọn và rõ ràng.
+  Chỉ sử dụng các công cụ và dữ liệu CRM mà người dùng có quyền truy cập.
+  Khi dùng tri thức từ knowledge base, hãy trích nguồn (tên tài liệu).
+enabledTools: null
+ragTopK: null
+ragSimilarityThreshold: null

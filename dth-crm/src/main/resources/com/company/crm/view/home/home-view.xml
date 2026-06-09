@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg://homeView.title" focusMode="NO_FOCUS">
+    <facets>
+        <settings id="settingsFacet" auto="true"/>
+    </facets>
+    <layout padding="false" classNames="dashboard-grid-container">
+        <gridLayout width="100%" classNames="dashboard-grid">
+            <vbox id="leftBox" classNames="dashboard-grid-main-content">
+                <formLayout id="leftContent" width="100%"/>
+            </vbox>
+
+            <vbox id="rightBox" classNames="dashboard-grid-secondary-content">
+                <formLayout id="rightContent"/>
+            </vbox>
+        </gridLayout>
+    </layout>
+</view>

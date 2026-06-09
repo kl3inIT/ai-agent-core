@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  # Main CRM data store
+  dthcrm-db:
+    image: postgres:16
+    container_name: dthcrm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dthcrm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5555:5432"
+    volumes:
+      - dthcrm-db-data:/var/lib/postgresql/data
+
+  # Agentstore for ai-agent add-on (requires pgvector)
+  dthcrm-agentstore:
+    image: pgvector/pgvector:pg16
+    container_name: dthcrm-agentstore
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agentstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5556:5432"
+    volumes:
+      - dthcrm-agentstore-data:/var/lib/postgresql/data
+
+volumes:
+  dthcrm-db-data:
+  dthcrm-agentstore-data:

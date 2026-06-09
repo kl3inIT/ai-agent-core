@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<menu-config xmlns="http://jmix.io/schema/flowui/menu">
+
+    <item view="HomeView" id="home" description="msg:///menu_config.home.description"
+          title="msg:///menu_config.home.title" icon="vaadin:home"/>
+
+    <separator/>
+
+    <item view="UserTask.list" id="tasks"
+          title="msg:///menu_config.tasks.title" icon="vaadin:check-square"/>
+
+    <menu opened="true" id="catalog"
+          title="msg:///menu_config.catalog.title" icon="vaadin:open-book">
+        <item view="Category.list" id="categories"
+              title="msg:///menu_config.catalog.categories.title" icon="vaadin:list-ul"/>
+        <item view="CategoryItem.list" id="products"
+              title="msg:///menu_config.catalog.categoryItems.title" icon="vaadin:cubes"/>
+    </menu>
+
+    <item view="Client.list" id="clients" title="msg:///menu_config.clients.title" icon="vaadin:users"/>
+
+    <item view="Order.list" id="orders" title="msg:///menu_config.orders.title" icon="vaadin:cart"/>
+
+    <menu opened="false" id="finance" title="msg:///menu_config.finance.title" icon="vaadin:pie-chart">
+        <item view="Invoice.list" id="invoices" title="msg:///menu_config.finance.invoices.title"
+              icon="vaadin:file-text"/>
+        <item view="Payment.list" id="payments" title="msg:///menu_config.finance.payments.title" icon="vaadin:wallet"/>
+    </menu>
+
+    <menu opened="false" id="administration"
+          description="msg:///menu_config.administration.description"
+          title="msg:///menu_config.administration.title" icon="vaadin:cog">
+        <item view="dynat_CategoryView.list" id="dynamic_attributes"
+              title="msg:///menu_config.administration.dynamic_attributes.title" icon="vaadin:table"/>
+        <item view="appSettings.view" id="app_settings"
+              title="msg:///menu_config.administration.app_settings.title" icon="vaadin:wrench"/>
+        <menu id="reports" title="msg:///menu_config.administration.reports.title" icon="vaadin:modal-list">
+            <item view="report_Report.list" title="msg:///menu_config.administration.reports.list.title"/>
+            <item view="report_ReportGroup.list" title="msg:///menu_config.administration.reports.group.title"/>
+            <item view="report_ReportRunView" title="msg:///menu_config.administration.reports.run.title"/>
+            <item view="report_ReportTableView" title="msg:///menu_config.administration.reports.table.title"/>
+        </menu>
+    </menu>
+
+    <separator/>
+
+    <menu id="ai-agent" title="msg://com.vn.agent/menu.addon" icon="vaadin:magic" opened="false">
+        <item view="AiAgent_Chat" id="ai-agent-chat"
+              title="msg://com.vn.agent/menu.chat" icon="vaadin:comments"/>
+        <item view="AiAgent_Conversation.list" id="ai-agent-conversations"
+              title="msg://com.vn.agent/menu.conversations" icon="vaadin:archive"/>
+        <item view="AiAgent_KnowledgeBase.list" id="ai-agent-knowledge"
+              title="msg://com.vn.agent/menu.knowledge" icon="vaadin:database"/>
+        <item view="AiAgent_Configuration" id="ai-agent-config"
+              title="msg://com.vn.agent/menu.configuration" icon="vaadin:cog"/>
+        <item view="AiAgent_AiAuditEvent.list" id="ai-agent-audit"
+              title="msg://com.vn.agent/menu.audit" icon="vaadin:eye"/>
+    </menu>
+</menu-config>

@@ -1,4 +1,5 @@
 rootProject.name = 'ai-agent-core'
 
 includeBuild 'jmix-app'
+includeBuild 'dth-crm'
 includeBuild 'ai-agent'

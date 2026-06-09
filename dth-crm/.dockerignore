@@ -1,0 +1,44 @@
+# build artefacts + node_modules
+# (Dockerfile.jar needs build/libs/dth-crm.jar — unblock that specific path)
+# build/ excluded — the COPY in Dockerfile.jar reads dth-crm.jar from the
+# root of the context, not from build/libs/, so we don't need to whitelist it.
+build
+**/build
+node_modules
+**/node_modules
+src/main/frontend/generated
+src/main/bundles
+vite.generated.ts
+pnpmfile.js
+webpack.generated.js
+
+# IDE / local dev
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+.run
+jmix-studio.xml
+
+# Jmix workspace state
+.gradle
+.jmix
+
+# git / CI metadata
+.git
+.gitignore
+.github
+
+# secrets / local config
+.env
+.env.*
+*.log
+
+# docker-related files (avoid context recursion)
+Dockerfile*
+docker-compose*.yml
+
+# OS / temp
+.DS_Store
+Thumbs.db
