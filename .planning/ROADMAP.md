@@ -188,7 +188,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion — 18-02/18-03 reuse the Plan 01 denylist memo)*
 
 - [x] 18-02-PLAN.md — PERF-01: add ONE per-turn RunContext ThreadLocal cache slot (safe-miss on foreign streaming threads, wiped in clear()); route LlmExposurePolicy CRUD verdicts + readable schema through it; call-count + cache-empty-after-clear + D-09 boundary invariant
-- [ ] 18-03-PLAN.md — PERF-03: build the RAG Filter.Expression once per retrieval reusing the PERF-02 denylist cache; clauses verbatim; times(1) call-count proxy + existing denylist test unchanged
+- [x] 18-03-PLAN.md — PERF-03: build the RAG Filter.Expression once per retrieval reusing the PERF-02 denylist cache; clauses verbatim; times(1) call-count proxy + existing denylist test unchanged
 
 **Wave 3** *(blocked on Waves 1–2 — cross-cutting close)*
 
@@ -226,7 +226,7 @@ Plans:
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 7/7 | Complete   | 2026-05-13 |
 | 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 5/5 | Complete   | 2026-05-31 |
-| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 3/5 | In Progress|  |
+| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 4/5 | In Progress|  |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |
 
 ## Notes
@@ -246,7 +246,7 @@ _(Phase 999.1 (mutation-internals hardening) and Phase 999.2 (Chat Voice Input �
 
 **Requirements:** TBD
 
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 

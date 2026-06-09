@@ -4,12 +4,12 @@ milestone: v1.2
 milestone_name: — Operator Experience, Voice Input & Runtime Performance
 status: Ready to execute
 stopped_at: Completed 18-04-PLAN.md
-last_updated: "2026-06-09T04:53:41.584Z"
+last_updated: "2026-06-09T05:00:34.340Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 24
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 18 (ai-runtime-performance-pass-targeted) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
 | Field | Value |
@@ -361,6 +361,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 18 P18-01 | 14m | 2 tasks | 4 files |
 | Phase 18 P04 | ~25m | 1 tasks | 2 files |
 | Phase 18 P18-02 | 30m | 2 tasks | 4 files |
+| Phase 18 P18-03 | 4min | 2 tasks | 2 files |
 
 ### Quick Tasks Completed
 
@@ -370,7 +371,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-06-09T04:53:28.152Z
+**Last session:** 2026-06-09T05:00:34.330Z
 **Stopped at:** Completed 18-04-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
