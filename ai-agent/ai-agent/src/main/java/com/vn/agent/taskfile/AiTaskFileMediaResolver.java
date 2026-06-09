@@ -151,6 +151,18 @@ public class AiTaskFileMediaResolver {
      * <p>Returns {@link Resolved#empty()} when {@code conversationId} is null or no
      * non-expired rows exist; the caller injects {@code .media(...)} only when
      * {@link Resolved#isEmpty()} is false.
+     *
+     * <p>[NOTE] Phase 18 PERF-04 (D-10 scope discipline): this method is invoked exactly
+     * ONCE per turn (both transports — {@code DefaultChatServiceImpl:350,617}, Phase 13.1
+     * Plan 03), and within it each kept row's blob is read through {@code FileStorage.openStream}
+     * exactly ONCE (the encode path is single-pass: image rows via {@link #buildMedia}, document
+     * rows via {@link #extractDocumentText}, both funnel through {@link #readFileBytes}). The
+     * per-file {@link Media} encode therefore already runs at most once per
+     * {@code (conversationId, taskFileId)} per turn — there is no in-turn re-serialization to
+     * dedupe. PERF-04 ships this as a REGRESSION LOCK (call-count proxy
+     * {@code TaskFileMediaEncodeOncePerTurnTest}) rather than adding a redundant per-turn
+     * {@code Media} cache (RESEARCH Open Q2 / Pitfall 5). Do NOT add a {@code Media} memo here
+     * unless a proxy first proves a second in-turn encode of the same file.
      */
     public Resolved resolveActive(UUID conversationId) {
         if (conversationId == null) {
