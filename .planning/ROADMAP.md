@@ -178,7 +178,21 @@ Plans:
   4. Task-file `Media` is encoded/resolved once per `(conversationId, taskFileId)` per turn (cache evicted on attachment add/delete/TTL) rather than re-encoded per injection; prompt/context is not re-serialized within a turn; FK batch-loading (shared with MUT-16) is in effect — each confirmed by a checkable proxy.
   5. No benchmark harness and no admin-screen perf work are introduced; each optimization ships with a checkable proxy (SELECT-count assertion via the test-scoped `datasource-proxy`, "1 query not N", or call-count assertion); the existing security / exposure / audit / tool / RAG test suites pass unchanged; an admin edit (via the Phase 16 change event) is visible within one turn.
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1**
+
+- [ ] 18-01-PLAN.md — PERF-02: memoize the exposure denylist app-wide inside LlmExposurePolicy (ConcurrentHashMap + @EventListener(LlmExposureChangedEvent) eviction); lower the ToolQueryCountBaselineTest SELECT ceiling (line 151 only) + call-count/event-subscription proxies
+- [ ] 18-04-PLAN.md — PERF-04: proxy-first characterization of the task-file Media encode/settings-read path; regression-lock if already once-per-(convId,taskFileId)-per-turn, else per-turn memo evicted on attach/delete/TTL + AiSettingsChangedEvent
+
+**Wave 2** *(blocked on Wave 1 completion — 18-02/18-03 reuse the Plan 01 denylist memo)*
+
+- [ ] 18-02-PLAN.md — PERF-01: add ONE per-turn RunContext ThreadLocal cache slot (safe-miss on foreign streaming threads, wiped in clear()); route LlmExposurePolicy CRUD verdicts + readable schema through it; call-count + cache-empty-after-clear + D-09 boundary invariant
+- [ ] 18-03-PLAN.md — PERF-03: build the RAG Filter.Expression once per retrieval reusing the PERF-02 denylist cache; clauses verbatim; times(1) call-count proxy + existing denylist test unchanged
+
+**Wave 3** *(blocked on Waves 1–2 — cross-cutting close)*
+
+- [ ] 18-05-PLAN.md — PERF-05: build-dependency invariant (no jmh/gatling/caffeine) + PERF-01..04 proxy-existence scan + admin-edit-visible-next-turn eviction test + full-suite gate (only allowed existing-test-body edit is ToolQueryCountBaselineTest.java:151)
 
 ### Phase 19: Chat Voice Input — Soniox STT (+ OpenAI fallback)
 
