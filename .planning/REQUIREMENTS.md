@@ -49,7 +49,7 @@ Six near-independent feature areas layered onto the shipped v1.1 agent harness w
 
 ### AI-Runtime Performance Pass (targeted)
 
-- [ ] **PERF-01**: Per-turn (single `RunContext`) memoization of `getReadableSchema()` / readable-entity metadata / `AccessManager` decisions / `LlmExposurePolicy` resolution — computed once and shared across all tool calls in the turn; nothing user/role/exposure-sensitive is reused across turns or users.
+- [x] **PERF-01**: Per-turn (single `RunContext`) memoization of `getReadableSchema()` / readable-entity metadata / `AccessManager` decisions / `LlmExposurePolicy` resolution — computed once and shared across all tool calls in the turn; nothing user/role/exposure-sensitive is reused across turns or users.
 - [x] **PERF-02**: Longer-lived memoization of pure-metadata derivations (entity name → `MetaClass`) and the exposure denylist (`getDenylistedEntityNames()`), with the denylist and any other exposure-derived cache evicted on `LlmExposureChangedEvent`; `AccessManager` remains authoritative for actual data access.
 - [ ] **PERF-03**: The RAG retrieval `Filter.Expression` (role/exposure scoping) is built once per retrieval rather than rebuilt repeatedly; the `(source_entity IS NULL) OR (NOT IN <denied>)` / role clauses are preserved verbatim (no "redundant clause" removal); the existing `RetrievalFilterBuilder` denylist test passes unchanged.
 - [x] **PERF-04**: Task-file `Media` is encoded/resolved once per `(conversationId, taskFileId)` per turn (cache evicted on attachment add/delete) rather than re-encoded per injection; prompt/context is not re-serialized within a turn; FK batch-loading (shared with MUT-16) is in effect.
@@ -128,7 +128,7 @@ Which phases cover which requirements.
 | MUT-16 | Phase 17 | Complete |
 | MUT-17 | Phase 17 | Complete |
 | MUT-18 | Phase 17 | Complete |
-| PERF-01 | Phase 18 | Pending |
+| PERF-01 | Phase 18 | Complete |
 | PERF-02 | Phase 18 | Complete |
 | PERF-03 | Phase 18 | Pending |
 | PERF-04 | Phase 18 | Complete |

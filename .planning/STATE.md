@@ -4,12 +4,12 @@ milestone: v1.2
 milestone_name: — Operator Experience, Voice Input & Runtime Performance
 status: Ready to execute
 stopped_at: Completed 18-04-PLAN.md
-last_updated: "2026-06-09T04:38:14.482Z"
+last_updated: "2026-06-09T04:53:41.584Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
 ## Current Position
 
 Phase: 18 (ai-runtime-performance-pass-targeted) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
 Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
 | Field | Value |
@@ -278,6 +278,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 - [Phase ?]: [Phase 17]: Plan 17-05 MUT-18 gate — behavior parity HOLDS; 106/0/0/2skip GREEN + 3 structural proxies GREEN + zero test-body edits. Phase 17 complete (5/5).
 - [Phase 18]: Plan 18-01: LlmExposurePolicy denylist memoized app-wide (single-sentinel-key ConcurrentHashMap + computeIfAbsent caching Collections.unmodifiableSet), evicted by new @EventListener(LlmExposureChangedEvent) onExposureChanged().clear() — eviction twin of RelatedWriteMetadataResolver. Immutable view (T-18-04) so the shared cache cannot be poisoned. NO @Cacheable (D-07 private self-invoked). D-06 branch: NO entity-name->MetaClass memo added (already off the immutable metamodel; D-10 scope discipline). ToolQueryCountBaselineTest:151 ceiling 5L->4L (line 151 only; assertions byte-for-byte). Two pure-JUnit proxies green (call-count + event-subscription invariant); the baseline @SpringBootTest cannot boot here due to the pre-existing Phase 11/13 AiAuditEvent metaclass regression (NOT this plan) — re-validate ceiling under D-11 isolated boot.
 - [Phase 18]: Plan 18-04 (PERF-04): proxy proved task-file Media encode (FileStorage.openStream) already runs once per (conversationId, taskFileId) per turn -> REGRESSION-LOCK branch (TaskFileMediaEncodeOncePerTurnTest, pure-JUnit/Mockito), NO Media cache added per D-10. Settings singleton read 3x/turn recorded as deferred settings-read observation, out of locked encode-cache scope. Constrained DataManager row load asserted; PerTurnMediaInjectionTest + budget/TTL tests unchanged (PerTurnMediaInjectionTest still hits the pre-existing Phase 11/13 @SpringBootTest boot regression, not introduced here).
+- [Phase ?]: [Phase 18]: Plan 18-02 (PERF-01): RunContext gains ONE active-turn-gated ThreadLocal per-turn cache slot wiped in clear(); LlmExposurePolicy canReadEntity/canCreate/canUpdate/getReadableSchema resolve once per turn via perTurnMemoize with locale-invariant CrudVerdictKey(metaClassName,operation). Off-turn = recompute-without-store (D-02 safe miss). getReadableSchema cached value deeply-immutable (Set.copyOf on inner attribute sets). D-09 boundary source-scan confines the cache symbol to RunContext+LlmExposurePolicy (absent from BuiltInDataTools).
 
 ### Performance Metrics
 
@@ -359,6 +360,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 | Phase 17 P04 | ~40 min | 3 tasks | 3 files |
 | Phase 18 P18-01 | 14m | 2 tasks | 4 files |
 | Phase 18 P04 | ~25m | 1 tasks | 2 files |
+| Phase 18 P18-02 | 30m | 2 tasks | 4 files |
 
 ### Quick Tasks Completed
 
@@ -368,7 +370,7 @@ Pending todo queue is now empty — all capture notes resolved and archived (see
 
 ## Session Continuity
 
-**Last session:** 2026-06-09T04:38:14.471Z
+**Last session:** 2026-06-09T04:53:28.152Z
 **Stopped at:** Completed 18-04-PLAN.md
 **Resume file:** None
 **Blockers:** Pre-existing Phase 11/13 Spring-context boot regression (atmosphere-runtime / agentstoreEntityManagerFactory) still affects module-level @SpringBootTest classes; documented in .planning/phases/13-chat-task-input-stt-task-scoped-file/deferred-items.md. v1.2 phases prefer XML/source-scan or pure-Mockito tests for UI/contract coverage where the boot context is implicated. ALSO: `:jmix-app:test` requires a running PostgreSQL (`agentstore`) datasource — fails with `org.postgresql.util.PSQLException: The connection attempt failed` in environments without one; logged in .planning/phases/15-right-sidebar-chat-surface-observability-ux/deferred-items.md. `:ai-agent:ai-agent:test` (HSQLDB/no-DB) is green.
