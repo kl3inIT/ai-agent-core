@@ -148,7 +148,7 @@ class ToolQueryCountBaselineTest {
      * is set to absorb the policy lookup plus a small margin for one extra meta query.
      * Independent of metamodel size — the slope test (R-03h) is the contractual N+1 detector.
      */
-    private static final long METAMODEL_TOOL_POLICY_LOOKUP_CEILING = 5L;
+    private static final long METAMODEL_TOOL_POLICY_LOOKUP_CEILING = 4L;
 
     @Test
     @DisplayName("list_entities runs at most one JDBC SELECT in steady state (metamodel + LlmExposurePolicy lookup)")
