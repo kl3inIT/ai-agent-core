@@ -112,7 +112,7 @@ public final class AgentSystemPromptRules {
 
     /**
      * Phase 11 MUT-10 mutation-tool rules. Appended to the system prompt ONLY when
-     * {@code ai-agent.tools.mutation.enabled=true}; the conditional gate lives in the sibling
+     * {@code jmix.ai-agent.tools.mutation.enabled=true}; the conditional gate lives in the sibling
      * top-level {@code @Component AgentSystemPromptRulesComposer} (NOT a nested static class —
      * the codebase has no precedent for nested {@code @Component}s and sibling top-level matches
      * existing structure).

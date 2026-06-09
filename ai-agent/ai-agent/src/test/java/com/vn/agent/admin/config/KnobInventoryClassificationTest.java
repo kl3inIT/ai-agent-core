@@ -90,7 +90,7 @@ class KnobInventoryClassificationTest {
         assertNotNull(mutationEnabled, "AiAgentMutationProperties.enabled must carry @KnobMetadata");
         assertEquals(KnobMetadata.Tier.TIER_2, mutationEnabled.tier());
         assertTrue(mutationEnabled.requiresRestart(),
-                "Tier-2 boot toggle ai-agent.tools.mutation.enabled MUST carry requiresRestart=true");
+                "Tier-2 boot toggle jmix.ai-agent.tools.mutation.enabled MUST carry requiresRestart=true");
 
         KnobMetadata titleEnabled = recordComponentAnnotation(
                 com.vn.agent.conversation.AiAgentTitleProperties.class, "enabled");

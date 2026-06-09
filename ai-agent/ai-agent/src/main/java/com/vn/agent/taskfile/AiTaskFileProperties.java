@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration properties for task-scoped chat file uploads, bound to
- * {@code ai-agent.task-file.*}. Picked up by {@code @ConfigurationPropertiesScan}
+ * {@code jmix.ai-agent.task-file.*}. Picked up by {@code @ConfigurationPropertiesScan}
  * on {@code AIConfiguration}.
  *
  * <p>Phase 13.1 contract:
@@ -30,7 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p><b>Security note:</b> no secrets are carried; {@code toString} is safe to log.
  */
-@ConfigurationProperties(prefix = "ai-agent.task-file")
+@ConfigurationProperties(prefix = "jmix.ai-agent.task-file")
 public class AiTaskFileProperties {
 
     /** TTL in seconds. Default 86400 (24h). Sentinel -1 = no TTL (skip cleanup-job purge). */

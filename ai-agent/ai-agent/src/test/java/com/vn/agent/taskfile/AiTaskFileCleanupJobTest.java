@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * </ol>
  */
 @SpringBootTest(classes = AITestConfiguration.class,
-        properties = {"ai-agent.task-file.ttl-seconds=3600"})
+        properties = {"jmix.ai-agent.task-file.ttl-seconds=3600"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class

@@ -3,7 +3,7 @@ package com.vn.agent.conversation;
 import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties("ai-agent.conversation-title")
+@ConfigurationProperties("jmix.ai-agent.conversation-title")
 public record AiAgentTitleProperties(
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
                 displayMessageKey = "bootConfig.knob.title.enabled")

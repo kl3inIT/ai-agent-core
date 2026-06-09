@@ -9,7 +9,7 @@ import org.springframework.util.StringUtils;
  * Phase 11 MUT-10 sibling top-level composer that selects between
  * {@link AgentSystemPromptRules#PROMPT_RULES} (read-only baseline, applied on every chat turn)
  * and {@code PROMPT_RULES + MUTATION_PROMPT_RULES} (when
- * {@code ai-agent.tools.mutation.enabled=true}).
+ * {@code jmix.ai-agent.tools.mutation.enabled=true}).
  *
  * <p>Wave-4 prompt composer call sites (currently {@code DefaultChatServiceImpl} blocking
  * {@code ask(...)} AND streaming {@code stream(...)} per Phase 9 P05) inject this and call
@@ -53,7 +53,7 @@ public class AgentSystemPromptRulesComposer {
     /**
      * @return the read-only {@link AgentSystemPromptRules#PROMPT_RULES} baseline, with
      *         {@link AgentSystemPromptRules#MUTATION_PROMPT_RULES} appended when
-     *         {@code ai-agent.tools.mutation.enabled=true}. Both constants begin and end with
+     *         {@code jmix.ai-agent.tools.mutation.enabled=true}. Both constants begin and end with
      *         {@code "\n"} so concatenation yields clean blank-line separators without callers
      *         needing to know the joining convention.
      */

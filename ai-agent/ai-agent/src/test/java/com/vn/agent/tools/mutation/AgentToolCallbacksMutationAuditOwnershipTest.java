@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Plan 11-10 Task 1 — single-audit-owner regression gate (HIGH review feedback for Plan 11-09).
  *
- * <p>With {@code ai-agent.tools.mutation.enabled=true}, {@link AgentToolCallbacks#forCurrentUser()}
+ * <p>With {@code jmix.ai-agent.tools.mutation.enabled=true}, {@link AgentToolCallbacks#forCurrentUser()}
  * must wrap mutation callbacks (create/update/add_related/remove_related) in
  * {@link MutationToolCallbackBoundaryDecorator} and NOT in
  * {@link ToolCallbackAuditDecorator}. This preserves the Plan 11-07C invariant:
@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * its own try/catch, so {@code safeWriteAudit} is not called — exactly one row, not two.
  */
 @SpringBootTest(classes = AITestConfiguration.class,
-        properties = {"ai-agent.tools.mutation.enabled=true"})
+        properties = {"jmix.ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class

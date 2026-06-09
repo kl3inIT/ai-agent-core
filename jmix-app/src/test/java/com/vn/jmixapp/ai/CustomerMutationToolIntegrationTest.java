@@ -27,7 +27,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "ai-agent.tools.mutation.enabled=true")
+@SpringBootTest(properties = "jmix.ai-agent.tools.mutation.enabled=true")
 @ActiveProfiles("test")
 class CustomerMutationToolIntegrationTest {
 

@@ -62,8 +62,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
-                "ai-agent.tools.mutation.enabled=true",
-                "ai-agent.tools.mutation.bulk-max-rows=200",
+                "jmix.ai-agent.tools.mutation.enabled=true",
+                "jmix.ai-agent.tools.mutation.bulk-max-rows=200",
                 "agentstore.liquibase.change-log=com/vn/agent/test_liquibase/test-agentstore-changelog.xml"
         })
 @ImportAutoConfiguration({

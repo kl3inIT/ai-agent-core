@@ -27,7 +27,7 @@ import java.util.Set;
  * Host-side reference intent proving the generic extraction engine against jmixapp_Customer.
  */
 @Component
-@ConditionalOnProperty(prefix = "ai-agent.intents.customer-reference",
+@ConditionalOnProperty(prefix = "jmix.ai-agent.intents.customer-reference",
         name = "enabled",
         havingValue = "true",
         matchIfMissing = true)

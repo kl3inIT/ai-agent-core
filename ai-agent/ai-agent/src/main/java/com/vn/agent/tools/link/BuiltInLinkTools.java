@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Always-on link generator tools (independent of {@code ai-agent.tools.mutation.enabled} per
+ * Always-on link generator tools (independent of {@code jmix.ai-agent.tools.mutation.enabled} per
  * Phase 11 D-05). Produces deep-link URLs for the host shell using {@link ViewRegistry}
  * routes and the {@link ServerProperties}-derived servlet context path.
  *

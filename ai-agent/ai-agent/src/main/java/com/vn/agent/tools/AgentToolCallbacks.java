@@ -41,7 +41,7 @@ import java.util.List;
  *       {@link ToolCallbackAuditDecorator} loop alongside the read-only {@link BuiltInDataTools}
  *       and host {@link ToolContributor} beans.</li>
  *   <li>{@link BuiltInMutationTools} is conditional on
- *       {@code ai-agent.tools.mutation.enabled=true}; the bean is absent from the context under
+ *       {@code jmix.ai-agent.tools.mutation.enabled=true}; the bean is absent from the context under
  *       default config. RESEARCH Q5 mandates {@link ObjectProvider} (NOT
  *       {@code @Autowired(required=false)} field injection — proxy / eager-init quirks make
  *       the field variant brittle). When the bean is absent
@@ -57,7 +57,7 @@ import java.util.List;
  * <p>D-09 callback counts:
  * <ul>
  *   <li>default (mutation off): 6 read + 2 link + 1 extraction = 9 callbacks.</li>
- *   <li>{@code ai-agent.tools.mutation.enabled=true}: 6 + 2 + 1 + 5 = 14 callbacks.</li>
+ *   <li>{@code jmix.ai-agent.tools.mutation.enabled=true}: 6 + 2 + 1 + 5 = 14 callbacks.</li>
  *   <li>NEVER: a {@code delete_record} callback under any property combination (D-07).</li>
  * </ul>
  */

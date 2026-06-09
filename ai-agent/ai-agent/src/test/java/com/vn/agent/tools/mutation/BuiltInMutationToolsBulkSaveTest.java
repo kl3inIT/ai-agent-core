@@ -61,7 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * REQUIRES_NEW reservation) to FULLY commit before the second call sees the row as COMMITTED.
  */
 @MutationIntegrationTest
-@TestPropertySource(properties = "ai-agent.tools.mutation.bulk-max-rows=100")
+@TestPropertySource(properties = "jmix.ai-agent.tools.mutation.bulk-max-rows=100")
 class BuiltInMutationToolsBulkSaveTest {
 
     private static final String FIXTURE_ENTITY = "mutationTest_MutationTestFixture";

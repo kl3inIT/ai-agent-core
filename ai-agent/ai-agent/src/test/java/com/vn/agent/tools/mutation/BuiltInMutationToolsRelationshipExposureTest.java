@@ -42,7 +42,7 @@ import static org.mockito.Mockito.verify;
  * is NEVER called.
  */
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
-        properties = {"ai-agent.tools.mutation.enabled=true"})
+        properties = {"jmix.ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class

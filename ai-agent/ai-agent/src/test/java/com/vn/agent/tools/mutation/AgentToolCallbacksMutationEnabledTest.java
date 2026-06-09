@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * properties.
  */
 @SpringBootTest(classes = AITestConfiguration.class,
-        properties = {"ai-agent.tools.mutation.enabled=true"})
+        properties = {"jmix.ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
@@ -78,8 +78,8 @@ class AgentToolCallbacksMutationEnabledTest {
  */
 @SpringBootTest(classes = AITestConfiguration.class,
         properties = {
-                "ai-agent.tools.mutation.enabled=true",
-                "ai-agent.tools.mutation.allowDelete=true"
+                "jmix.ai-agent.tools.mutation.enabled=true",
+                "jmix.ai-agent.tools.mutation.allowDelete=true"
         })
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

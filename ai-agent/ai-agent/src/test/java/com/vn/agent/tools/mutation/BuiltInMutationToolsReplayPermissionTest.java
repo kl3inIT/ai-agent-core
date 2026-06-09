@@ -45,7 +45,7 @@ import static org.mockito.Mockito.when;
  */
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
-                "ai-agent.tools.mutation.enabled=true",
+                "jmix.ai-agent.tools.mutation.enabled=true",
                 "main.liquibase.change-log=com/vn/agent/test_liquibase/test-main-changelog.xml",
                 "jmix.ai-agent.audit.hash-sensitive-fields=true",
                 "jmix.ai-agent.audit.sensitive-fields=secret"

@@ -29,7 +29,7 @@ public class AiExtractionDraftCleanupJob {
         this.dataManager = dataManager;
     }
 
-    @Scheduled(fixedDelayString = "${ai-agent.extraction.cleanup-interval-ms:3600000}")
+    @Scheduled(fixedDelayString = "${jmix.ai-agent.extraction.cleanup-interval-ms:3600000}")
     @Transactional("agentstoreTransactionManager")
     public void deleteExpiredDrafts() {
         OffsetDateTime now = OffsetDateTime.now();

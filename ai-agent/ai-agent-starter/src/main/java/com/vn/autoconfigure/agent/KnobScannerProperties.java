@@ -16,13 +16,13 @@ import java.util.Set;
  *
  * <p>Hosts shipping their own {@code @ConfigurationProperties} records under a
  * custom prefix opt them into the admin inventory via
- * {@code ai-agent.admin.knob-scanner.additional-prefixes=mycompany.custom.}
+ * {@code jmix.ai-agent.admin.knob-scanner.additional-prefixes=mycompany.custom.}
  * (trailing dot recommended for prefix safety).</p>
  *
  * <p>Self-introspection: this record is itself annotated as Tier-2 so the
  * scanner reports its own additional-prefixes knob alongside the rest.</p>
  */
-@ConfigurationProperties(prefix = "ai-agent.admin.knob-scanner")
+@ConfigurationProperties(prefix = "jmix.ai-agent.admin.knob-scanner")
 public record KnobScannerProperties(
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
                 displayMessageKey = "bootConfig.knob.knobScanner.additionalPrefixes")
