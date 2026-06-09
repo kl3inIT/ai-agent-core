@@ -226,7 +226,7 @@ Plans:
 | 15. Right-Sidebar Chat Surface & Observability UX | v1.2 | 6/6 | Complete   | 2026-05-12 |
 | 16. Admin Settings — Model Picker & Config-Knob Migration *(merged from old 16+17 on 2026-05-13)* | v1.2 | 7/7 | Complete   | 2026-05-13 |
 | 17. Mutation-Internals Hardening (Phase 11 follow-up) *(was 18)* | v1.2 | 5/5 | Complete   | 2026-05-31 |
-| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 5/5 | Complete   | 2026-06-09 |
+| 18. AI-Runtime Performance Pass (targeted) *(was 19)* | v1.2 | 5/5 | Complete    | 2026-06-09 |
 | 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) *(was 20)* | v1.2 | 0/? | Not started | - |
 
 ## Notes
