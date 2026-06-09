@@ -254,17 +254,19 @@ The canonical pure-JUnit + Mockito call-count style (sidesteps the boot regressi
 
 **All other claims are `[VERIFIED: codebase]` against the cited file:line.** The Spring AI threading assumption is the only `[ASSUMED]` item, and D-02's safe-miss design makes it non-load-bearing for correctness.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact `CacheKey` type for the per-turn slot.**
    - What we know: D-04 fixes the key *semantics* (`agent.permissions`/verdicts locale-invariant; `agent.entities` locale-bearing). The user delegated the concrete shape to researcher/planner.
    - What's unclear: whether to use a sealed-interface key, a record per cached kind, or a string-prefixed `Object` key.
    - Recommendation: a small `record` per cached kind (e.g. `ReadableSchemaKey(userId, Set<role>)`, `CrudVerdictKey(metaClassName, op)`) keyed in one `Map<Object,Object>`; keep locale out of the verdict keys, in the entities key. Planner's discretion (D-Discretion).
+   - **RESOLVED (Plan 18-02):** `record CrudVerdictKey(String metaClassName, String operation)` keyed without locale, plus a `ReadableSchemaKey` marker, in one per-turn `Map<Object,Object>` — matches the recommendation.
 
 2. **Does PERF-04 need a cache at all, or only a regression lock?**
    - What we know: `resolveActive` is already once-per-turn (`:350,617`); but *within* `resolveActive` each kept row reads `FileStorage`/Tika exactly once already (`:233-240`).
    - What's unclear: whether any in-turn path re-invokes encode for the same `(convId,taskFileId)`.
    - Recommendation: run the call-count proxy first (D-10 scope discipline). If no second encode occurs in a turn, ship the regression assertion and skip the cache; keep `PerTurnMediaInjectionTest` unchanged.
+   - **RESOLVED (Plan 18-04):** built as the proxy-first branch — run the encode call-count proxy, then ship a regression-lock if already once-per-turn, else a memo evicted on `AiSettingsChangedEvent(UI_SETTINGS)` + attachment add/delete/TTL.
 
 ## Environment Availability
 
