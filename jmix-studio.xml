@@ -74,6 +74,24 @@
           </option>
         </ModuleSettings>
       </entry>
+      <entry key="dth-crm.main">
+        <ModuleSettings>
+          <option name="dataStoreOptionsV2">
+            <map>
+              <entry key="agentstore">
+                <value>
+                  <DataStoreSettingsV2 />
+                </value>
+              </entry>
+              <entry key="main">
+                <value>
+                  <DataStoreSettingsV2 />
+                </value>
+              </entry>
+            </map>
+          </option>
+        </ModuleSettings>
+      </entry>
     </moduleSettings>
   </component>
 </project>

@@ -1,0 +1,77 @@
+# Production-ish stack: app + 2 Postgres (main CRM data, agentstore with pgvector).
+# Pull from GHCR or build locally. Secrets come from `.env` next to this file.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d
+#   docker compose -f docker-compose.prod.yml --env-file .env logs -f app
+#
+# Required env (.env):
+#   IMAGE_TAG=ghcr.io/<owner>/dth-crm:latest   # or your registry/tag
+#   POSTGRES_PASSWORD=<strong-password>
+#   OPENROUTER_API_KEY=sk-or-v1-...
+
+services:
+  db-main:
+    image: postgres:16
+    container_name: dthcrm-db-main
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dthcrm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - dthcrm-db-main:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dthcrm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-agentstore:
+    image: pgvector/pgvector:pg16
+    container_name: dthcrm-db-agentstore
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agentstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - dthcrm-db-agentstore:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentstore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ${IMAGE_TAG:-dth-crm:local}
+    container_name: dthcrm-app
+    restart: unless-stopped
+    depends_on:
+      db-main:
+        condition: service_healthy
+      db-agentstore:
+        condition: service_healthy
+    environment:
+      # main store
+      MAIN_DATASOURCE_URL: jdbc:postgresql://db-main:5432/dthcrm
+      MAIN_DATASOURCE_USERNAME: postgres
+      MAIN_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # agentstore
+      AGENTSTORE_DATASOURCE_URL: jdbc:postgresql://db-agentstore:5432/agentstore
+      AGENTSTORE_DATASOURCE_USERNAME: postgres
+      AGENTSTORE_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # AI provider
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?missing OPENROUTER_API_KEY}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.6-35b-a3b}
+      # profile
+      DTH_ACTIVE_PROFILE: prod
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - dthcrm-file-storage:/app/file-storage
+
+volumes:
+  dthcrm-db-main:
+  dthcrm-db-agentstore:
+  dthcrm-file-storage:

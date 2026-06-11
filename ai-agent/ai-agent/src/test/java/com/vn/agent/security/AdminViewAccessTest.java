@@ -51,9 +51,9 @@ class AdminViewAccessTest {
     }
 
     @Test
-    void deniesParametersListForNonAdmin() {
-        assertThat(permittedFor("alice", "AiAgent_Parameters.list"))
-                .as("Non-admin must NOT see Parameters list").isFalse();
+    void deniesParametersDetailForNonAdmin() {
+        assertThat(permittedFor("alice", "AiAgent_Parameters.detail"))
+                .as("Non-admin must NOT see Parameters detail").isFalse();
     }
 
     @Test
@@ -69,12 +69,6 @@ class AdminViewAccessTest {
     }
 
     @Test
-    void deniesBaselineContextForNonAdmin() {
-        assertThat(permittedFor("alice", "AiAgent_BaselineContext"))
-                .as("Non-admin must NOT see baseline context diagnostics").isFalse();
-    }
-
-    @Test
     void deniesAiConfigurationForNonAdmin() {
         assertThat(permittedFor("alice", "AiAgent_Configuration"))
                 .as("Non-admin must NOT see AI configuration").isFalse();
@@ -84,11 +78,10 @@ class AdminViewAccessTest {
     void allowsAdminViewsForAdmin() {
         assertThat(permittedFor("admin", "AiAgent_ChatDialog")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_Configuration")).isTrue();
-        assertThat(permittedFor("admin", "AiAgent_Parameters.list")).isTrue();
+        assertThat(permittedFor("admin", "AiAgent_Parameters.detail")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_KnowledgeBase.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.list")).isTrue();
         assertThat(permittedFor("admin", "AiAgent_AiAuditEvent.detailDialog")).isTrue();
-        assertThat(permittedFor("admin", "AiAgent_BaselineContext")).isTrue();
     }
 
     @Test

@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.tuple;
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
 })
 @Import({StubChatModelConfiguration.class, StubVectorStoreConfiguration.class})
-@TestPropertySource(properties = "ai-agent.conversation-title.enabled=false")
+@TestPropertySource(properties = "jmix.ai-agent.conversation-title.enabled=false")
 class ChatPanelFragmentSurfaceSwitchTest {
 
     private static final String USERNAME = "alice";

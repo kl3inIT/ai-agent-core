@@ -13,14 +13,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Phase 13.1 Plan 07 — REQ-1 / UI-01 CRM-style layout DOM regression.
+ * Inline-attachments layout DOM regression.
  *
- * <p>Asserts that the reshaped {@code chat-panel-fragment.xml} renders the documented
- * CRM split (left chat / right Attachments panel) with the correct slot ids, AND that
- * BOTH chat surface descriptors ({@code chat-view.xml} for FULL_ROUTE, {@code
- * chat-dialog-view.xml} for HEADER_BUTTON) compose the same {@link
- * com.vn.agent.view.chat.fragment.ChatPanelFragment} class so the layout is identical
- * regardless of which surface mounted it.
+ * <p>Asserts that {@code chat-panel-fragment.xml} renders the full-width chat column with
+ * the upload moved into the composer bar (the right-pane Attachments split was retired;
+ * files render inline as cards), AND that BOTH chat surface descriptors
+ * ({@code chat-view.xml} for FULL_ROUTE, {@code chat-dialog-view.xml} for HEADER_BUTTON)
+ * compose the same {@link com.vn.agent.view.chat.fragment.ChatPanelFragment} class so the
+ * layout is identical regardless of which surface mounted it.
  *
  * <p><b>Why XML descriptor parsing instead of {@code @UiTest}:</b> the module-level
  * {@code @SpringBootTest} boot regression documented in
@@ -44,59 +44,51 @@ class CrmStyleLayoutTest {
             "com.vn.agent.view.chat.fragment.ChatPanelFragment";
 
     @Test
-    void chatPanelFragmentRendersCrmStyleSplitWithRightPane() throws Exception {
+    void chatPanelFragmentRendersFullWidthChatWithComposerUpload() throws Exception {
         Document document = readDescriptor(FRAGMENT_DESCRIPTOR);
 
-        // 1. Horizontal split with splitterPosition=68 (CRM verbatim port).
-        Element split = elementById(document, "conversationSplit");
-        assertThat(split.getTagName()).isEqualTo("split");
-        assertThat(split.getAttribute("orientation")).isEqualTo("HORIZONTAL");
-        assertThat(split.getAttribute("splitterPosition")).isEqualTo("68");
+        // 1. The right-pane Attachments split is retired — chat is full-width now.
+        assertThat(elementByIdOrNull(document, "conversationSplit"))
+                .as("right-pane split must be gone (inline-attachments layout)")
+                .isNull();
+        assertThat(elementByIdOrNull(document, "attachmentsPanel"))
+                .as("permanent right-pane Attachments vbox must be gone")
+                .isNull();
+        assertThat(elementByIdOrNull(document, "attachmentsGridLayout"))
+                .as("right-pane card grid must be gone (files render inline)")
+                .isNull();
+        assertThat(elementByIdOrNull(document, "attachmentsEmptyState"))
+                .as("right-pane empty-state must be gone")
+                .isNull();
 
-        // 2. Left pane contains the chat column with messageListSlot + messageInputSlot.
-        Element chatPanel = elementById(document, "chatPanel");
-        assertThat(chatPanel.getTagName()).isEqualTo("vbox");
+        // 2. Full-width chat column substrate is preserved.
+        assertThat(elementByIdOrNull(document, "rootLayout"))
+                .as("rootLayout is the full-width chat column")
+                .isNotNull();
         assertThat(elementByIdOrNull(document, "messageListSlot"))
-                .as("messageListSlot is the substrate for mixed bubbles + NOTICE rows")
+                .as("messageListSlot is the substrate for chat bubbles + inline cards")
                 .isNotNull();
         assertThat(elementByIdOrNull(document, "messageInputSlot"))
                 .as("messageInputSlot remains the Phase 12 STT integration site")
                 .isNotNull();
 
-        // 3. Right pane is the Attachments vbox — REQ-7 slot id contract.
-        Element attachmentsPanel = elementById(document, "attachmentsPanel");
-        assertThat(attachmentsPanel.getTagName())
-                .as("Phase 12 ChatSurfaceMounter binds attachmentsPanel as a vbox slot")
-                .isEqualTo("vbox");
+        // 3. Upload moved into the composer bar next to the input — exactly one <upload>,
+        //    no deprecated receiverType, declarative cap preserved.
+        Element composerBar = elementById(document, "composerBar");
+        assertThat(composerBar.getTagName()).isEqualTo("hbox");
+        assertThat(document.getElementsByTagName("upload").getLength())
+                .as("exactly one upload control, now in the composer")
+                .isEqualTo(1);
+        Element taskFileUpload = elementById(document, "taskFileUpload");
+        assertThat(taskFileUpload.hasAttribute("receiverType"))
+                .as("UploadHandler.toFile path — no declarative receiverType")
+                .isFalse();
+        assertThat(taskFileUpload.getAttribute("maxFiles")).isEqualTo("10");
 
-        // 4. Right-pane child ids documented by SPEC §3.
-        assertThat(elementByIdOrNull(document, "attachmentsTitle"))
-                .as("right-pane title h3 (CRM verbatim slot id)")
-                .isNotNull();
-        assertThat(elementByIdOrNull(document, "attachmentsEmptyState"))
-                .as("empty-state vbox toggled on by refreshTaskFiles()")
-                .isNotNull();
-        assertThat(elementByIdOrNull(document, "attachmentsGridLayout"))
-                .as("right-pane gridLayout itemsContainer=taskFilesDc")
-                .isNotNull();
-        assertThat(elementByIdOrNull(document, "taskFileUpload"))
-                .as("XML id rename from Phase 13 'upload' to taskFileUpload")
-                .isNotNull();
-
-        // 5. NO chip-strip residue (attachRow / attachButton) anywhere in the document.
-        assertThat(elementByIdOrNull(document, "attachRow"))
-                .as("Phase 13 inline-upload row must be retired (D-29)")
-                .isNull();
-        assertThat(elementByIdOrNull(document, "attachButton"))
-                .as("Phase 13 paperclip button must be retired (D-29)")
-                .isNull();
-
-        // 6. Right-pane vbox must be a direct child of the split (CRM-verbatim shape).
-        List<Element> splitChildren = directElementChildren(split);
-        assertThat(splitChildren)
-                .as("split must contain exactly chatPanel (left) and attachmentsPanel (right)")
+        // 4. The composer bar holds the upload AND the message-input slot.
+        assertThat(directElementChildren(composerBar))
                 .extracting(e -> e.getAttribute("id"))
-                .containsExactly("chatPanel", "attachmentsPanel");
+                .containsExactly("taskFileUpload", "messageInputSlot");
     }
 
     @Test

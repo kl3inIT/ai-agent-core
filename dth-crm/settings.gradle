@@ -1,0 +1,9 @@
+rootProject.name = 'dth-crm'
+
+// Mirror of jmix-app: when opened standalone, include the sibling add-on build so
+// dth-crm resolves com.vn:ai-agent-starter from source instead of a published
+// SNAPSHOT. When included from the workspace root composite, gradle.parent is
+// non-null, so we skip re-including ai-agent and avoid duplicate entries.
+if (gradle.parent == null && file('../ai-agent').exists()) {
+    includeBuild '../ai-agent'
+}

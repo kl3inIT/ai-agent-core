@@ -52,7 +52,7 @@ import java.util.regex.Pattern;
  *   <li>A host {@code @ConfigurationProperties} without {@code @KnobMetadata}
  *       still appears in Tier-2 with {@code requiresRestart=true} IF its prefix
  *       matches the allowed list (extend via
- *       {@code ai-agent.admin.knob-scanner.additional-prefixes}).</li>
+ *       {@code jmix.ai-agent.admin.knob-scanner.additional-prefixes}).</li>
  *   <li>A property name matching the Tier-3 pattern from
  *       {@link AdminSecretPatternProperties#resolvedPatterns()} is masked as a
  *       Tier-3 secret indicator even if its declaring record forgot the

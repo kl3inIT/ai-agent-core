@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <menu-config xmlns="http://jmix.io/schema/flowui/menu">
 
-    <menu id="AI" title="msg://com.vn.agent/menu.addon" opened="true">
+    <menu id="AI" title="msg://com.vn.agent/menu.addon" opened="true" icon="vaadin:magic">
         <item id="aiAgent.chat" view="AiAgent_Chat"
-              title="msg://com.vn.agent/menu.chat"/>
+              title="msg://com.vn.agent/menu.chat" icon="vaadin:comments"/>
         <item id="aiAgent.conversations" view="AiAgent_Conversation.list"
-              title="msg://com.vn.agent/menu.conversations"/>
+              title="msg://com.vn.agent/menu.conversations" icon="vaadin:archives"/>
+        <separator/>
         <item id="aiAgent.configuration" view="AiAgent_Configuration"
-              title="msg://com.vn.agent/menu.configuration"/>
+              title="msg://com.vn.agent/menu.configuration" icon="vaadin:cog"/>
         <item id="aiAgent.knowledge.list" view="AiAgent_KnowledgeBase.list"
-              title="msg://com.vn.agent/menu.knowledge"/>
+              title="msg://com.vn.agent/menu.knowledge" icon="vaadin:book"/>
         <item id="aiAgent.audit.list" view="AiAgent_AiAuditEvent.list"
-              title="msg://com.vn.agent/menu.audit"/>
+              title="msg://com.vn.agent/menu.audit" icon="vaadin:clipboard-check"/>
     </menu>
 
 </menu-config>

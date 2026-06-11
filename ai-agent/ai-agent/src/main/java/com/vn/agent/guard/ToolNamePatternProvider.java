@@ -50,7 +50,7 @@ public class ToolNamePatternProvider {
      *   <li>6 read-only built-ins from {@code BuiltInDataTools} (v1.0).</li>
      *   <li>2 link tools from {@code BuiltInLinkTools} (Phase 11 Plan 11-08, always-on).</li>
      *   <li>4 mutation tools from {@code BuiltInMutationTools} (Phase 11 Plans 11-07A/B/C; only
-     *       registered as callbacks when {@code ai-agent.tools.mutation.enabled=true}, but the
+     *       registered as callbacks when {@code jmix.ai-agent.tools.mutation.enabled=true}, but the
      *       NAMES are scanned unconditionally so leakage in a default-config deployment would
      *       still flag — closes the tool-name leak gap on a property flip).</li>
      * </ul>

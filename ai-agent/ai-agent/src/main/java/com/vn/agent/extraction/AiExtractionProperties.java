@@ -5,10 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration properties for intent-extraction draft persistence, bound to
- * {@code ai-agent.extraction.*}. Picked up by {@code @ConfigurationPropertiesScan}
+ * {@code jmix.ai-agent.extraction.*}. Picked up by {@code @ConfigurationPropertiesScan}
  * and registered explicitly from {@code AIConfiguration}.
  */
-@ConfigurationProperties(prefix = "ai-agent.extraction")
+@ConfigurationProperties(prefix = "jmix.ai-agent.extraction")
 public class AiExtractionProperties {
 
     /** Draft TTL in seconds. Default 3600 (1h). */

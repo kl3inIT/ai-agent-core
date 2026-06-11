@@ -38,121 +38,136 @@
     border-left: 2px solid var(--lumo-contrast-30pct);
 }
 
-/* --- Phase 13.1 UAT-fix: NOTICE divider row ---------------------------------
+/* --- Inline attachment card (jmix-crm style) -------------------------------
  *
- * The NOTICE row is rendered as a plain <div class="ai-agent-attachment-notice">
- * sibling of the <vaadin-message-list> block. Plain-div substrate avoids the
- * default <vaadin-avatar> upload-arrow fallback that the prior
- * <vaadin-message class="attachment-event"> substrate exposed when no userName
- * was set. UI-SPEC §138 explicitly allows "alternatively a custom inline element".
+ * Uploaded files render inline in the timeline as AiTaskFileInlineCard
+ * (vaadin-card.ai-agent-attachment-card) anchored under the originating turn,
+ * replacing the retired right-pane Attachments grid. The card stays compact and
+ * left-aligned so it reads as an attachment chip rather than a chat bubble.
  */
-.ai-agent-attachment-notice {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--lumo-space-xs);
-    padding: var(--lumo-space-s) var(--lumo-space-m);
-    margin: var(--lumo-space-m) auto;
-    max-width: fit-content;
-    color: var(--lumo-primary-text-color);
-    font-size: var(--lumo-font-size-s);
-    font-weight: 500;
-    background: var(--lumo-primary-color-10pct);
-    border: 1px solid var(--lumo-primary-color-50pct);
-    border-radius: var(--lumo-border-radius-l);
-    box-shadow: var(--lumo-box-shadow-xs);
-}
-
-.ai-agent-attachment-notice::before {
-    content: "📎";
-    font-size: var(--lumo-font-size-m);
-    line-height: 1;
-}
-
-/* --- Phase 13.1 UAT-fix-02: responsive attachments grid + card -------------- */
-
-/* Right-pane card grid: single column inside the narrow right pane so cards
- * never overflow when the dialog is resized small. Each card stretches to the
- * pane width via card width="100%" + min-width:0 to allow inner content to
- * truncate instead of pushing the card wider than its container. */
-#attachmentsGridLayout {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--lumo-space-s);
-    align-content: start;
-}
-
-#attachmentsGridLayout > * {
-    min-width: 0;
-}
-
-#attachmentsGridLayout vaadin-card {
-    width: 100%;
+.ai-agent-attachment-card {
+    width: fit-content;
+    max-width: min(28rem, 90%);
+    margin: var(--lumo-space-xs) 0;
     box-sizing: border-box;
 }
 
-#attachmentsGridLayout vaadin-card h5,
-#attachmentsGridLayout vaadin-card .text-secondary {
+.ai-agent-attachment-card__name {
     overflow-wrap: anywhere;
     word-break: break-word;
 }
 
-/* Stack the action icons under the H5 filename when the right-pane is narrow,
- * preventing the card header from overflowing horizontally. The card's header
- * row uses flex by default; force-wrap is the cleanest cross-Vaadin solution. */
-#attachmentsGridLayout vaadin-card::part(header) {
+.ai-agent-attachment-card vaadin-card::part(header),
+.ai-agent-attachment-card::part(header) {
     flex-wrap: wrap;
     gap: var(--lumo-space-xs);
 }
 
-/* --- Phase 13.1: right-pane attachments dropzone ---------------------------- */
+/* --- Composer bar: compact attach control next to the MessageInput ---------- */
 
-vaadin-upload.attachments-dropzone {
-    margin-top: auto;
-    min-height: 8rem;
-    border: 1px dashed var(--lumo-contrast-30pct);
-    border-radius: var(--lumo-border-radius-m);
-    background: var(--lumo-contrast-5pct);
-    padding: var(--lumo-space-s);
+/* Title/toolbar gutter — the root layout is padding="false" (so the message list can
+ * run full-bleed), which left the title row flush against the panel/dialog edge
+ * ("sát"). Give it the same horizontal gutter as the composer below. */
+.ai-agent-chat-panel__toolbar {
+    padding: var(--lumo-space-s) var(--lumo-space-m) 0;
+    box-sizing: border-box;
 }
 
-vaadin-upload.attachments-dropzone::part(drop-label) {
+.ai-agent-chat-panel__composer {
+    padding: 0 var(--lumo-space-m) var(--lumo-space-s);
+}
+
+/* The MessageInput ships a default 5px top/bottom padding that made the text field +
+ * Send button sit ~5px higher than the "Đính kèm" attach button (the composer is
+ * vertically centered, but the extra padding still skewed the optical baseline). Zero the
+ * vertical padding so the input control and the attach button line up cleanly. */
+.ai-agent-chat-panel__composer vaadin-message-input {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+vaadin-upload.ai-agent-attachment-upload {
+    border: none;
+    background: transparent;
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+vaadin-upload.ai-agent-attachment-upload::part(drop-label) {
+    display: none;
+}
+
+/* Hide the upload's built-in file-chip list — uploaded files render as inline cards in
+ * the timeline instead (the default chip looked cramped next to the MessageInput). */
+vaadin-upload.ai-agent-attachment-upload vaadin-upload-file-list,
+vaadin-upload.ai-agent-attachment-upload [slot="file-list"] {
+    display: none;
+}
+
+/* --- Empty-chat starter-prompt suggestions --------------------------------- */
+
+.ai-agent-chat-panel__suggestions {
+    /* Horizontally centered empty-state (ChatGPT-style). messageListSlot is a flex column, so
+     * `margin: 0 auto` does NOT center a flex item horizontally — use `align-self: center`
+     * (the earlier margin-auto attempt is what made the panel drift). max-width keeps the cards
+     * comfortably readable on a wide full-page chat. */
+    align-self: center;
+    padding: var(--lumo-space-m);
+    margin: 0;
+    max-width: 52rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.ai-agent-chat-panel__suggestions-heading {
+    margin: 0 0 var(--lumo-space-s);
     color: var(--lumo-secondary-text-color);
-    font-size: var(--lumo-font-size-xs);
-    display: block;
-    width: 100%;
-    text-align: center;
-    white-space: normal;
-    margin-top: var(--lumo-space-xs);
+    font-size: var(--lumo-font-size-s);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
-vaadin-upload.attachments-dropzone::part(primary-buttons) {
-    width: 100%;
-    min-height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    gap: var(--lumo-space-xs);
-}
-
-.attachment-card-meta {
+.ai-agent-chat-panel__suggestions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--lumo-space-s);
 }
 
-.attachment-card-meta-separator {
-    opacity: 0.8;
+@media (max-width: 600px) {
+    .ai-agent-chat-panel__suggestions-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
-.attachment-card-source-icon {
-    width: 0.75rem;
-    height: 0.75rem;
+.ai-agent-chat-panel__suggestion-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lumo-space-xs);
+    padding: var(--lumo-space-m);
+    border: 1px solid var(--lumo-contrast-10pct);
+    border-radius: var(--lumo-border-radius-l);
+    background: var(--lumo-base-color);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.ai-agent-chat-panel__suggestion-card:hover {
+    border-color: var(--lumo-primary-color-50pct);
+    background: var(--lumo-primary-color-10pct);
+    box-shadow: var(--lumo-box-shadow-xs);
+}
+
+.ai-agent-chat-panel__suggestion-title {
+    font-weight: 600;
+    color: var(--lumo-header-text-color);
+    font-size: var(--lumo-font-size-s);
+}
+
+.ai-agent-chat-panel__suggestion-prompt {
     color: var(--lumo-secondary-text-color);
-}
-
-.attachment-card-source-text {
-    font-size: 0.7rem;
+    font-size: var(--lumo-font-size-xs);
+    line-height: 1.4;
 }
 
 /* --- Phase 14: intent card-row picker -------------------------------------- */
@@ -266,11 +281,10 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
  * Justified raw-CSS exception per D-01 (no new Vaadin theme / theme.json).
  *
  * Width: clamp(640px, 32vw, 760px) — replaces the malformed `clamp(420px, 32vw, 32vw)`
- * flagged in 15-REVIEWS point #4. The fragment's chat-panel-fragment.xml has a
- * <split orientation="HORIZONTAL" splitterPosition="68"> (68% chat / 32% attachments),
- * so 640px min ⇒ ~205px for the attachments pane — matching the project's ~200px
- * attachment-card note (cf. ChatSurfaceMounter.configureDialogWindow comment). 32vw
- * preferred; 760px cap on wide screens.
+ * flagged in 15-REVIEWS point #4. The chat panel is now full-width inside the sidebar
+ * (the right-pane Attachments split was retired; files render as inline cards), so the
+ * clamp just keeps the docked panel comfortably wide. 32vw preferred; 760px cap on
+ * wide screens.
  *
  * top: var(--lumo-size-xl, 3.5rem) — a Lumo size token used as the navbar-height
  * proxy with a 3.5rem fallback (this app's StandardMainView navbar is position:relative,
@@ -348,7 +362,9 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     justify-content: center;
     align-items: center;
     gap: var(--lumo-space-xs);
-    margin: var(--lumo-space-s) auto;
+    /* Left-aligned under the assistant turn (was centered, which read as misaligned vs. the
+     * left-aligned message bubbles). */
+    margin: var(--lumo-space-s) var(--lumo-space-m);
     padding: var(--lumo-space-xs) var(--lumo-space-m);
     width: fit-content;
     max-width: 60%;
@@ -368,12 +384,13 @@ vaadin-upload.attachments-dropzone::part(primary-buttons) {
     animation: ai-agent-status-pulse 1.2s steps(4, end) infinite;
 }
 
-/* Stream-progress bar lives in the messageInputSlot. Narrow it and center to match
- * the polished streaming-status pill above so the two surfaces feel like one indicator. */
+/* Stream-progress bar lives in the messageInputSlot. The old `width: 60%` +
+ * `max-width: 360px` + `margin: 0 auto` centered it, which read as misaligned ("lệch")
+ * next to the left-aligned status pill and input. Let it span the full input width
+ * (the component already calls setWidthFull) — a thin full-width bar above the input. */
 .ai-agent-chat-panel__stream-progress {
-    width: 60% !important;
-    max-width: 360px;
-    margin: 0 auto var(--lumo-space-xs);
+    width: 100% !important;
+    margin: 0 0 var(--lumo-space-xs);
     --vaadin-progress-bar-height: 3px;
 }
 

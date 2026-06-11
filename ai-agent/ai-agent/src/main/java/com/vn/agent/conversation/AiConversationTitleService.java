@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
-@ConditionalOnProperty(prefix = "ai-agent.conversation-title", name = "enabled",
+@ConditionalOnProperty(prefix = "jmix.ai-agent.conversation-title", name = "enabled",
         havingValue = "true", matchIfMissing = true)
 public class AiConversationTitleService {
 

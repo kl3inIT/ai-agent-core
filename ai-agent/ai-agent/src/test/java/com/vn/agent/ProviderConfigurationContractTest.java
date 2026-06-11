@@ -11,14 +11,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ProviderConfigurationContractTest {
 
+    // Demo host application.properties. jmix-app was retired in favour of dth-crm as the
+    // sole demo host; this contract now tracks the current host's provider wiring.
+    private static final String HOST_APPLICATION_PROPERTIES =
+            "dth-crm/src/main/resources/application.properties";
+
     @Test
     void applicationUsesOpenRouterBaseUrlAndSeparateChatEmbeddingModels() throws Exception {
-        Properties properties = loadProperties("jmix-app/src/main/resources/application.properties");
+        Properties properties = loadProperties(HOST_APPLICATION_PROPERTIES);
 
         assertThat(properties.getProperty("spring.ai.openai.base-url"))
                 .isEqualTo("https://openrouter.ai/api");
+        // The API key must be environment-injected (no literal default secret), regardless of
+        // the placeholder default the host chooses.
         assertThat(properties.getProperty("spring.ai.openai.api-key"))
-                .isEqualTo("${OPENROUTER_API_KEY:}");
+                .startsWith("${OPENROUTER_API_KEY:");
         assertThat(properties.getProperty("spring.ai.openai.chat.options.model"))
                 .isNotBlank();
         assertThat(properties.getProperty("spring.ai.openai.embedding.options.model"))
@@ -30,10 +37,10 @@ class ProviderConfigurationContractTest {
 
     @Test
     void applicationDoesNotHardcodeProviderSecret() throws Exception {
-        String source = read("jmix-app/src/main/resources/application.properties");
+        String source = read(HOST_APPLICATION_PROPERTIES);
 
         assertThat(source)
-                .contains("spring.ai.openai.api-key=${OPENROUTER_API_KEY:}")
+                .contains("spring.ai.openai.api-key=${OPENROUTER_API_KEY:")
                 .doesNotContain("spring.ai.openai.api-key=sk-");
     }
 

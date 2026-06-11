@@ -1,11 +1,12 @@
-# Local development database for ai-agent-core.
+# Local development database for ai-agent-core (single pgvector container, two DBs).
 #
 #   docker compose up -d
 #
-# Brings up PostgreSQL 16 with the pgvector extension and creates the two
-# databases the app needs: `ai-agent` (main store) and `agentstore` (AI store +
-# Spring AI pgvector table). Liquibase changelogs run on app boot and create the
-# schema; pgvector is enabled in agentstore by the init script.
+# Brings up PostgreSQL 18 with the pgvector extension and creates the two databases
+# the app needs in ONE container: `dthcrm` (the dth-crm host's main store) and
+# `agentstore` (the ai-agent add-on store + Spring AI pgvector table). Liquibase
+# changelogs run on app boot and create the schema; pgvector is enabled in
+# agentstore by the init script.
 #
 # Host port 5433: 5432 is held by another local docker Postgres, and 5555 is held
 # by a local SoftEther vpnserver (vpnserver_x64) over IPv4 which RSTs the Postgres
@@ -13,7 +14,7 @@
 
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
     container_name: ai-agent-postgres
     environment:
       POSTGRES_USER: postgres
@@ -22,7 +23,9 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ai-agent-pgdata:/var/lib/postgresql/data
+      # PG18+ images store data in a major-version subdir; mount the volume at
+      # /var/lib/postgresql (NOT /…/data) per docker-library/postgres#1259.
+      - ai-agent-pgdata:/var/lib/postgresql
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]

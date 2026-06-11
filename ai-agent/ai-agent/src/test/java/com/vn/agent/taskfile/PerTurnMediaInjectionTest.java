@@ -50,9 +50,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("integration")
 @SpringBootTest(classes = AITestConfiguration.class,
         properties = {
-                "ai-agent.task-file.ttl-seconds=86400",
-                "ai-agent.task-file.per-turn-max-files=10",
-                "ai-agent.task-file.per-turn-max-total-bytes=52428800"
+                "jmix.ai-agent.task-file.ttl-seconds=86400",
+                "jmix.ai-agent.task-file.per-turn-max-files=10",
+                "jmix.ai-agent.task-file.per-turn-max-total-bytes=52428800"
         })
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,

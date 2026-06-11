@@ -26,7 +26,7 @@ class ToolNavigationLeakScannerTest {
     private static final Path REPOSITORY_ROOT = resolveRepositoryRoot();
     private static final Path AGENT_MAIN_SOURCE = REPOSITORY_ROOT.resolve(
             "ai-agent/ai-agent/src/main/java");
-    private static final Path HOST_MAIN_SOURCE = REPOSITORY_ROOT.resolve("jmix-app/src/main/java");
+    private static final Path HOST_MAIN_SOURCE = REPOSITORY_ROOT.resolve("dth-crm/src/main/java");
     private static final Path EXTRACTION_TOOL_BRIDGE = AGENT_MAIN_SOURCE.resolve(
             "com/vn/agent/extraction/ExtractionToolBridge.java");
 
@@ -187,13 +187,13 @@ class ToolNavigationLeakScannerTest {
         Path cursor = currentDirectory;
         while (cursor != null) {
             if (Files.exists(cursor.resolve("ai-agent/ai-agent/src/main/java"))
-                    && Files.exists(cursor.resolve("jmix-app/src/main/java"))) {
+                    && Files.exists(cursor.resolve("dth-crm/src/main/java"))) {
                 return cursor;
             }
             if (Files.exists(cursor.resolve("src/main/java/com/vn/agent"))
                     && cursor.getParent() != null
                     && cursor.getParent().getParent() != null
-                    && Files.exists(cursor.getParent().getParent().resolve("jmix-app/src/main/java"))) {
+                    && Files.exists(cursor.getParent().getParent().resolve("dth-crm/src/main/java"))) {
                 return cursor.getParent().getParent();
             }
             cursor = cursor.getParent();

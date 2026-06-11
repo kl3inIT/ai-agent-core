@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
         properties = {
-                "ai-agent.tools.mutation.enabled=true",
+                "jmix.ai-agent.tools.mutation.enabled=true",
                 "jmix.ai-agent.audit.hash-sensitive-fields=true",
                 "jmix.ai-agent.audit.sensitive-fields=secret"
         })

@@ -140,7 +140,7 @@
                                 text="msg:///aiUiSettingsDetail.action.save"
                                 themeNames="primary"/>
                         <button id="resetTier1Button"
-                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                                text="msg:///aiConfiguration.action.reset"/>
                     </hbox>
                 </vbox>
             </tab>
@@ -164,7 +164,7 @@
                                 text="msg:///aiUiSettingsDetail.action.save"
                                 themeNames="primary"/>
                         <button id="resetGeneralButton"
-                                text="msg:///aiConfiguration.exposure.action.refresh"/>
+                                text="msg:///aiConfiguration.action.reset"/>
                     </hbox>
                 </vbox>
             </tab>

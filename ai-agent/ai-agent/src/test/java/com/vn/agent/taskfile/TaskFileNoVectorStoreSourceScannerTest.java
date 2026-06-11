@@ -65,15 +65,14 @@ class TaskFileNoVectorStoreSourceScannerTest {
             TASKFILE_SOURCE_ROOT.resolve("AiTaskFileMediaResolver.java");
 
     /**
-     * Phase 13.1 TEST-16-PORT: widened scope. Files outside the
-     * {@code com.vn.agent.taskfile} package that participate in the task-file
-     * pathway (the right-pane card renderer + the reshaped chat-panel fragment
-     * XML) are also asserted to be free of the forbidden tokens. Listed
-     * explicitly because they live outside the package walk root.
+     * TEST-16-PORT: widened scope. Files outside the {@code com.vn.agent.taskfile}
+     * package that participate in the task-file pathway (the inline attachment card +
+     * the chat-panel fragment XML) are also asserted to be free of the forbidden
+     * tokens. Listed explicitly because they live outside the package walk root.
      */
     private static final List<Path> EXTRA_TASKFILE_SCOPE = List.of(
             Path.of("src", "main", "java", "com", "vn", "agent", "view", "chat", "fragment",
-                    "AiTaskFileCardFragmentRenderer.java"),
+                    "AiTaskFileInlineCard.java"),
             Path.of("src", "main", "resources", "com", "vn", "agent", "view", "chat", "fragment",
                     "chat-panel-fragment.xml")
     );

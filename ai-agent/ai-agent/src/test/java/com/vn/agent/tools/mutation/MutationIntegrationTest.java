@@ -18,7 +18,7 @@ import java.lang.annotation.Target;
  *
  * <p>Consolidates the boilerplate that was copy-pasted across the mutation test suite
  * ({@code @SpringBootTest(classes=…) + @ImportAutoConfiguration(…) + @Import(…)} with
- * {@code ai-agent.tools.mutation.enabled=true}). Because every test that uses THIS annotation
+ * {@code jmix.ai-agent.tools.mutation.enabled=true}). Because every test that uses THIS annotation
  * declares an identical {@code MergedContextConfiguration}, Spring's test context cache reuses a
  * SINGLE application context across all of them instead of rebooting Jmix + the agentstore
  * datastore once per class — the dominant cost in the suite's wall-clock.
@@ -33,7 +33,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
-        properties = {"ai-agent.tools.mutation.enabled=true"})
+        properties = {"jmix.ai-agent.tools.mutation.enabled=true"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class

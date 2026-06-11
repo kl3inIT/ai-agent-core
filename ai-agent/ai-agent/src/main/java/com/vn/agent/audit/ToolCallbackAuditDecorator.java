@@ -11,60 +11,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.definition.ToolDefinition;
-import org.springframework.lang.NonNull;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.UUID;
 
 /**
- * Wraps a delegate {@link ToolCallback} so every tool invocation persists a PRE row eagerly
- * (before the delegate runs) and a POST row in {@code finally} with the real outcome + latency
- * (AUD-04). Both writes go through the {@link AuditWriter} REQUIRES_NEW bean, so the rows
- * survive even when the delegate throws AND its own transaction rolls back (AUD-02).
+ * Wraps a delegate {@link ToolCallback} so every tool invocation persists a POST row in
+ * {@code finally} with the real outcome + latency (AUD-04). The write goes through the
+ * {@link AuditWriter} REQUIRES_NEW bean, so the row survives even when the delegate throws AND
+ * its own transaction rolls back (AUD-02).
  *
- * <p><b>Not a Spring @Component.</b> Instantiated per-callback by {@code AgentToolCallbacks}
- * (Plan 04-04). No {@code @Transactional} annotation on this class — the durability guarantee
- * comes from the injected {@link AuditWriter} proxy, not from the decorator.
+ * <p>Shared tool-context / streaming / identity plumbing lives in
+ * {@link AbstractToolCallbackAuditDecorator}; this subclass owns the generic per-call audit
+ * write, the {@code shouldWriteGenericAudit} carve-out (so self-auditing tools like
+ * {@code prepare_form_draft} are not double-audited), and the structured-payload streaming
+ * extraction.
  *
  * <p><b>Plan 07-02 streaming extension (RESEARCH Open Q#2 RESOLVED).</b> When a streaming run
- * is active ({@code ChatService.stream(...)} path registered a {@link StreamingSinkHolder}
- * entry for the current {@link RunContext#get()} runId), each tool invocation also emits
- * {@link StreamingEvent.ToolCall} on entry and {@link StreamingEvent.ToolResult} on exit to
- * the active sink — interleaved with Content chunks in the ChatView Flux so the UI can render
- * live tool-call cards (D-08). Blocking {@code ask(...)} path is unchanged: the sink lookup
- * returns empty and {@code ifPresent(...)} is a no-op, preserving Phase-4 semantics.</p>
+ * is active, each tool invocation emits {@link StreamingEvent.ToolCall} on entry and
+ * {@link StreamingEvent.ToolResult} on exit so the UI can render live tool-call cards (D-08).
+ * Blocking {@code ask(...)} path is unchanged: the sink lookup returns empty and the emit is a
+ * no-op, preserving Phase-4 semantics.</p>
  */
-public class ToolCallbackAuditDecorator implements ToolCallback {
+public class ToolCallbackAuditDecorator extends AbstractToolCallbackAuditDecorator {
 
     private static final Logger log = LoggerFactory.getLogger(ToolCallbackAuditDecorator.class);
-
-    /** Cap on {@code resultSummary} written into the LOB column — keeps rows reasonable. */
-    static final int RESULT_SUMMARY_MAX_CHARS = 4096;
-
-    /** Cap on {@code argumentsJson} (model-supplied tool input) written into the LOB column (MD-04). */
-    static final int ARGUMENTS_JSON_MAX_CHARS = 4096;
-
-    /** Suffix appended when a captured value is truncated, so the truncation is observable. */
-    static final String TRUNCATION_SUFFIX = "…[truncated]";
 
     private static final String PREPARE_FORM_DRAFT_TOOL = "prepare_form_draft";
     private static final String OPEN_FORM_WITH_DRAFT_ACTION = "open_form_with_draft";
     private static final String PROPOSE_ACTION_CHOICES_TOOL = "propose_action_choices";
     private static final String SHOW_ACTION_CHOICES_ACTION = "show_action_choices";
     private static final ObjectMapper STRUCTURED_PAYLOAD_OBJECT_MAPPER = new ObjectMapper();
-
-    private static String cap(String value, int maxChars) {
-        if (value == null || value.length() <= maxChars) {
-            return value;
-        }
-        return value.substring(0, maxChars) + TRUNCATION_SUFFIX;
-    }
-
-    private final ToolCallback delegate;
-    private final AuditWriter auditWriter;
-    private final CurrentAuthentication currentAuthentication;
-    private final StreamingSinkHolder streamingSinkHolder;
 
     /**
      * Phase-4 constructor preserved for non-streaming callers; delegates to the Plan-07-02
@@ -85,31 +61,11 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
                                       AuditWriter auditWriter,
                                       CurrentAuthentication currentAuthentication,
                                       StreamingSinkHolder streamingSinkHolder) {
-        this.delegate = delegate;
-        this.auditWriter = auditWriter;
-        this.currentAuthentication = currentAuthentication;
-        this.streamingSinkHolder = streamingSinkHolder;
+        super(delegate, auditWriter, currentAuthentication, streamingSinkHolder);
     }
 
     @Override
-    @NonNull
-    public ToolDefinition getToolDefinition() {
-        return delegate.getToolDefinition();
-    }
-
-    @Override
-    @NonNull
-    public String call(@NonNull String toolInput) {
-        return callInternal(toolInput, null, false);
-    }
-
-    @Override
-    @NonNull
-    public String call(@NonNull String toolInput, ToolContext toolContext) {
-        return callInternal(toolInput, toolContext, true);
-    }
-
-    private String callInternal(String toolInput, ToolContext toolContext, boolean useContextOverload) {
+    protected String callInternal(String toolInput, ToolContext toolContext, boolean useContextOverload) {
         UUID runId = resolveRunId(toolContext);          // may be null if invoked outside a chat call (defensive)
         String userUsername = resolveUserUsername();
         UUID conversationId = resolveConversationId(toolContext);
@@ -200,60 +156,5 @@ public class ToolCallbackAuditDecorator implements ToolCallback {
             return null;
         }
         return null;
-    }
-
-    private static UUID resolveRunId(ToolContext toolContext) {
-        UUID runId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_RUN_ID_KEY);
-        return runId != null ? runId : RunContext.get();
-    }
-
-    private static UUID resolveConversationId(ToolContext toolContext) {
-        UUID conversationId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY);
-        return conversationId != null ? conversationId : RunContext.getConversationId();
-    }
-
-    private static UUID uuidFromToolContext(ToolContext toolContext, String key) {
-        if (toolContext == null || toolContext.getContext() == null) {
-            return null;
-        }
-        Object raw = toolContext.getContext().get(key);
-        if (raw instanceof UUID uuid) {
-            return uuid;
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return UUID.fromString(text);
-            } catch (IllegalArgumentException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Plan 07-02 bridge: emit a lifecycle event into the request-scoped
-     * {@link StreamingSinkHolder} sink if one exists for the current thread's runId.
-     * Non-streaming callers (and callers outside {@code ChatService.stream(...)}) see a no-op
-     * — zero behavior change for the Phase-4 blocking path.
-     */
-    private void emitToolEvent(UUID runId,
-                               java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
-        if (streamingSinkHolder == null) {
-            return;
-        }
-        try {
-            streamingSinkHolder.currentOrForRun(runId).ifPresent(emitter);
-        } catch (RuntimeException ex) {
-            log.debug("Streaming tool-event emission failed; continuing with audit-only path", ex);
-        }
-    }
-
-    private String resolveUserUsername() {
-        try {
-            UserDetails user = currentAuthentication.getUser();
-            return user != null ? user.getUsername() : "anonymous";
-        } catch (RuntimeException anon) {
-            return "anonymous";
-        }
     }
 }

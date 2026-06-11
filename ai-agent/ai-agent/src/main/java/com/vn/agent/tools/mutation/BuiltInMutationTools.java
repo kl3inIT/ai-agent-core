@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * LLM-mediated mutation tool surface (Phase 11). Conditional via
- * {@code @ConditionalOnProperty(prefix="ai-agent.tools.mutation", name="enabled",
+ * {@code @ConditionalOnProperty(prefix="jmix.ai-agent.tools.mutation", name="enabled",
  * havingValue="true")} — default OFF. When the bean is absent, no mutation callbacks are
  * registered with {@code AgentToolCallbacks.forCurrentUser} (TEST-13 boot assertion).
  *
@@ -54,7 +54,7 @@ import java.util.Map;
  * {@link MutationErrorTranslator} (which rebuilds canned safe templates).
  */
 @Component
-@ConditionalOnProperty(prefix = "ai-agent.tools.mutation",
+@ConditionalOnProperty(prefix = "jmix.ai-agent.tools.mutation",
         name = "enabled", havingValue = "true")
 public class BuiltInMutationTools {
 

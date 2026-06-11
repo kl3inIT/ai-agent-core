@@ -56,7 +56,7 @@ class AiConversationTitleServiceTest {
                 ConditionalOnProperty.class);
 
         assertThat(conditional).isNotNull();
-        assertThat(conditional.prefix()).isEqualTo("ai-agent.conversation-title");
+        assertThat(conditional.prefix()).isEqualTo("jmix.ai-agent.conversation-title");
         assertThat(conditional.name()).containsExactly("enabled");
         assertThat(conditional.havingValue()).isEqualTo("true");
         assertThat(conditional.matchIfMissing()).isTrue();

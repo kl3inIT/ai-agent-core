@@ -55,6 +55,7 @@ v1.1.0 turned the read-only MVP into a mutation-capable, governance-aware, multi
 - ✓ Chat task file: `AiTaskFile` transient entity (structurally disjoint from KB ingestion), attach UI, Spring AI `Media` injection, `bulk_save_records` tool (one transaction, batch idempotency), default chat model swap to multimodal `qwen/qwen3.6-35b-a3b` (Apache-2.0, self-hostable) — v1.1.0 / Phase 13 (TASK-01..06, ENT-07, MUT-14, SEC-06 partial, TEST-16)
 - ✓ Chat attachments CRM-style right-pane + persistent multi-turn context: jmix-crm right-pane port (card grid + drop-zone + empty state), per-turn-all `Media` injection with LRU token-budget cap + `task_file_budget_exceeded` audit, conversation-scoped 24h TTL, inline `[user] added attachment` notice rows — v1.1.0 / Phase 13.1 (UI-01, RES-01, AUDIT-01, LIFE-01, UX-01, SCHEMA-01, CONTRACT-01, TEST-16-PORT, I18N-01)
 - ✓ Intent-driven extraction → prefilled Jmix forms: `IntentExtractor<T>` SPI + `IntentRegistry` + prompt-only `MetaClassDtoSynthesizer`, persisted `AiExtractionDraft` (owner-scoped, TTL, hidden from the LLM), `prepare_form_draft` + server-validated `propose_action_choices` tools, chat-rendered confirm/action rows, controller-side-only navigation (`OpenFormWithDraftHandler`), permission-gated `setValueIfPermitted` prefill, host `CustomerDraftIntentExtractor` reference; LLM never receives `ViewNavigators` or any UI-mutation primitive — v1.1.0 / Phase 14 (EXTRACT-01..10, ENT-08, SPI-12, SEC-06 partial, TEST-15)
+- ✓ AI-runtime performance pass (targeted): per-turn memoization anchored to one `RunContext` ThreadLocal slot (active-turn-gated safe-miss, wiped in `clear()`) routing `LlmExposurePolicy` CRUD verdicts + readable schema; app-wide denylist `ConcurrentHashMap`+`computeIfAbsent` (immutable view) evicted on `@EventListener(LlmExposureChangedEvent)`; RAG `Filter.Expression` built once per retrieval (clauses verbatim); task-file `Media` encode regression-locked once-per-`(conversationId, taskFileId)`-per-turn (D-10 proxy-first, no cache added); one checkable proxy per optimization; `ToolQueryCountBaselineTest` SELECT ceiling lowered (line 151 only); no benchmark harness / Caffeine / admin-screen perf / new component; all existing security/exposure/audit/tool/RAG suites unchanged (865 tests green) — v1.2 / Phase 18 (PERF-01..05)
 
 ### Active
 
@@ -65,7 +66,7 @@ v1.2 — Operator Experience, Voice Input & Runtime Performance (REQ-IDs assigne
 - [ ] Admin model management: curated common-model dropdown + custom model-name free-entry in admin Parameters/Settings UI; admin-only.
 - [ ] Admin config-knob migration: surface operator-relevant prior-phase properties knobs as editable `AiParameters` / admin UI settings.
 - [ ] Phase 11 mutation-internals hardening: dedup gate sequencing, batch-load to-one FK refs during binding, cache related-write metadata. (Promotes ROADMAP Backlog Phase 999.1.)
-- [ ] AI-runtime performance pass (targeted): chat turn execution, tool calls, mutation binding/save, media/attachment injection, RAG retrieval/filter building, prompt/context construction, repeated metadata/security/exposure-policy resolution.
+- [x] AI-runtime performance pass (targeted): chat turn execution, tool calls, mutation binding/save, media/attachment injection, RAG retrieval/filter building, prompt/context construction, repeated metadata/security/exposure-policy resolution. — ✓ Validated in Phase 18 (PERF-01..05), 2026-06-09
 
 ### Deferred (carried to v1.3+ / later hardening pass)
 
@@ -165,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-11 — milestone v1.2 (Operator Experience, Voice Input & Runtime Performance) started*
+*Last updated: 2026-06-09 — Phase 18 (AI-Runtime Performance Pass, targeted) complete: PERF-01..05 validated*

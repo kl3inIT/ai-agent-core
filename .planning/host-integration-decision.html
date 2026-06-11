@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chọn cách tích hợp dth-crm ↔ ai-agent addon</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --line:#2a2f3a; --ink:#e6e9ef; --mut:#9aa3b2;
+    --good:#3fb950; --warn:#d29922; --bad:#f85149; --accent:#58a6ff; --accent2:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:32px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:var(--mut);margin:0 0 24px;font-size:14px}
+  .reality{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent2);border-radius:10px;padding:16px 18px;margin-bottom:24px}
+  .reality b{color:var(--accent2)}
+  .reality code{background:#0b0d11;padding:1px 6px;border-radius:5px;color:#e6e9ef;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .opt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden;display:flex;flex-direction:column}
+  .opt.win{border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset}
+  .opt h2{font-size:15px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .tag{font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:20px;text-transform:uppercase}
+  .tag.rec{background:rgba(63,185,80,.15);color:var(--good);border:1px solid rgba(63,185,80,.4)}
+  .tag.no{background:rgba(248,81,73,.12);color:var(--bad);border:1px solid rgba(248,81,73,.35)}
+  .tag.ok{background:rgba(210,153,34,.12);color:var(--warn);border:1px solid rgba(210,153,34,.35)}
+  .body{padding:12px 16px;flex:1}
+  .body .what{color:var(--mut);font-size:13px;margin:0 0 12px;min-height:54px}
+  ul{margin:0;padding:0;list-style:none;font-size:13px}
+  li{padding:3px 0 3px 20px;position:relative}
+  li.p::before{content:"▲";color:var(--good);position:absolute;left:0;font-size:10px;top:5px}
+  li.c::before{content:"▼";color:var(--bad);position:absolute;left:0;font-size:10px;top:5px}
+  .meter{display:flex;gap:4px;padding:10px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--mut);flex-wrap:wrap}
+  .pill{background:#0b0d11;border:1px solid var(--line);border-radius:20px;padding:2px 9px}
+  .verdict{margin-top:24px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .verdict b{color:var(--good)}
+  .cmd{background:#0b0d11;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:8px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:#c9d3e0;white-space:pre-wrap}
+  .cmd .k{color:var(--accent)} .cmd .s{color:#7ee787}
+</style>
+</head>
+<body>
+  <h1>dth-crm ↔ ai-agent addon — chọn cách tích hợp / dev workflow</h1>
+  <p class="sub">Mục tiêu: dùng <b>dth-crm</b> làm host để phát triển &amp; kiểm thử addon, thay cho <code>jmix-app</code> demo.</p>
+
+  <div class="reality">
+    <b>Thực trạng đã khảo sát:</b> Kiến trúc đã đúng chuẩn addon.
+    <code>ai-agent-core</code> = project addon (publish <code>com.vn:ai-agent-starter:1.1.1-SNAPSHOT</code> ra Nexus).
+    <code>dth-crm</code> = app thật (Jmix 2.8.1), <b>đã wire đầy đủ</b> (agentstore+pgvector, Spring AI/OpenRouter, catalog model, prompt tiếng Việt) và <b>đã consume addon</b> + bắc cầu bằng <code>CrmReportToolContributor</code> (SPI <code>ToolContributor</code>). dth-crm dựng trên jmix-crm sample (<code>com.company.crm.*</code>, 218 file). Coords addon khớp <code>com.vn:ai-agent-starter</code> ⇒ rất hợp composite build.
+  </div>
+
+  <div class="grid">
+    <div class="opt win">
+      <h2>A. Composite build <span class="tag rec">Khuyến nghị</span></h2>
+      <div class="body">
+        <p class="what">dth-crm/settings.gradle thêm <code>includeBuild('../ai-agent-core/ai-agent')</code>. Gradle tự thay dependency Nexus bằng source addon local.</p>
+        <ul>
+          <li class="p">Sửa addon → chạy dth-crm → áp dụng ngay, KHÔNG publish</li>
+          <li class="p">0 dòng port; addon vẫn release độc lập</li>
+          <li class="p">Prod/CI vẫn lấy từ Nexus (bỏ includeBuild là xong)</li>
+          <li class="p">jmix-app giữ nguyên làm test host của addon</li>
+          <li class="c">2 repo song song; cần cùng Jmix/Spring AI version (đang khớp)</li>
+        </ul>
+      </div>
+      <div class="meter"><span class="pill">Vòng lặp: tức thì</span><span class="pill">Rủi ro: thấp</span><span class="pill">Port: 0</span></div>
+    </div>
+
+    <div class="opt">
+      <h2>B. Publish loop <span class="tag ok">Status quo</span></h2>
+      <div class="body">
+        <p class="what">Giữ nguyên: <code>publishToMavenLocal</code> / push snapshot Nexus, dth-crm <code>changing=true</code> kéo về.</p>
+        <ul>
+          <li class="p">Cô lập tuyệt đối; giống prod</li>
+          <li class="p">Không đổi gì cấu hình</li>
+          <li class="c">Mỗi thay đổi phải publish lại → chậm</li>
+          <li class="c">Dễ lệch version cache, khó debug</li>
+        </ul>
+      </div>
+      <div class="meter"><span class="pill">Vòng lặp: chậm</span><span class="pill">Rủi ro: thấp</span><span class="pill">Port: 0</span></div>
+    </div>
+
+    <div class="opt">
+      <h2>C. Port dth-crm vào đây <span class="tag no">Không nên</span></h2>
+      <div class="body">
+        <p class="what">Bê dth-crm thành module host trong composite ai-agent-core, bỏ jmix-app.</p>
+        <ul>
+          <li class="p">1 repo duy nhất khi dev</li>
+          <li class="c">Nhốt sản phẩm thật vào repo addon → mất tính phân phối</li>
+          <li class="c">Trộn 2 lịch sử git, 2 vòng đời release</li>
+          <li class="c">Mất jmix-app (test host tự chứa của addon)</li>
+        </ul>
+      </div>
+      <div class="meter"><span class="pill">Vòng lặp: tức thì</span><span class="pill">Rủi ro: cao</span><span class="pill">Port: rất lớn</span></div>
+    </div>
+
+    <div class="opt">
+      <h2>D. Vendor addon vào dth-crm <span class="tag no">Không nên</span></h2>
+      <div class="body">
+        <p class="what">Copy source addon (com.vn.agent) thẳng vào dth-crm, bỏ dependency.</p>
+        <ul>
+          <li class="p">Không cần build phụ</li>
+          <li class="c">Mất hẳn tính tái sử dụng — addon thành code riêng của 1 app</li>
+          <li class="c">Vá lỗi/tính năng không quay về addon được</li>
+          <li class="c">Trái định vị "agent harness tái sử dụng"</li>
+        </ul>
+      </div>
+      <div class="meter"><span class="pill">Vòng lặp: tức thì</span><span class="pill">Rủi ro: cao</span><span class="pill">Port: lớn</span></div>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <b>Khuyến nghị: A — Composite build.</b> Đạt đúng mục tiêu "dùng dth-crm làm host" mà không port dòng nào, giữ addon release độc lập, vòng lặp dev tức thì. Việc "học jmix-crm" (starter, chat-about-this, thinking row…) là <i>tính năng cho ADDON</i> ở phase riêng — không phải port từ dth-crm.
+    <div class="cmd"><span class="k"># dth-crm/settings.gradle</span>
+rootProject.name = <span class="s">'dth-crm'</span>
+includeBuild(<span class="s">'../ai-agent-core/ai-agent'</span>)   <span class="k">// Gradle substitute com.vn:ai-agent-starter -> local</span></div>
+  </div>
+</body>
+</html>

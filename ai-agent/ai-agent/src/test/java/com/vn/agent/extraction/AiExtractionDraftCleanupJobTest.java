@@ -25,7 +25,7 @@ class AiExtractionDraftCleanupJobTest {
 
         assertThat(source).contains(
                 "import io.jmix.core.UnconstrainedDataManager;",
-                "@Scheduled(fixedDelayString = \"${ai-agent.extraction.cleanup-interval-ms:3600000}\")",
+                "@Scheduled(fixedDelayString = \"${jmix.ai-agent.extraction.cleanup-interval-ms:3600000}\")",
                 "@Transactional(\"agentstoreTransactionManager\")",
                 "private final UnconstrainedDataManager dataManager;",
                 "dataManager.load(AiExtractionDraft.class)",

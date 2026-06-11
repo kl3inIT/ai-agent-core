@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<view xmlns="http://jmix.io/schema/flowui/view">
+<view xmlns="http://jmix.io/schema/flowui/view"
+      title="msg:///chatDialogView.title">
     <layout width="100%" height="100%" padding="false" spacing="false">
         <fragment id="chatPanelFragment"
                   class="com.vn.agent.view.chat.fragment.ChatPanelFragment"/>

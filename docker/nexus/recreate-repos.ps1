@@ -1,0 +1,198 @@
+# Recreate Jmix add-on publishing repos on Nexus 3 via REST API.
+#
+# Idempotent: skips any repo/role/user that already exists.
+#
+# Usage (interactive — prompts for admin password securely):
+#   ./docker/nexus/recreate-repos.ps1
+#
+# Usage (CI / non-interactive):
+#   $pwd = ConvertTo-SecureString 'admin-pwd' -AsPlainText -Force
+#   ./docker/nexus/recreate-repos.ps1 -AdminPassword $pwd -DeployPassword (
+#       ConvertTo-SecureString 'deploy-pwd' -AsPlainText -Force)
+#
+# On success prints the deploy username + password — copy these into the GitHub
+# secrets NEXUS_USERNAME / NEXUS_PASSWORD.
+
+[CmdletBinding()]
+param(
+    [string]$NexusUrl = 'https://nexus.x2h.com.vn',
+    [string]$AdminUser = 'admin',
+    [SecureString]$AdminPassword,
+    [string]$DeployUser = 'jmix-publisher',
+    [SecureString]$DeployPassword,
+    [string]$BlobStore = 'default',
+    [string]$ReleasesRepo = 'jmix-internal-releases',
+    [string]$SnapshotsRepo = 'jmix-internal-snapshots',
+    [string]$RoleId = 'jmix-publisher-role'
+)
+
+$ErrorActionPreference = 'Stop'
+
+if (-not $AdminPassword) {
+    $AdminPassword = Read-Host "Nexus admin password for '$AdminUser'" -AsSecureString
+}
+
+if (-not $DeployPassword) {
+    # Generate a 32-char password if caller did not supply one.
+    Add-Type -AssemblyName System.Web
+    $generated = [System.Web.Security.Membership]::GeneratePassword(32, 6)
+    $DeployPassword = ConvertTo-SecureString $generated -AsPlainText -Force
+    $script:GeneratedDeployPassword = $generated
+}
+
+function ConvertFrom-SecureStringPlain([SecureString]$s) {
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)
+    try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+}
+
+$adminPlain = ConvertFrom-SecureStringPlain $AdminPassword
+$pair = "${AdminUser}:${adminPlain}"
+$basic = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pair))
+$headers = @{ Authorization = $basic; 'Content-Type' = 'application/json' }
+
+function Invoke-Nexus {
+    param(
+        [Parameter(Mandatory)][string]$Method,
+        [Parameter(Mandatory)][string]$Path,
+        $Body
+    )
+    $uri = "$NexusUrl$Path"
+    $args = @{
+        Method = $Method
+        Uri = $uri
+        Headers = $headers
+        SkipHttpErrorCheck = $true
+        StatusCodeVariable = 'sc'
+    }
+    if ($Body) {
+        $args.Body = ($Body | ConvertTo-Json -Depth 10 -Compress)
+    }
+    $response = Invoke-RestMethod @args
+    [PSCustomObject]@{ Status = $sc; Body = $response }
+}
+
+function Test-Exists([string]$Path) {
+    $r = Invoke-Nexus -Method GET -Path $Path
+    return $r.Status -eq 200
+}
+
+function Confirm-Created([object]$Result, [string]$What) {
+    if ($Result.Status -in 200, 201, 204) {
+        Write-Host "  created: $What" -ForegroundColor Green
+    } else {
+        throw "Failed to create $What — HTTP $($Result.Status): $($Result.Body | ConvertTo-Json -Depth 5)"
+    }
+}
+
+Write-Host "=> Nexus: $NexusUrl" -ForegroundColor Cyan
+
+# Sanity: confirm auth works.
+$ping = Invoke-Nexus -Method GET -Path '/service/rest/v1/status'
+if ($ping.Status -ne 200) {
+    throw "Cannot reach Nexus or admin auth failed (HTTP $($ping.Status)). Check URL and admin password."
+}
+
+# ---------- 1. releases repo (Version policy: RELEASE, writePolicy: ALLOW_ONCE) ----------
+Write-Host "[1/4] $ReleasesRepo (maven2 hosted, RELEASE, disable-redeploy)"
+if (Test-Exists "/service/rest/v1/repositories/$ReleasesRepo") {
+    Write-Host "  exists — skipping" -ForegroundColor Yellow
+} else {
+    $body = @{
+        name = $ReleasesRepo
+        online = $true
+        storage = @{
+            blobStoreName = $BlobStore
+            strictContentTypeValidation = $true
+            writePolicy = 'ALLOW_ONCE'
+        }
+        maven = @{
+            versionPolicy = 'RELEASE'
+            layoutPolicy = 'STRICT'
+            contentDisposition = 'INLINE'
+        }
+    }
+    $r = Invoke-Nexus -Method POST -Path '/service/rest/v1/repositories/maven/hosted' -Body $body
+    Confirm-Created $r $ReleasesRepo
+}
+
+# ---------- 2. snapshots repo (Version policy: SNAPSHOT, writePolicy: ALLOW) ----------
+Write-Host "[2/4] $SnapshotsRepo (maven2 hosted, SNAPSHOT, allow-redeploy)"
+if (Test-Exists "/service/rest/v1/repositories/$SnapshotsRepo") {
+    Write-Host "  exists — skipping" -ForegroundColor Yellow
+} else {
+    $body = @{
+        name = $SnapshotsRepo
+        online = $true
+        storage = @{
+            blobStoreName = $BlobStore
+            strictContentTypeValidation = $true
+            writePolicy = 'ALLOW'
+        }
+        maven = @{
+            versionPolicy = 'SNAPSHOT'
+            layoutPolicy = 'STRICT'
+            contentDisposition = 'INLINE'
+        }
+    }
+    $r = Invoke-Nexus -Method POST -Path '/service/rest/v1/repositories/maven/hosted' -Body $body
+    Confirm-Created $r $SnapshotsRepo
+}
+
+# ---------- 3. publisher role ----------
+# Privileges are auto-generated by Nexus when the repos above were created.
+Write-Host "[3/4] role $RoleId"
+if (Test-Exists "/service/rest/v1/security/roles/$RoleId") {
+    Write-Host "  exists — skipping" -ForegroundColor Yellow
+} else {
+    $body = @{
+        id = $RoleId
+        source = 'default'
+        name = 'Jmix Publisher'
+        description = 'Deploy permission for jmix-internal-releases / -snapshots'
+        privileges = @(
+            "nx-repository-view-maven2-$ReleasesRepo-add",
+            "nx-repository-view-maven2-$ReleasesRepo-edit",
+            "nx-repository-view-maven2-$ReleasesRepo-read",
+            "nx-repository-view-maven2-$SnapshotsRepo-add",
+            "nx-repository-view-maven2-$SnapshotsRepo-edit",
+            "nx-repository-view-maven2-$SnapshotsRepo-read"
+        )
+        roles = @()
+    }
+    $r = Invoke-Nexus -Method POST -Path '/service/rest/v1/security/roles' -Body $body
+    Confirm-Created $r "role $RoleId"
+}
+
+# ---------- 4. deploy user ----------
+Write-Host "[4/4] user $DeployUser"
+$userCheck = Invoke-Nexus -Method GET -Path "/service/rest/v1/security/users?userId=$DeployUser"
+$userExists = ($userCheck.Status -eq 200) -and ($userCheck.Body | Where-Object { $_.userId -eq $DeployUser })
+if ($userExists) {
+    Write-Host "  exists — skipping (delete in UI if you need to rotate password)" -ForegroundColor Yellow
+} else {
+    $deployPlain = ConvertFrom-SecureStringPlain $DeployPassword
+    $body = @{
+        userId = $DeployUser
+        firstName = 'Jmix'
+        lastName = 'Publisher'
+        emailAddress = "$DeployUser@x2h.com.vn"
+        password = $deployPlain
+        status = 'active'
+        roles = @($RoleId)
+    }
+    $r = Invoke-Nexus -Method POST -Path '/service/rest/v1/security/users' -Body $body
+    Confirm-Created $r "user $DeployUser"
+}
+
+Write-Host ""
+Write-Host "Done." -ForegroundColor Green
+Write-Host ""
+Write-Host "GitHub secrets to set (repo Settings -> Secrets and variables -> Actions):" -ForegroundColor Cyan
+Write-Host "  NEXUS_USERNAME = $DeployUser"
+if ($script:GeneratedDeployPassword) {
+    Write-Host "  NEXUS_PASSWORD = $($script:GeneratedDeployPassword)" -ForegroundColor Yellow
+    Write-Host "  ^ generated this run — copy now, not stored anywhere."
+} else {
+    Write-Host "  NEXUS_PASSWORD = (the value you passed in via -DeployPassword)"
+}

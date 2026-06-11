@@ -9,7 +9,7 @@ import java.util.List;
  * pattern list consumed by the {@code KnobInventoryScanner} when computing
  * Tier-3 secret indicators.
  *
- * <p>Bound to {@code ai-agent.admin.*}. Picked up automatically by the
+ * <p>Bound to {@code jmix.ai-agent.admin.*}. Picked up automatically by the
  * {@code @ConfigurationPropertiesScan} on
  * {@link com.vn.agent.AIConfiguration}.</p>
  *
@@ -22,7 +22,7 @@ import java.util.List;
  *
  * <p>Hosts that ship additional secret-bearing property shapes (e.g.
  * {@code *.private-key}, {@code *.credential}) override the list via
- * {@code ai-agent.admin.secret-property-patterns}.</p>
+ * {@code jmix.ai-agent.admin.secret-property-patterns}.</p>
  *
  * <p>{@link #resolvedPatterns()} returns the locked 4-element default when
  * the property is {@code null} or empty — never returns {@code null}.</p>
@@ -34,7 +34,7 @@ import java.util.List;
  * <p><b>Security note</b>: this record carries pattern strings, not the
  * matched values themselves; its {@code toString} is safe to log.</p>
  */
-@ConfigurationProperties("ai-agent.admin")
+@ConfigurationProperties("jmix.ai-agent.admin")
 public record AdminSecretPatternProperties(
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2,
                 requiresRestart = true,

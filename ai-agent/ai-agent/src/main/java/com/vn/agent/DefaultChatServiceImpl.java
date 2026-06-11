@@ -302,7 +302,7 @@ public class DefaultChatServiceImpl implements ChatService {
             // host's profile prompt so they apply on every turn — even when the host has not
             // configured a profile prompt and even when the LLM has not yet seen any tool error
             // in the current conversation.
-            // Phase 11 MUT-10: when ai-agent.tools.mutation.enabled=true the composer additionally
+            // Phase 11 MUT-10: when jmix.ai-agent.tools.mutation.enabled=true the composer additionally
             // appends MUTATION_PROMPT_RULES (idempotency / access-denied / concurrent-modification
             // / verify-link guidance). Resolved per-turn so a host config flip lights up on the
             // very next chat turn without a restart.

@@ -51,11 +51,9 @@ public interface AiAgentAdminRole {
             // Phase 15 Plan 03 — SIDEBAR surface host view (parity with AiAgent_ChatDialog).
             "AiAgent_Sidebar",
             "AiAgent_Configuration",
-            "AiAgent_BaselineContext",
             "AiAgent_Conversation.list", "AiAgent_Conversation.detail",
-            "AiAgent_Parameters.list", "AiAgent_Parameters.detail",
+            "AiAgent_Parameters.detail",
             "AiAgent_KnowledgeBase.list", "AiAgent_KnowledgeDocument.detail",
-            "AiAgent_AiAuditEvent.list", "AiAgent_AiAuditEvent.detailDialog",
-            "AiAgent_AiExposureRule.list", "AiAgent_AiExposureRule.detail"})
+            "AiAgent_AiAuditEvent.list", "AiAgent_AiAuditEvent.detailDialog"})
     void adminViews();
 }

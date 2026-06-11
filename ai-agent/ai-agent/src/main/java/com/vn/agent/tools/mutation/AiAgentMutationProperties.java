@@ -7,14 +7,14 @@ import java.time.Duration;
 
 /**
  * Configuration properties for the AI agent's mutation-capable tool surface, bound to
- * {@code ai-agent.tools.mutation.*}. Picked up by the {@code @ConfigurationPropertiesScan} on
+ * {@code jmix.ai-agent.tools.mutation.*}. Picked up by the {@code @ConfigurationPropertiesScan} on
  * {@code AIConfiguration}.
  *
  * <p>Default values (consulted by {@code resolved*} accessors):
  * <ul>
  *   <li>{@code resolvedEnabled() = false} — mutation tools are NOT registered as tool callbacks
  *       under default config (TEST-13 boot assertion). Hosts opt in via
- *       {@code ai-agent.tools.mutation.enabled=true}.</li>
+ *       {@code jmix.ai-agent.tools.mutation.enabled=true}.</li>
  *   <li>{@code resolvedAllowDelete() = false} — forward-signal only. v1.1 does NOT ship a
  *       {@code delete_record} tool even when this flag is true (CONTEXT D-07).</li>
  *   <li>{@code resolvedConfirmationRequired() = true} — UX hint metadata only; not enforced
@@ -30,7 +30,7 @@ import java.time.Duration;
  * <p><b>Security note:</b> no secrets are carried in this record; its {@code toString} is safe
  * to log.
  */
-@ConfigurationProperties("ai-agent.tools.mutation")
+@ConfigurationProperties("jmix.ai-agent.tools.mutation")
 public record AiAgentMutationProperties(
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
                 displayMessageKey = "bootConfig.knob.mutation.enabled")
@@ -73,7 +73,7 @@ public record AiAgentMutationProperties(
 
     /**
      * Phase 13 D-02 — DoS guard for {@code bulk_save_records}. Defaults to
-     * {@value #DEFAULT_BULK_MAX_ROWS} when {@code ai-agent.tools.mutation.bulk-max-rows} is
+     * {@value #DEFAULT_BULK_MAX_ROWS} when {@code jmix.ai-agent.tools.mutation.bulk-max-rows} is
      * unset. Values <= 0 fall back to the default (a misconfigured 0 must not silently
      * disable the bulk tool).
      */

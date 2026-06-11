@@ -15,7 +15,7 @@ import com.vn.agent.guard.AgentSystemPromptRules;
  * ({@code DefaultChatServiceImpl.ask} blocking + {@code DefaultChatServiceImpl.stream})
  * pass {@code AgentSystemPromptRulesComposer.effectiveRules()} which appends
  * {@link AgentSystemPromptRules#MUTATION_PROMPT_RULES} when
- * {@code ai-agent.tools.mutation.enabled=true}.
+ * {@code jmix.ai-agent.tools.mutation.enabled=true}.
  */
 public final class SystemPromptComposer {
 

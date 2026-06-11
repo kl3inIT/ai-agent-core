@@ -9,9 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.definition.ToolDefinition;
-import org.springframework.lang.NonNull;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.UUID;
 
@@ -31,7 +28,8 @@ import java.util.UUID;
  * SECOND row per call with the generic shape — duplicate audit rows are a HIGH-severity
  * correctness bug (Plan 11-09 review feedback).
  *
- * <p><b>What this decorator does.</b>
+ * <p><b>What this decorator does (beyond the shared
+ * {@link AbstractToolCallbackAuditDecorator} plumbing).</b>
  * <ul>
  *   <li>Emits {@link StreamingEvent.ToolCall} before delegate invocation and
  *       {@link StreamingEvent.ToolResult} after delegate return / throw — same shape
@@ -47,6 +45,9 @@ import java.util.UUID;
  *       its {@code safeWriteAudit} never throws, so reaching this rethrow path
  *       means a delegate-thrown exception is a bug / last-resort path. The
  *       single ERROR row written here is the only audit signal in that case.</li>
+ *   <li>Installs a {@link RunContext} snapshot around the delegate call so a mutation tool
+ *       running on a pooled thread sees the correct run/conversation/root-audit ids, then
+ *       restores the prior state in {@code finally}.</li>
  * </ul>
  *
  * <p><b>Not a Spring @Component.</b> Instantiated per-callback by
@@ -54,30 +55,10 @@ import java.util.UUID;
  * {@link ToolCallback}, after the generic {@link ToolCallbackAuditDecorator}
  * loop has already wrapped read + link + contributor callbacks.
  */
-public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
+public class MutationToolCallbackBoundaryDecorator extends AbstractToolCallbackAuditDecorator {
 
     private static final Logger log = LoggerFactory.getLogger(MutationToolCallbackBoundaryDecorator.class);
 
-    /** Cap on captured raw arguments JSON written into the LOB column. Mirrors {@link ToolCallbackAuditDecorator}. */
-    static final int ARGUMENTS_JSON_MAX_CHARS = 4096;
-
-    /** Cap on captured result/error summary written into the LOB column. */
-    static final int RESULT_SUMMARY_MAX_CHARS = 4096;
-
-    /** Suffix appended when a captured value is truncated, so the truncation is observable. */
-    static final String TRUNCATION_SUFFIX = "…[truncated]";
-
-    private static String cap(String value, int maxChars) {
-        if (value == null || value.length() <= maxChars) {
-            return value;
-        }
-        return value.substring(0, maxChars) + TRUNCATION_SUFFIX;
-    }
-
-    private final ToolCallback delegate;
-    private final StreamingSinkHolder streamingSinkHolder;
-    private final AuditWriter auditWriter;
-    private final CurrentAuthentication currentAuthentication;
     private final MutationArgumentSanitizer mutationArgumentSanitizer;
 
     public MutationToolCallbackBoundaryDecorator(ToolCallback delegate,
@@ -85,32 +66,12 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
                                                  AuditWriter auditWriter,
                                                  CurrentAuthentication currentAuthentication,
                                                  MutationArgumentSanitizer mutationArgumentSanitizer) {
-        this.delegate = delegate;
-        this.streamingSinkHolder = streamingSinkHolder;
-        this.auditWriter = auditWriter;
-        this.currentAuthentication = currentAuthentication;
+        super(delegate, auditWriter, currentAuthentication, streamingSinkHolder);
         this.mutationArgumentSanitizer = mutationArgumentSanitizer;
     }
 
     @Override
-    @NonNull
-    public ToolDefinition getToolDefinition() {
-        return delegate.getToolDefinition();
-    }
-
-    @Override
-    @NonNull
-    public String call(@NonNull String toolInput) {
-        return callInternal(toolInput, null, false);
-    }
-
-    @Override
-    @NonNull
-    public String call(@NonNull String toolInput, ToolContext toolContext) {
-        return callInternal(toolInput, toolContext, true);
-    }
-
-    private String callInternal(String toolInput, ToolContext toolContext, boolean useContextOverload) {
+    protected String callInternal(String toolInput, ToolContext toolContext, boolean useContextOverload) {
         UUID runId = resolveRunId(toolContext);
         UUID conversationId = resolveConversationId(toolContext);
         String userUsername = resolveUserUsername();
@@ -178,55 +139,6 @@ public class MutationToolCallbackBoundaryDecorator implements ToolCallback {
         }
         if (conversationId != null) {
             RunContext.setConversationId(conversationId);
-        }
-    }
-
-    private static UUID resolveRunId(ToolContext toolContext) {
-        UUID runId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_RUN_ID_KEY);
-        return runId != null ? runId : RunContext.get();
-    }
-
-    private static UUID resolveConversationId(ToolContext toolContext) {
-        UUID conversationId = uuidFromToolContext(toolContext, RunContext.TOOL_CONTEXT_CONVERSATION_ID_KEY);
-        return conversationId != null ? conversationId : RunContext.getConversationId();
-    }
-
-    private static UUID uuidFromToolContext(ToolContext toolContext, String key) {
-        if (toolContext == null || toolContext.getContext() == null) {
-            return null;
-        }
-        Object raw = toolContext.getContext().get(key);
-        if (raw instanceof UUID uuid) {
-            return uuid;
-        }
-        if (raw instanceof String text && !text.isBlank()) {
-            try {
-                return UUID.fromString(text);
-            } catch (IllegalArgumentException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private void emitToolEvent(UUID runId,
-                               java.util.function.Consumer<reactor.core.publisher.Sinks.Many<StreamingEvent>> emitter) {
-        if (streamingSinkHolder == null) {
-            return;
-        }
-        try {
-            streamingSinkHolder.currentOrForRun(runId).ifPresent(emitter);
-        } catch (RuntimeException ex) {
-            log.debug("Streaming tool-event emission failed in mutation boundary; continuing", ex);
-        }
-    }
-
-    private String resolveUserUsername() {
-        try {
-            UserDetails user = currentAuthentication.getUser();
-            return user.getUsername();
-        } catch (RuntimeException anon) {
-            return "anonymous";
         }
     }
 

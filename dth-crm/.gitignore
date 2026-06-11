@@ -1,0 +1,51 @@
+.jmix
+
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**
+!**/src/test/**
+
+# Remove this line if you want to follow recommendations in src/main/bundles/README.md
+src/main/bundles/
+
+### IntelliJ IDEA ###
+.idea/*
+!.idea/encodings.xml
+*.iws
+*.iml
+*.ipr
+out/
+/target/
+
+### VS Code ###
+.vscode/
+
+# The following files are generated/updated by vaadin-gradle-plugin
+node_modules/
+src/main/frontend/generated/
+pnpmfile.js
+vite.generated.ts
+webpack.generated.js
+
+.DS_Store
+Thumbs.db
+
+# local secrets — match every .env variant
+.env
+.env.*
+
+# server compose has secrets baked in — never commit
+docker-compose.server.yml
+deploy/
+
+# root jar for the server-side image build — not source-of-truth
+/dth-crm.jar
+
+# Jmix Studio IDE metadata
+jmix-studio.xml
+
+# runtime artefacts
+*.log
+heapdumps/
+*.hprof

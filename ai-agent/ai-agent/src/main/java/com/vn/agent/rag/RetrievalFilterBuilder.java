@@ -74,6 +74,23 @@ public class RetrievalFilterBuilder {
         this.llmExposurePolicy = llmExposurePolicy;
     }
 
+    /**
+     * Builds the RAG {@code Filter.Expression} ONCE per retrieval (PERF-03 / D-03).
+     *
+     * <p>The denylist is read via a SINGLE {@link LlmExposurePolicy#getDenylistedEntityNames()}
+     * call, which since Plan 18-01 (PERF-02) hits the app-wide {@code denylistCache} — a memoized
+     * read evicted on {@code LlmExposureChangedEvent}, NOT a per-call agentstore SELECT. The
+     * {@code Filter.Expression} is assembled exactly once per {@code buildFor} invocation (no loop
+     * re-invokes the build), so an admin denylist edit is visible on the next retrieval (T-18-09).</p>
+     *
+     * <p><b>Role extraction stays request-fresh (T-18-10):</b> the role set is derived from the
+     * supplied {@link Authentication} on EVERY call and is NOT cached across requests — only the
+     * exposure denylist portion is memoized (in {@link LlmExposurePolicy}). The
+     * {@code (source_entity IS NULL) OR (NOT IN <denied>)} NIN clause, the per-role
+     * {@code (model && roleA) || (model && roleB)} composition, the admin-bypass branch, and the
+     * fail-closed empty-role branch are preserved VERBATIM — no "redundant clause" removal
+     * (T-18-08). No new cache lives here; the once-per-retrieval contract is structural.</p>
+     */
     public Filter.Expression buildFor(Authentication auth) {
         Set<String> roles = auth == null
                 ? Set.of()

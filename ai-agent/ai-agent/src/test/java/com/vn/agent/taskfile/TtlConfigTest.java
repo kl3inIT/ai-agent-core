@@ -51,19 +51,19 @@ class TtlConfigTest {
     @Test
     void defaultTtlSecondsIs86400() {
         assertThat(taskFileProperties.getTtlSeconds())
-                .as("default ai-agent.task-file.ttl-seconds must be 86400 (24h) — REQ-4 LIFE-01")
+                .as("default jmix.ai-agent.task-file.ttl-seconds must be 86400 (24h) — REQ-4 LIFE-01")
                 .isEqualTo(86_400L);
     }
 }
 
 /**
- * Phase 13.1 REQ-4 sentinel branch: {@code ai-agent.task-file.ttl-seconds=-1} causes the
+ * Phase 13.1 REQ-4 sentinel branch: {@code jmix.ai-agent.task-file.ttl-seconds=-1} causes the
  * cleanup job to log once at INFO and short-circuit; expired rows survive across multiple
  * cleanup invocations.
  */
 @Tag("integration")
 @SpringBootTest(classes = AITestConfiguration.class,
-        properties = {"ai-agent.task-file.ttl-seconds=-1"})
+        properties = {"jmix.ai-agent.task-file.ttl-seconds=-1"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
@@ -141,7 +141,7 @@ class TtlConfigSentinelSkipsCleanupTest {
  */
 @Tag("integration")
 @SpringBootTest(classes = AITestConfiguration.class,
-        properties = {"ai-agent.task-file.ttl-seconds=-1"})
+        properties = {"jmix.ai-agent.task-file.ttl-seconds=-1"})
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class

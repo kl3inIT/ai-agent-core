@@ -20,7 +20,9 @@ out/
 
 
 .env
-.claude/
+# Ignore local Claude Code state, but keep the installed Jmix skills under version control.
+.claude/*
+!.claude/skills/
 
 # Plan 08-07 (R-07a): local nexus credentials must NEVER be committed.
 # Use ~/.gradle/gradle.properties (user-global, untracked by definition) OR
