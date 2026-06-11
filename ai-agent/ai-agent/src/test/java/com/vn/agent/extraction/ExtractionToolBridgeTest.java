@@ -9,6 +9,7 @@ import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.tools.AgentToolCallbacks;
 import com.vn.agent.tools.BuiltInDataTools;
+import com.vn.agent.tools.jpql.BuiltInJpqlTool;
 import com.vn.agent.tools.link.BuiltInLinkTools;
 import com.vn.agent.tools.mutation.BuiltInMutationTools;
 import io.jmix.core.security.CurrentAuthentication;
@@ -110,6 +111,7 @@ class ExtractionToolBridgeTest {
         AgentToolCallbacks callbacks = new AgentToolCallbacks(
                 mock(BuiltInDataTools.class),
                 mock(BuiltInLinkTools.class),
+                mock(BuiltInJpqlTool.class),
                 bridge,
                 new ActionProposalTool(mock(ActionProposalService.class)),
                 mutationToolsProvider,

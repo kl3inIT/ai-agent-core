@@ -17,9 +17,6 @@ class AttachmentReviewFixContractTest {
     private static final Path CHAT_PANEL_FRAGMENT = Path.of(
             "src", "main", "java", "com", "vn", "agent", "view", "chat", "fragment",
             "ChatPanelFragment.java");
-    private static final Path CARD_RENDERER = Path.of(
-            "src", "main", "java", "com", "vn", "agent", "view", "chat", "fragment",
-            "AiTaskFileCardFragmentRenderer.java");
 
     @Test
     void uploadValidationUsesStagedFileSizeForCapAndPersistedRow() throws IOException {
@@ -35,21 +32,15 @@ class AttachmentReviewFixContractTest {
 
     @Test
     void cardDeleteIsBlobFirstAndRefreshesOwningLoader() throws IOException {
-        String renderer = Files.readString(CARD_RENDERER);
+        // Inline-attachments: the card renderer was retired; delete now lives in the fragment
+        // (AiTaskFileInlineCard is a pure renderer that calls back into ChatPanelFragment).
         String chatPanel = Files.readString(CHAT_PANEL_FRAGMENT);
 
-        assertThat(renderer)
-                .as("renderer must use root-bundle Messages directly rather than fragment MessageBundle "
-                        + "or a stale message group constant")
-                .contains("private String message(String key)")
-                .contains("return messages.getMessage(key);")
-                .doesNotContain("MessageBundle")
-                .doesNotContain("MESSAGE_GROUP");
-        assertThat(renderer.indexOf("storage.removeFile(ref)"))
+        assertThat(chatPanel.indexOf("storage.removeFile(ref)"))
                 .as("blob delete must happen before DB row delete")
-                .isLessThan(renderer.indexOf("dataManager.remove(row)"));
-        assertThat(renderer)
-                .as("successful delete must notify the owning UI")
+                .isLessThan(chatPanel.indexOf("dataManager.remove(file)"));
+        assertThat(chatPanel)
+                .as("successful delete must notify other open UIs")
                 .contains("UiEventPublisher")
                 .contains("AiTaskFileDeletedUiEvent");
 

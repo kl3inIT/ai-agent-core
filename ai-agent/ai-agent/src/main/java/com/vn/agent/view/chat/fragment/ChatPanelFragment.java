@@ -57,12 +57,13 @@ import io.jmix.core.security.CurrentAuthentication;
 import io.jmix.flowui.Dialogs;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
+import io.jmix.flowui.UiEventPublisher;
+import io.jmix.flowui.download.Downloader;
 import io.jmix.flowui.action.DialogAction;
 import io.jmix.flowui.app.inputdialog.DialogActions;
 import io.jmix.flowui.app.inputdialog.DialogOutcome;
 import io.jmix.flowui.app.inputdialog.InputParameter;
 import io.jmix.flowui.component.card.JmixCard;
-import io.jmix.flowui.component.gridlayout.GridLayout;
 import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.upload.JmixUpload;
 import io.jmix.flowui.component.validation.ValidationErrors;
@@ -75,7 +76,6 @@ import io.jmix.flowui.model.CollectionContainer;
 import io.jmix.flowui.model.CollectionLoader;
 import io.jmix.flowui.view.Subscribe;
 import io.jmix.flowui.view.Supply;
-import io.jmix.flowui.view.Target;
 import io.jmix.flowui.view.View;
 import io.jmix.flowui.view.ViewComponent;
 import org.slf4j.Logger;
@@ -106,18 +106,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** D-29 substrate: Phase 13.1 UAT-fix — left chat column renders USER/ASSISTANT turns
- *  on Vaadin {@link MessageList} + {@link MessageListItem} (Phase 7.1 baseline,
- *  feedback_jmix_first_ui — these ARE Vaadin components shipped by Jmix). NOTICE rows
- *  render as plain {@code <div class="ai-agent-attachment-notice">} sibling elements
- *  appended to the message-list slot AFTER the {@code <vaadin-message-list>} block;
- *  this avoids the default {@code <vaadin-avatar>} upload-arrow fallback that the
- *  prior {@code <vaadin-message class="attachment-event">} substrate exposed when no
- *  userName was set. UI-SPEC §138 explicitly allows "alternatively a custom inline
- *  element" for the NOTICE row, so this satisfies the visual contract.
- *  The right pane stays data-loader driven via {@code taskFilesDl}; empty-state
- *  visibility toggles on {@link CollectionLoader.PostLoadEvent}. D-03 per-event
- *  ui.access; D-04 Stop via CancellationRegistry.cancel; Pitfall #8 dispose-on-detach.
+/** Full-width chat column renders USER/ASSISTANT turns on Vaadin {@link MessageList} +
+ *  {@link MessageListItem} (Phase 7.1 baseline, feedback_jmix_first_ui — these ARE Vaadin
+ *  components shipped by Jmix). Uploaded files (jmix-crm style inline attachments) render as
+ *  {@link AiTaskFileInlineCard} sibling elements anchored after the originating turn's
+ *  {@code <vaadin-message>}; the upload entry point lives in the composer bar next to the
+ *  {@link MessageInput}. The retired right-pane Attachments split is gone — {@code taskFilesDl}
+ *  now only feeds replay of those inline cards on conversation switch. NOTICE AiMessage rows
+ *  still persist as the model's upload ledger (ProjectingChatMemoryRepository D-A1) but are no
+ *  longer rendered in the UI. D-03 per-event ui.access; D-04 Stop via
+ *  CancellationRegistry.cancel; Pitfall #8 dispose-on-detach.
  *  Public API for ChatView: setConversationId / hasMessages / isStreaming / startNewChat. */
 @FragmentDescriptor("chat-panel-fragment.xml")
 // Phase 15 Plan 03 (REVIEWS point #5): the @CssImport for ai-agent-chat.css used to
@@ -146,14 +144,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @ViewComponent private JmixRadioButtonGroup<IntentOption> intentCardRow;
     @ViewComponent private VerticalLayout messageInputSlot;
 
-    // Phase 13.1 REQ-7 / Pitfall 6 — slot id contract preserved; field type stays
-    // VerticalLayout exactly because Phase 12 ChatSurfaceMounter binds by this type.
-    @ViewComponent private VerticalLayout attachmentsPanel;
-    // Phase 13.1 UI-01 — right-pane data container + loader for the card grid.
+    // Inline-attachments: data container + loader supply the conversation's AiTaskFile rows
+    // so they can be replayed as inline cards on conversation switch (no right-pane grid).
     @ViewComponent private CollectionContainer<AiTaskFile> taskFilesDc;
     @ViewComponent private CollectionLoader<AiTaskFile> taskFilesDl;
-    @ViewComponent private VerticalLayout attachmentsEmptyState;
-    @ViewComponent private GridLayout attachmentsGridLayout;
     @ViewComponent private JmixUpload taskFileUpload;
 
     @Autowired private ChatService chatService;
@@ -177,6 +171,10 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     @Autowired private ActionProposalService actionProposalService;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private UiComponents uiComponents;
+    // Inline-attachments: download streams the FileRef; uiEventPublisher notifies other
+    // open chat surfaces of a card delete so they reload their loader.
+    @Autowired private Downloader downloader;
+    @Autowired private UiEventPublisher uiEventPublisher;
     // Phase 13 Plan 04 — task-file persistence collaborators.
     @Autowired private Metadata metadataApi;
     @Autowired private FileStorageLocator fileStorageLocator;
@@ -188,6 +186,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
     private MessageList messageList;
     private MessageInput messageInput;
+    /** Empty-chat starter-prompt panel; spliced into {@code messageListSlot} only when the
+     *  conversation has no messages, removed on first submit / conversation switch. */
+    private Div suggestionsPanel;
     private ProgressBar streamProgressBar;
     private final List<MessageListItem> items = new ArrayList<>();
     private final Map<String, String> labels = new HashMap<>();
@@ -264,7 +265,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     /**
      * One "extra" element ({@code .ai-agent-turn-extra} wrapper around a {@code <vaadin-details>},
      * an {@code .ai-agent-action-choice} {@code <div>}, an {@code .ai-agent-intent-confirm} {@code <div>},
-     * or an {@code .ai-agent-attachment-notice} {@code <div>}) anchored in the DOM immediately after the
+     * or an inline attachment {@code <vaadin-card>}) anchored in the DOM immediately after the
      * {@code turnIndex}-th {@code <vaadin-message>} child of {@code <vaadin-message-list>}.
      * {@code turnIndex} is the index in {@link #items} of the transcript message the extra hangs under.
      */
@@ -309,14 +310,13 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         hideInitialIntentCardRow();
         updateTitleEditState();
 
-        // Phase 13.1 UI-01 — right-pane upload handler + loader binding.
+        // Inline-attachments: composer upload handler + loader binding.
         initAttachmentsAndUpload();
         if (conversationId != null) {
             taskFilesDl.setParameter("conversationId", conversationId);
             taskFilesDl.load();
         }
-        // Initial empty-state toggle (loader may already be primed by setConversationIdInternal).
-        refreshTaskFiles();
+        renderPromptSuggestionsIfEmpty();
     }
 
     /**
@@ -352,28 +352,16 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         UUID.randomUUID() + "-" + safeFileName(fileMetadata.fileName())).toFile()));
     }
 
-    /**
-     * Phase 13.1 UI-01 — empty-state visibility toggle, fired by Jmix's typed
-     * {@link CollectionLoader.PostLoadEvent}. Matches project memory
-     * {@code feedback_jmix_data_loader_events}: data-loader events use
-     * {@code @Subscribe(id="...", target=Target.DATA_LOADER)} with typed event records,
-     * not {@code loader.addPostLoadListener(...)}.
-     */
-    @Subscribe(id = "taskFilesDl", target = Target.DATA_LOADER)
-    public void onTaskFilesPostLoad(final CollectionLoader.PostLoadEvent<AiTaskFile> event) {
-        refreshTaskFiles();
-    }
-
     @EventListener
     public void onTaskFileDeleted(final AiTaskFileDeletedUiEvent event) {
         if (event.getConversationId() != null
                 && !Objects.equals(conversationId, event.getConversationId())) {
             return;
         }
+        // Inline cards are removed directly by performTaskFileDelete on the originating surface;
+        // other open surfaces just reload the loader to keep their container in sync.
         if (taskFilesDl != null) {
             taskFilesDl.load();
-        } else {
-            refreshTaskFiles();
         }
     }
 
@@ -403,15 +391,6 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 .withThemeVariant(NotificationVariant.LUMO_WARNING)
                 .withDuration(8000)
                 .show());
-    }
-
-    private void refreshTaskFiles() {
-        if (taskFilesDc == null || attachmentsEmptyState == null || attachmentsGridLayout == null) {
-            return;
-        }
-        boolean empty = taskFilesDc.getItems().isEmpty();
-        attachmentsEmptyState.setVisible(empty);
-        attachmentsGridLayout.setVisible(!empty);
     }
 
     void refreshIntentCardRow() {
@@ -632,14 +611,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         if (cid == null) {
             updateConversationTitle(null);
             updateTitleEditState();
-            // Reset right-pane loader so empty-state shows when no conversation is active.
+            // No active conversation: clear the task-file loader so no inline cards linger.
             if (taskFilesDl != null) {
                 taskFilesDl.removeParameter("conversationId");
             }
             if (taskFilesDc != null) {
                 taskFilesDc.setItems(List.of());
             }
-            refreshTaskFiles();
+            renderPromptSuggestionsIfEmpty();
             return;
         }
         // Ownership check (D-09) — foreign / missing ids throw ConversationNotFoundException.
@@ -648,7 +627,8 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         updateConversationTitle(conversation.getTitle());
         updateTitleEditState();
 
-        // Phase 13.1 UI-01 — re-bind right-pane loader on conversation switch.
+        // Inline-attachments: re-bind the task-file loader on conversation switch so the
+        // uploaded files can be replayed as inline cards (time-merged below).
         if (taskFilesDl != null) {
             taskFilesDl.setParameter("conversationId", cid);
             taskFilesDl.load();
@@ -660,35 +640,122 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                 .parameter("cid", cid)
                 .list();
 
-        // Phase 13.1 UAT-fix — dispatch by role across mixed substrate:
+        // Dispatch by role:
         //   USER / ASSISTANT  → MessageListItem accumulated into the items list, then
-        //                        flushed with a single setItems at the end of replay
-        //                        (Pitfall #5 — only the turn boundary calls setItems).
-        //   NOTICE            → plain <div class="ai-agent-attachment-notice"> appended
-        //                        as sibling of the MessageList element. Strict
-        //                        chronological in-bubble interleaving is approximated as
-        //                        end-of-list (UI-SPEC §138 allows custom inline element).
+        //                        flushed with a single setItems (Pitfall #5 — only the turn
+        //                        boundary calls setItems).
+        //   NOTICE            → NOT rendered in the UI. NOTICE rows persist as the model's
+        //                        upload ledger (ProjectingChatMemoryRepository D-A1); the UI
+        //                        instead replays uploaded files as inline cards (below).
         //   SYSTEM / TOOL     → skipped (replay shows user-visible turns only).
+        // bubbleTimes mirrors items[] (only USER/ASSISTANT) so a task file can be anchored
+        // under the turn it chronologically belongs to.
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
+        List<OffsetDateTime> bubbleTimes = new ArrayList<>();
         for (AiMessage m : history) {
             AiMessageRole role = m.getRole();
             if (role == AiMessageRole.USER) {
                 items.add(buildItem(m, userName, USER_COLOR));
+                bubbleTimes.add(m.getCreatedDate());
                 messageCount++;
             } else if (role == AiMessageRole.ASSISTANT) {
                 items.add(buildItem(m, aiName, AI_COLOR));
+                bubbleTimes.add(m.getCreatedDate());
                 messageCount++;
-            } else if (role == AiMessageRole.NOTICE) {
-                // anchorExtra uses items.size()-1 = the last transcript item appended so far.
-                appendNoticeRow(m.getContent());
             }
         }
         if (messageList != null) {
             messageList.setItems(new ArrayList<>(items));
         }
-        // Re-splice the per-turn NOTICE extras into the freshly-rendered message-list light DOM.
+        // Replay uploaded files as inline cards, anchored by createdDate, then re-splice all
+        // per-turn extras into the freshly-rendered message-list light DOM.
+        renderReplayTaskFileCards(bubbleTimes);
         reanchorAllExtras();
+        renderPromptSuggestionsIfEmpty();
+    }
+
+    /**
+     * Replays the conversation's uploaded {@link AiTaskFile} rows (already loaded into
+     * {@code taskFilesDc}) as inline attachment cards, each anchored under the most recent
+     * USER/ASSISTANT bubble created at or before the file's {@code createdDate}.
+     */
+    private void renderReplayTaskFileCards(List<OffsetDateTime> bubbleTimes) {
+        if (taskFilesDc == null) {
+            return;
+        }
+        for (AiTaskFile file : taskFilesDc.getItems()) {
+            AiTaskFileInlineCard card = new AiTaskFileInlineCard(messages);
+            card.setTaskFile(file, this::downloadTaskFile,
+                    fileToDelete -> confirmDeleteTaskFile(fileToDelete, card.getElement()));
+            anchorExtra(resolveTaskFileTurnIndex(bubbleTimes, file.getCreatedDate()), card.getElement());
+            messageCount++;
+        }
+    }
+
+    private int resolveTaskFileTurnIndex(List<OffsetDateTime> bubbleTimes, OffsetDateTime fileTime) {
+        if (fileTime == null) {
+            return Math.max(0, bubbleTimes.size() - 1);
+        }
+        int index = 0;
+        for (int i = 0; i < bubbleTimes.size(); i++) {
+            OffsetDateTime t = bubbleTimes.get(i);
+            if (t != null && !t.isAfter(fileTime)) {
+                index = i;
+            }
+        }
+        return index;
+    }
+
+    /**
+     * Render starter-prompt cards into the empty chat area. No-op unless the substrate exists, the
+     * conversation has no rendered messages/files, and a panel is not already shown. Suggestion text
+     * comes from the {@code chatView.suggestions.*} message keys so host apps can override them with
+     * domain-specific prompts. Clicking a card submits its prompt as a normal chat turn.
+     */
+    private void renderPromptSuggestionsIfEmpty() {
+        if (messageListSlot == null || suggestionsPanel != null || messageCount > 0 || isStreaming()) {
+            return;
+        }
+        Div panel = new Div();
+        panel.addClassName("ai-agent-chat-panel__suggestions");
+
+        H5 heading = new H5(messages.getMessage("chatView.suggestions.heading"));
+        heading.addClassName("ai-agent-chat-panel__suggestions-heading");
+        panel.add(heading);
+
+        Div grid = new Div();
+        grid.addClassName("ai-agent-chat-panel__suggestions-grid");
+        for (int i = 1; i <= 4; i++) {
+            String title = messages.getMessage("chatView.suggestions." + i + ".title");
+            String prompt = messages.getMessage("chatView.suggestions." + i + ".prompt");
+
+            Div card = new Div();
+            card.addClassName("ai-agent-chat-panel__suggestion-card");
+            Span titleSpan = new Span(title);
+            titleSpan.addClassName("ai-agent-chat-panel__suggestion-title");
+            Span promptSpan = new Span(prompt);
+            promptSpan.addClassName("ai-agent-chat-panel__suggestion-prompt");
+            card.add(titleSpan, promptSpan);
+            card.addClickListener(event -> {
+                clearPromptSuggestions();
+                submitChatTurn(prompt, prompt, selectedIntentIdForSubmit());
+            });
+            grid.add(card);
+        }
+        panel.add(grid);
+
+        suggestionsPanel = panel;
+        // First child so the panel sits at the top of the empty chat area; the flex-grow
+        // MessageList fills the space below it.
+        messageListSlot.addComponentAsFirst(panel);
+    }
+
+    private void clearPromptSuggestions() {
+        if (suggestionsPanel != null) {
+            suggestionsPanel.removeFromParent();
+            suggestionsPanel = null;
+        }
     }
 
     public UUID getConversationId() { return conversationId; }
@@ -797,6 +864,7 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     private void submitChatTurn(String displayText, String modelText,
                                 String toolSurfaceIntentId,
                                 String privateSystemAppendix) {
+        clearPromptSuggestions();
         String userName = resolveLabel("chatView.message.userName", "You");
         String aiName = resolveLabel("chatView.message.assistantName", "AI Assistant");
 
@@ -1053,8 +1121,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         }
         int msgCount = items.size();
         // Stable sort by turnIndex (preserves append order within a turn), drop extras whose turn is gone.
+        // Exception: when there are no message bubbles yet (msgCount == 0) keep turnIndex-0 extras — a file
+        // uploaded before the first message anchors at the top of an empty conversation and must still render
+        // (it sits as a sibling after the empty <vaadin-message-list>; the client splice is a no-op then).
         turnExtras.sort(java.util.Comparator.comparingInt(TurnExtra::turnIndex));
-        turnExtras.removeIf(te -> te.turnIndex() < 0 || te.turnIndex() >= msgCount);
+        turnExtras.removeIf(te -> te.turnIndex() < 0 || (msgCount > 0 && te.turnIndex() >= msgCount));
         com.vaadin.flow.dom.Element slotEl = messageListSlot.getElement();
         com.vaadin.flow.dom.Element mlEl = messageList != null ? messageList.getElement() : null;
         int insertAt = (mlEl != null && slotEl.indexOfChild(mlEl) >= 0)
@@ -1212,26 +1283,99 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
     }
 
     /**
-     * Phase 13.1 UAT-fix — append a NOTICE divider as a plain {@code <div>} sibling of
-     * the {@code <vaadin-message-list>} block. The plain-div substrate avoids the default
-     * {@code <vaadin-avatar>} upload-arrow fallback that the prior {@code <vaadin-message
-     * class="attachment-event">} substrate exposed when no userName was set. The
-     * {@code <div>} text content is set via {@code setText}, which is HTML-escaped by the
-     * Vaadin Element API (T-13.1-17 mitigation), so even a filename containing script tags
-     * cannot inject HTML.
+     * Appends an uploaded {@link AiTaskFile} as an inline attachment card (jmix-crm style),
+     * anchored under the current turn's {@code <vaadin-message>}. Download streams the
+     * {@link io.jmix.core.FileRef}; delete confirms then removes blob + row + card. The card
+     * renders {@code setText}-escaped filename internally (T-13.1-17 carry-over).
      */
-    private void appendNoticeRow(String text) {
-        if (text == null) {
-            text = "";
+    private void appendTaskFileCard(AiTaskFile file) {
+        if (file == null) {
+            return;
         }
-        com.vaadin.flow.dom.Element notice = new com.vaadin.flow.dom.Element("div");
-        notice.getClassList().add("ai-agent-attachment-notice");
-        notice.setText(text);
-        // Phase 15-06 Gap 2 — anchor inline after the current turn's <vaadin-message> (the last
-        // transcript item at append time, both for live uploads and history replay), not at the
-        // messageListSlot tail. setText() keeps the value HTML-escaped (T-13.1-17).
-        anchorExtra(items.isEmpty() ? 0 : items.size() - 1, notice);
+        AiTaskFileInlineCard card = new AiTaskFileInlineCard(messages);
+        card.setTaskFile(file, this::downloadTaskFile,
+                fileToDelete -> confirmDeleteTaskFile(fileToDelete, card.getElement()));
+        anchorExtra(items.isEmpty() ? 0 : items.size() - 1, card.getElement());
         messageCount++;
+    }
+
+    private void downloadTaskFile(AiTaskFile file) {
+        if (file == null || file.getStorageRef() == null) {
+            return;
+        }
+        downloader.setShowNewWindow(true);
+        downloader.download(file.getStorageRef());
+    }
+
+    private void confirmDeleteTaskFile(AiTaskFile file, com.vaadin.flow.dom.Element cardElement) {
+        if (file == null) {
+            return;
+        }
+        String filename = file.getFilename() == null || file.getFilename().isBlank()
+                ? messages.getMessage("chatView.attachments.missingFileName")
+                : file.getFilename();
+        dialogs.createOptionDialog()
+                .withHeader(messages.getMessage("chatView.attachments.deleteConfirm.title"))
+                .withText(MessageFormat.format(
+                        messages.getMessage("chatView.attachments.deleteConfirm.message"), filename))
+                .withActions(
+                        new DialogAction(DialogAction.Type.YES)
+                                .withVariant(ActionVariant.DANGER)
+                                .withText(messages.getMessage("chatView.attachments.deleteConfirm.confirm"))
+                                .withHandler(actionEvent -> performTaskFileDelete(file, cardElement)),
+                        new DialogAction(DialogAction.Type.NO)
+                                .withText(messages.getMessage("chatView.attachments.deleteConfirm.cancel")))
+                .open();
+    }
+
+    /**
+     * Blob-first delete: remove the FileStorage blob BEFORE the JPA row so a failed blob
+     * removal preserves the row for retry (and the TTL cleanup job can still discover it).
+     * On success the inline card is removed and a {@link AiTaskFileDeletedUiEvent} is
+     * published so other open chat surfaces reload their loader.
+     */
+    private void performTaskFileDelete(AiTaskFile file, com.vaadin.flow.dom.Element cardElement) {
+        FileRef ref = file.getStorageRef();
+        UUID convId = file.getConversation() == null ? conversationId : file.getConversation().getId();
+        if (ref != null) {
+            try {
+                FileStorage storage = fileStorageLocator.getByName(ref.getStorageName());
+                storage.removeFile(ref);
+            } catch (RuntimeException blobEx) {
+                log.warn("Failed to remove blob for AiTaskFile {}; preserving row for retry",
+                        file.getId(), blobEx);
+                notifications.create(messages.getMessage("chatView.attachments.delete.failed"))
+                        .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                        .show();
+                return;
+            }
+        }
+        try {
+            dataManager.remove(file);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to remove AiTaskFile {} after blob delete", file.getId(), ex);
+            notifications.create(messages.getMessage("chatView.attachments.delete.failed"))
+                    .withThemeVariant(NotificationVariant.LUMO_WARNING)
+                    .show();
+            return;
+        }
+        removeTaskFileCard(cardElement);
+        try {
+            uiEventPublisher.publishEventForCurrentUI(new AiTaskFileDeletedUiEvent(this, convId));
+        } catch (RuntimeException eventFailure) {
+            log.debug("Failed to publish task-file delete UI event for {}", file.getId(), eventFailure);
+        }
+    }
+
+    private void removeTaskFileCard(com.vaadin.flow.dom.Element cardElement) {
+        if (cardElement == null) {
+            return;
+        }
+        turnExtras.removeIf(te -> te.element() == cardElement);
+        cardElement.removeFromParent();
+        if (messageCount > 0) {
+            messageCount--;
+        }
     }
 
     void appendIntentConfirmRow(UUID draftId, String entityName, String instanceName) {
@@ -1505,9 +1649,12 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
         turnExtras.clear();
         statusRow = null;
         turnContentSeen = false;
+        // removeAll() below detaches the suggestions panel; null the field so it can re-render.
+        suggestionsPanel = null;
         if (messageListSlot != null) {
             // Wipe the underlying element children so both the MessageList component AND any
-            // raw <div class="ai-agent-attachment-notice"> sibling rows are removed.
+            // anchored per-turn extra sibling rows (inline attachment cards, disclosures,
+            // action-choice / intent-confirm rows) are removed.
             messageListSlot.removeAll();
             messageListSlot.getElement().removeAllChildren();
             // Re-attach a fresh MessageList so subsequent items render into a clean substrate.
@@ -1653,12 +1800,11 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
      *       forbids {@code new AiTaskFile()}).</li>
      *   <li>Save under the regular {@code DataManager} so the user row-level policy from
      *       Plan 13-01 stamps the row with {@code userUsername} and prevents cross-user reads.</li>
-     *   <li><b>Phase 13.1 UX-01</b> — persist a NOTICE {@link AiMessage} attributed to the
-     *       uploading user and append a {@code <div class="ai-agent-attachment-notice">}
-     *       sibling row to {@code messageListSlot}. Failure is logged and the upload still
-     *       succeeds (per CONTEXT integration-points "log-and-continue").</li>
-     *   <li>Reload {@code taskFilesDl} so the right-pane card grid + empty-state toggle
-     *       reflect the new row.</li>
+     *   <li>Append an inline {@link AiTaskFileInlineCard} for the saved file (the user-visible
+     *       surface) AND persist a NOTICE {@link AiMessage} as the model's upload ledger
+     *       (ProjectingChatMemoryRepository D-A1) — the latter is no longer rendered. Failure
+     *       to write the NOTICE is logged and the upload still succeeds (per CONTEXT
+     *       integration-points "log-and-continue").</li>
      * </ol>
      *
      * <p>Best-effort temp-file cleanup runs in the {@code finally} block; a missing temp
@@ -1745,8 +1891,14 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
 
             AiTaskFile saved = dataManager.save(row);
 
-            // Phase 13.1 UX-01 — bilingual NOTICE row. Log-and-continue per CONTEXT
-            // integration-points: a NOTICE-write failure does NOT roll back the upload.
+            // Inline-attachments: render the uploaded file as a downloadable card in the timeline.
+            accessUi(() -> appendTaskFileCard(saved));
+
+            // Bilingual NOTICE AiMessage persists as the model's upload ledger
+            // (ProjectingChatMemoryRepository D-A1) — it survives the per-turn projection wipe so
+            // the model knows which files were attached. It is NOT rendered in the UI anymore (the
+            // inline card above is the user-visible surface). Log-and-continue: a NOTICE-write
+            // failure does NOT roll back the upload.
             try {
                 AiMessage notice = metadataApi.create(AiMessage.class);
                 notice.setConversation(conversation);
@@ -1765,16 +1917,9 @@ public class ChatPanelFragment extends Fragment<VerticalLayout> {
                         saved.getFilename()));
                 notice.setCreatedDate(OffsetDateTime.now());
                 notice.setSeq(nextSeq(conversation.getId()));
-                AiMessage savedNotice = dataManager.save(notice);
-                final String noticeText = savedNotice.getContent();
-                accessUi(() -> appendNoticeRow(noticeText));
+                dataManager.save(notice);
             } catch (RuntimeException noticeEx) {
                 log.warn("Failed to write NOTICE AiMessage for upload {}", fileName, noticeEx);
-            }
-
-            // Refresh the right-pane grid + emptyState toggle via PostLoadEvent.
-            if (taskFilesDl != null) {
-                accessUi(() -> taskFilesDl.load());
             }
         } catch (RuntimeException ex) {
             log.warn("Task-file upload failed for {}", fileName, ex);

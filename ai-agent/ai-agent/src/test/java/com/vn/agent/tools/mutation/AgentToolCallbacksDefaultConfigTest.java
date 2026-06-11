@@ -49,18 +49,21 @@ class AgentToolCallbacksDefaultConfigTest {
                 .collect(Collectors.toList());
 
         // Diagnostic: when mutation is OFF and there are no host ToolContributors, exactly
-        // 6 read + 2 link + 1 extraction + 2 action-proposal (single + bulk) callbacks should
-        // appear. If a future contributor is added, the name-based assertions below remain
-        // authoritative.
-        assertThat(names).hasSize(11);
+        // 7 read (incl. describe_entities) + 2 link + 1 jpql + 1 extraction + 2 action-proposal
+        // (single + bulk) callbacks should appear. If a future contributor is added, the
+        // name-based assertions below remain authoritative.
+        assertThat(names).hasSize(13);
 
         // Read tools (D-09 default surface).
         assertThat(names).contains(
-                "list_entities", "describe_entity", "find_records",
+                "list_entities", "describe_entity", "describe_entities", "find_records",
                 "count_records", "get_record", "get_related_records");
 
         // Link tools (Plan 11-08, always-on per D-05).
         assertThat(names).contains("generate_entity_list_link", "generate_entity_detail_link");
+
+        // Always-on read-only JPQL analytics tool (built-in, not a host ToolContributor).
+        assertThat(names).contains("run_jpql_query");
 
         // Phase 14 safe planning and draft tools + Workstream A bulk action proposal.
         assertThat(names).contains(

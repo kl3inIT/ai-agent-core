@@ -9,6 +9,7 @@ import com.vn.agent.audit.ToolCallbackAuditDecorator;
 import com.vn.agent.extraction.ExtractionToolBridge;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.spi.ToolContributor;
+import com.vn.agent.tools.jpql.BuiltInJpqlTool;
 import com.vn.agent.tools.link.BuiltInLinkTools;
 import com.vn.agent.tools.mutation.BuiltInMutationTools;
 import io.jmix.core.security.CurrentAuthentication;
@@ -54,10 +55,12 @@ import java.util.List;
  *       binding/invocation failures.</li>
  * </ul>
  *
- * <p>D-09 callback counts:
+ * <p>D-09 callback counts (read tools are now 7 after {@code describe_entities}; the always-on
+ * {@code run_jpql_query} analytics built-in adds 1 more):
  * <ul>
- *   <li>default (mutation off): 6 read + 2 link + 1 extraction = 9 callbacks.</li>
- *   <li>{@code jmix.ai-agent.tools.mutation.enabled=true}: 6 + 2 + 1 + 5 = 14 callbacks.</li>
+ *   <li>default (mutation off): 7 read + 2 link + 1 jpql + 1 extraction + 2 action-proposal
+ *       = 13 callbacks.</li>
+ *   <li>{@code jmix.ai-agent.tools.mutation.enabled=true}: 13 + 5 mutation = 18 callbacks.</li>
  *   <li>NEVER: a {@code delete_record} callback under any property combination (D-07).</li>
  * </ul>
  */
@@ -94,6 +97,7 @@ public class AgentToolCallbacks {
 
     private final BuiltInDataTools builtIns;
     private final BuiltInLinkTools builtInLinkTools;
+    private final BuiltInJpqlTool builtInJpqlTool;
     private final ExtractionToolBridge extractionToolBridge;
     private final ActionProposalTool actionProposalTool;
     private final ObjectProvider<BuiltInMutationTools> mutationToolsProvider;
@@ -105,6 +109,7 @@ public class AgentToolCallbacks {
 
     public AgentToolCallbacks(BuiltInDataTools builtIns,
                               BuiltInLinkTools builtInLinkTools,
+                              BuiltInJpqlTool builtInJpqlTool,
                               ExtractionToolBridge extractionToolBridge,
                               ActionProposalTool actionProposalTool,
                               ObjectProvider<BuiltInMutationTools> mutationToolsProvider,
@@ -115,6 +120,7 @@ public class AgentToolCallbacks {
                               MutationArgumentSanitizer mutationArgumentSanitizer) {
         this.builtIns = builtIns;
         this.builtInLinkTools = builtInLinkTools;
+        this.builtInJpqlTool = builtInJpqlTool;
         this.extractionToolBridge = extractionToolBridge;
         this.actionProposalTool = actionProposalTool;
         this.mutationToolsProvider = mutationToolsProvider;
@@ -157,6 +163,10 @@ public class AgentToolCallbacks {
         // Always-on link tools (Plan 11-08): generic audit wrapping is correct here — link tools
         // do NOT self-audit; they emit a single SUCCESS/ERROR row through the generic decorator.
         Collections.addAll(all, fromBean(builtInLinkTools));
+        // Always-on read-only JPQL analytics tool: a first-class built-in (not a host
+        // ToolContributor), audited through the same generic decorator. Security lives in
+        // AiJpqlQueryService (LoadValuesAccessContext + secured loadValues + exposure overlay).
+        Collections.addAll(all, fromBean(builtInJpqlTool));
         if (includeExtraction) {
             Collections.addAll(all, fromBean(extractionToolBridge));
         }

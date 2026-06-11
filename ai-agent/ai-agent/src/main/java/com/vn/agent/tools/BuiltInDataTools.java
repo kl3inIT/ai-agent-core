@@ -173,6 +173,57 @@ public class BuiltInDataTools {
     }
   }
 
+  // -------- Tool 2b: describe_entities (batch schema for JPQL authoring) --------
+
+  /**
+   * Batch variant of {@link #describeEntity(String)}: describes several entities in one call so the
+   * LLM can see the cross-entity relationship graph and enum-id mappings it needs to author a
+   * correct {@code run_jpql_query} (the JPQL tool's description tells the model to call this first).
+   *
+   * <p>Returns a JSON array of the same per-entity descriptor {@code describe_entity} produces.
+   * Uniform opacity is preserved: an unknown or denied entity name aborts the batch with {@code
+   * unknown_entity} exactly as the singular tool would (the LLM should only pass names it saw in
+   * {@code list_entities}).
+   */
+  @Tool(
+      name = "describe_entities",
+      description =
+          """
+                    Describe several entities at once. Returns a JSON array of the same per-entity
+                    schema as describe_entity (attributes, types, relationships, enum values). Call
+                    this before run_jpql_query to get the relationship graph and enum ids needed to
+                    write a correct JPQL query.
+                    """)
+  public String describeEntities(
+      @ToolParam(
+              description =
+                  "Exact entity names from agent.entities or list_entities; do not infer or add prefixes")
+          List<String> entityNames) {
+    try {
+      List<JsonNode> descriptors = new ArrayList<>();
+      if (entityNames != null) {
+        for (String entityName : entityNames) {
+          MetaClass metaClass = toolEntityResolver.resolveReadableEntityOrThrow(entityName);
+          Set<String> schemaAttributeNames = llmExposurePolicy.getReadableSchema().get(metaClass);
+          if (schemaAttributeNames == null) {
+            throw new ToolUserError(
+                "unknown_entity", "no entity named " + entityName, UnknownEntityHints.AS_LIST);
+          }
+          Set<String> readableAttributeNames =
+              toolEntityResolver.llmReadableAttributes(metaClass, schemaAttributeNames);
+          descriptors.add(
+              objectMapper.readTree(toolResultFormatter.describe(metaClass, readableAttributeNames)));
+        }
+      }
+      return toolResultFormatter.toJson(descriptors);
+    } catch (ToolUserError toolUserError) {
+      return toolResultFormatter.error(toolUserError);
+    } catch (JsonProcessingException e) {
+      // describe(...) emits valid JSON by construction; a parse failure here is an internal fault.
+      return toolResultFormatter.error("describe_failed", "could not assemble batch schema");
+    }
+  }
+
   // -------- Tool 3: find_records (TOOL-05, TOOL-06, D-12, D-14) --------
 
   @Tool(

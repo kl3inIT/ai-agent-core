@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <fragment xmlns="http://jmix.io/schema/flowui/fragment">
     <!--
-        Phase 13.1 Plan 04 — CRM-style right-pane Attachments shape (UI-01 / CONTRACT-01-xml).
-        Horizontal split with chat on the left and the Attachments panel on the right
-        (splitterPosition=68). Replaces the Phase 13 inline pill-strip plus inline-upload
-        row layout. The right-pane vbox keeps id="attachmentsPanel" so the Phase 12
-        ChatSurfaceMounter contract (slot id) is unchanged.
+        Inline-attachments layout (jmix-crm style). The prior Phase 13.1 right-pane
+        Attachments split was retired: chat is now full-width and uploaded files render
+        inline in the timeline as downloadable attachment cards (built in Java by
+        ChatPanelFragment.appendTaskFileCard via AiTaskFileInlineCard). The upload entry
+        point moved into the composer bar next to the MessageInput (a compact attach
+        control, not a permanent dropzone).
+
+        taskFilesDc/taskFilesDl are kept: the loader supplies the conversation's
+        AiTaskFile rows so they can be replayed as inline cards on conversation switch.
 
         REVIEWS HIGH-4 carry-over: <upload> carries NO declarative receiverType — the
         handler is wired in Java via UploadHandler.toFile(...) (project memory
-        feedback_jmix_upload_receiver_deprecated). Mirrors KnowledgeBaseView.documentUpload.
+        feedback_jmix_upload_receiver_deprecated). Only FileRejectedEvent is @Subscribe-d.
     -->
     <data>
         <collection id="taskFilesDc" class="com.vn.agent.entity.AiTaskFile">
@@ -18,7 +22,7 @@
             </fetchPlan>
             <loader id="taskFilesDl">
                 <query>
-                    <![CDATA[select e from ai_AiTaskFile e where e.conversation.id = :conversationId order by e.createdDate desc]]>
+                    <![CDATA[select e from ai_AiTaskFile e where e.conversation.id = :conversationId order by e.createdDate asc]]>
                 </query>
             </loader>
         </collection>
@@ -26,75 +30,50 @@
     <content>
         <vbox id="rootLayout" classNames="ai-agent-chat-panel"
               width="100%" height="100%" padding="false" spacing="false">
-            <split id="conversationSplit" orientation="HORIZONTAL"
-                   width="100%" height="100%" splitterPosition="68">
-                <vbox id="chatPanel" width="100%" height="100%"
-                      padding="false" spacing="false">
-                    <hbox id="titleBar" width="100%" alignItems="CENTER"
-                          classNames="ai-agent-chat-panel__toolbar">
-                        <h3 id="conversationTitle"
-                            text="msg:///chatView.action.newChat"
-                            classNames="m-0 ai-agent-chat-panel__title"/>
-                        <button id="editConversationTitleButton"
-                                icon="PENCIL"
-                                title="msg:///chatView.action.editTitle"
-                                ariaLabel="msg:///chatView.action.editTitle"
-                                themeNames="tertiary-inline small icon"
-                                visible="false"/>
-                        <button id="newChatButton"
-                                icon="PLUS"
-                                title="msg:///chatView.action.newChat"
-                                ariaLabel="msg:///chatView.action.newChat"
-                                themeNames="tertiary-inline small icon"/>
-                        <button id="stopButton"
-                                text="msg:///chatView.action.stop"
-                                themeNames="tertiary"
-                                visible="false"/>
-                    </hbox>
-                    <vbox id="messageListSlot" width="100%" height="100%"
-                          padding="false" spacing="false"
-                          classNames="ai-agent-chat-panel__messages"/>
-                    <radioButtonGroup id="intentCardRow"
-                                      classNames="ai-agent-intent-card-row"
-                                      themeNames="horizontal"
-                                      visible="false"
-                                      width="100%"
-                                      ariaLabel="msg:///chatView.intent.cardRow.ariaLabel"/>
-                    <vbox id="messageInputSlot" width="100%"
-                          padding="false" spacing="false"
-                          classNames="ai-agent-chat-panel__input"/>
-                </vbox>
-                <vbox id="attachmentsPanel" width="100%" height="100%"
-                      spacing="false" padding="true">
-                    <h3 id="attachmentsTitle"
-                        text="msg:///chatView.attachments.title"
-                        classNames="m-0"/>
-                    <vbox id="attachmentsEmptyState"
-                          alignItems="CENTER" justifyContent="CENTER"
-                          spacing="true" padding="true"
-                          width="100%" height="100%">
-                        <icon icon="vaadin:cloud-upload" size="XL"
-                              classNames="text-tertiary"/>
-                        <span text="msg:///chatView.attachments.emptyState"
-                              classNames="text-tertiary text-s"/>
-                    </vbox>
-                    <gridLayout id="attachmentsGridLayout"
-                                itemsContainer="taskFilesDc"
-                                width="100%">
-                        <fragmentRenderer
-                                class="com.vn.agent.view.chat.fragment.AiTaskFileCardFragmentRenderer"/>
-                    </gridLayout>
-                    <upload id="taskFileUpload"
-                            width="100%"
-                            classNames="attachments-dropzone"
-                            acceptedFileTypes="application/pdf,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/html,text/plain,text/markdown,image/png,image/jpeg,image/gif,image/webp,.pdf,.csv,.doc,.docx,.xls,.xlsx,.html,.htm,.txt,.md,.png,.jpg,.jpeg,.gif,.webp"
-                            maxFiles="10"
-                            maxFileSize="104857600"
-                            uploadText="msg:///chatView.attachments.uploadText"
-                            dropLabel="msg:///chatView.attachments.dropLabel"
-                            dropAllowed="true"/>
-                </vbox>
-            </split>
+            <hbox id="titleBar" width="100%" alignItems="CENTER"
+                  classNames="ai-agent-chat-panel__toolbar">
+                <h3 id="conversationTitle"
+                    text="msg:///chatView.action.newChat"
+                    classNames="m-0 ai-agent-chat-panel__title"/>
+                <button id="editConversationTitleButton"
+                        icon="PENCIL"
+                        title="msg:///chatView.action.editTitle"
+                        ariaLabel="msg:///chatView.action.editTitle"
+                        themeNames="tertiary-inline small icon"
+                        visible="false"/>
+                <button id="newChatButton"
+                        icon="PLUS"
+                        title="msg:///chatView.action.newChat"
+                        ariaLabel="msg:///chatView.action.newChat"
+                        themeNames="tertiary-inline small icon"/>
+                <button id="stopButton"
+                        text="msg:///chatView.action.stop"
+                        themeNames="tertiary"
+                        visible="false"/>
+            </hbox>
+            <vbox id="messageListSlot" width="100%" height="100%"
+                  padding="false" spacing="false"
+                  classNames="ai-agent-chat-panel__messages"/>
+            <radioButtonGroup id="intentCardRow"
+                              classNames="ai-agent-intent-card-row"
+                              themeNames="horizontal"
+                              visible="false"
+                              width="100%"
+                              ariaLabel="msg:///chatView.intent.cardRow.ariaLabel"/>
+            <hbox id="composerBar" width="100%" alignItems="CENTER" spacing="true"
+                  padding="false" expand="messageInputSlot"
+                  classNames="ai-agent-chat-panel__composer">
+                <upload id="taskFileUpload"
+                        classNames="ai-agent-attachment-upload"
+                        acceptedFileTypes="application/pdf,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/html,text/plain,text/markdown,image/png,image/jpeg,image/gif,image/webp,.pdf,.csv,.doc,.docx,.xls,.xlsx,.html,.htm,.txt,.md,.png,.jpg,.jpeg,.gif,.webp"
+                        maxFiles="10"
+                        maxFileSize="104857600"
+                        uploadText="msg:///chatView.attachments.button"
+                        dropAllowed="false"/>
+                <vbox id="messageInputSlot" width="100%"
+                      padding="false" spacing="false"
+                      classNames="ai-agent-chat-panel__input"/>
+            </hbox>
         </vbox>
     </content>
 </fragment>

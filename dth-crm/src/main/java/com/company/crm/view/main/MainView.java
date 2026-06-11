@@ -1,6 +1,5 @@
 package com.company.crm.view.main;
 
-import io.jmix.flowui.ViewNavigators;
 import com.company.crm.app.online.OnlineDemoDataCreator;
 import com.company.crm.app.ui.component.CrmLoader;
 import com.company.crm.app.util.constant.CrmConstants;
@@ -22,7 +21,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.popover.Popover;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import io.jmix.core.AccessManager;
 import io.jmix.core.Messages;
 import io.jmix.core.Metadata;
 import io.jmix.core.security.CurrentAuthentication;
@@ -30,7 +28,6 @@ import io.jmix.core.usersubstitution.CurrentUserSubstitution;
 import io.jmix.flowui.DialogWindows;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.ViewNavigators;
-import io.jmix.flowui.accesscontext.UiShowViewContext;
 import io.jmix.flowui.app.main.StandardMainView;
 import io.jmix.flowui.asynctask.UiAsyncTasks;
 import io.jmix.flowui.component.SupportsTypedValue.TypedValueChangeEvent;
@@ -77,8 +74,6 @@ public class MainView extends StandardMainView {
     private CurrentAuthentication currentAuthentication;
     @Autowired
     private CurrentUserSubstitution currentUserSubstitution;
-    @Autowired
-    private AccessManager accessManager;
 
     @Autowired(required = false)
     private OnlineDemoDataCreator onlineDemoDataCreator;
@@ -89,24 +84,15 @@ public class MainView extends StandardMainView {
     private TypedTextField<String> searchField;
     @ViewComponent
     private JmixButton notificationsButton;
-    @ViewComponent
-    private JmixButton chatButton;
 
     final Popover[] searchPopover = {null};
     final Popover[] notificationsPopover = {null};
 
     @Subscribe
     private void onReady(final ReadyEvent event) {
-        checkChatButtonPermission();
         if (onlineDemoDataCreator != null) {
             onlineDemoDataCreator.createDemoDataIfNeeded();
         }
-    }
-
-    private void checkChatButtonPermission() {
-        UiShowViewContext context = new UiShowViewContext("AiAgent_Chat");
-        accessManager.applyRegisteredConstraints(context);
-        chatButton.setVisible(context.isPermitted());
     }
 
     @Subscribe("userMenu.profileItem.profileAction")
@@ -189,11 +175,6 @@ public class MainView extends StandardMainView {
     @Subscribe(id = "notificationsButton", subject = "clickListener")
     private void onNotificationsButtonSingleClick(final ClickEvent<JmixButton> event) {
         onNotificationButtonClick();
-    }
-
-    @Subscribe(id = "chatButton", subject = "clickListener")
-    private void onChatButtonClick(final ClickEvent<JmixButton> event) {
-        viewNavigators.view(this, "AiAgent_Chat").navigate();
     }
 
     private Avatar createAvatar(String fullName) {

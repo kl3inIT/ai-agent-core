@@ -44,7 +44,9 @@
                         </suffix>
                     </textField>
                 </div>
-                <button id="chatButton" icon="MAGIC" themeNames="icon tertiary" classNames="me-l"/>
+                <!-- AI chat entry points (header dialog button + sidebar toggle) are auto-mounted
+                     by the add-on's ChatSurfaceMounter; the host must NOT add its own duplicate
+                     wand button (it produced two identical MAGIC icons in the navbar). -->
                 <button id="notificationsButton" icon="BELL_O" themeNames="tertiary" classNames="me-l"
                         css="background-color: var(--lumo-shade-5pct);"/>
 

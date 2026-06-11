@@ -48,8 +48,8 @@ public final class AgentSystemPromptRules {
             "- In user-facing replies, do NOT use internal entity names that look like '<prefix>_<Name>'"
                     + ". Use the human label from agent.entities instead.",
             "- In user-facing replies, do NOT mention tool names such as list_entities, describe_entity,"
-                    + " find_records, count_records, get_record, get_related_records, or RETRIEVAL."
-                    + " Refer to actions in plain business language.",
+                    + " describe_entities, find_records, count_records, get_record, get_related_records,"
+                    + " run_jpql_query, or RETRIEVAL. Refer to actions in plain business language.",
             "- For tool arguments named entityName, use exactly one entity name shown in agent.entities"
                     + " or returned by list_entities. Do NOT infer, add, or rewrite application prefixes.",
             "- These vocabulary rules apply to text the user reads. Tool calls still use the exact"
@@ -77,6 +77,19 @@ public final class AgentSystemPromptRules {
                     + " bulk_save_records). Never invent rows, ids, phone numbers, emails, or fill"
                     + " missing fields with plausible-looking placeholders. If find_records returned"
                     + " zero rows, say so explicitly.",
+            "",
+            "Analytics and aggregation (choose the right tool):",
+            "- For counts-per-group, sums, averages, min/max, sorting by a computed or aggregated"
+                    + " value, or top-N / ranking questions (for example 'top 5 customers by order"
+                    + " count', 'revenue per month', 'orders grouped by status'), first call"
+                    + " describe_entities for the involved entities, then call run_jpql_query. It"
+                    + " returns the grouped/aggregated result in ONE query.",
+            "- Do NOT answer aggregation, grouping, or ranking questions by looping"
+                    + " get_related_records per record or by issuing many find_records / count_records"
+                    + " calls — that is slow, hits row limits, and produces wrong totals.",
+            "- Keep find_records / count_records for simple single-entity lookups and filters; switch"
+                    + " to run_jpql_query as soon as the question needs GROUP BY, ORDER BY by an"
+                    + " aggregate, JOINs across relationships, or selected column projections.",
             "",
             "Do not leak internals (applies to ALL user-facing reply text):",
             "- NEVER reveal internal tool names to the user — neither read tools nor mutation tools"

@@ -47,20 +47,19 @@ import static org.mockito.Mockito.when;
 class ChatPanelFragmentConversationIdTest {
 
     @Test
-    void descriptorAddsTitleEditAndAttachmentsPaneWithSafeUpload() throws Exception {
+    void descriptorAddsTitleEditAndComposerUpload() throws Exception {
         Document document = readDescriptor();
 
         Element conversationTitle = elementById(document, "conversationTitle");
         Element editTitleButton = elementById(document, "editConversationTitleButton");
-        Element attachmentsPanel = elementById(document, "attachmentsPanel");
 
         assertThat(conversationTitle.getTagName()).isEqualTo("h3");
         assertThat(conversationTitle.getAttribute("text")).startsWith("msg://");
         assertThat(editTitleButton.getAttribute("icon")).isEqualTo("PENCIL");
         assertThat(editTitleButton.hasAttribute("text")).isFalse();
         assertThat(editTitleButton.getAttribute("title")).startsWith("msg://");
-        assertThat(attachmentsPanel.getTagName()).isEqualTo("vbox");
-        assertThat(attachmentsPanel.hasAttribute("visible")).isFalse();
+
+        // The right-pane Attachments split is retired; upload now lives in the composer.
         assertThat(document.getElementsByTagName("upload").getLength()).isEqualTo(1);
 
         Element taskFileUpload = elementById(document, "taskFileUpload");
@@ -123,10 +122,16 @@ class ChatPanelFragmentConversationIdTest {
 
         assertThat(fragment.hasMessages()).isFalse();
         assertThat(getInt(fragment, "messageCount")).isZero();
-        // the stale sibling row is gone; only a fresh <vaadin-message-list> remains
+        // the stale sibling row is gone; the only remaining children are the fresh
+        // <vaadin-message-list> and the empty-chat starter-prompt suggestions panel
+        // (rendered because the cleared conversation has no messages).
         assertThat(slot.getElement().getChildren()
                 .filter(e -> "vaadin-message-list".equals(e.getTag())).count()).isEqualTo(1);
-        assertThat(slot.getElement().getChildCount()).isEqualTo(1);
+        assertThat(slot.getElement().getChildren()
+                .anyMatch(e -> e.getClassList().contains("ai-agent-chat-panel__suggestions")))
+                .as("empty chat re-renders the starter-prompt suggestions panel")
+                .isTrue();
+        assertThat(slot.getElement().getChildCount()).isEqualTo(2);
     }
 
     @Test

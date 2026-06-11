@@ -9,6 +9,7 @@ import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.spi.ToolContributor;
 import com.vn.agent.tools.AgentToolCallbacks;
 import com.vn.agent.tools.BuiltInDataTools;
+import com.vn.agent.tools.jpql.BuiltInJpqlTool;
 import com.vn.agent.tools.link.BuiltInLinkTools;
 import com.vn.agent.tools.mutation.BuiltInMutationTools;
 import io.jmix.core.security.CurrentAuthentication;
@@ -257,6 +258,7 @@ class AgentToolCallbacksIntentGatingTest {
         return new AgentToolCallbacks(
                 mock(BuiltInDataTools.class),
                 mock(BuiltInLinkTools.class),
+                mock(BuiltInJpqlTool.class),
                 extractionToolBridge,
                 new ActionProposalTool(mock(ActionProposalService.class)),
                 mutationToolsProvider,

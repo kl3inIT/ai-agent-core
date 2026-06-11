@@ -21,8 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Plan 11-10 Task 1 — TEST-13 mutation-enabled proof. Two contexts:
  * <ul>
  *   <li>{@code AgentToolCallbacksMutationEnabledTest} — {@code mutation.enabled=true} only.
- *       Asserts the 5 mutation callbacks plus all 6 read + 2 link + 1 extraction + 1 action-proposal
- *       callbacks are exposed (15), and {@code delete_record} is absent.</li>
+ *       Asserts the 5 mutation callbacks plus all 7 read (incl. describe_entities) + 1 jpql + 2 link
+ *       + 1 extraction + 2 action-proposal callbacks are exposed (18), and {@code delete_record} is
+ *       absent.</li>
  *   <li>{@code AgentToolCallbacksMutationEnabledAllowDeleteTest} — {@code enabled=true} plus
  *       {@code allowDelete=true}. Asserts {@code delete_record} is STILL absent (D-07 absolute);
  *       the future-signal flag does not unlock a v1.1 delete tool because the @Tool method
@@ -51,13 +52,13 @@ class AgentToolCallbacksMutationEnabledTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        // Diagnostic — no host ToolContributor beans on the test classpath, exact 16
-        // (15 + Workstream A propose_bulk_action_choices).
-        assertThat(names).hasSize(16);
+        // Diagnostic — no host ToolContributor beans on the test classpath, exact 18
+        // (16 + describe_entities batch-schema tool + run_jpql_query analytics tool).
+        assertThat(names).hasSize(18);
 
         assertThat(names).contains(
-                "list_entities", "describe_entity", "find_records",
-                "count_records", "get_record", "get_related_records",
+                "list_entities", "describe_entity", "describe_entities", "find_records",
+                "count_records", "get_record", "get_related_records", "run_jpql_query",
                 "generate_entity_list_link", "generate_entity_detail_link");
 
         assertThat(names).contains(
@@ -98,8 +99,9 @@ class AgentToolCallbacksMutationEnabledAllowDeleteTest {
                 .map(cb -> cb.getToolDefinition().name())
                 .collect(Collectors.toList());
 
-        assertThat(names).hasSize(16);
+        assertThat(names).hasSize(18);
         assertThat(names).contains("bulk_save_records");
+        assertThat(names).contains("describe_entities", "run_jpql_query");
         assertThat(names).contains(
                 "prepare_form_draft", "propose_action_choices", "propose_bulk_action_choices");
         assertThat(names).doesNotContain("delete_record");
