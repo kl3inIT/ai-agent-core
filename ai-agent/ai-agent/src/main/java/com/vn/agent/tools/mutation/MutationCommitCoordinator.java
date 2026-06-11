@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.orchestration.RunContext;
 import com.vn.agent.tools.ToolResultFormatter;
 import com.vn.agent.tools.ToolUserError;

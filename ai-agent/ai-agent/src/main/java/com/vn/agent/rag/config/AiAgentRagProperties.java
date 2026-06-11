@@ -3,8 +3,6 @@ package com.vn.agent.rag.config;
 import com.vn.agent.admin.config.KnobMetadata;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.time.Duration;
-
 /**
  * Configuration surface for the RAG layer, bound to {@code jmix.ai-agent.rag.*}
  * (D-22). Picked up by the {@code @ConfigurationPropertiesScan} on
@@ -19,11 +17,7 @@ import java.time.Duration;
  *   <li>{@link #topK()} / {@link #similarityThreshold()} — tuning knobs for
  *       {@code VectorStoreDocumentRetriever} (AI-SPEC §4).</li>
  *   <li>{@link #splitter()} — {@code TokenTextSplitter} chunking sizes (D-13).
- *       Note: {@code chunkOverlap} is a semantic alias — {@code TokenTextSplitter}
- *       does not do overlapping windows; {@code minChunkSizeChars} is the honest
- *       lower-bound knob (RESEARCH Pitfall #5).</li>
- *   <li>{@link #embedRetry()} — Spring Retry backoff bounds for transient
- *       provider errors during embed calls (D-16).</li>
+ *       {@code minChunkSizeChars} is the honest lower-bound knob (RESEARCH Pitfall #5).</li>
  *   <li>{@link #sampleIngester()} — classpath-markdown reference ingester
  *       enablement + path pattern (D-17).</li>
  *   <li>{@link #ingestExecutor()} — bounded {@code ThreadPoolTaskExecutor} sizing
@@ -56,9 +50,6 @@ public record AiAgentRagProperties(
                 displayMessageKey = "bootConfig.knob.rag.splitter")
         Splitter splitter,
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
-                displayMessageKey = "bootConfig.knob.rag.embedRetry")
-        EmbedRetry embedRetry,
-        @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
                 displayMessageKey = "bootConfig.knob.rag.sampleIngester")
         SampleIngester sampleIngester,
         @KnobMetadata(tier = KnobMetadata.Tier.TIER_2, requiresRestart = true,
@@ -74,10 +65,7 @@ public record AiAgentRagProperties(
     private static final int DEFAULT_UPLOAD_MAX_FILE_SIZE_BYTES = 104_857_600;
 
     /** {@code TokenTextSplitter} sizing — see D-13 and RESEARCH Pitfall #5. */
-    public record Splitter(Integer chunkSize, Integer chunkOverlap, Integer minChunkSizeChars) {}
-
-    /** Spring Retry bounds around the embed call (D-16). */
-    public record EmbedRetry(Integer maxAttempts, Duration initialInterval, Double multiplier) {}
+    public record Splitter(Integer chunkSize, Integer minChunkSizeChars) {}
 
     /** Classpath-markdown reference ingester, disabled by default (D-17). */
     public record SampleIngester(Boolean enabled, String pathPattern) {}

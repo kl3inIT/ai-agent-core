@@ -3,7 +3,7 @@ package com.vn.agent.tools.link;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.AITestConfiguration;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
 import io.jmix.core.metamodel.model.MetaClass;

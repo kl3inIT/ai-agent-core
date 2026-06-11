@@ -2,7 +2,6 @@ package com.vn.agent;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.action.ActionIntentId;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.extraction.ExtractionInput;
@@ -91,7 +90,6 @@ class DefaultChatServiceIntentRoutingTest {
     private StreamingSinkHolder streamingSinkHolder;
     private AgentSystemPromptRulesComposer rulesComposer;
     private IntentRegistry intentRegistry;
-    private ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     private AiTaskFileMediaResolver taskFileMediaResolver;
     private AiTaskFileRepository taskFileRepository;
     private DefaultChatServiceImpl service;
@@ -118,7 +116,6 @@ class DefaultChatServiceIntentRoutingTest {
         streamingSinkHolder = mock(StreamingSinkHolder.class);
         rulesComposer = mock(AgentSystemPromptRulesComposer.class);
         intentRegistry = mock(IntentRegistry.class);
-        titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
         taskFileMediaResolver = mock(AiTaskFileMediaResolver.class);
         taskFileRepository = mock(AiTaskFileRepository.class);
 
@@ -172,7 +169,6 @@ class DefaultChatServiceIntentRoutingTest {
                 streamingSinkHolder,
                 rulesComposer,
                 intentRegistry,
-                titleEligibilityPublisher,
                 taskFileMediaResolver,
                 taskFileRepository,
                 mock(org.springframework.context.ApplicationEventPublisher.class));

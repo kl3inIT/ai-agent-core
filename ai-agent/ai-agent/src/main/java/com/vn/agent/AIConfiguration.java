@@ -1,6 +1,5 @@
 package com.vn.agent;
 
-import com.vn.agent.conversation.AiAgentTitleProperties;
 import com.vn.agent.extraction.AiExtractionProperties;
 import com.vn.agent.rag.MdcPropagatingTaskDecorator;
 import com.vn.agent.rag.config.AiAgentRagProperties;
@@ -103,13 +102,14 @@ public class AIConfiguration {
      */
     @Bean(name = "aiAgentTitleExecutor")
     @ConditionalOnMissingBean(name = "aiAgentTitleExecutor")
-    public ThreadPoolTaskExecutor aiAgentTitleExecutor(AiAgentTitleProperties props) {
+    public ThreadPoolTaskExecutor aiAgentTitleExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        AiAgentTitleProperties.Executor cfg = props.resolvedExecutor();
-        executor.setCorePoolSize(cfg.resolvedCorePoolSize());
-        executor.setMaxPoolSize(cfg.resolvedMaxPoolSize());
-        executor.setQueueCapacity(cfg.resolvedQueueCapacity());
-        executor.setKeepAliveSeconds(cfg.resolvedKeepAliveSeconds());
+        // Fixed small pool: title generation is a low-volume, fail-silent side job, not an
+        // operator-tunable knob. CallerRunsPolicy below supplies back-pressure on overflow.
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(32);
+        executor.setKeepAliveSeconds(60);
         executor.setThreadNamePrefix("ai-title-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setTaskDecorator(new MdcPropagatingTaskDecorator());

@@ -1,6 +1,6 @@
 package com.vn.agent.rag;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import org.junit.jupiter.api.Tag;
@@ -62,7 +62,7 @@ class RetrievalFilterBuilderBuildOncePerRetrievalTest {
 
     private static AiAgentRagProperties ragProps() {
         // admin-bypass false → the non-admin per-role + exposure branch is exercised.
-        return new AiAgentRagProperties(false, 5, 0.5, null, null, null, null, null, null);
+        return new AiAgentRagProperties(false, 5, 0.5, null, null, null, null, null);
     }
 
     private static LlmExposurePolicy denylistPolicy() {

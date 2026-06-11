@@ -1,6 +1,6 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.QueryUtils;

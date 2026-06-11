@@ -7,7 +7,6 @@ import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiAuditEvent;
 import com.vn.agent.entity.AiTaskFile;
 import com.vn.agent.entity.AiUiSettings;
-import com.vn.agent.exposure.AiExposureRule;
 import com.vn.agent.tools.mutation.AiMutationIntent;
 import io.jmix.security.model.EntityPolicyAction;
 import io.jmix.security.role.annotation.EntityPolicy;
@@ -31,7 +30,6 @@ public interface AiAgentAdminRole {
     @EntityPolicy(entityClass = AiAuditEvent.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiParameters.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiKnowledgeDocument.class, actions = EntityPolicyAction.ALL)
-    @EntityPolicy(entityClass = AiExposureRule.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiMutationIntent.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiTaskFile.class, actions = EntityPolicyAction.ALL)
     @EntityPolicy(entityClass = AiUiSettings.class, actions = {

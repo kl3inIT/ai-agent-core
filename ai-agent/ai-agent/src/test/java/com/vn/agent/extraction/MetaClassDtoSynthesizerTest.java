@@ -2,24 +2,23 @@ package com.vn.agent.extraction;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.exposure.LlmExposurePolicy;
-import io.jmix.core.AccessManager;
+import com.vn.agent.extraction.introspection.DatatypePropertyIntrospector;
+import com.vn.agent.extraction.introspection.EnumPropertyIntrospector;
+import com.vn.agent.extraction.introspection.PropertyIntrospector;
+import com.vn.agent.extraction.introspection.RelationPropertyIntrospector;
 import io.jmix.core.MessageTools;
 import io.jmix.core.Metadata;
 import io.jmix.core.MetadataTools;
-import io.jmix.core.accesscontext.EntityAttributeContext;
 import io.jmix.core.metamodel.datatype.Datatype;
 import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.core.metamodel.model.MetaProperty;
 import io.jmix.core.metamodel.model.Range;
 import jakarta.persistence.OneToMany;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 
 import java.lang.reflect.AnnotatedElement;
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
@@ -31,7 +30,7 @@ class MetaClassDtoSynthesizerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void schemaJsonParsesAndCustomerLikeFieldsAreIncludedAndExcluded() throws Exception {
+    void schemaJsonParsesSystemAndCollectionFieldsExcludedToOneBecomesUuid() throws Exception {
         MetaProperty id = datatypeProperty("id", java.util.UUID.class, false);
         MetaProperty version = datatypeProperty("version", Integer.class, false);
         MetaProperty name = datatypeProperty("name", String.class, true);
@@ -46,70 +45,38 @@ class MetaClassDtoSynthesizerTest {
         when(customer.getProperties()).thenReturn(List.of(
                 id, version, name, email, phone, createdBy, recommendedProducts, salesOwnerProperty));
 
-        MetaClassDtoSynthesizer synthesizer = synthesizer(customer, id, Set.of(
-                "name", "email", "phone", "salesOwner", "recommendedProducts"));
+        MetaClassDtoSynthesizer synthesizer = synthesizer(customer, id);
 
-        try (MockedConstruction<EntityAttributeContext> ignored = Mockito.mockConstruction(
-                EntityAttributeContext.class,
-                (attributeAccessContext, context) -> when(attributeAccessContext.canModify()).thenReturn(true))) {
-            MetaClassDtoSynthesizer.SynthesizedSchema schema = synthesizer.buildSchema(customer);
-            JsonNode root = objectMapper.readTree(schema.schemaJson());
-            JsonNode properties = root.get("properties");
+        MetaClassDtoSynthesizer.SynthesizedSchema schema = synthesizer.buildSchema(customer);
+        JsonNode root = objectMapper.readTree(schema.schemaJson());
+        JsonNode properties = root.get("properties");
 
-            assertThat(root.get("type").asText()).isEqualTo("object");
-            assertThat(schema.attributeNames()).containsExactly("email", "name", "phone", "salesOwner");
-            assertThat(schema.requiredAttributeNames()).containsExactly("name");
-            assertThat(properties.has("name")).isTrue();
-            assertThat(properties.has("email")).isTrue();
-            assertThat(properties.has("phone")).isTrue();
-            assertThat(properties.get("salesOwner").get("format").asText()).isEqualTo("uuid");
-            assertThat(properties.has("recommendedProducts")).isFalse();
-            assertThat(properties.has("id")).isFalse();
-            assertThat(properties.has("version")).isFalse();
-            assertThat(properties.has("createdBy")).isFalse();
-        }
-    }
-
-    @Test
-    void deniedEntityAttributeContextAttributesAreExcluded() throws Exception {
-        MetaProperty id = datatypeProperty("id", java.util.UUID.class, false);
-        MetaProperty name = datatypeProperty("name", String.class, false);
-        MetaProperty phone = datatypeProperty("phone", String.class, false);
-        MetaClass customer = metaClass("jmixapp_Customer", id, name, phone);
-        MetaClassDtoSynthesizer synthesizer = synthesizer(customer, id, Set.of("name", "phone"));
-
-        try (MockedConstruction<EntityAttributeContext> ignored = Mockito.mockConstruction(
-                EntityAttributeContext.class,
-                (attributeAccessContext, context) -> {
-                    String attributeName = (String) context.arguments().get(1);
-                    when(attributeAccessContext.canModify()).thenReturn(!"phone".equals(attributeName));
-                })) {
-            MetaClassDtoSynthesizer.SynthesizedSchema schema = synthesizer.buildSchema(customer);
-            JsonNode properties = objectMapper.readTree(schema.schemaJson()).get("properties");
-
-            assertThat(schema.attributeNames()).containsExactly("name");
-            assertThat(properties.has("name")).isTrue();
-            assertThat(properties.has("phone")).isFalse();
-        }
+        assertThat(root.get("type").asText()).isEqualTo("object");
+        assertThat(schema.attributeNames()).containsExactly("email", "name", "phone", "salesOwner");
+        assertThat(schema.requiredAttributeNames()).containsExactly("name");
+        assertThat(properties.has("name")).isTrue();
+        assertThat(properties.has("email")).isTrue();
+        assertThat(properties.has("phone")).isTrue();
+        assertThat(properties.get("salesOwner").get("format").asText()).isEqualTo("uuid");
+        assertThat(properties.has("recommendedProducts")).isFalse();
+        assertThat(properties.has("id")).isFalse();
+        assertThat(properties.has("version")).isFalse();
+        assertThat(properties.has("createdBy")).isFalse();
     }
 
     private MetaClassDtoSynthesizer synthesizer(MetaClass metaClass,
-                                               MetaProperty primaryKeyProperty,
-                                               Set<String> readableAttributes) {
+                                               MetaProperty primaryKeyProperty) {
         Metadata metadata = mock(Metadata.class);
         MetadataTools metadataTools = mock(MetadataTools.class);
         when(metadataTools.getPrimaryKeyProperty(metaClass)).thenReturn(primaryKeyProperty);
-        AccessManager accessManager = mock(AccessManager.class);
-        LlmExposurePolicy exposurePolicy = mock(LlmExposurePolicy.class);
-        lenient().when(exposurePolicy.canReadEntity(org.mockito.ArgumentMatchers.any(MetaClass.class))).thenReturn(true);
-        lenient().when(exposurePolicy.canReadAttribute(org.mockito.ArgumentMatchers.eq(metaClass),
-                org.mockito.ArgumentMatchers.anyString())).thenAnswer(invocation ->
-                readableAttributes.contains(invocation.getArgument(1, String.class)));
         MessageTools messageTools = mock(MessageTools.class);
         lenient().when(messageTools.getPropertyCaption(org.mockito.ArgumentMatchers.any(MetaProperty.class)))
                 .thenAnswer(invocation -> ((MetaProperty) invocation.getArgument(0)).getName());
-        return new MetaClassDtoSynthesizer(metadata, metadataTools, accessManager,
-                exposurePolicy, messageTools, objectMapper);
+        List<PropertyIntrospector> introspectors = List.of(
+                new RelationPropertyIntrospector(messageTools),
+                new EnumPropertyIntrospector(messageTools),
+                new DatatypePropertyIntrospector(messageTools));
+        return new MetaClassDtoSynthesizer(metadata, metadataTools, objectMapper, introspectors);
     }
 
     private static MetaClass metaClass(String name, MetaProperty... properties) {

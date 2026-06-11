@@ -1,5 +1,8 @@
 package com.vn.agent.filter;
 
+import com.vn.agent.filter.literal.DatatypeLiteralValueConverter;
+import com.vn.agent.filter.literal.EnumLiteralValueConverter;
+import com.vn.agent.filter.literal.ReferenceLiteralValueConverter;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.metamodel.datatype.Datatype;
 import io.jmix.core.metamodel.datatype.EnumClass;
@@ -40,7 +43,10 @@ class FilterLiteralValueConverterTest {
 
     @BeforeEach
     void setUp() {
-        filterLiteralValueConverter = new FilterLiteralValueConverter();
+        filterLiteralValueConverter = new FilterLiteralValueConverter(List.of(
+                new ReferenceLiteralValueConverter(),
+                new EnumLiteralValueConverter(),
+                new DatatypeLiteralValueConverter()));
     }
 
     // --------- helpers ---------

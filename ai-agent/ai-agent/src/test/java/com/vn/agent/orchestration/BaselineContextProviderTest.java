@@ -1,7 +1,7 @@
 package com.vn.agent.orchestration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import io.jmix.core.AccessManager;
 import io.jmix.core.MessageTools;
 import io.jmix.core.accesscontext.CrudEntityContext;

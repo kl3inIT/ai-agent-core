@@ -23,7 +23,7 @@ import java.util.UUID;
  * row-level ownership policy applies. System cleanup is the only path expected
  * to bypass security, and that happens in {@code AiExtractionDraftCleanupJob}.
  *
- * <p>Excluded from the LLM-visible surface via {@code AiInternalEntityNames}.
+ * <p>Excluded from the LLM-visible surface via {@code AiAgentToolsProperties} hidden-entities.
  */
 @Store(name = "agentstore")
 @JmixEntity

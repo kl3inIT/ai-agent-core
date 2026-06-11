@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.spi.IntentExtractor;
 import com.vn.agent.taskfile.AiTaskFileMediaResolver;
 import io.jmix.core.DataManager;

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiExtractionDraft;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import com.vn.agent.tools.mutation.fixture.MutationChildFixture;
 import com.vn.agent.tools.mutation.fixture.MutationParentFixture;

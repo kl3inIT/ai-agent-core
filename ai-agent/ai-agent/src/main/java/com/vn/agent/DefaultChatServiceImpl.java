@@ -4,7 +4,7 @@ import com.vn.agent.action.ActionIntentId;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.audit.AuditWriter;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
+import com.vn.agent.conversation.ConversationTitleEligibleEvent;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
@@ -175,7 +175,6 @@ public class DefaultChatServiceImpl implements ChatService {
     private final StreamingSinkHolder streamingSinkHolder;
     private final AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
     private final IntentRegistry intentRegistry;
-    private final ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     // Phase 13.1 Plan 03 — per-turn-all Media injection via resolveActive(...). The Phase 13
     // single-turn pending-state stamp and the standalone two-phase user-message persist seam
     // are gone; the chat-memory advisor's own AiMessage projection is now the sole user-message
@@ -208,7 +207,6 @@ public class DefaultChatServiceImpl implements ChatService {
                                   StreamingSinkHolder streamingSinkHolder,
                                   AgentSystemPromptRulesComposer agentSystemPromptRulesComposer,
                                   IntentRegistry intentRegistry,
-                                  ConversationTitleEligibilityPublisher titleEligibilityPublisher,
                                   AiTaskFileMediaResolver taskFileMediaResolver,
                                   AiTaskFileRepository taskFileRepository,
                                   ApplicationEventPublisher eventPublisher) {
@@ -229,7 +227,6 @@ public class DefaultChatServiceImpl implements ChatService {
         this.streamingSinkHolder = streamingSinkHolder;
         this.agentSystemPromptRulesComposer = agentSystemPromptRulesComposer;
         this.intentRegistry = intentRegistry;
-        this.titleEligibilityPublisher = titleEligibilityPublisher;
         this.taskFileMediaResolver = taskFileMediaResolver;
         this.taskFileRepository = taskFileRepository;
         this.eventPublisher = eventPublisher;
@@ -995,7 +992,8 @@ public class DefaultChatServiceImpl implements ChatService {
             return;
         }
         try {
-            titleEligibilityPublisher.publishIfEligible(conversationId, userId, runId, safeGetLocale());
+            eventPublisher.publishEvent(
+                    new ConversationTitleEligibleEvent(conversationId, userId, runId, safeGetLocale()));
         } catch (RuntimeException failure) {
             log.warn("Conversation title eligibility publication failed runId={} convId={}",
                     runId, conversationId, failure);

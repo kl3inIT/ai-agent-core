@@ -1,7 +1,7 @@
 package com.vn.agent.entity;
 
 import com.vn.agent.AITestConfiguration;
-import com.vn.agent.exposure.AiInternalEntityNames;
+import com.vn.agent.tools.AiAgentToolsProperties;
 import io.jmix.core.Metadata;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +74,6 @@ class AiUiSettingsModelTest {
 
     @Test
     void uiSettingsEntityIsAlwaysHiddenFromLlmMetadata() {
-        assertThat(AiInternalEntityNames.contains("ai_AiUiSettings")).isTrue();
+        assertThat(AiAgentToolsProperties.DEFAULT_HIDDEN_ENTITIES).contains("ai_AiUiSettings");
     }
 }

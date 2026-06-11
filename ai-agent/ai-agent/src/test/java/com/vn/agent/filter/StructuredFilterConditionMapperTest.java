@@ -1,6 +1,9 @@
 package com.vn.agent.filter;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.filter.literal.DatatypeLiteralValueConverter;
+import com.vn.agent.filter.literal.EnumLiteralValueConverter;
+import com.vn.agent.filter.literal.ReferenceLiteralValueConverter;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.orchestration.AiUiSettingsResolver;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.QueryUtils;
@@ -42,7 +45,10 @@ class StructuredFilterConditionMapperTest {
 
     @BeforeEach
     void setUp() {
-        FilterLiteralValueConverter filterLiteralValueConverter = new FilterLiteralValueConverter();
+        FilterLiteralValueConverter filterLiteralValueConverter = new FilterLiteralValueConverter(List.of(
+                new ReferenceLiteralValueConverter(),
+                new EnumLiteralValueConverter(),
+                new DatatypeLiteralValueConverter()));
         llmExposurePolicy = mock(LlmExposurePolicy.class);
         // Default: every attribute is readable. Individual tests override.
         lenient().when(llmExposurePolicy.canReadAttribute(org.mockito.ArgumentMatchers.any(), anyString()))

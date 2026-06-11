@@ -2,7 +2,6 @@ package com.vn.agent;
 
 import java.time.Duration;
 import com.vn.agent.audit.AuditWriter;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiToolCallOutcome;
@@ -113,7 +112,6 @@ class DefaultChatServiceImplStreamingBadModelFallbackTest {
     private StreamingSinkHolder streamingSinkHolder;
     private AgentSystemPromptRulesComposer agentSystemPromptRulesComposer;
     private IntentRegistry intentRegistry;
-    private ConversationTitleEligibilityPublisher titleEligibilityPublisher;
     private AiTaskFileMediaResolver taskFileMediaResolver;
     private AiTaskFileRepository taskFileRepository;
     private ApplicationEventPublisher eventPublisher;
@@ -153,7 +151,6 @@ class DefaultChatServiceImplStreamingBadModelFallbackTest {
         streamingSinkHolder = mock(StreamingSinkHolder.class);
         agentSystemPromptRulesComposer = mock(AgentSystemPromptRulesComposer.class);
         intentRegistry = mock(IntentRegistry.class);
-        titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
         taskFileMediaResolver = mock(AiTaskFileMediaResolver.class);
         taskFileRepository = mock(AiTaskFileRepository.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
@@ -206,7 +203,6 @@ class DefaultChatServiceImplStreamingBadModelFallbackTest {
                 streamingSinkHolder,
                 agentSystemPromptRulesComposer,
                 intentRegistry,
-                titleEligibilityPublisher,
                 taskFileMediaResolver,
                 taskFileRepository,
                 eventPublisher);

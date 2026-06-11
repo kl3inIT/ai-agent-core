@@ -2,7 +2,7 @@ package com.vn.agent.tools.fetchplan;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.orchestration.RunContext;
 import io.jmix.core.FetchMode;
 import io.jmix.core.FetchPlan;

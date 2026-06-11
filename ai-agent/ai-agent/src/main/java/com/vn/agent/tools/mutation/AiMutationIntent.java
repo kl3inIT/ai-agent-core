@@ -39,7 +39,7 @@ import java.util.UUID;
  * </ul>
  *
  * <p>Persisted in the {@code agentstore} datasource alongside other AI-* entities.
- * Excluded from the LLM-visible surface via {@code AiInternalEntityNames}.
+ * Excluded from the LLM-visible surface via {@code AiAgentToolsProperties} hidden-entities.
  */
 @Store(name = "agentstore")
 @JmixEntity

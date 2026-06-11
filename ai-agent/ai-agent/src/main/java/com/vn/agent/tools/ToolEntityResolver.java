@@ -1,6 +1,6 @@
 package com.vn.agent.tools;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.filter.FilterLiteralValueConverter;
 import io.jmix.core.Metadata;
 import io.jmix.core.MetadataTools;

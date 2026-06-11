@@ -3,7 +3,7 @@ package com.vn.agent.tools;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.filter.FilterNode;
 import com.vn.agent.filter.StructuredFilterConditionMapper;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;

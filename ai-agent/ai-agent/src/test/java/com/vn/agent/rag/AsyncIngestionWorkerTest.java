@@ -59,8 +59,8 @@ class AsyncIngestionWorkerTest {
         vectorStore = mock(VectorStore.class);
         ragProps = new AiAgentRagProperties(
                 null, null, null,
-                new AiAgentRagProperties.Splitter(200, null, 10),
-                null, null, null, null, null);
+                new AiAgentRagProperties.Splitter(200, 10),
+                null, null, null, null);
         embeddingProps = new AiAgentEmbeddingProperties(
                 "qwen/qwen3-embedding-4b", 2000, null);
         resourceLoader = new DefaultResourceLoader();
@@ -237,8 +237,8 @@ class AsyncIngestionWorkerTest {
         stubLoad(id, doc(id, "classpath:ai-kb/fixture-alpha.md", "[\"ai-agent-user\"]"));
         AiAgentRagProperties capped = new AiAgentRagProperties(
                 null, null, null,
-                new AiAgentRagProperties.Splitter(200, null, 10),
-                null, null, null,
+                new AiAgentRagProperties.Splitter(200, 10),
+                null, null,
                 new AiAgentRagProperties.Ingest(1),
                 null);
         AsyncIngestionWorker cappedWorker = new AsyncIngestionWorker(statusWriter, cancellationRegistry,

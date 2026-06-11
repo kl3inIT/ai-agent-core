@@ -49,22 +49,6 @@
                     </dataGrid>
                 </vbox>
             </tab>
-            <tab id="exposureRulesTab" label="msg:///aiConfiguration.tab.exposureRules">
-                <vbox id="exposureRulesContent" padding="true" spacing="true" width="100%">
-                    <multiSelectComboBox id="hiddenEntitiesField"
-                                         label="msg:///aiConfiguration.exposure.hiddenEntities"
-                                         helperText="msg:///aiConfiguration.exposure.hiddenEntities.helper"
-                                         placeholder="msg:///aiConfiguration.exposure.hiddenEntities.placeholder"
-                                         width="100%"/>
-                    <hbox id="exposureRulesButtonsPanel" classNames="buttons-panel">
-                        <button id="saveExposureRulesButton"
-                                text="msg:///aiConfiguration.exposure.action.save"
-                                themeNames="primary"/>
-                        <button id="refreshExposureRulesButton"
-                                text="msg:///aiConfiguration.exposure.action.refresh"/>
-                    </hbox>
-                </vbox>
-            </tab>
             <tab id="promptContextTab" label="msg:///aiConfiguration.tab.promptContext">
                 <vbox id="promptContextContent" padding="true" spacing="true" width="100%">
                     <hbox id="promptToolbar"

@@ -44,7 +44,6 @@
         <class>io.jmix.securitydata.entity.StringCollectionConverter</class>
         <class>io.jmix.core.entity.UriConverter</class>
         <class>io.jmix.core.entity.FileRefConverter</class>
-        <class>com.vn.agent.exposure.AiExposureRule</class>
         <class>com.vn.agent.entity.AiExtractionDraft</class>
         <class>com.vn.agent.entity.AiConversation</class>
         <class>com.vn.agent.entity.AiParameters</class>

@@ -1,6 +1,6 @@
 package com.vn.agent.tools.mutation;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.security.AiAgentMutationRole;
 import com.vn.agent.tools.ToolUserError;
 import io.jmix.core.AccessManager;

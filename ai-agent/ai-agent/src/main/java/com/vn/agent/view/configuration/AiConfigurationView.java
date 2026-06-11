@@ -11,7 +11,6 @@ import com.vn.agent.admin.config.AiKnobDefaults;
 import com.vn.agent.entity.AiChatSurface;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.entity.AiUiSettings;
-import com.vn.agent.exposure.AiExposureRuleAdminService;
 import com.vn.agent.orchestration.AiParametersResolver;
 import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.SystemPromptComposer;
@@ -22,12 +21,9 @@ import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.utils.NotificationUtils;
 import com.vn.agent.view.chat.AiUiSettingsService;
-import com.vn.agent.view.exposure.MetaclassComboBoxHelper;
 import com.vn.agent.view.parameters.ParametersDetailView;
-import io.jmix.core.MessageTools;
 import io.jmix.core.Messages;
 import io.jmix.core.security.CurrentAuthentication;
-import io.jmix.core.metamodel.model.MetaClass;
 import io.jmix.flowui.Notifications;
 import io.jmix.flowui.UiComponents;
 import io.jmix.flowui.action.list.CreateAction;
@@ -37,7 +33,6 @@ import io.jmix.flowui.component.checkbox.JmixCheckbox;
 import io.jmix.flowui.component.checkboxgroup.JmixCheckboxGroup;
 import io.jmix.flowui.component.codeeditor.CodeEditor;
 import io.jmix.flowui.component.grid.DataGrid;
-import io.jmix.flowui.component.multiselectcombobox.JmixMultiSelectComboBox;
 import io.jmix.flowui.component.radiobuttongroup.JmixRadioButtonGroup;
 import io.jmix.flowui.component.textfield.TypedTextField;
 import io.jmix.flowui.component.textfield.JmixIntegerField;
@@ -57,16 +52,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * Unified admin surface for AI runtime configuration, governance, and prompt diagnostics.
@@ -88,8 +79,6 @@ public class AiConfigurationView extends StandardView {
     private EditAction<AiParameters> editAction;
     @ViewComponent("parametersDataGrid.removeAction")
     private RemoveAction<AiParameters> removeAction;
-    @ViewComponent
-    private JmixMultiSelectComboBox<MetaClass> hiddenEntitiesField;
     @ViewComponent
     private TypedTextField<String> generatedAtField;
     @ViewComponent
@@ -135,21 +124,15 @@ public class AiConfigurationView extends StandardView {
     @Autowired
     private AiParametersBodyYamlMapper yamlMapper;
     @Autowired
-    private AiExposureRuleAdminService exposureRuleAdminService;
-    @Autowired
     private BaselineContextProvider baselineContextProvider;
     @Autowired
     private AiParametersResolver parametersResolver;
     @Autowired
     private CurrentAuthentication currentAuthentication;
     @Autowired
-    private MetaclassComboBoxHelper metaclassComboBoxHelper;
-    @Autowired
     private AiUiSettingsService uiSettingsService;
     @Autowired
     private AiKnobDefaults knobDefaults;
-    @Autowired
-    private MessageTools messageTools;
     @Autowired
     private Notifications notifications;
     @Autowired
@@ -158,7 +141,6 @@ public class AiConfigurationView extends StandardView {
     private UiComponents uiComponents;
 
     private final Map<UUID, AiParametersBody> parsedCache = new HashMap<>();
-    private List<MetaClass> selectableEntities = Collections.emptyList();
     private AiUiSettings currentUiSettings;
 
     @Subscribe
@@ -167,10 +149,6 @@ public class AiConfigurationView extends StandardView {
         editAction.setViewClass(ParametersDetailView.class);
         parametersDataGrid.setPartNameGenerator(parameters ->
                 Boolean.TRUE.equals(parameters.getActive()) ? "ai-agent-active-row" : null);
-
-        selectableEntities = metaclassComboBoxHelper.buildFilteredList();
-        hiddenEntitiesField.setItems(selectableEntities);
-        hiddenEntitiesField.setItemLabelGenerator(this::entityLabel);
 
         enabledSurfacesField.setItems(AiChatSurface.class);
         enabledSurfacesField.setItemLabelGenerator(messages::getMessage);
@@ -182,7 +160,6 @@ public class AiConfigurationView extends StandardView {
 
     @Subscribe
     public void onBeforeShow(final BeforeShowEvent event) {
-        refreshExposureSelection();
         refreshBaselinePreview();
         refreshGeneralSelection();
         refreshTier1Selection();
@@ -238,30 +215,6 @@ public class AiConfigurationView extends StandardView {
             NotificationUtils.errorWithDetail(notifications, messages,
                     "parametersList.error.setActive", ex);
         }
-    }
-
-    @Subscribe("saveExposureRulesButton")
-    public void onSaveExposureRulesButtonClick(final ClickEvent<Button> event) {
-        try {
-            exposureRuleAdminService.replaceHiddenEntityNames(
-                    selectedHiddenEntityNames(),
-                    selectableEntityNames());
-            refreshExposureSelection();
-            refreshBaselinePreview();
-            notifications.create(messages.getMessage("aiConfiguration.exposure.saved"))
-                    .withThemeVariant(NotificationVariant.LUMO_SUCCESS)
-                    .show();
-        } catch (Exception ex) {
-            log.warn("Unable to save AI exposure rules", ex);
-            NotificationUtils.errorWithDetail(notifications, messages,
-                    "aiConfiguration.exposure.error.save", ex);
-        }
-    }
-
-    @Subscribe("refreshExposureRulesButton")
-    public void onRefreshExposureRulesButtonClick(final ClickEvent<Button> event) {
-        refreshExposureSelection();
-        refreshBaselinePreview();
     }
 
     @Subscribe("refreshPromptButton")
@@ -378,34 +331,6 @@ public class AiConfigurationView extends StandardView {
                 return null;
             }
         });
-    }
-
-    private void refreshExposureSelection() {
-        Set<String> hiddenEntityNames = exposureRuleAdminService.findHiddenEntityNames();
-        Set<MetaClass> selected = selectableEntities.stream()
-                .filter(metaClass -> hiddenEntityNames.contains(metaClass.getName()))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        hiddenEntitiesField.setValue(selected);
-    }
-
-    private Set<String> selectedHiddenEntityNames() {
-        Set<MetaClass> selected = hiddenEntitiesField.getValue();
-        if (selected == null || selected.isEmpty()) {
-            return Set.of();
-        }
-        return selected.stream()
-                .map(MetaClass::getName)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private Set<String> selectableEntityNames() {
-        return selectableEntities.stream()
-                .map(MetaClass::getName)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-    }
-
-    private String entityLabel(MetaClass metaClass) {
-        return messageTools.getEntityCaption(metaClass) + " (" + metaClass.getName() + ")";
     }
 
     private void refreshBaselinePreview() {

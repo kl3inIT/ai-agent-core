@@ -8,7 +8,6 @@ import com.vn.agent.entity.AiToolCallOutcome;
 import com.vn.agent.orchestration.AiUiSettingsResolver;
 import io.jmix.core.UnconstrainedDataManager;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
@@ -272,32 +271,6 @@ class AiConversationTitleServiceTest {
         assertThat(service.savedConversations).isEmpty();
     }
 
-    @Test
-    void eligibilityPublisherPublishesOnlyForFirstAssistantReply() {
-        UUID conversationId = UUID.randomUUID();
-        UUID runId = UUID.randomUUID();
-        AiConversation conversation = conversation(conversationId, "Find overdue invoices");
-        TestEligibilityPublisher publisher = new TestEligibilityPublisher(conversation,
-                List.of(
-                        message(AiMessageRole.USER, "Find overdue invoices", 1),
-                        message(AiMessageRole.ASSISTANT, "There are three overdue invoices.", 2)));
-
-        publisher.publishIfEligible(conversationId, "alice", runId, Locale.ENGLISH);
-
-        assertThat(publisher.publishedEvents)
-                .containsExactly(new ConversationTitleEligibleEvent(conversationId, "alice", runId, Locale.ENGLISH));
-
-        publisher.messages = List.of(
-                message(AiMessageRole.USER, "Find overdue invoices", 1),
-                message(AiMessageRole.ASSISTANT, "There are three overdue invoices.", 2),
-                message(AiMessageRole.USER, "Show the largest one", 3),
-                message(AiMessageRole.ASSISTANT, "The largest overdue invoice is INV-9.", 4));
-
-        publisher.publishIfEligible(conversationId, "alice", UUID.randomUUID(), Locale.ENGLISH);
-
-        assertThat(publisher.publishedEvents).hasSize(1);
-    }
-
     private static TestTitleServiceBuilder serviceBuilder() {
         return new TestTitleServiceBuilder();
     }
@@ -355,8 +328,7 @@ class AiConversationTitleServiceTest {
             // Phase 16 D-03 — title knobs read via resolver. The resolver mock falls
             // through to the property bean's resolved values so existing test
             // assertions stay byte-identical.
-            AiAgentTitleProperties properties = new AiAgentTitleProperties(true, "title-model", 6, 1,
-                    new AiAgentTitleProperties.Executor(1, 2, 32, 60));
+            AiAgentTitleProperties properties = new AiAgentTitleProperties(true, "title-model", 6, 1);
             AiUiSettingsResolver aiUiSettingsResolver = mock(AiUiSettingsResolver.class);
             org.mockito.Mockito.lenient()
                     .when(aiUiSettingsResolver.resolveTitleMaxContextMessages())
@@ -431,33 +403,6 @@ class AiConversationTitleServiceTest {
                 throw modelFailure;
             }
             return modelTitle;
-        }
-    }
-
-    private static final class TestEligibilityPublisher extends ConversationTitleEligibilityPublisher {
-        private final AiConversation conversation;
-        private final List<ConversationTitleEligibleEvent> publishedEvents = new ArrayList<>();
-        private List<AiMessage> messages;
-
-        private TestEligibilityPublisher(AiConversation conversation, List<AiMessage> messages) {
-            super(mock(UnconstrainedDataManager.class), mock(ApplicationEventPublisher.class));
-            this.conversation = conversation;
-            this.messages = messages;
-        }
-
-        @Override
-        Optional<AiConversation> loadConversation(UUID conversationId) {
-            return Optional.of(conversation);
-        }
-
-        @Override
-        List<AiMessage> loadVisibleMessages(UUID conversationId) {
-            return messages;
-        }
-
-        @Override
-        void publishEvent(ConversationTitleEligibleEvent event) {
-            publishedEvents.add(event);
         }
     }
 }

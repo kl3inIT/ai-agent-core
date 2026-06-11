@@ -9,7 +9,7 @@ import com.vn.agent.orchestration.BaselineContextProvider;
 import com.vn.agent.orchestration.ConversationGateway;
 import com.vn.agent.orchestration.StreamingSinkHolder;
 import com.vn.agent.audit.AuditWriter;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
+import com.vn.agent.conversation.ConversationTitleEligibleEvent;
 import com.vn.agent.guard.RateLimitGuard;
 import com.vn.agent.guard.TokenBudgetGuard;
 import com.vn.agent.rag.advisor.AuditingDocumentRetriever;
@@ -33,13 +33,11 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.List;
-import java.util.Locale;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.atLeastOnce;
@@ -79,7 +77,7 @@ class ChatServiceFilterParamContractTest {
     ChatClientResponse chatClientResponse;
     CancellationRegistry cancellationRegistry;
     StreamingSinkHolder streamingSinkHolder;
-    ConversationTitleEligibilityPublisher titleEligibilityPublisher;
+    org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
 
     DefaultChatServiceImpl service;
 
@@ -104,7 +102,7 @@ class ChatServiceFilterParamContractTest {
         chatClientResponse = mock(ChatClientResponse.class);
         cancellationRegistry = mock(CancellationRegistry.class);
         streamingSinkHolder = mock(StreamingSinkHolder.class);
-        titleEligibilityPublisher = mock(ConversationTitleEligibilityPublisher.class);
+        applicationEventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
 
         AiConversation conv = mock(AiConversation.class);
         convId = UUID.randomUUID();
@@ -167,10 +165,9 @@ class ChatServiceFilterParamContractTest {
                 streamingSinkHolder,
                 rulesComposer,
                 mock(IntentRegistry.class),
-                titleEligibilityPublisher,
                 taskFileMediaResolver,
                 mock(com.vn.agent.taskfile.AiTaskFileRepository.class),
-                mock(org.springframework.context.ApplicationEventPublisher.class));
+                applicationEventPublisher);
     }
 
     @Test
@@ -245,10 +242,12 @@ class ChatServiceFilterParamContractTest {
 
         service.ask("alice", null, "hello");
 
-        InOrder inOrder = inOrder(callSpec, titleEligibilityPublisher);
+        InOrder inOrder = inOrder(callSpec, applicationEventPublisher);
         inOrder.verify(callSpec).chatClientResponse();
-        inOrder.verify(titleEligibilityPublisher)
-                .publishIfEligible(eq(convId), eq("alice"), any(UUID.class), any(Locale.class));
+        inOrder.verify(applicationEventPublisher)
+                .publishEvent(org.mockito.ArgumentMatchers.<ConversationTitleEligibleEvent>argThat(
+                        event -> convId.equals(event.conversationId())
+                                && "alice".equals(event.userUsername())));
     }
 
     @Test
@@ -258,8 +257,8 @@ class ChatServiceFilterParamContractTest {
 
         service.ask("alice", null, "hello");
 
-        verify(titleEligibilityPublisher, never())
-                .publishIfEligible(any(), anyString(), any(), any());
+        verify(applicationEventPublisher, never())
+                .publishEvent(any(ConversationTitleEligibleEvent.class));
     }
 
     @Test
@@ -270,8 +269,10 @@ class ChatServiceFilterParamContractTest {
 
         service.stream("alice", null, "hello", null).blockLast();
 
-        verify(titleEligibilityPublisher)
-                .publishIfEligible(eq(convId), eq("alice"), any(UUID.class), any(Locale.class));
+        verify(applicationEventPublisher)
+                .publishEvent(org.mockito.ArgumentMatchers.<ConversationTitleEligibleEvent>argThat(
+                        event -> convId.equals(event.conversationId())
+                                && "alice".equals(event.userUsername())));
     }
 
     private static ChatResponse chatResponse(String content) {

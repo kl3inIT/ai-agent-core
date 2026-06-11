@@ -31,6 +31,7 @@
             </column>
             <column name="RESULT_ENTITY_ID" type="${uuid.type}"/>
             <column name="RESULT_ENTITY_NAME" type="varchar(255)"/>
+            <column name="RESULT_SUMMARY" type="varchar(4000)"/>
             <column name="ERROR_CODE" type="varchar(64)"/>
             <column name="COMMITTED_AT" type="datetime"/>
             <column name="CREATED_AT" type="datetime">
@@ -47,8 +48,7 @@
             Composite unique index — concurrency gate (Phase 11 D-02). Index name
             MUST match the JPA @Index(name="IDX_AI_MUT_INTENT_DEDUP", unique=true)
             declaration on AiMutationIntent so JPA schema validation does not try
-            to emit a duplicate constraint with a generated name (mirrors the
-            AiExposureRule BLOCKER-02 fix).
+            to emit a duplicate constraint with a generated name.
         -->
         <createIndex indexName="IDX_AI_MUT_INTENT_DEDUP"
                      tableName="AI_MUTATION_INTENT"

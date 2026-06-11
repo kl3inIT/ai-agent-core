@@ -1,6 +1,6 @@
 package com.vn.agent.rag;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.security.AiAgentAdminRole;
@@ -51,7 +51,7 @@ class RetrievalFilterBuilderDenylistTest {
     }
 
     private static AiAgentRagProperties ragProps(boolean adminBypass) {
-        return new AiAgentRagProperties(adminBypass, 5, 0.5, null, null, null, null, null, null);
+        return new AiAgentRagProperties(adminBypass, 5, 0.5, null, null, null, null, null);
     }
 
     private static LlmExposurePolicy emptyExposurePolicy() {

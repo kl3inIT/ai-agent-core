@@ -1,6 +1,6 @@
 package com.vn.agent.rag;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.rag.config.AiAgentEmbeddingProperties;
 import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.security.AiAgentAdminRole;
@@ -78,10 +78,8 @@ public class RetrievalFilterBuilder {
      * Builds the RAG {@code Filter.Expression} ONCE per retrieval (PERF-03 / D-03).
      *
      * <p>The denylist is read via a SINGLE {@link LlmExposurePolicy#getDenylistedEntityNames()}
-     * call, which since Plan 18-01 (PERF-02) hits the app-wide {@code denylistCache} — a memoized
-     * read evicted on {@code LlmExposureChangedEvent}, NOT a per-call agentstore SELECT. The
-     * {@code Filter.Expression} is assembled exactly once per {@code buildFor} invocation (no loop
-     * re-invokes the build), so an admin denylist edit is visible on the next retrieval (T-18-09).</p>
+     * call, which returns a static config set (no DB SELECT). The {@code Filter.Expression} is
+     * assembled exactly once per {@code buildFor} invocation (no loop re-invokes the build).</p>
      *
      * <p><b>Role extraction stays request-fresh (T-18-10):</b> the role set is derived from the
      * supplied {@link Authentication} on EVERY call and is NOT cached across requests — only the

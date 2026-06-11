@@ -1,6 +1,6 @@
 package com.vn.agent.extraction;
 
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.spi.IntentExtractor;
 import io.jmix.core.Messages;
 import io.jmix.core.Metadata;

@@ -20,7 +20,7 @@ class RetrievalAugmentationAdvisorFactoryTest {
     void retrievalAdvisor_allowsEmptyContextByDefault() throws Exception {
         VectorStore vectorStore = mock(VectorStore.class);
         AiAgentRagProperties props = new AiAgentRagProperties(
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
         AuditWriter auditWriter = mock(AuditWriter.class);
         CurrentAuthentication currentAuthentication = mock(CurrentAuthentication.class);
         StreamingSinkHolder streamingSinkHolder = new StreamingSinkHolder();

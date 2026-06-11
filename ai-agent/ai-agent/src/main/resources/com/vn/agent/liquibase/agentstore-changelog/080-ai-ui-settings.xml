@@ -19,6 +19,24 @@
             <column name="DEFAULT_SURFACE" type="varchar(64)" defaultValue="FULL_ROUTE">
                 <constraints nullable="false"/>
             </column>
+            <!--
+                Phase 16 D-01 — 12 Tier-1 runtime knobs. All nullable by contract:
+                null = fall through to module.properties default (resolved by
+                AiUiSettingsResolver). TASK_FILE_MAX_FILE_SIZE_BYTES (chat task-file
+                per-file cap) is distinct from UPLOAD_MAX_FILE_SIZE_BYTES (RAG/KB cap).
+            -->
+            <column name="TASK_FILE_TTL_SECONDS" type="bigint"/>
+            <column name="TASK_FILE_PER_TURN_MAX_FILES" type="int"/>
+            <column name="TASK_FILE_PER_TURN_MAX_TOTAL_BYTES" type="bigint"/>
+            <column name="TASK_FILE_MAX_FILE_SIZE_BYTES" type="bigint"/>
+            <column name="MUTATION_CONFIRMATION_REQUIRED" type="boolean"/>
+            <column name="MUTATION_IDEMPOTENCY_TTL_SECONDS" type="bigint"/>
+            <column name="MUTATION_BULK_MAX_ROWS" type="int"/>
+            <column name="PROMPT_ENTITY_INVENTORY_LIMIT" type="int"/>
+            <column name="TOOLS_MAX_FILTER_DEPTH" type="int"/>
+            <column name="TITLE_MAX_CONTEXT_MESSAGES" type="int"/>
+            <column name="TITLE_MIN_ASSISTANT_MESSAGES_TRIGGER" type="int"/>
+            <column name="UPLOAD_MAX_FILE_SIZE_BYTES" type="bigint"/>
             <column name="CREATED_BY" type="varchar(255)"/>
             <column name="CREATED_DATE" type="datetime"/>
             <column name="LAST_MODIFIED_BY" type="varchar(255)"/>

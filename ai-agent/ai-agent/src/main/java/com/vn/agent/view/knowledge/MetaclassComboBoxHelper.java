@@ -1,6 +1,6 @@
-package com.vn.agent.view.exposure;
+package com.vn.agent.view.knowledge;
 
-import com.vn.agent.exposure.AiInternalEntityNames;
+import com.vn.agent.tools.AiAgentToolsProperties;
 import io.jmix.core.MessageTools;
 import io.jmix.core.Metadata;
 import io.jmix.core.entity.annotation.SystemLevel;
@@ -13,15 +13,14 @@ import java.util.stream.Collectors;
 
 /**
  * Shared helper that produces the filtered, sorted list of {@link MetaClass} for the
- * entity-name ComboBox in {@code AiExposureRuleDetailView} and
- * {@code KnowledgeBaseView} upload/edit forms (CONTEXT.md D-11).
+ * entity-name ComboBox in {@code KnowledgeBaseView} upload/edit forms (CONTEXT.md D-11).
  *
  * <p>Excludes:
  * <ul>
  *     <li>{@code @SystemLevel} entities — matches the
  *         {@code CurrentUserSchemaAccess.isSystemLevelEntity} exclusion rule.</li>
- *     <li>AI-* internal entities — denylisting the governance UI itself would brick
- *         admin access to the very rules controlling exposure.</li>
+ *     <li>AI-* internal entities — hidden from the LLM schema surface via
+ *         {@link AiAgentToolsProperties}.</li>
  * </ul>
  *
  * <p>Items are sorted alphabetically by locale-resolved entity caption so the
@@ -37,10 +36,14 @@ public class MetaclassComboBoxHelper {
 
     private final Metadata metadata;
     private final MessageTools messageTools;
+    private final AiAgentToolsProperties toolsProperties;
 
-    public MetaclassComboBoxHelper(Metadata metadata, MessageTools messageTools) {
+    public MetaclassComboBoxHelper(Metadata metadata,
+                                   MessageTools messageTools,
+                                   AiAgentToolsProperties toolsProperties) {
         this.metadata = metadata;
         this.messageTools = messageTools;
+        this.toolsProperties = toolsProperties;
     }
 
     /**
@@ -51,7 +54,7 @@ public class MetaclassComboBoxHelper {
     public List<MetaClass> buildFilteredList() {
         return metadata.getSession().getClasses().stream()
                 .filter(mc -> !mc.getJavaClass().isAnnotationPresent(SystemLevel.class))
-                .filter(mc -> !AiInternalEntityNames.contains(mc.getName()))
+                .filter(mc -> !toolsProperties.contains(mc.getName()))
                 .sorted(Comparator.comparing(messageTools::getEntityCaption))
                 .collect(Collectors.toList());
     }

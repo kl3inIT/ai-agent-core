@@ -29,7 +29,6 @@ import com.vn.agent.rag.config.AiAgentRagProperties;
 import com.vn.agent.utils.DataGridRenderers;
 import com.vn.agent.utils.DataGridRenderers.ActionColumnType;
 import com.vn.agent.utils.NotificationUtils;
-import com.vn.agent.view.exposure.MetaclassComboBoxHelper;
 import io.jmix.core.MessageTools;
 import io.jmix.core.Messages;
 import io.jmix.core.Metadata;

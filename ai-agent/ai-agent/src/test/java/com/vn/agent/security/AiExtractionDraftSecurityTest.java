@@ -22,7 +22,7 @@ class AiExtractionDraftSecurityTest {
     private static final Path ROW_LEVEL_ROLE_SOURCE = Path.of(
             "src/main/java/com/vn/agent/security/AiAgentUserRowLevelRole.java");
     private static final Path INTERNAL_ENTITY_NAMES_SOURCE = Path.of(
-            "src/main/java/com/vn/agent/exposure/AiInternalEntityNames.java");
+            "src/main/java/com/vn/agent/tools/AiAgentToolsProperties.java");
 
     @Test
     void userRoleGrantsDraftCrudAndRowLevelRoleScopesByOwner() throws Exception {

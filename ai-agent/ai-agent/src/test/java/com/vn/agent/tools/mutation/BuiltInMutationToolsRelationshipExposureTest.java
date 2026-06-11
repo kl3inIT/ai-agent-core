@@ -3,15 +3,8 @@ package com.vn.agent.tools.mutation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vn.agent.AITestConfiguration;
-import com.vn.agent.exposure.AiExposureRule;
-import com.vn.agent.exposure.AiExposureRuleMode;
 import com.vn.agent.test_support.StubChatModelConfiguration;
 import com.vn.agent.test_support.StubVectorStoreConfiguration;
-import io.jmix.core.Metadata;
-import io.jmix.core.UnconstrainedDataManager;
-import io.jmix.core.security.SystemAuthenticator;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -27,11 +20,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * Plan 11-10 Task 3 — TEST-10 relationship-target LLM exposure denial.
+ * TEST-10 relationship-target LLM exposure denial.
  *
- * <p>Seeds an {@link AiExposureRule} that hides
- * {@code mutationTest_MutationLinkedChildFixture} from the LLM surface (Phase 10 R4 / EXP-09).
- * Calls {@code add_related_record} on
+ * <p>Hides {@code mutationTest_MutationLinkedChildFixture} from the LLM surface via the static
+ * schema-visibility denylist ({@code jmix.ai-agent.tools.hidden-entities}). Calls
+ * {@code add_related_record} on
  * {@link com.vn.agent.tools.mutation.fixture.MutationLinkedParentFixture}'s {@code linkedChildren}
  * relationship; the resolver succeeds at the metadata level (the parent is visible), but the
  * child-target LLM exposure check
@@ -42,7 +35,10 @@ import static org.mockito.Mockito.verify;
  * is NEVER called.
  */
 @SpringBootTest(classes = {AITestConfiguration.class, MutationFixturePersistenceTestConfiguration.class},
-        properties = {"jmix.ai-agent.tools.mutation.enabled=true"})
+        properties = {
+                "jmix.ai-agent.tools.mutation.enabled=true",
+                "jmix.ai-agent.tools.hidden-entities=mutationTest_MutationLinkedChildFixture"
+        })
 @ImportAutoConfiguration({
         com.vn.autoconfigure.agent.AIAutoConfiguration.class,
         com.vn.autoconfigure.agent.SpiDefaultsAutoConfiguration.class
@@ -52,54 +48,15 @@ import static org.mockito.Mockito.verify;
 class BuiltInMutationToolsRelationshipExposureTest {
 
     private static final String LINKED_PARENT_ENTITY = "mutationTest_MutationLinkedParentFixture";
-    private static final String LINKED_CHILD_ENTITY = "mutationTest_MutationLinkedChildFixture";
 
     @Autowired
     private BuiltInMutationTools builtInMutationTools;
 
     @Autowired
-    private Metadata metadata;
-
-    @Autowired
     private MutationToolTestContext mutationToolTestContext;
-
-    @Autowired
-    private UnconstrainedDataManager unconstrainedDataManager;
-
-    @Autowired
-    private SystemAuthenticator systemAuthenticator;
 
     @MockitoBean
     private MutationSaveExecutor mutationSaveExecutor;
-
-    private UUID denylistRuleId;
-
-    @BeforeEach
-    void seedDenylistOnLinkedChild() {
-        // Hide the relationship target from the LLM surface. The parent is left visible so the
-        // resolver reaches the child-exposure gate (must-haves contract: child gating proves
-        // LlmExposurePolicy is enforced on top of Jmix AccessManager).
-        systemAuthenticator.runWithSystem(() -> {
-            AiExposureRule rule = metadata.create(AiExposureRule.class);
-            rule.setEntityName(LINKED_CHILD_ENTITY);
-            rule.setMode(AiExposureRuleMode.EXCLUDE);
-            rule.setEnabled(true);
-            AiExposureRule saved = unconstrainedDataManager.save(rule);
-            denylistRuleId = saved.getId();
-        });
-    }
-
-    @AfterEach
-    void cleanDenylist() {
-        if (denylistRuleId == null) return;
-        UUID id = denylistRuleId;
-        denylistRuleId = null;
-        systemAuthenticator.runWithSystem(() ->
-                unconstrainedDataManager.load(AiExposureRule.class)
-                        .id(id)
-                        .optional()
-                        .ifPresent(unconstrainedDataManager::remove));
-    }
 
     @Test
     void hiddenRelationshipTarget_blocksAddRelatedRecord_beforeAnySave() throws Exception {

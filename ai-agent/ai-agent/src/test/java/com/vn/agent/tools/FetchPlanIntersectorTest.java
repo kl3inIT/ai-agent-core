@@ -2,7 +2,7 @@ package com.vn.agent.tools;
 
 import com.vn.agent.audit.AuditWriter;
 import com.vn.agent.entity.AiToolCallOutcome;
-import com.vn.agent.exposure.LlmExposurePolicy;
+import com.vn.agent.metadata.LlmExposurePolicy;
 import com.vn.agent.spi.FetchPlanContext;
 import com.vn.agent.spi.ToolFetchPlanCustomizer;
 import com.vn.agent.tools.fetchplan.FetchPlanIntersector;

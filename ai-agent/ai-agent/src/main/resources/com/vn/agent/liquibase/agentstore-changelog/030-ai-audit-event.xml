@@ -17,7 +17,7 @@
             <column name="CONVERSATION_ID" type="${uuid.type}"/>
             <column name="USER_USERNAME" type="varchar(255)"/>
             <column name="RUN_ID" type="${uuid.type}"/>
-            <column name="KIND" type="varchar(16)">
+            <column name="KIND" type="varchar(32)">
                 <constraints nullable="false"/>
             </column>
             <column name="EVENT_NAME" type="varchar(128)"/>
@@ -28,7 +28,7 @@
             <column name="HIT_COUNT" type="int"/>
             <column name="TOP_SCORE" type="double"/>
             <column name="FILTERS_JSON" type="clob"/>
-            <column name="OUTCOME" type="varchar(16)"/>
+            <column name="OUTCOME" type="varchar(32)"/>
             <column name="DENIAL_REASON" type="varchar(512)"/>
             <column name="ERROR_CLASS" type="varchar(255)"/>
             <column name="PROMPT_HASH" type="varchar(64)"/>
@@ -37,6 +37,7 @@
                 <constraints nullable="false"/>
             </column>
             <column name="FINISHED_AT" type="${offsetDateTime.type}"/>
+            <column name="RETRIEVAL_HITS_JSON" type="clob"/>
         </createTable>
     </changeSet>
 
@@ -72,12 +73,6 @@
                      tableName="AI_AGENT_AUDIT_EVENT">
             <column name="RUN_ID"/>
         </createIndex>
-    </changeSet>
-
-    <changeSet id="4" author="ai-agent">
-        <addColumn tableName="AI_AGENT_AUDIT_EVENT">
-            <column name="RETRIEVAL_HITS_JSON" type="clob"/>
-        </addColumn>
     </changeSet>
 
 </databaseChangeLog>

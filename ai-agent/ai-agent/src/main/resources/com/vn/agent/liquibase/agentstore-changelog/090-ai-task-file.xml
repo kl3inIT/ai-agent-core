@@ -6,12 +6,11 @@
                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        Phase 13 D-03: AiTaskFile schema. The CONVERSATION_ID FK uses inline
-        deleteCascade="true" (CASCADE) — when a conversation is deleted, its
-        task files go with it. The MESSAGE_ID FK is added in a separate
-        addForeignKeyConstraint changeSet (id="3") so we can specify
-        onDelete="SET NULL" per REVIEWS HIGH-2 — inline references=... on a
-        column does NOT support onDelete in all dialects.
+        Phase 13 D-03 / Phase 13.1 SCHEMA-01: AiTaskFile final schema. The
+        CONVERSATION_ID FK uses inline deleteCascade="true" (CASCADE) — when a
+        conversation is deleted, its task files go with it. The earlier MESSAGE_ID
+        + INJECTED_AT columns (and their FK/indexes) were removed in 13.1 once the
+        per-turn-all resolver no longer needed them; they are not present here.
     -->
     <changeSet id="1" author="ai-agent">
         <createTable tableName="AI_TASK_FILE">
@@ -27,13 +26,6 @@
                              references="AI_AGENT_CONVERSATION(ID)"
                              deleteCascade="true"/>
             </column>
-            <!--
-                MESSAGE_ID is nullable per D-03 (two-phase write). The FK is added
-                in changeSet id="3" with explicit onDelete="SET NULL" semantics so
-                JPA @OnDelete(DeletePolicy.UNLINK) and the DB schema agree.
-            -->
-            <column name="MESSAGE_ID" type="${uuid.type}"/>
-            <column name="INJECTED_AT" type="${offsetDateTime.type}"/>
             <column name="USER_USERNAME" type="varchar(255)">
                 <constraints nullable="false"/>
             </column>
@@ -60,37 +52,10 @@
                      tableName="AI_TASK_FILE">
             <column name="CONVERSATION_ID"/>
         </createIndex>
-        <createIndex indexName="IDX_AI_TASK_FILE__ON_MESSAGE"
-                     tableName="AI_TASK_FILE">
-            <column name="MESSAGE_ID"/>
-        </createIndex>
         <createIndex indexName="IDX_AI_TASK_FILE__EXPIRES_AT"
                      tableName="AI_TASK_FILE">
             <column name="EXPIRES_AT"/>
         </createIndex>
-        <!--
-            REVIEWS HIGH-1: supports the resolver predicate
-            "injectedAt IS NULL AND expiresAt > :now".
-        -->
-        <createIndex indexName="IDX_AI_TASK_FILE__INJECTED_AT"
-                     tableName="AI_TASK_FILE">
-            <column name="INJECTED_AT"/>
-        </createIndex>
-    </changeSet>
-
-    <!--
-        REVIEWS HIGH-2: explicit ON DELETE SET NULL FK for MESSAGE_ID so the
-        DB schema agrees with JPA @OnDelete(DeletePolicy.UNLINK). When a stale
-        AiMessage is deleted, the task-file row itself is preserved (cleanup
-        happens via TTL) but its message link is cleared.
-    -->
-    <changeSet id="3" author="ai-agent">
-        <addForeignKeyConstraint baseTableName="AI_TASK_FILE"
-                                 baseColumnNames="MESSAGE_ID"
-                                 constraintName="FK_AI_TASK_FILE__ON_MESSAGE"
-                                 referencedTableName="AI_AGENT_MESSAGE"
-                                 referencedColumnNames="ID"
-                                 onDelete="SET NULL"/>
     </changeSet>
 
 </databaseChangeLog>

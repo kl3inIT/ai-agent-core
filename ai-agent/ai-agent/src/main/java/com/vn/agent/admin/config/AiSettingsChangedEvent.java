@@ -15,10 +15,7 @@ import org.springframework.context.ApplicationEvent;
  * views/services NEVER inject ApplicationEventPublisher for this event (Plan 10-06 R2
  * invariant; SEC-08 second leg enforces).
  *
- * <p>Mirrors the {@code com.vn.agent.exposure.LlmExposureChangedEvent} precedent — one
- * publish site per entity, with a source-scan test guarding against view/service drift.
- *
- * @see com.vn.agent.exposure.LlmExposureChangedEvent
+ * <p>One publish site per entity, with a source-scan test guarding against view/service drift.
  */
 public class AiSettingsChangedEvent extends ApplicationEvent {
 

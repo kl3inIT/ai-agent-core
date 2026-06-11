@@ -48,7 +48,7 @@ import java.util.UUID;
  * every non-expired row for the conversation on every turn, so no pending-state
  * marker or message back-link is needed.
  *
- * <p>Excluded from the LLM-visible surface via {@code AiInternalEntityNames}.
+ * <p>Excluded from the LLM-visible surface via {@code AiAgentToolsProperties} hidden-entities.
  */
 @Store(name = "agentstore")
 @JmixEntity

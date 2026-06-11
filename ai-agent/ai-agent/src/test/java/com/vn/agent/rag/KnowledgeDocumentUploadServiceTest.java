@@ -80,7 +80,7 @@ class KnowledgeDocumentUploadServiceTest {
     // CR-01: AiAgentRagProperties is required so the allowlist validator can resolve
     // the default classpath:ai-kb/ prefix used by every fixture URI in this suite.
     AiAgentRagProperties ragProperties =
-        new AiAgentRagProperties(null, null, null, null, null, null, null, null, null);
+        new AiAgentRagProperties(null, null, null, null, null, null, null, null);
 
     service =
         new KnowledgeDocumentUploadService(
@@ -177,7 +177,6 @@ class KnowledgeDocumentUploadServiceTest {
       java.nio.file.Files.write(stagedFile, bytes);
       AiAgentRagProperties ragProperties =
           new AiAgentRagProperties(
-              null,
               null,
               null,
               null,

@@ -37,7 +37,6 @@ class AiAgentRagPropertiesTest {
                 null,
                 null,
                 null,
-                null,
                 upload);
     }
 }

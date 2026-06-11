@@ -2,7 +2,6 @@ package com.vn.agent.guard;
 
 import com.vn.agent.DefaultChatServiceImpl;
 import com.vn.agent.audit.AuditWriter;
-import com.vn.agent.conversation.ConversationTitleEligibilityPublisher;
 import com.vn.agent.entity.AiConversation;
 import com.vn.agent.entity.AiParameters;
 import com.vn.agent.extraction.IntentRegistry;
@@ -141,7 +140,6 @@ class AskTypedRetryTest {
                 /* streamingSinkHolder */ null,
                 rulesComposer,
                 mock(IntentRegistry.class),
-                mock(ConversationTitleEligibilityPublisher.class),
                 // Phase 13.1 Plan 03: task-file media + repository dependencies. AskTypedRetryTest
                 // exercises only the typed-retry path with no attached files, so the resolver is
                 // stubbed to return an empty Resolved record and the repository is unused.
