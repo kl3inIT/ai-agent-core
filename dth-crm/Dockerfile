@@ -24,12 +24,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd --system --gid 1001 dthcrm \
     && useradd  --system --uid 1001 --gid dthcrm --home-dir /app --shell /sbin/nologin dthcrm \
     && mkdir -p /app/heapdumps /app/.jmix /app/file-storage \
+    && curl -fL -o /app/otel-agent.jar \
+        https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.28.1/opentelemetry-javaagent.jar \
     && chown -R dthcrm:dthcrm /app
 
 WORKDIR /app
 COPY --chown=dthcrm:dthcrm dth-crm.jar /app/app.jar
 
 ENV DTH_SERVER_PORT=8080
+# OpenTelemetry Java agent (zero-code): HTTP/JDBC/logback + bắc cầu Micrometer
+# ObservationRegistry -> observation Spring AI thành span gen_ai + metric token usage.
+ENV JAVA_TOOL_OPTIONS="-javaagent:/app/otel-agent.jar"
 
 USER dthcrm
 EXPOSE 8080

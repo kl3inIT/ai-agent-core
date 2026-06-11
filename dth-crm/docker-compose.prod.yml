@@ -66,6 +66,19 @@ services:
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.6-35b-a3b}
       # profile
       DTH_ACTIVE_PROFILE: prod
+      # ---- Observability: OTLP về collector dùng chung (stack LGTM) ----
+      OTEL_SERVICE_NAME: dth-crm
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://host.docker.internal:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
+      OTEL_INSTRUMENTATION_SPRING_SCHEDULING_ENABLED: "false"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=prod
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${APP_PORT:-8080}:8080"
     volumes:

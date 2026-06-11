@@ -48,6 +48,12 @@ configurations.configureEach {
 }
 
 dependencies {
+    //              --- [ SPRING AI BOM OVERRIDE ] ---
+    // ai-agent-starter kéo spring-ai-bom 1.1.4 (transitive). Ép lên 1.1.7 (cùng dòng GA 1.1.x,
+    // không breaking change — chỉ vá CVE-2026-41705/41712/41713/41863 + lỗi rớt chunk streaming
+    // OpenAI + Ollama GraalVM). Platform constraint thắng version 1.1.4 transitive (highest-wins).
+    implementation platform('org.springframework.ai:spring-ai-bom:1.1.7')
+
     //              --- [ JMIX CORE ] ---
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
@@ -94,6 +100,10 @@ dependencies {
 
     //              --- [ SPRING ] ---
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    // Observability: cung cấp Micrometer ObservationRegistry để Spring AI phát
+    // observation (gen_ai span + token usage). OTel agent (-javaagent) bắc cầu
+    // các observation này thành span/metric OTLP. Xem application-prod.properties.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     //              --- [ DTH AI AGENT ADD-ON ] ---
     implementation('com.vn:ai-agent-starter:1.1.1-SNAPSHOT') { changing = true }

@@ -1,0 +1,51 @@
+# Deploy dth-crm trên server dev: CHỈ chạy app, dùng pgvector container sẵn có
+# trên app-network (2 DB: dthcrm = main, dthcrm-agent = agentstore + pgvector).
+# Quan sát: OTel agent (trong image) -> collector LGTM dùng chung (service.name=dth-crm).
+#
+#   docker compose -f docker-compose.app.yml --env-file .env up -d
+services:
+  app:
+    image: ${IMAGE_TAG:-dthcrm-app:local}
+    container_name: dthcrm-app
+    restart: unless-stopped
+    environment:
+      # main store -> pgvector/dthcrm ; agentstore -> pgvector/dthcrm-agent (có extension vector)
+      MAIN_DATASOURCE_URL: jdbc:postgresql://pgvector:5432/dthcrm
+      MAIN_DATASOURCE_USERNAME: postgres
+      MAIN_DATASOURCE_PASSWORD: Dth@2026!
+      AGENTSTORE_DATASOURCE_URL: jdbc:postgresql://pgvector:5432/dthcrm-agent
+      AGENTSTORE_DATASOURCE_USERNAME: postgres
+      AGENTSTORE_DATASOURCE_PASSWORD: Dth@2026!
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?missing OPENROUTER_API_KEY}
+      DTH_ACTIVE_PROFILE: prod
+      # app mặc định listen 8088 (application.properties) -> ép 8080 cho khớp EXPOSE/healthcheck/mapping
+      SERVER_PORT: "8080"
+      DTH_SERVER_PORT: "8080"
+      # ---- Observability: OTLP -> collector dùng chung ----
+      OTEL_SERVICE_NAME: dth-crm
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://host.docker.internal:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_INSTRUMENTATION_LOGBACK_MDC_ENABLED: "true"
+      OTEL_INSTRUMENTATION_SPRING_SCHEDULING_ENABLED: "false"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=prod
+      # Profiling do Alloy attach động (pyroscope.java) — không cần -javaagent pyroscope.
+      # OTel agent vẫn nạp qua JAVA_TOOL_OPTIONS bake trong Dockerfile (/app/otel-agent.jar).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${APP_PORT:-8999}:8080"
+    volumes:
+      - dthcrm-file-storage:/app/file-storage
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+
+volumes:
+  dthcrm-file-storage:
