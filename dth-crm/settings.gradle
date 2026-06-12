@@ -1,5 +1,17 @@
 rootProject.name = 'dth-crm'
 
+// Shared version catalog. The TOML lives at the composite root
+// (../gradle/libs.versions.toml); each included build registers an explicit
+// `from(...)` because the auto-load convention only fires for the build that
+// owns `gradle/libs.versions.toml` directly under its rootDir.
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("${rootDir}/../gradle/libs.versions.toml"))
+        }
+    }
+}
+
 // Mirror of jmix-app: when opened standalone, include the sibling add-on build so
 // dth-crm resolves com.vn:ai-agent-starter from source instead of a published
 // SNAPSHOT. When included from the workspace root composite, gradle.parent is

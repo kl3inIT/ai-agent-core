@@ -13,5 +13,11 @@ args = ["postgres-mcp", "--access-mode=unrestricted", "postgresql://postgres:adm
 command = "uvx"
 args = ["postgres-mcp", "--access-mode=unrestricted", "postgresql://postgres:admin123@localhost:5433/agentstore"]
 
+# Context7 — current library/framework docs (Jmix, Spring, Vaadin, etc.)
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+# value = name of the env var to read (set via: setx CONTEXT7_API_KEY ...)
+env_http_headers = { CONTEXT7_API_KEY = "CONTEXT7_API_KEY" }
+
 [mcp_servers.jetbrains]
 url = "http://127.0.0.1:65030/stream"

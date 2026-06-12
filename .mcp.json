@@ -1,14 +1,5 @@
 {
   "mcpServers": {
-    "playwright-test": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "playwright",
-        "run-test-mcp-server"
-      ]
-    },
     "postgres-main": {
       "command": "uvx",
       "args": [
@@ -24,6 +15,13 @@
         "--access-mode=unrestricted",
         "postgresql://postgres:admin123@localhost:5433/agentstore"
       ]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      }
     }
   }
 }

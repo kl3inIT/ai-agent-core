@@ -33,8 +33,11 @@ subprojects {
         projectId = 'AI'
     }
 
+    // Spring AI BOM version sourced from the shared version catalog
+    // (gradle/libs.versions.toml — `springAi` entry). The `ext` re-export is
+    // kept for any sub-build script that still references `springAiVersion`.
     ext {
-        set('springAiVersion', "1.1.4")
+        set('springAiVersion', libs.versions.springAi.get())
     }
 
     dependencyManagement {

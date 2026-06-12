@@ -71,6 +71,22 @@ jobs:
           fail_on_failure: true
           require_tests: false
 
+      # Aggregate JaCoCo coverage across ai-agent + dth-crm. Runs after the test step
+      # so it picks up the *.exec data produced by the earlier `check` invocation.
+      # `if: always()` keeps the report uploadable even when a test goes red, so
+      # reviewers can still see which lines DID execute on a failing run.
+      - name: Generate aggregate JaCoCo coverage report
+        if: always()
+        run: ./gradlew jacocoRootReport --no-daemon --build-cache
+
+      - name: Upload JaCoCo coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ai-agent-coverage-report
+          path: |
+            build/reports/jacoco/rootReport/
+
       # Always upload — even on green runs, the HTML + XML reports are useful for flake
       # forensics and CI cache inspection.
       - name: Upload test reports

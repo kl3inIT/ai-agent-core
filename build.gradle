@@ -1,12 +1,118 @@
 // Composite root. Aggregator tasks fan out to includedBuilds so a single command
 // drives both ai-agent (add-on) and dth-crm (demo host). Pattern mirrors
 // jmix-insurance/build.gradle's aggregator block.
+
 ext.jmixCompositeProjectRoot = true
 
-['test', 'check', 'compileJava', 'clean'].each { taskName ->
+apply plugin: 'base'
+apply plugin: 'jacoco'
+
+// JaCoCo resolves its Ant runtime (`org.jacoco:org.jacoco.ant`) from
+// Maven Central; declare a repository here so the root project can fetch it.
+repositories {
+    mavenCentral()
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
+}
+
+// 'base' contributes `check`, `clean`, `assemble`, etc., so use named()+configure
+// for tasks it already registered and register() only for the genuinely new ones.
+//
+// Tasks fan out to per-included-build paths the aggregator actually owns:
+//   - ai-agent has no `:test` at its root (only its subprojects do), so we
+//     route through `:ai-agent:test`/`:ai-agent-starter:test`/...
+//   - dth-crm DOES have `:test` at its root (applies the `java` plugin
+//     directly), so `:test` is fine there.
+def aiAgentTestPaths = [':ai-agent:test', ':ai-agent-starter:test', ':ai-agent-test-support:test']
+def aiAgentCheckPaths = [':ai-agent:check', ':ai-agent-starter:check', ':ai-agent-test-support:check']
+def aiAgentCompilePaths = [':ai-agent:compileJava', ':ai-agent-starter:compileJava', ':ai-agent-test-support:compileJava']
+def aiAgentCleanPaths = [':ai-agent:clean', ':ai-agent-starter:clean', ':ai-agent-test-support:clean']
+
+def includedTaskPaths = { String taskName ->
+    def aiAgentBuild = gradle.includedBuild('ai-agent')
+    def dthCrmBuild = gradle.includedBuild('dth-crm')
+    def paths = []
+    switch (taskName) {
+        case 'test':       paths.addAll(aiAgentTestPaths.collect { aiAgentBuild.task(it) });    paths << dthCrmBuild.task(':test');       break
+        case 'check':      paths.addAll(aiAgentCheckPaths.collect { aiAgentBuild.task(it) });   paths << dthCrmBuild.task(':check');      break
+        case 'compileJava':paths.addAll(aiAgentCompilePaths.collect { aiAgentBuild.task(it) }); paths << dthCrmBuild.task(':compileJava');break
+        case 'clean':      paths.addAll(aiAgentCleanPaths.collect { aiAgentBuild.task(it) });   paths << dthCrmBuild.task(':clean');      break
+    }
+    return paths
+}
+
+['test', 'compileJava'].each { taskName ->
     tasks.register(taskName) {
         group = 'composite'
         description = "Run :${taskName} across every included build (ai-agent + dth-crm)."
-        dependsOn gradle.includedBuilds.collect { it.task(":${taskName}") }
+        dependsOn includedTaskPaths(taskName)
+    }
+}
+['check', 'clean'].each { taskName ->
+    tasks.named(taskName) {
+        description = "Run :${taskName} across every included build (ai-agent + dth-crm)."
+        dependsOn includedTaskPaths(taskName)
+    }
+}
+
+// --- Aggregate JaCoCo report across all included builds ---------------------------
+// Pattern mirrors jmix-insurance/build.gradle:69-111. Reactive providers fan the
+// file collections across `gradle.includedBuilds` so the aggregator picks up exec
+// data from ai-agent + dth-crm without each having to register itself here.
+//
+// Report-only at this stage: no `jacocoRootCoverageVerification` task / no
+// thresholds. We surface coverage trends first; thresholds follow once we have
+// a baseline.
+tasks.register('jacocoRootReport', JacocoReport) {
+    description = 'Aggregate JaCoCo coverage report across every included build (ai-agent + dth-crm).'
+    group = 'Verification'
+
+    // Depend on the composite-root `test` aggregator (registered above), which
+    // fans out to each included build's `:test`. ai-agent's build root has no
+    // `:test` task of its own (its tests live under `:ai-agent:ai-agent`), so
+    // we cannot use `includedBuild.task(':test')` directly here.
+    dependsOn tasks.named('test')
+
+    def reportRoots = providers.provider {
+        gradle.includedBuilds.collect { it.projectDir } + [rootDir]
+    }
+
+    classDirectories.setFrom(reportRoots.map { roots ->
+        files(roots.collect { reportRoot ->
+            fileTree(reportRoot) {
+                include '**/build/classes/java/main/**'
+                // Jmix POJO entities don't carry meaningful test logic — they're
+                // bytecode-enhanced data holders. Exclude so they don't dilute
+                // the coverage signal. `exposure` was a prior layer that's been
+                // removed (see refactor commit 9105bd9); kept here defensively
+                // in case any orphan classes linger in build/ caches.
+                exclude '**/entity/**'
+                exclude '**/exposure/**'
+                exclude '**/autoconfigure/**'
+            }
+        })
+    })
+    sourceDirectories.setFrom(reportRoots.map { roots ->
+        files(roots.collect { reportRoot ->
+            fileTree(reportRoot) {
+                include '**/src/main/java/**'
+            }
+        })
+    })
+    executionData.setFrom(reportRoots.map { roots ->
+        files(roots.collect { reportRoot ->
+            fileTree(reportRoot) {
+                include '**/build/jacoco/*.exec'
+            }
+        })
+    })
+
+    reports {
+        xml.required = true
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir('reports/jacoco/rootReport/html')
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/rootReport/jacoco.xml')
     }
 }

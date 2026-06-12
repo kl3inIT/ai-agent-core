@@ -1,4 +1,12 @@
 rootProject.name = 'ai-agent-core'
 
+// Shared version catalog. The TOML file lives at `gradle/libs.versions.toml`
+// and is AUTO-LOADED by Gradle 8.x's `libs` accessor for THIS build. Each
+// included build has its own `gradle/libs.versions.toml` symlink-or-import via
+// its settings.gradle (the file is at the composite root, so included builds
+// register a relative `from(...)` to point at the same TOML). Composite root
+// scripts use `libs.*` directly via the auto-loaded catalog — no explicit
+// `from()` needed here.
+
 includeBuild 'dth-crm'
 includeBuild 'ai-agent'

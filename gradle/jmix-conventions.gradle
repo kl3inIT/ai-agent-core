@@ -24,3 +24,24 @@ tasks.withType(Test).configureEach {
     // Liquibase classpath scan when multiple modules ship changelog snippets.
     systemProperty 'liquibase.duplicateFileMode', 'WARN'
 }
+
+// --- JaCoCo coverage (report-only, no threshold) --------------------------------
+// Per-module exec data + per-module HTML/XML reports. The aggregate report is
+// composed at the composite root (see root build.gradle's `jacocoRootReport`).
+// Pattern mirrors jmix-insurance/gradle/jmix-domain-conventions.gradle.
+apply plugin: 'jacoco'
+
+jacoco {
+    toolVersion = '0.8.11'
+}
+
+tasks.withType(Test).configureEach {
+    finalizedBy(tasks.named('jacocoTestReport'))
+}
+
+tasks.named('jacocoTestReport') {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}

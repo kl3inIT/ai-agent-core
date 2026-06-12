@@ -1,0 +1,50 @@
+## Shared version catalog for the composite build (ai-agent add-on + dth-crm host).
+##
+## Loaded by each included build's settings.gradle via:
+##   dependencyResolutionManagement {
+##     versionCatalogs {
+##       libs { from(files("${rootDir}/../gradle/libs.versions.toml")) }
+##     }
+##   }
+##
+## Migration is intentionally incremental — the catalog is the canonical source
+## for versions, but individual build files migrate to `libs.*` aliases one
+## literal at a time. New dependencies SHOULD use the catalog; legacy literals
+## may still exist until migrated.
+
+[versions]
+# Jmix BOM. Referenced in plugin classpaths and `jmix { bomVersion = … }` blocks.
+jmix = "2.8.1"
+
+# Spring AI BOM. Single line across the composite (add-on + host); host no
+# longer overrides — the transitive version from ai-agent-starter already
+# resolves to this value.
+springAi = "1.1.7"
+
+# Coverage tooling.
+jacoco = "0.8.11"
+
+# Test infrastructure.
+testcontainers = "1.19.8"
+asm = "9.9"
+datasourceProxy = "1.11.0"
+
+# Document/markdown rendering.
+flexmark = "0.64.8"
+owaspHtmlSanitizer = "20220608.1"
+
+# Vaadin add-ons used by the demo host.
+sortableLayout = "2.1.0"
+
+# Spring dependency-management plugin pinned in ai-agent/build.gradle classpath.
+springDependencyManagement = "1.1.7"
+
+# GitHub Actions report action (referenced by ai-agent-ci.yml — kept here for
+# discoverability; CI yaml does not consume the catalog directly).
+mikepenzActionJunit = "5"
+
+[libraries]
+# Spring AI BOM (single version across the composite).
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "springAi" }
+
+[bundles]

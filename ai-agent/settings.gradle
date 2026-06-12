@@ -1,5 +1,17 @@
 rootProject.name = 'ai-agent-addon'
 
+// Shared version catalog. The TOML lives at the composite root
+// (../gradle/libs.versions.toml); each included build registers an explicit
+// `from(...)` because the auto-load convention only fires for the build that
+// owns `gradle/libs.versions.toml` directly under its rootDir.
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("${rootDir}/../gradle/libs.versions.toml"))
+        }
+    }
+}
+
 include 'ai-agent'
 include 'ai-agent-starter'
 include 'ai-agent-test-support'

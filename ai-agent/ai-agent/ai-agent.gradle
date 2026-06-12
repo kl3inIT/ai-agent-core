@@ -36,11 +36,11 @@ dependencies {
     implementation 'io.jmix.flowui:jmix-flowui-starter'
     implementation 'io.jmix.flowui:jmix-flowui-themes'
 
-    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.4'
-    implementation 'org.springframework.ai:spring-ai-openai:1.1.4'
+    implementation 'org.springframework.ai:spring-ai-client-chat:1.1.7'
+    implementation 'org.springframework.ai:spring-ai-openai:1.1.7'
 
     // Plan 04-04: ProjectingChatMemoryRepository decorates JdbcChatMemoryRepository (D-08 dual-layer).
-    implementation 'org.springframework.ai:spring-ai-model-chat-memory-repository-jdbc:1.1.4'
+    implementation 'org.springframework.ai:spring-ai-model-chat-memory-repository-jdbc:1.1.7'
 
     // Plan 05-01 (RAG-02): pgvector VectorStore + Tika document reader. Do NOT add
     // spring-ai-starter-model-openai here — Phase 4 brings it transitively via
@@ -53,8 +53,8 @@ dependencies {
     // Without `api`, those types would not be visible on the starter's compile
     // classpath. Rule 3 deviation recorded in 05-01-SUMMARY.md. Tika stays at
     // `implementation` scope because it's only referenced from internal workers.
-    api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.4'
-    implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.4'
+    api 'org.springframework.ai:spring-ai-starter-vector-store-pgvector:1.1.7'
+    implementation 'org.springframework.ai:spring-ai-tika-document-reader:1.1.7'
 
     // Plan 05-02 (RAG-04): RetrievalAugmentationAdvisor + VectorStoreDocumentRetriever
     // live in spring-ai-rag. Keep the version explicit here because this module is
@@ -64,7 +64,7 @@ dependencies {
     // Declared at `api` scope because RetrievalAugmentationAdvisorFactory
     // exposes RetrievalAugmentationAdvisor as a public @Bean and ChatClientFactory accepts
     // it as a parameter — both are visible to the ai-agent-starter module.
-    api 'org.springframework.ai:spring-ai-rag:1.1.4'
+    api 'org.springframework.ai:spring-ai-rag:1.1.7'
 
     // Plan 06-02 (PARAM-02/D-05): YAML ser/de for AiParametersBody (strict-on-write) +
     // Jakarta Bean Validation API for @NotBlank/@DecimalMin/etc. constraints on that record.
@@ -135,7 +135,7 @@ dependencies {
     // Plan 05-01's bean-collision test compiles against a complete test tier.
     testImplementation 'org.testcontainers:postgresql:1.19.8'
     testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
-    testImplementation 'org.springframework.ai:spring-ai-test:1.1.4'
+    testImplementation 'org.springframework.ai:spring-ai-test:1.1.7'
     implementation 'org.postgresql:postgresql'
 }
 

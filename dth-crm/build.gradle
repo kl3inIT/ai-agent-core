@@ -47,11 +47,13 @@ configurations.configureEach {
 }
 
 dependencies {
-    //              --- [ SPRING AI BOM OVERRIDE ] ---
-    // ai-agent-starter kéo spring-ai-bom 1.1.4 (transitive). Ép lên 1.1.7 (cùng dòng GA 1.1.x,
-    // không breaking change — chỉ vá CVE-2026-41705/41712/41713/41863 + lỗi rớt chunk streaming
-    // OpenAI + Ollama GraalVM). Platform constraint thắng version 1.1.4 transitive (highest-wins).
-    implementation platform('org.springframework.ai:spring-ai-bom:1.1.7')
+    //              --- [ SPRING AI BOM ] ---
+    // Single Spring AI version (1.1.7) across the composite: ai-agent + ai-agent-starter
+    // also declare 1.1.7 since the bump (CVE-2026-41705/41712/41713/41863 + OpenAI chunk
+    // streaming + Ollama GraalVM fixes). The explicit platform here pins the BOM for the
+    // host's own transitive resolution because spring-ai-starter's BOM import doesn't
+    // re-export as a versioned dep. Version sourced from gradle/libs.versions.toml.
+    implementation platform(libs.spring.ai.bom)
 
     //              --- [ JMIX CORE ] ---
     implementation 'io.jmix.core:jmix-core-starter'
