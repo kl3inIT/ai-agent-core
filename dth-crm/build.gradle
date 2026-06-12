@@ -97,7 +97,7 @@ dependencies {
     implementation 'io.jmix.translations:jmix-translations-es'
 
     //              --- [ VAADIN ADD-ONS ] ---
-    implementation 'org.vaadin.jchristophe:sortable-layout:2.1.0'
+    implementation 'org.vaadin.jchristophe:sortable-layout:3.0.1'
 
     //              --- [ SPRING ] ---
     implementation 'org.springframework.boot:spring-boot-starter-web'
