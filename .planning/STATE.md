@@ -1,42 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: — Operator Experience, Voice Input & Runtime Performance
-status: Ready to plan
-stopped_at: Completed 18-04-PLAN.md
-last_updated: "2026-06-09T05:38:11.955Z"
+milestone: v1.2.0
+milestone_name: Operator Experience & Runtime Performance
+status: Shipped
+stopped_at: v1.2.0 milestone closed (Phases 15–18 shipped; Phase 19 descoped → Backlog 999.2)
+last_updated: "2026-06-12T04:00:00.000Z"
 progress:
-  total_phases: 6
+  total_phases: 4
   completed_phases: 4
   total_plans: 25
   completed_plans: 25
-  percent: 67
+  percent: 100
 ---
 
 # Project State
 
-**Last updated:** 2026-05-13 (revised — former Phases 16 + 17 merged into the new Phase 16; former 18/19/20 renumbered to 17/18/19)
+**Last updated:** 2026-06-12 — v1.2.0 milestone closed (Operator Experience & Runtime Performance; Voice Input descoped → Backlog 999.2)
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-05-11 — after v1.1.0)
+See: `.planning/PROJECT.md` (updated 2026-06-12 — after v1.2.0)
 
 **Core value:** Drop the add-on into a Jmix app and end-users can safely converse with their data and documents on day one — no agent framework code written by the host team.
 
-**Current focus:** Phase 18 — ai-runtime-performance-pass-targeted
+**Current focus:** Planning the next milestone (v1.3) — run `/gsd-new-milestone`. Top candidates: Chat Voice Input (Backlog 999.2), admin-rotated provider credentials (Backlog 999.1), carried hardening debt.
 
 ## Current Position
 
-Phase: 19
-Plan: Not started
-Milestone: v1.2 — executing (Phase 15 shipped 2026-05-12, PR #29 merged)
-Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) — Phase 17 (now behavior-frozen) MUST precede it
+Phase: — (between milestones)
+Plan: —
+Milestone: v1.2.0 — SHIPPED 2026-06-12 (tag `v1.2.0`); Phases 15–18 complete, Phase 19 descoped → Backlog 999.2
+Next: `/gsd-new-milestone` to define v1.3
 | Field | Value |
 |-------|-------|
-| Milestone | v1.2 (executing) |
-| Phase | 16 (closed — UI consolidation refactor in-flight) |
-| Status | PHASE_COMPLETE |
-| Last activity | 2026-05-14 — Phase 16 UAT closed (tests 1–3 PASSED; AiUiSettingsDetailView consolidation into AiConfigurationView starting) |
+| Milestone | v1.2.0 (shipped 2026-06-12) |
+| Phase | — (milestone closed) |
+| Status | MILESTONE_COMPLETE |
+| Last activity | 2026-06-12 — v1.2.0 archived (roadmap + requirements), PROJECT.md evolved, tagged `v1.2.0` |
 
 ## Phase Status
 
@@ -49,11 +49,11 @@ Next: /gsd-verify-work 17, then start Phase 18 (AI-Runtime Performance Pass) —
 | 13. Chat Task File — Attach + LLM Read + Bulk Save | Complete | 6/6 | 2026-05-05 | 2026-05-06 |
 | 13.1. Chat Attachments — CRM-Style Right-Pane + Persistent Multi-Turn Context | Shipped | 7/7 | 2026-05-07 | 2026-05-07 |
 | 14. Intent-Driven Extraction → Form Prefill | Merged — PR #28; manual UAT passed (14/14) 2026-05-11 | 10/10 | 2026-05-07 | 2026-05-11 |
-| 15. Right-Sidebar Chat Surface & Observability UX | Phase complete — ready for verification | 5/5 | 2026-05-11 | 2026-05-12 |
-| 16. Admin Settings — Model Picker & Config-Knob Migration | Complete — ready for verification | 7/7 | 2026-05-13 | 2026-05-13 |
-| 17. Mutation-Internals Hardening (Phase 11 follow-up) | Complete — MUT-18 parity HOLDS, ready for verification | 5/5 | 2026-05-31 | 2026-05-31 |
-| 18. AI-Runtime Performance Pass (targeted) | Not started | 0/? | - | - |
-| 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Not started | 0/? | - | - |
+| 15. Right-Sidebar Chat Surface & Observability UX | Shipped (v1.2.0) | 6/6 | 2026-05-11 | 2026-05-12 |
+| 16. Admin Settings — Model Picker & Config-Knob Migration | Shipped (v1.2.0) | 9/9 | 2026-05-13 | 2026-05-13 |
+| 17. Mutation-Internals Hardening (Phase 11 follow-up) | Shipped (v1.2.0) — MUT-18 parity HOLDS | 5/5 | 2026-05-31 | 2026-05-31 |
+| 18. AI-Runtime Performance Pass (targeted) | Shipped (v1.2.0) | 5/5 | 2026-06-09 | 2026-06-09 |
+| 19. Chat Voice Input — Soniox STT (+ OpenAI fallback) | Descoped → Backlog 999.2 (never started) | 0/? | - | - |
 
 ## Hard Build-Order
 
@@ -115,7 +115,22 @@ Detailed REQ-IDs in `.planning/milestones/v1.1.0-REQUIREMENTS.md`. Roadmap archi
 
 ## Deferred Items
 
-Items acknowledged and deferred at v1.1.0 milestone close on 2026-05-11. Disposition updated 2026-05-11 after v1.2 roadmap creation (then revised same day — Soniox STT moved to Phase 20) — Phase 999.1 and 999.2 PROMOTED into v1.2 (then renumbered to Phases 17 and 19 on 2026-05-13 after the Phase 16+17 merge); the collapsible-tool-detail todo promoted into v1.2 Phase 15.
+### Acknowledged & deferred at v1.2.0 milestone close (2026-06-12)
+
+The milestone shipped with these items open; the user chose to acknowledge and defer rather than block the close.
+
+| Category | Item | Status | Disposition |
+|----------|------|--------|-------------|
+| phase_descope | Phase 19 — Chat Voice Input — Soniox STT (+ OpenAI fallback) | never started | Descoped from v1.2.0 → ROADMAP **Backlog Phase 999.2** (full scope preserved: STT-01..06, TEST-18). Milestone renamed to drop "Voice Input". Promote with `/gsd-new-milestone` or `/gsd-review-backlog`. |
+| debug | bulk-create-allowlist-collision | fixing | Open — `enabledTools` allowlist enumerated; the model states the bulk tool is absent (no exception). Deferred; investigate in v1.3 (relates to `bulk_save_records` exposure + Backlog 999.2 STT-independent). |
+| debug | bulk-create-confirm-throws | awaiting_human_verify | Open — hypothesis: ≥2-record same-entity request routed to `propose_action_choices` (single-row `Map`) with an ARRAY → Spring AI `MethodToolCallback` deserialize failure before the method body; `propose_bulk_action_choices` exists but wasn't chosen. Deferred; human-verify in v1.3. |
+| uat_gap | Phase 17 — 17-UAT.md | testing (4 pending scenarios) | Non-blocking — MUT-18 byte-for-byte parity HOLDS via the automated Phase 9/10/11 mutation suite + the 17-05 git-diff test-tree audit (zero test-body edits). Manual UAT scenarios (happy-path create/update, related-write, fail-closed gate) deferred to a v1.3 verification pass. |
+
+Resolved during v1.2.0 close: the `2026-04-26-add-collapsible-tool-detail-and-ephemeral-status-to-chat-ui` todo → archived to `todos/done/` (Phase 15 shipped). Dormant seeds SEED-001/002/003/004/006/008/009 remain dormant (triggers not met) — NOT activated. Carried v1.1.0 debt (Phase 10 re-verification, Nyquist `*-VALIDATION.md` backfill, PKG-05/TEST-07 clean-consumer smoke) still carried to a later hardening pass.
+
+### Acknowledged & deferred at v1.1.0 milestone close (2026-05-11)
+
+Items acknowledged and deferred at v1.1.0 milestone close on 2026-05-11. Disposition updated 2026-05-11 after v1.2 roadmap creation (then revised same day — Soniox STT moved to Phase 20) — Phase 999.1 and 999.2 PROMOTED into v1.2 (then renumbered to Phases 17 and 19 on 2026-05-13 after the Phase 16+17 merge); the collapsible-tool-detail todo promoted into v1.2 Phase 15. *(v1.2.0 update: Phase 999.1 shipped as Phase 17; Phase 999.2 / Phase 19 descoped back to Backlog 999.2 — see the v1.2.0 block above.)*
 
 | Category | Item | Status | Disposition |
 |----------|------|--------|-------------|

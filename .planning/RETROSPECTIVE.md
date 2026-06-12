@@ -88,6 +88,50 @@
 
 ---
 
+## Milestone: v1.2.0 — Operator Experience & Runtime Performance
+
+**Shipped:** 2026-06-12
+**Phases:** 4 (15, 16, 17, 18) | **Plans:** 25
+
+### What Was Built
+- Right-sidebar chat surface & observability UX: `SIDEBAR` third surface over the same `ChatPanelFragment`, ephemeral KIND-keyed streaming-status line + collapsed per-turn tool-detail disclosure, driven by the existing `StreamingEvent` flux + `AiAuditEvent` tree (no new persisted "turn" entity), UI-layer leak test.
+- Admin model picker + three-tier config-knob migration: curated open-weights `ComboBox` + custom escape hatch (validity checked at first use → per-request `ChatOptions`), Tier-1 runtime-editable / Tier-2 boot read-only / Tier-3 secret indicator-only taxonomy, `AiSettingsChangedEvent` eviction hook, SEC-08 secret-redaction invariants.
+- Mutation-internals hardening: canonical `MutationGateChain` (five tools as thin adapters, `@Transactional` only on the save executor), constrained batch FK loads, memoized related-write metadata — byte-for-byte v1.1 parity (MUT-18 HOLDS).
+- AI-runtime performance pass: per-turn `RunContext` memoization, app-wide denylist cache evicted on `LlmExposureChangedEvent`, RAG `Filter.Expression` once per retrieval, task-file `Media` regression-locked — each with a checkable proxy; 865 tests green.
+
+### What Worked
+- The hard ordering constraint (Phase 17 hardening → Phase 18 perf) paid off exactly as designed: extracting the canonical `MutationGateChain` first meant the perf pass memoized one chain + one batch-FK load, not a duplicated sequence.
+- "Checkable proxy per optimization" (SELECT-count via `datasource-proxy`, "1 query not N", call-count) turned an invisible perf pass into green/red gates — no benchmark harness needed, and the existing security/exposure/audit/RAG suites stayed the authority on correctness.
+- Phase 16's `AiSettingsChangedEvent` single-publish-site eviction hook was designed in Phase 16 specifically as Phase 18's settings-cache invalidation contract — cross-phase dependency planned up front, wired cleanly.
+- MUT-18 parity was enforced mechanically: the full Phase 9/10/11 mutation suite passing with a git-diff audit proving zero test-body edits is a stronger guarantee than any manual "behaves the same" review.
+- Source-level invariants again carried their weight (gate-order test, secret-redaction scan, no-`@Transactional`-on-chain, build-dependency invariant forbidding jmh/gatling/caffeine).
+
+### What Was Inefficient
+- Working-doc checkbox drift recurred for the third milestone running — TEST-19 / TEST-20 / SEC-08 shipped in code (15-05 / 16-03 / 16-06) but stayed unchecked in `REQUIREMENTS.md`; the Phase 16 plan checkboxes (16-08/16-09) lagged the on-disk summaries. Normalized at close, again.
+- Phase 16 swelled mid-milestone: the 16+17 merge, then a UAT that closed after 3/16 tests with the UI Settings consolidation shipped as unnumbered in-place refactor commits. Hard to reconstruct "what is Phase 16" from the ROADMAP alone.
+- Two bulk-create defects (`bulk-create-allowlist-collision`, `bulk-create-confirm-throws`) were opened as debug sessions and carried open across the whole milestone instead of being closed or explicitly scheduled — same "UI/agent follow-ups linger as debug sessions" pattern flagged in v1.0.
+- Phase 17 UAT (4 scenarios) never ran — parity was proven by the automated suite, but the milestone closed with the manual UAT still `testing`.
+- Voice Input (Phase 19) sat in the milestone name and scope from 2026-05-11 but was never started; carrying an unstarted headline feature for a month inflated the milestone's apparent scope until it was descoped at close.
+
+### Patterns Established
+- Invisible passes (perf, hardening) must ship a checkable proxy per change and lean on the existing suites for correctness — refactor-with-parity is a test-diff guarantee, not a review opinion.
+- Design the cross-phase invalidation/eviction contract in the producing phase (`AiSettingsChangedEvent` in Phase 16 for Phase 18) rather than retrofitting it in the consumer.
+- A third UI surface should reuse the one fragment + one backend + one session-state, never fork them — `SIDEBAR` over `ChatPanelFragment` kept continuity for free.
+- Don't let a headline feature ride in a milestone's name/scope while unstarted — either start it or descope it early; renaming the milestone at close to match what shipped is the honest record but a late correction.
+
+### Key Lessons
+1. Ordering hardening-before-perf is the right shape for "make it invisible" milestones — consolidate the duplication first, then optimize the single path; the reverse would have memoized a sequence about to be deleted.
+2. Parity refactors are cheap to trust when "zero test-body edits + full suite green" is the gate; spend the effort on the test-tree git-diff audit, not on re-reviewing behavior by eye.
+3. Milestone-close planning-doc normalization is now a standing tax across v1.0/v1.1/v1.2 — worth a lightweight checkbox-sync step at each phase ship, not a big reconciliation at close.
+4. Open debug sessions are scope: close them, schedule them, or descope them before milestone end — don't carry `fixing`/`awaiting_human_verify` sessions silently into the next milestone.
+
+### Cost Observations
+- Model mix: not measured in this repo.
+- Sessions: multiple GSD phase sessions across 2026-05-11 → 2026-06-12 (Phase 15 mid-May; 17/18 late-May to early-June), plus a close session on 2026-06-12.
+- Notable: the perf pass (Phase 18) shipped five optimizations behind proxies with the full suite (865 tests) green and zero new dependencies — the "no benchmark harness" bet held.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -96,6 +140,7 @@
 |-----------|----------|--------|------------|
 | v1.0.0 | multiple | 10 dirs / 63 plans | Established full GSD phase lifecycle from skeleton through release readiness |
 | v1.1.0 | multiple + ship/audit/close | 7 phases / 62 plans / 138 tasks | Build-order discipline (foundations→policy→mutations→features); mid-milestone phase rewrites (13 STT-split, 13.1 follow-up); gap-closure waves; multi-agent ship+review+fix+CI in one pass; source-scanner architectural invariants |
+| v1.2.0 | multiple + close | 4 phases / 25 plans | "Make it invisible" milestone (observability + admin tuning + hardening + perf); hard ordering hardening→perf; checkable-proxy-per-optimization; cross-phase eviction contracts designed in the producing phase; descoped an unstarted headline feature (Voice Input → Backlog 999.2) and renamed the milestone to match what shipped |
 
 ### Cumulative Quality
 
@@ -103,6 +148,7 @@
 |-----------|-------|----------|-------------------|
 | v1.0.0 | 236 unit/integration tests in broad Phase 8 broom; CI green on PR #3 | Not measured | Not measured |
 | v1.1.0 | ~700 tests (full `:ai-agent:ai-agent:test` green); cross-phase integration audit PASS (8/8 wiring, 5/5 E2E); CI green on PR #28 | Not measured | Zero new core deps (Spring AI / Jmix / pgvector only) |
+| v1.2.0 | 865 tests green (full `:ai-agent:ai-agent:test`); MUT-18 parity via Phase 9/10/11 suites unchanged (zero test-body edits); perf proxies (SELECT-count / call-count) per optimization | Not measured | Zero new core deps; build-dependency invariant forbids jmh/gatling/caffeine |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -110,4 +156,5 @@
 2. Use empirical broad-broom test evidence to widen scope when an architectural family of failures appears.
 3. Build-order discipline pays compound interest: a single-boundary refactor early makes every downstream phase a near-mechanical extension.
 4. Encode architectural invariants as source-scanner tests, and re-run a phase's verification after any "fixed in code, decision deferred" REVIEW item — stale status docs cost more later.
-5. Planning artifacts need milestone-close normalization (checkbox state, scattered cross-refs, deferred items) — both v1.0 and v1.1 hit this.
+5. Planning artifacts need milestone-close normalization (checkbox state, scattered cross-refs, deferred items) — v1.0, v1.1, AND v1.2 all hit this; the recurring tax argues for a per-phase-ship checkbox-sync step rather than a big close-time reconciliation.
+6. For "invisible" passes (perf, hardening), ship a checkable proxy per change and let the existing suites own correctness — order hardening before perf so you optimize a consolidated path, not a duplicated one; and don't carry an unstarted headline feature in a milestone's name — start it or descope it early (v1.2's Voice Input rode the scope a month before descoping).

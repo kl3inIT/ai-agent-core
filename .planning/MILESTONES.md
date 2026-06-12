@@ -1,5 +1,40 @@
 # Project Milestones: Jmix AI Agent (ai-agent-core)
 
+## v1.2.0 Operator Experience & Runtime Performance (Shipped: 2026-06-12)
+
+**Delivered:** Turned the v1.1 agent into one operators can tune and observe — without new core dependencies. Four near-independent feature areas: a third right-sidebar chat surface with in-chat observability, an admin model picker + three-tier config-knob migration, mutation-internals hardening (Phase 11 follow-up), and a targeted AI-runtime performance pass. The hard ordering constraint (Phase 17 mutation-internals hardening → Phase 18 perf pass) was honored.
+
+**Phases completed:** 4 — Phase 15, 16, 17, 18 (25 plans). Phase 16 merged the former Phases 16+17 on 2026-05-13; former Phases 18/19/20 renumbered to 17/18/19.
+
+**Key accomplishments:**
+
+- **Phase 15 — Right-Sidebar Chat Surface & Observability UX:** `SIDEBAR` chat surface as a third surface over the SAME `ChatPanelFragment` (no second chat backend/memory), ephemeral KIND-keyed streaming-status line in a sibling slot (clears on finalization, never leaks `@Tool`/entity names), collapsed-by-default per-turn "what the agent did — N steps, total ms" disclosure (humanized label-only steps), driven entirely by the existing `StreamingEvent` flux + `AiAuditEvent` tree — no new persisted "turn" entity. `ObservabilityLeakTest` (TEST-19) reuses the Phase 9 leak-guard packs at the UI layer. Resolved the pending collapsible-tool-detail / ephemeral-status todo.
+- **Phase 16 — Admin Settings — Model Picker & Config-Knob Migration:** curated open-weights `ComboBox` (readable labels, default marked) + custom free-entry escape hatch, admin-only, validity checked at first use (graceful fallback) → per-request `ChatOptions`; documented three-tier knob taxonomy — Tier-1 runtime knobs editable via the `AiUiSettingsResolver` read-through, Tier-2 boot toggles read-only with "requires restart", Tier-3 secrets "configured: yes/no" only (SEC-08); `AiSettingsChangedEvent` single-publish-site eviction hook (consumed by Phase 18). TEST-20 curated-allowlist test.
+- **Phase 17 — Mutation-Internals Hardening (Phase 11 follow-up):** canonical `MutationGateChain` `@Component` (five mutation tools become thin adapters; `@Transactional` only on `MutationSaveExecutor.save`; source-level gate-order invariant), constrained batch FK loads (one `.ids()` per target class, row-level security preserved), memoized related-write metadata. MUT-18 parity HOLDS — byte-for-byte identical, Phase 9/10/11 suites pass with zero test-body edits. Promoted Backlog 999.1.
+- **Phase 18 — AI-Runtime Performance Pass (targeted):** per-turn `RunContext` ThreadLocal memoization of `getReadableSchema()`/`AccessManager`/exposure resolution (safe-miss on foreign streaming threads, wiped in `clear()`), app-wide denylist cache evicted on `LlmExposureChangedEvent`, RAG `Filter.Expression` built once per retrieval (clauses verbatim), task-file `Media` regression-locked once-per-`(convId,taskFileId)`-per-turn; one checkable proxy per optimization; no benchmark harness / Caffeine / admin-screen perf / new component; 865 tests green.
+
+**Stats:**
+
+- 4 phase directories, 25 plans, 25 summaries
+- Timeline: 2026-05-11 → 2026-06-12
+- Tag: `v1.2.0`
+
+**Requirements:** 22 of 29 delivered (Phase 15: 5 · 16: 8 · 17: 4 · 18: 5). 7 deferred (STT-01..06, TEST-18 — see below).
+
+**Descoped — Voice Input (Phase 19):** Chat Voice Input — Soniox STT (+ OpenAI fallback) was never started and was moved back to ROADMAP Backlog Phase 999.2 (full scope preserved). The milestone was renamed from "Operator Experience, Voice Input & Runtime Performance" to "Operator Experience & Runtime Performance" to match what shipped.
+
+**Known deferred items at close:** 2 open debug sessions (`bulk-create-allowlist-collision` [fixing], `bulk-create-confirm-throws` [awaiting_human_verify]) + Phase 17 UAT (`17-UAT.md`, 4 pending scenarios — non-blocking, MUT-18 parity HOLDS via the automated suite) — see `.planning/STATE.md` § Deferred Items. Plus carried v1.1.0 debt (Phase 10 re-verification, Nyquist backfill, PKG-05/TEST-07) and dormant seeds SEED-001/002/003/004/006/008/009.
+
+**Archived artifact sets:**
+
+- `.planning/milestones/v1.2.0-ROADMAP.md`
+- `.planning/milestones/v1.2.0-REQUIREMENTS.md`
+- Phase artifacts: kept in `.planning/phases/` (run `/gsd-cleanup` later to archive retroactively).
+
+**What's next:** `/gsd-new-milestone` for v1.3 — likely candidates: Chat Voice Input (Backlog 999.2), admin-rotated provider credentials (Backlog 999.1), and the carried hardening debt (Phase 10 re-verification + Nyquist backfill + clean-consumer smoke).
+
+---
+
 ## v1.1.0 Prompt Hardening, Mutation Tools & Configurable Chat Surfaces (Shipped: 2026-05-11)
 
 **Delivered:** The v1.0 read-only Jmix AI Agent grew into a mutation-capable, governance-aware, multi-surface chat add-on — without new core dependencies. Hard build-order honored: tool/prompt foundations → exposure policy → mutation tools → configurable surfaces / chat task file / intent extraction.
