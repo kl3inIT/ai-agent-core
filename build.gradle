@@ -1,1 +1,12 @@
+// Composite root. Aggregator tasks fan out to includedBuilds so a single command
+// drives both ai-agent (add-on) and dth-crm (demo host). Pattern mirrors
+// jmix-insurance/build.gradle's aggregator block.
 ext.jmixCompositeProjectRoot = true
+
+['test', 'check', 'compileJava', 'clean'].each { taskName ->
+    tasks.register(taskName) {
+        group = 'composite'
+        description = "Run :${taskName} across every included build (ai-agent + dth-crm)."
+        dependsOn gradle.includedBuilds.collect { it.task(":${taskName}") }
+    }
+}

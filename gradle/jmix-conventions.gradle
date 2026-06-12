@@ -1,0 +1,26 @@
+// Shared Jmix conventions for every Java project in the composite (ai-agent
+// subprojects + dth-crm). Pattern mirrors jmix-insurance/gradle/jmix-domain-conventions.gradle:
+// applied from each consumer via `apply from: "${rootDir}/../gradle/jmix-conventions.gradle"`.
+//
+// What lives here = only the cross-cutting Java/test conventions that BOTH the
+// add-on and the host need. Publishing, Nexus URLs, repositories, Spring AI BOM
+// version and Vaadin excludes stay in the consumer build files (they differ).
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // Jmix needs reflection-accessible parameter names for @Subscribe binding.
+    options.compilerArgs.add('-parameters')
+    options.release = 21
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    // jmix-insurance pattern: suppress noisy duplicate-file warnings from the
+    // Liquibase classpath scan when multiple modules ship changelog snippets.
+    systemProperty 'liquibase.duplicateFileMode', 'WARN'
+}

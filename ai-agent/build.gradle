@@ -51,10 +51,11 @@ subprojects {
     def subArchivesBaseName = props.getProperty('archivesBaseName')
     def archName = subArchivesBaseName.substring(1, subArchivesBaseName.length() - 1)
 
+    // Toolchain 21, -parameters, options.release, useJUnitPlatform and the Liquibase
+    // duplicate-file mode live in gradle/jmix-conventions.gradle (jmix-insurance pattern).
+    apply from: "${rootDir}/../gradle/jmix-conventions.gradle"
+
     java {
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
         withSourcesJar()
     }
 
@@ -106,8 +107,4 @@ subprojects {
         enabled = false
     }
 
-    project.tasks.withType(JavaCompile).configureEach {
-        options.compilerArgs.add("-parameters")
-        options.release = 21
-    }
 }

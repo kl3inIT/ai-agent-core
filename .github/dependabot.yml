@@ -1,10 +1,12 @@
 version: 2
 updates:
+  # Gradle: scan the composite root + both includedBuilds. (jmix-app was dropped;
+  # dth-crm is the current demo host.) No npm: the project ships no package.json.
   - package-ecosystem: "gradle"
     directories:
       - "/"
       - "/ai-agent"
-      - "/jmix-app"
+      - "/dth-crm"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -15,24 +17,6 @@ updates:
       - "gradle"
     groups:
       gradle-minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-
-  - package-ecosystem: "npm"
-    directory: "/jmix-app"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:30"
-      timezone: "Asia/Bangkok"
-    labels:
-      - "dependencies"
-      - "npm"
-    groups:
-      npm-minor-and-patch:
         patterns:
           - "*"
         update-types:

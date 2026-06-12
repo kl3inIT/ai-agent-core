@@ -44,17 +44,6 @@ jobs:
         with:
           cache-disabled: false
 
-      - name: Resolve aiAgentVersion (R-07b — dynamic, NOT hardcoded)
-        id: version
-        run: |
-          VERSION=$(grep -E '^version=' ai-agent/gradle.properties | cut -d= -f2 | tr -d ' ')
-          if [ -z "$VERSION" ]; then
-            echo "ERROR: could not resolve version from ai-agent/gradle.properties" >&2
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Resolved aiAgentVersion: $VERSION"
-
       # WR-002: invoke `check` (not just `test`) so the Docker-gated `integrationTest`
       # task — wired into `check` by ai-agent/ai-agent.gradle when Docker is detected on
       # the runner — runs as part of the PR gate. GitHub ubuntu-latest runners ship with
@@ -72,14 +61,23 @@ jobs:
       - name: Publish ai-agent + ai-agent-starter to local maven (for downstream smoke)
         run: ./gradlew :ai-agent:ai-agent:publishToMavenLocal :ai-agent:ai-agent-starter:publishToMavenLocal --no-daemon
 
-      # consumer-smoke is deferred per Plan 08-05. When the subproject lands, this step
-      # invokes the smoke against the just-published artifact:
-      # - name: Boot consumer-smoke against the just-published artifact
-      #   run: ./gradlew :consumer-smoke:bootRunSmoke -PaiAgentVersion=${{ steps.version.outputs.VERSION }} --no-daemon
+      # jmix-insurance pattern: surface JUnit failures as a PR check so reviewers can click
+      # straight to the failing test from the GitHub PR check list.
+      - name: Publish JUnit test report
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: 'ai-agent/ai-agent/build/test-results/test/TEST-*.xml'
+          fail_on_failure: true
+          require_tests: false
 
-      - name: Upload test reports on failure
-        if: failure()
+      # Always upload — even on green runs, the HTML + XML reports are useful for flake
+      # forensics and CI cache inspection.
+      - name: Upload test reports
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ai-agent-test-reports
-          path: ai-agent/ai-agent/build/reports/tests/
+          path: |
+            ai-agent/ai-agent/build/reports/tests/
+            ai-agent/ai-agent/build/test-results/

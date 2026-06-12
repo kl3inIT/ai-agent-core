@@ -14,13 +14,12 @@ jmix {
 group = 'com.vn.dth'
 version = '0.0.1-SNAPSHOT'
 
+// Toolchain 21, -parameters, useJUnitPlatform and the Liquibase duplicate-file mode
+// live in gradle/jmix-conventions.gradle (jmix-insurance pattern).
+apply from: "${rootDir}/../gradle/jmix-conventions.gradle"
+
 bootJar {
     archiveFileName = "dth-crm.jar"
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -127,9 +126,6 @@ configurations.implementation {
     exclude group: 'commons-logging', module: 'commons-logging'
 }
 
-test {
-    useJUnitPlatform()
-}
 
 idea {
     module {
