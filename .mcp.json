@@ -8,6 +8,22 @@
         "playwright",
         "run-test-mcp-server"
       ]
+    },
+    "postgres-main": {
+      "command": "uvx",
+      "args": [
+        "postgres-mcp",
+        "--access-mode=unrestricted",
+        "postgresql://postgres:admin123@localhost:5433/dthcrm"
+      ]
+    },
+    "postgres-agentstore": {
+      "command": "uvx",
+      "args": [
+        "postgres-mcp",
+        "--access-mode=unrestricted",
+        "postgresql://postgres:admin123@localhost:5433/agentstore"
+      ]
     }
   }
 }

@@ -38,6 +38,13 @@ import java.util.List;
  * Flow-UI filter chain into the add-on; the corresponding test-classpath fixtures were not
  * introduced at the same time, leaving every subsequent {@code @SpringBootTest} unable to
  * bootstrap. Test-side fix; production is untouched.
+ *
+ * <p><b>Deprecation note (Plan 04 test-support consolidation):</b> the reusable, persona-driven
+ * version of this configuration now lives in
+ * {@link com.vn.agent.testsupport.user.TestUsersConfiguration} (in the
+ * {@code :ai-agent-test-support} module). New test slices should import that and contribute
+ * a {@code @Bean List<UserPersona>}. This duplicate stays in place until call sites are
+ * migrated in a follow-up pass.
  */
 @Configuration
 public class TestUsersConfiguration {

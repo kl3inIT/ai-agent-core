@@ -1,0 +1,17 @@
+# Postgres MCP Pro (crystaldba/postgres-mcp) — inspection/query for the two local
+# stores. Both DBs live in the same pgvector container on port 5433 (see
+# docker-compose.yml / application.properties). Creds: postgres/admin123.
+# access-mode=unrestricted: full read/write/DDL on these dev DBs.
+
+# host store (dth-crm "main" datasource)
+[mcp_servers.postgres_main]
+command = "uvx"
+args = ["postgres-mcp", "--access-mode=unrestricted", "postgresql://postgres:admin123@localhost:5433/dthcrm"]
+
+# ai-agent add-on store (agentstore datasource, pgvector)
+[mcp_servers.postgres_agentstore]
+command = "uvx"
+args = ["postgres-mcp", "--access-mode=unrestricted", "postgresql://postgres:admin123@localhost:5433/agentstore"]
+
+[mcp_servers.jetbrains]
+url = "http://127.0.0.1:65030/stream"

@@ -1,5 +1,16 @@
 archivesBaseName = 'ai-agent'
 
+// Note (Plan 04 — test-support consolidation): we evaluated moving the Phase-11 mutation
+// host fixtures (`com.vn.agent.tools.mutation.fixture.*`) into a `src/testFixtures` source
+// set via the `java-test-fixtures` plugin so they live outside `src/test`. Compile-time
+// worked, but the io.jmix Gradle plugin's `enhanceJmix*` tasks bind to `main` and `test`
+// source sets only — fixtures in `testFixtures` are NOT bytecode-enhanced and NOT scanned
+// into the Jmix metamodel, which crashes every @SpringBootTest that touches a fixture entity
+// (`MetaClass not found for class MutationTestFixture` from AnnotatedResourceRoleProvider).
+// The fixtures stay under `src/test` for now; the `exclude '**/com/vn/agent/tools/mutation/
+// fixture/**'` filters in the Test tasks below keep Gradle's JUnit scanner from treating them
+// as tests. Revisit if/when io.jmix gains `enhanceJmixTestFixtures` support.
+
 dependencies {
     implementation 'io.jmix.core:jmix-core-starter'
     implementation 'io.jmix.data:jmix-eclipselink-starter'
@@ -91,6 +102,15 @@ dependencies {
     // main classes/resources via sourceSets, so a jar copy causes Liquibase to
     // find changelog.xml twice and fail with "Found N files" errors.
     testImplementation(project(':ai-agent-starter')) {
+        exclude group: 'com.vn', module: 'ai-agent'
+    }
+
+    // Shared test infrastructure (auth extension, EntityTestData, persona seeding,
+    // UI interaction helpers). Mirrors jmix-insurance's test-support + test-support-ui
+    // pattern collapsed into one module. Exclude the transitive ai-agent jar for the same
+    // reason as :ai-agent-starter above — this module already contributes its main
+    // classes/resources via sourceSets.
+    testImplementation(project(':ai-agent-test-support')) {
         exclude group: 'com.vn', module: 'ai-agent'
     }
 

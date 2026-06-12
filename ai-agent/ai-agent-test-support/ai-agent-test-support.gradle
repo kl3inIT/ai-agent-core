@@ -1,0 +1,48 @@
+archivesBaseName = 'ai-agent-test-support'
+
+// No persistent entities live in this module — disable the Jmix bytecode enhancer to skip
+// the (occasionally flaky on empty classpaths) `enhanceJmixMain` task. Mirrors the
+// `:ai-agent-starter` configuration for the same reason.
+jmix {
+    entitiesEnhancing {
+        enabled = false
+    }
+}
+
+// Test-support library. Mirrors jmix-insurance's two-module split
+// (test-support + test-support-ui) collapsed into ONE module — at our scale the split is
+// unnecessary. Houses shared test infrastructure (auth extension, EntityTestData /
+// TestDataProvider SPI, persona model, UI interaction helpers) so each test slice no longer
+// ships its own copy.
+//
+// The parent build.gradle's subprojects {} block already applies java-library, maven-publish,
+// io.jmix, io.spring.dependency-management, and the shared jmix-conventions.gradle (toolchain
+// 21, -parameters, JUnit Platform). Nothing module-specific to add beyond dependencies.
+
+dependencies {
+    // JUnit5 + AssertJ + Mockito + Spring Boot test slice.
+    api('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+
+    // Jmix surfaces consumed by the helpers:
+    //   - SystemAuthenticator (AuthenticatedAs extension)
+    //   - DataManager / UnconstrainedDataManager / Id / EntityValidationException (EntityTestData)
+    //   - InMemoryUserRepository / RoleGrantedAuthorityUtils (TestUsersConfiguration)
+    api 'io.jmix.core:jmix-core-starter'
+    api 'io.jmix.security:jmix-security-starter'
+    api 'io.jmix.security:jmix-security-data-starter'
+
+    // UiTestUtils + Flow components used by UiTestSupport / FormInteractions /
+    // DataGridInteractions / ViewInteractions.
+    api 'io.jmix.flowui:jmix-flowui-starter'
+    api 'io.jmix.flowui:jmix-flowui-test-assist'
+
+    // Ai* entities / RunContext / role codes referenced by personas. Same `api` scope used
+    // by ai-agent-starter for the same reason — downstream tests instantiate these directly.
+    api project(':ai-agent')
+
+    // HSQLDB on the runtime classpath so consumer @SpringBootTest contexts pulling this
+    // module in get an in-memory store with no extra wiring.
+    runtimeOnly 'org.hsqldb:hsqldb'
+}

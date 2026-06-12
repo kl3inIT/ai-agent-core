@@ -43,6 +43,13 @@ import java.util.List;
  * {@link RoleGrantedAuthorityUtils#createResourceRoleGrantedAuthority(String)} so they match
  * the production Jmix wiring byte-for-byte. The fake marker is intentionally a hand-rolled
  * {@link SimpleGrantedAuthority} that wraps {@code AiAgentMutationRole.CODE} plus a suffix.
+ *
+ * <p><b>Deprecation note (Plan 04 test-support consolidation):</b> the reusable, persona-driven
+ * version of this configuration now lives in
+ * {@link com.vn.agent.testsupport.user.TestUsersConfiguration} (in the
+ * {@code :ai-agent-test-support} module). New test slices should import that and contribute
+ * a {@code @Bean List<UserPersona>} listing the {@code mutation-*} personas. This duplicate
+ * stays in place until the four TEST-10..13 mutation test classes are migrated in a follow-up.
  */
 @Configuration
 public class MutationToolTestUsersConfiguration {
