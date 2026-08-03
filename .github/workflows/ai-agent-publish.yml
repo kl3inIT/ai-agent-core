@@ -46,7 +46,7 @@ jobs:
           java-version: '21'
 
       - name: Gradle setup
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v6.2.0
 
       # R-07f: preflight secrets check. Fail loudly if any of the three required
       # secrets are missing rather than producing a confusing 401 mid-publish.
